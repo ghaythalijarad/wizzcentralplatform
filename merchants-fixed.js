@@ -2,9 +2,14 @@
 
 // Wait for Amplify to be loaded from CDN
 document.addEventListener('DOMContentLoaded', async function() {
-    // Configure Amplify with outputs
-    if (typeof aws_amplify === 'undefined') {
-        console.error('Amplify library not loaded. Please check the CDN script.');
+    // Wait a bit for the CDN to load, then check for Amplify
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Check for different possible global variable names
+    const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
+    
+    if (!AmplifyLib) {
+        console.error('Amplify library not loaded. Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('amplify')));
         showMessage('Error: Amplify library not loaded. Falling back to sample data.', 'error');
         merchantsData = getSampleMerchantsData();
         filteredMerchants = [...merchantsData];
@@ -13,12 +18,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
+    console.log('Amplify library loaded successfully:', AmplifyLib);
+
     try {
         // Fetch and configure with amplify_outputs.json
         const response = await fetch('./amplify_outputs.json');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
+        }
         const outputs = await response.json();
-        aws_amplify.Amplify.configure(outputs);
-        console.log('Amplify configured successfully');
+        
+        // Configure Amplify
+        if (AmplifyLib.Amplify && AmplifyLib.Amplify.configure) {
+            AmplifyLib.Amplify.configure(outputs);
+        } else if (AmplifyLib.configure) {
+            AmplifyLib.configure(outputs);
+        } else {
+            throw new Error('Amplify configure method not found');
+        }
+        
+        console.log('Amplify configured successfully with outputs:', outputs);
     } catch (error) {
         console.error('Error loading Amplify configuration:', error);
         showMessage('Error: Could not load Amplify configuration. Using sample data.', 'error');
@@ -116,8 +135,22 @@ async function loadMerchantsFromDynamoDB() {
     console.log('Attempting to load merchants from DynamoDB using Amplify Data...');
     
     try {
+        // Get Amplify library from global scope
+        const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
+        if (!AmplifyLib) {
+            throw new Error('Amplify library not available');
+        }
+
         // Create client using CDN-loaded Amplify
-        const client = aws_amplify.generateClient();
+        let client;
+        if (AmplifyLib.generateClient) {
+            client = AmplifyLib.generateClient();
+        } else if (AmplifyLib.API && AmplifyLib.API.generateClient) {
+            client = AmplifyLib.API.generateClient();
+        } else {
+            throw new Error('generateClient method not found in Amplify library');
+        }
+
         const { data: items, errors } = await client.models.Business.list();
 
         if (errors) {
@@ -617,8 +650,22 @@ async function updateMerchantStatus(merchantId, newStatus, reason = '') {
     console.log(`Updating merchant ${merchantId} to ${newStatus} with reason: ${reason}`);
     
     try {
+        // Get Amplify library from global scope
+        const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
+        if (!AmplifyLib) {
+            throw new Error('Amplify library not available');
+        }
+
         // Create client using CDN-loaded Amplify
-        const client = aws_amplify.generateClient();
+        let client;
+        if (AmplifyLib.generateClient) {
+            client = AmplifyLib.generateClient();
+        } else if (AmplifyLib.API && AmplifyLib.API.generateClient) {
+            client = AmplifyLib.API.generateClient();
+        } else {
+            throw new Error('generateClient method not found in Amplify library');
+        }
+
         const { data: updatedBusiness, errors } = await client.models.Business.update({
             id: merchantId,
             status: newStatus
