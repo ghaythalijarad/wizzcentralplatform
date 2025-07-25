@@ -1,0 +1,20 @@
+{
+  "version": "45.0.0",
+  "files": {
+    "97ec48c55112f9aefc10cd175912b2560878bee695d2dd20e81aaa57c7b6806c": {
+      "displayName": "amplify-wizzcentralplatformgen2-ghaythallaheebi-sandbox-b1037a839c Template",
+      "source": {
+        "path": "amplify-wizzcentralplatformgen2-ghaythallaheebi-sandbox-b1037a839c.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-current_region-893754d7": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}",
+          "objectKey": "97ec48c55112f9aefc10cd175912b2560878bee695d2dd20e81aaa57c7b6806c.json",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-${AWS::Region}"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}
