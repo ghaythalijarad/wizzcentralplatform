@@ -8,6 +8,14 @@ let awsConfig = null;
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Initializing merchants management with AWS SDK...');
     
+    // First, check for authentication
+    const accessToken = sessionStorage.getItem('accessToken');
+    if (!accessToken) {
+        // If no token, redirect to login. No need to load AWS config.
+        window.location.href = 'index.html';
+        return;
+    }
+
     // Check if AWS SDK is loaded
     if (typeof AWS === 'undefined') {
         console.error('AWS SDK not loaded. Please check the CDN script.');
@@ -33,12 +41,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
 
         const userPoolId = outputs.auth.user_pool_id;
-        const userPoolWebClientId = outputs.auth.user_pool_client_id;
         const identityPoolId = outputs.auth.identity_pool_id;
         const region = awsConfig.region;
-
         const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-        const accessToken = sessionStorage.getItem('accessToken');
 
         const credentials = new AWS.CognitoIdentityCredentials({
             IdentityPoolId: identityPoolId,
@@ -63,13 +68,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         filteredMerchants = [...merchantsData];
         initializeUI();
         setupEventListeners();
-        return;
-    }
-
-    // Check authentication
-    const accessToken = sessionStorage.getItem('accessToken');
-    if (!accessToken) {
-        window.location.href = 'index.html';
         return;
     }
     
