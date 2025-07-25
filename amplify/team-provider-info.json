@@ -10,6 +10,11 @@
       "StackName": "amplify-wizzcentralplatform-dev-8295f",
       "StackId": "arn:aws:cloudformation:us-east-1:109804294167:stack/amplify-wizzcentralplatform-dev-8295f/46cb8c70-68f0-11f0-b03a-1245cdb27e67",
       "AmplifyAppId": "d24n3fwmntc1up"
+    },
+    "categories": {
+      "hosting": {
+        "S3AndCloudFront": {}
+      }
     }
   }
 }
