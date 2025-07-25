@@ -7,6 +7,4 @@ frontend:
   artifacts:
     baseDirectory: .
     files:
-      - '*.html'
-      - '*.js'
-      - '*.css'
+      - '**/*'
