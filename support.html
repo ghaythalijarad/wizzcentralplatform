@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Support</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>WizzCentral</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item active">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Support Center</h1>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-primary" onclick="openNewTicketModal()">
+                    <i class="fas fa-plus"></i>
+                    New Ticket
+                </button>
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </button>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Support Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon tickets">
+                        <i class="fas fa-ticket-alt"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>47</h3>
+                        <p>Open Tickets</p>
+                        <span class="stat-change negative">+3</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon resolved">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>234</h3>
+                        <p>Resolved Today</p>
+                        <span class="stat-change positive">+12.5%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon response">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>2.4h</h3>
+                        <p>Avg Response Time</p>
+                        <span class="stat-change positive">-0.3h</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon satisfaction">
+                        <i class="fas fa-smile"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>94%</h3>
+                        <p>Satisfaction Rate</p>
+                        <span class="stat-change positive">+2.1%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Tabs -->
+            <div class="support-tabs">
+                <button class="tab-btn active" onclick="switchTab('tickets')">
+                    <i class="fas fa-ticket-alt"></i>
+                    Support Tickets
+                </button>
+                <button class="tab-btn" onclick="switchTab('faq')">
+                    <i class="fas fa-question-circle"></i>
+                    FAQ Management
+                </button>
+                <button class="tab-btn" onclick="switchTab('knowledge')">
+                    <i class="fas fa-book"></i>
+                    Knowledge Base
+                </button>
+            </div>
+
+            <!-- Tickets Tab -->
+            <div class="tab-content active" id="ticketsTab">
+                <!-- Filters and Search -->
+                <div class="table-controls">
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search tickets..." id="searchInput">
+                    </div>
+                    <div class="filter-container">
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                            <option value="closed">Closed</option>
+                        </select>
+                        <select id="priorityFilter">
+                            <option value="">All Priority</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                            <option value="order">Order Issues</option>
+                            <option value="payment">Payment</option>
+                            <option value="delivery">Delivery</option>
+                            <option value="app">App Issues</option>
+                            <option value="account">Account</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tickets Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Ticket ID</th>
+                                <th>Customer</th>
+                                <th>Subject</th>
+                                <th>Category</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th>Assigned To</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ticketsTableBody">
+                            <tr>
+                                <td>#TKT001</td>
+                                <td>
+                                    <div class="customer-info">
+                                        <div class="customer-avatar">
+                                            <img src="https://i.pravatar.cc/40?img=21" alt="Sarah Wilson">
+                                        </div>
+                                        <div>
+                                            <div class="customer-name">Sarah Wilson</div>
+                                            <div class="customer-email">sarah@email.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>Order not delivered</td>
+                                <td><span class="category-badge order">Order Issues</span></td>
+                                <td><span class="priority-badge high">High</span></td>
+                                <td><span class="status-badge open">Open</span></td>
+                                <td>John Support</td>
+                                <td>2 hours ago</td>
+                                <td>
+                                    <div class="actions">
+                                        <button class="btn-action" onclick="viewTicket('TKT001')" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="assignTicket('TKT001')" title="Assign">
+                                            <i class="fas fa-user-plus"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="resolveTicket('TKT001')" title="Resolve">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#TKT002</td>
+                                <td>
+                                    <div class="customer-info">
+                                        <div class="customer-avatar">
+                                            <img src="https://i.pravatar.cc/40?img=22" alt="Mike Johnson">
+                                        </div>
+                                        <div>
+                                            <div class="customer-name">Mike Johnson</div>
+                                            <div class="customer-email">mike@email.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>Payment failed</td>
+                                <td><span class="category-badge payment">Payment</span></td>
+                                <td><span class="priority-badge medium">Medium</span></td>
+                                <td><span class="status-badge in-progress">In Progress</span></td>
+                                <td>Lisa Support</td>
+                                <td>4 hours ago</td>
+                                <td>
+                                    <div class="actions">
+                                        <button class="btn-action" onclick="viewTicket('TKT002')" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="assignTicket('TKT002')" title="Assign">
+                                            <i class="fas fa-user-plus"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="resolveTicket('TKT002')" title="Resolve">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>#TKT003</td>
+                                <td>
+                                    <div class="customer-info">
+                                        <div class="customer-avatar">
+                                            <img src="https://i.pravatar.cc/40?img=23" alt="Emma Davis">
+                                        </div>
+                                        <div>
+                                            <div class="customer-name">Emma Davis</div>
+                                            <div class="customer-email">emma@email.com</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>App keeps crashing</td>
+                                <td><span class="category-badge app">App Issues</span></td>
+                                <td><span class="priority-badge low">Low</span></td>
+                                <td><span class="status-badge resolved">Resolved</span></td>
+                                <td>Tom Support</td>
+                                <td>1 day ago</td>
+                                <td>
+                                    <div class="actions">
+                                        <button class="btn-action" onclick="viewTicket('TKT003')" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="assignTicket('TKT003')" title="Assign">
+                                            <i class="fas fa-user-plus"></i>
+                                        </button>
+                                        <button class="btn-action" onclick="resolveTicket('TKT003')" title="Resolve">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- FAQ Tab -->
+            <div class="tab-content" id="faqTab">
+                <div class="faq-section">
+                    <div class="section-header">
+                        <h3>Frequently Asked Questions</h3>
+                        <button class="btn-primary" onclick="openAddFAQModal()">
+                            <i class="fas fa-plus"></i>
+                            Add FAQ
+                        </button>
+                    </div>
+                    
+                    <div class="faq-list">
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <h4>How do I track my order?</h4>
+                                <div class="faq-actions">
+                                    <button class="btn-action" onclick="editFAQ(1)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deleteFAQ(1)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="faq-answer">
+                                <p>You can track your order in real-time by going to the "My Orders" section in the app. You'll see the current status and estimated delivery time.</p>
+                                <div class="faq-meta">
+                                    <span class="faq-category">Order Tracking</span>
+                                    <span class="faq-views">1,234 views</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <h4>What payment methods are accepted?</h4>
+                                <div class="faq-actions">
+                                    <button class="btn-action" onclick="editFAQ(2)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deleteFAQ(2)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="faq-answer">
+                                <p>We accept all major credit cards, debit cards, PayPal, Apple Pay, Google Pay, and cash on delivery in select areas.</p>
+                                <div class="faq-meta">
+                                    <span class="faq-category">Payment</span>
+                                    <span class="faq-views">987 views</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <h4>How do I cancel my order?</h4>
+                                <div class="faq-actions">
+                                    <button class="btn-action" onclick="editFAQ(3)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deleteFAQ(3)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="faq-answer">
+                                <p>You can cancel your order within 5 minutes of placing it. Go to "My Orders" and tap the "Cancel" button. After preparation starts, cancellation may not be possible.</p>
+                                <div class="faq-meta">
+                                    <span class="faq-category">Order Management</span>
+                                    <span class="faq-views">756 views</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Base Tab -->
+            <div class="tab-content" id="knowledgeTab">
+                <div class="knowledge-section">
+                    <div class="section-header">
+                        <h3>Knowledge Base Articles</h3>
+                        <button class="btn-primary" onclick="openAddArticleModal()">
+                            <i class="fas fa-plus"></i>
+                            Add Article
+                        </button>
+                    </div>
+                    
+                    <div class="knowledge-grid">
+                        <div class="knowledge-card">
+                            <div class="knowledge-icon">
+                                <i class="fas fa-motorcycle"></i>
+                            </div>
+                            <h4>Driver Guidelines</h4>
+                            <p>Complete guide for delivery drivers including safety protocols, delivery procedures, and app usage.</p>
+                            <div class="knowledge-meta">
+                                <span class="knowledge-date">Updated: Jul 20, 2025</span>
+                                <span class="knowledge-views">2,456 views</span>
+                            </div>
+                            <div class="knowledge-actions">
+                                <button class="btn-action" onclick="viewArticle(1)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-action" onclick="editArticle(1)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-action danger" onclick="deleteArticle(1)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="knowledge-card">
+                            <div class="knowledge-icon">
+                                <i class="fas fa-store"></i>
+                            </div>
+                            <h4>Merchant Onboarding</h4>
+                            <p>Step-by-step guide for new merchants to set up their restaurant profile and start receiving orders.</p>
+                            <div class="knowledge-meta">
+                                <span class="knowledge-date">Updated: Jul 18, 2025</span>
+                                <span class="knowledge-views">1,843 views</span>
+                            </div>
+                            <div class="knowledge-actions">
+                                <button class="btn-action" onclick="viewArticle(2)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-action" onclick="editArticle(2)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-action danger" onclick="deleteArticle(2)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="knowledge-card">
+                            <div class="knowledge-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h4>Customer Support Best Practices</h4>
+                            <p>Guidelines for support agents on handling customer inquiries, escalation procedures, and communication standards.</p>
+                            <div class="knowledge-meta">
+                                <span class="knowledge-date">Updated: Jul 15, 2025</span>
+                                <span class="knowledge-views">1,234 views</span>
+                            </div>
+                            <div class="knowledge-actions">
+                                <button class="btn-action" onclick="viewArticle(3)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-action" onclick="editArticle(3)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-action" danger" onclick="deleteArticle(3)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <div class="pagination-info">
+                    Showing 1-10 of 47 tickets
+                </div>
+                <button class="pagination-btn">
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Ticket Modal -->
+    <div class="modal" id="newTicketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Ticket</h2>
+                <button class="modal-close" onclick="closeNewTicketModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="newTicketForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketCustomer">Customer Email</label>
+                            <input type="email" id="ticketCustomer" name="customer" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="ticketCategory">Category</label>
+                            <select id="ticketCategory" name="category" required>
+                                <option value="">Select category</option>
+                                <option value="order">Order Issues</option>
+                                <option value="payment">Payment</option>
+                                <option value="delivery">Delivery</option>
+                                <option value="app">App Issues</option>
+                                <option value="account">Account</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketPriority">Priority</label>
+                            <select id="ticketPriority" name="priority" required>
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ticketAssignee">Assign To</label>
+                            <select id="ticketAssignee" name="assignee">
+                                <option value="">Unassigned</option>
+                                <option value="john">John Support</option>
+                                <option value="lisa">Lisa Support</option>
+                                <option value="tom">Tom Support</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketSubject">Subject</label>
+                        <input type="text" id="ticketSubject" name="subject" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketDescription">Description</label>
+                        <textarea id="ticketDescription" name="description" rows="4" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeNewTicketModal()">Cancel</button>
+                <button type="submit" form="newTicketForm" class="btn-primary">Create Ticket</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+    <script src="support.js"></script>
+</body>
+</html>

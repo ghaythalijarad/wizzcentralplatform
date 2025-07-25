@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Customers Management</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>WizzCentral</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item active">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Customers Management</h1>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-primary" onclick="exportCustomers()">
+                    <i class="fas fa-download"></i>
+                    Export Data
+                </button>
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </button>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Customer Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon customers">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>2,847</h3>
+                        <p>Total Customers</p>
+                        <span class="stat-change positive">+8.2%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon active">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>1,456</h3>
+                        <p>Active This Month</p>
+                        <span class="stat-change positive">+12.1%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon orders">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>4.2</h3>
+                        <p>Avg Orders/Customer</p>
+                        <span class="stat-change positive">+0.3</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon revenue">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>$68.50</h3>
+                        <p>Avg Order Value</p>
+                        <span class="stat-change positive">+5.7%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters and Search -->
+            <div class="table-controls">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search customers..." id="searchInput">
+                </div>
+                <div class="filter-container">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="blocked">Blocked</option>
+                    </select>
+                    <select id="segmentFilter">
+                        <option value="">All Segments</option>
+                        <option value="vip">VIP</option>
+                        <option value="regular">Regular</option>
+                        <option value="new">New</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Customers Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            <th>Total Orders</th>
+                            <th>Total Spent</th>
+                            <th>Last Order</th>
+                            <th>Segment</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="customersTableBody">
+                        <tr>
+                            <td>
+                                <div class="customer-info">
+                                    <div class="customer-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=11" alt="Alice Johnson">
+                                    </div>
+                                    <div>
+                                        <div class="customer-name">Alice Johnson</div>
+                                        <div class="customer-id">#CUST001</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>alice.johnson@email.com</td>
+                            <td>+1 (555) 111-2222</td>
+                            <td><span class="status-badge active">Active</span></td>
+                            <td>24</td>
+                            <td>$1,245.80</td>
+                            <td>2 days ago</td>
+                            <td><span class="segment-badge vip">VIP</span></td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewCustomer('CUST001')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editCustomer('CUST001')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="blockCustomer('CUST001')" title="Block">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="customer-info">
+                                    <div class="customer-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=12" alt="Bob Wilson">
+                                    </div>
+                                    <div>
+                                        <div class="customer-name">Bob Wilson</div>
+                                        <div class="customer-id">#CUST002</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>bob.wilson@email.com</td>
+                            <td>+1 (555) 222-3333</td>
+                            <td><span class="status-badge active">Active</span></td>
+                            <td>8</td>
+                            <td>$567.25</td>
+                            <td>1 week ago</td>
+                            <td><span class="segment-badge regular">Regular</span></td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewCustomer('CUST002')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editCustomer('CUST002')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="blockCustomer('CUST002')" title="Block">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="customer-info">
+                                    <div class="customer-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=13" alt="Carol Davis">
+                                    </div>
+                                    <div>
+                                        <div class="customer-name">Carol Davis</div>
+                                        <div class="customer-id">#CUST003</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>carol.davis@email.com</td>
+                            <td>+1 (555) 333-4444</td>
+                            <td><span class="status-badge inactive">Inactive</span></td>
+                            <td>3</td>
+                            <td>$89.50</td>
+                            <td>2 months ago</td>
+                            <td><span class="segment-badge new">New</span></td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewCustomer('CUST003')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editCustomer('CUST003')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="blockCustomer('CUST003')" title="Block">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <div class="pagination-info">
+                    Showing 1-10 of 2,847 customers
+                </div>
+                <button class="pagination-btn">
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+    <script src="customers.js"></script>
+</body>
+</html>
