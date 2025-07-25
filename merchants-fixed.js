@@ -1,15 +1,34 @@
 // Merchants Management JavaScript
 
-import { Amplify } from 'aws-amplify';
-import { generateClient } from 'aws-amplify/data';
-import outputs from '../amplify_outputs.json';
-
-Amplify.configure(outputs);
-
-const client = generateClient();
-
-// Load authentication check
+// Wait for Amplify to be loaded from CDN
 document.addEventListener('DOMContentLoaded', async function() {
+    // Configure Amplify with outputs
+    if (typeof aws_amplify === 'undefined') {
+        console.error('Amplify library not loaded. Please check the CDN script.');
+        showMessage('Error: Amplify library not loaded. Falling back to sample data.', 'error');
+        merchantsData = getSampleMerchantsData();
+        filteredMerchants = [...merchantsData];
+        initializeUI();
+        setupEventListeners();
+        return;
+    }
+
+    try {
+        // Fetch and configure with amplify_outputs.json
+        const response = await fetch('./amplify_outputs.json');
+        const outputs = await response.json();
+        aws_amplify.Amplify.configure(outputs);
+        console.log('Amplify configured successfully');
+    } catch (error) {
+        console.error('Error loading Amplify configuration:', error);
+        showMessage('Error: Could not load Amplify configuration. Using sample data.', 'error');
+        merchantsData = getSampleMerchantsData();
+        filteredMerchants = [...merchantsData];
+        initializeUI();
+        setupEventListeners();
+        return;
+    }
+
     // Check authentication
     const accessToken = sessionStorage.getItem('accessToken');
     if (!accessToken) {
@@ -97,6 +116,8 @@ async function loadMerchantsFromDynamoDB() {
     console.log('Attempting to load merchants from DynamoDB using Amplify Data...');
     
     try {
+        // Create client using CDN-loaded Amplify
+        const client = aws_amplify.generateClient();
         const { data: items, errors } = await client.models.Business.list();
 
         if (errors) {
@@ -596,6 +617,8 @@ async function updateMerchantStatus(merchantId, newStatus, reason = '') {
     console.log(`Updating merchant ${merchantId} to ${newStatus} with reason: ${reason}`);
     
     try {
+        // Create client using CDN-loaded Amplify
+        const client = aws_amplify.generateClient();
         const { data: updatedBusiness, errors } = await client.models.Business.update({
             id: merchantId,
             status: newStatus
