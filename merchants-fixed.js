@@ -110,6 +110,66 @@ function hideMessage() {
     }
 }
 
+// Show/hide loader
+function showLoader(show, message = 'Loading...') {
+    let loader = document.getElementById('loader-overlay');
+    if (show) {
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'loader-overlay';
+            loader.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2000;
+                color: white;
+                font-size: 1.2rem;
+                flex-direction: column;
+            `;
+            const spinner = document.createElement('div');
+            spinner.className = 'loader-spinner';
+            spinner.style.cssText = `
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #3498db;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin-bottom: 1rem;
+            `;
+            const keyframes = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            const styleSheet = document.createElement("style");
+            styleSheet.type = "text/css";
+            styleSheet.innerText = keyframes;
+            document.head.appendChild(styleSheet);
+
+            const loaderMessage = document.createElement('p');
+            loaderMessage.id = 'loader-message';
+            
+            loader.appendChild(spinner);
+            loader.appendChild(loaderMessage);
+            document.body.appendChild(loader);
+        }
+        document.getElementById('loader-message').textContent = message;
+        loader.style.display = 'flex';
+    } else {
+        if (loader) {
+            loader.style.display = 'none';
+        }
+    }
+}
+
 // Initialize merchants management with fallback
 async function initializeMerchantsManagement() {
     try {
@@ -367,6 +427,43 @@ function filterMerchants() {
     updateMerchantStats();
 }
 
+// Pagination state
+let currentPage = 1;
+const rowsPerPage = 10;
+
+// Get paginated data
+function getPaginatedData(data) {
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    return data.slice(startIndex, endIndex);
+}
+
+// Render pagination controls
+function renderPaginationControls(totalItems) {
+    const paginationContainer = document.getElementById('pagination-controls');
+    if (!paginationContainer) return;
+
+    const totalPages = Math.ceil(totalItems / rowsPerPage);
+    paginationContainer.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    for (let i = 1; i <= totalPages; i++) {
+        const button = document.createElement('button');
+        button.textContent = i;
+        button.className = 'pagination-btn';
+        if (i === currentPage) {
+            button.classList.add('active');
+        }
+        button.addEventListener('click', () => {
+            currentPage = i;
+            renderMerchantsTable();
+            renderPaginationControls(totalItems);
+        });
+        paginationContainer.appendChild(button);
+    }
+}
+
 // Render merchants table
 function renderMerchantsTable() {
     const tableBody = document.getElementById('merchants-table-body');
@@ -381,6 +478,7 @@ function renderMerchantsTable() {
         if (!statusElement || statusElement.style.display === 'none') {
             showMessage('No merchants match the current filters.', 'info');
         }
+        renderPaginationControls(0);
         return; // Stop execution if no merchants to render
     } else {
         hideMessage(); // Hide any messages if we have data to render
@@ -392,6 +490,8 @@ function renderMerchantsTable() {
         const row = createMerchantTableRow(merchant);
         tableBody.appendChild(row);
     });
+
+    renderPaginationControls(filteredMerchants.length);
 }
 
 // Create merchant table row
@@ -722,8 +822,8 @@ async function updateMerchantStatus(merchantId, newStatus, reason = '') {
     }
 }
 
-// Show message function
-function showMessage(message, type) {
+// Show toast message function
+function showToastMessage(message, type) {
     // Remove existing messages
     const existingMessage = document.querySelector('.message');
     if (existingMessage) {
