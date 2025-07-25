@@ -1,16 +1,17 @@
 // Merchants Management JavaScript
 
-// Wait for Amplify to be loaded from CDN
+// AWS Configuration - we'll configure this from the amplify_outputs.json
+let dynamoDB = null;
+let awsConfig = null;
+
+// Wait for AWS SDK to be loaded
 document.addEventListener('DOMContentLoaded', async function() {
-    // Wait a bit for the CDN to load, then check for Amplify
-    await new Promise(resolve => setTimeout(resolve, 500));
+    console.log('Initializing merchants management with AWS SDK...');
     
-    // Check for different possible global variable names
-    const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
-    
-    if (!AmplifyLib) {
-        console.error('Amplify library not loaded. Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('amplify')));
-        showMessage('Error: Amplify library not loaded. Falling back to sample data.', 'error');
+    // Check if AWS SDK is loaded
+    if (typeof AWS === 'undefined') {
+        console.error('AWS SDK not loaded. Please check the CDN script.');
+        showMessage('Error: AWS SDK not loaded. Falling back to sample data.', 'error');
         merchantsData = getSampleMerchantsData();
         filteredMerchants = [...merchantsData];
         initializeUI();
@@ -18,29 +19,35 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    console.log('Amplify library loaded successfully:', AmplifyLib);
-
     try {
-        // Fetch and configure with amplify_outputs.json
+        // Load AWS configuration from amplify_outputs.json
         const response = await fetch('./amplify_outputs.json');
         if (!response.ok) {
             throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
         }
         const outputs = await response.json();
         
-        // Configure Amplify
-        if (AmplifyLib.Amplify && AmplifyLib.Amplify.configure) {
-            AmplifyLib.Amplify.configure(outputs);
-        } else if (AmplifyLib.configure) {
-            AmplifyLib.configure(outputs);
-        } else {
-            throw new Error('Amplify configure method not found');
-        }
+        // Configure AWS SDK
+        awsConfig = {
+            region: outputs.data?.aws_region || 'us-east-1',
+            accessKeyId: 'placeholder', // Will be overridden by Cognito credentials
+            secretAccessKey: 'placeholder'
+        };
+
+        AWS.config.update({
+            region: awsConfig.region,
+            credentials: new AWS.CognitoIdentityCredentials({
+                IdentityPoolId: outputs.auth.identity_pool_id
+            })
+        });
+
+        // Initialize DynamoDB client
+        dynamoDB = new AWS.DynamoDB.DocumentClient();
         
-        console.log('Amplify configured successfully with outputs:', outputs);
+        console.log('AWS SDK configured successfully with region:', awsConfig.region);
     } catch (error) {
-        console.error('Error loading Amplify configuration:', error);
-        showMessage('Error: Could not load Amplify configuration. Using sample data.', 'error');
+        console.error('Error configuring AWS SDK:', error);
+        showMessage('Error: Could not configure AWS. Using sample data.', 'error');
         merchantsData = getSampleMerchantsData();
         filteredMerchants = [...merchantsData];
         initializeUI();
@@ -130,28 +137,83 @@ async function initializeMerchantsManagement() {
     }
 }
 
-// Load merchants data from DynamoDB using Amplify Data
+// Load merchants data from DynamoDB using AWS SDK
 async function loadMerchantsFromDynamoDB() {
-    console.log('Attempting to load merchants from DynamoDB using Amplify Data...');
+    console.log('Attempting to load merchants from DynamoDB using AWS SDK...');
     
     try {
-        // Get Amplify library from global scope
-        const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
-        if (!AmplifyLib) {
-            throw new Error('Amplify library not available');
+        if (!dynamoDB) {
+            throw new Error('DynamoDB client not initialized');
         }
 
-        // Create client using CDN-loaded Amplify
-        let client;
-        if (AmplifyLib.generateClient) {
-            client = AmplifyLib.generateClient();
-        } else if (AmplifyLib.API && AmplifyLib.API.generateClient) {
-            client = AmplifyLib.API.generateClient();
+        // Scan the businesses table
+        const params = {
+            TableName: 'order-receiver-businesses-dev'
+        };
+
+        const result = await dynamoDB.scan(params).promise();
+        console.log('DynamoDB scan result:', result);
+
+        if (result.Items && result.Items.length > 0) {
+            merchantsData = result.Items.map(item => ({
+                id: item.businessId || item.id || 'N/A',
+                name: item.businessName || item.name || 'Unknown Business',
+                email: item.email || 'N/A',
+                phone: item.phoneNumber || item.phone || 'N/A',
+                category: mapBusinessType(item.businessType || item.category),
+                status: item.status || 'unknown',
+                commission: 15, // Default commission
+                ordersToday: 0, // Default orders
+                revenueToday: 0, // Default revenue
+                rating: null, // No rating data
+                joinDate: item.createdAt ? formatDate(item.createdAt) : 'N/A',
+                avatar: item.businessPhotoUrl || generateAvatarUrl(item.businessName || item.name),
+                address: extractAddress(item.address) || 'Address not available',
+                owner: item.ownerName || 'N/A'
+            }));
+
+            console.log(`Successfully loaded ${merchantsData.length} merchants from DynamoDB`);
+            return;
         } else {
-            throw new Error('generateClient method not found in Amplify library');
+            console.log('No merchants found in DynamoDB');
+            showMessage('The database is currently empty. No merchants to display.', 'info');
+            merchantsData = [];
+            return;
         }
+    } catch (error) {
+        console.error('Error loading merchants from DynamoDB:', error);
+        throw error;
+    }
+}
 
-        const { data: items, errors } = await client.models.Business.list();
+// Helper function to map business types to display categories
+function mapBusinessType(businessType) {
+    const typeMap = {
+        'restaurant': 'Restaurant',
+        'store': 'Grocery',
+        'cafe': 'Restaurant',
+        'cloudkitchen': 'Restaurant',
+        'pharmacy': 'Pharmacy',
+        'retail': 'Retail'
+    };
+    return typeMap[businessType] || 'Other';
+}
+
+// Helper function to extract address from complex address object
+function extractAddress(address) {
+    if (typeof address === 'string') {
+        return address;
+    }
+    if (address && typeof address === 'object') {
+        const parts = [];
+        if (address.street) parts.push(address.street);
+        if (address.district) parts.push(address.district);
+        if (address.city) parts.push(address.city);
+        if (address.country) parts.push(address.country);
+        return parts.join(', ') || 'Address not available';
+    }
+    return 'Address not available';
+}
 
         if (errors) {
             console.error('Failed to fetch merchants from DynamoDB:', errors);
@@ -650,33 +712,29 @@ async function updateMerchantStatus(merchantId, newStatus, reason = '') {
     console.log(`Updating merchant ${merchantId} to ${newStatus} with reason: ${reason}`);
     
     try {
-        // Get Amplify library from global scope
-        const AmplifyLib = window.aws_amplify || window.AmplifyCore || window.Amplify;
-        if (!AmplifyLib) {
-            throw new Error('Amplify library not available');
+        if (!dynamoDB) {
+            throw new Error('DynamoDB client not initialized');
         }
 
-        // Create client using CDN-loaded Amplify
-        let client;
-        if (AmplifyLib.generateClient) {
-            client = AmplifyLib.generateClient();
-        } else if (AmplifyLib.API && AmplifyLib.API.generateClient) {
-            client = AmplifyLib.API.generateClient();
-        } else {
-            throw new Error('generateClient method not found in Amplify library');
-        }
+        // Update the item in DynamoDB
+        const params = {
+            TableName: 'order-receiver-businesses-dev',
+            Key: {
+                businessId: merchantId
+            },
+            UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':status': newStatus,
+                ':updatedAt': new Date().toISOString()
+            },
+            ReturnValues: 'ALL_NEW'
+        };
 
-        const { data: updatedBusiness, errors } = await client.models.Business.update({
-            id: merchantId,
-            status: newStatus
-        });
-
-        if (errors) {
-            console.error('Error updating merchant status:', errors);
-            throw errors;
-        }
-
-        console.log('Update successful:', updatedBusiness);
+        const result = await dynamoDB.update(params).promise();
+        console.log('Update successful:', result);
 
         // Update local data and re-render
         const merchantIndex = merchantsData.findIndex(m => m.id === merchantId);
