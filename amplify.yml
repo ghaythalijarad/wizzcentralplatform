@@ -5,6 +5,6 @@ frontend:
       commands:
         - echo "Static website - no build step required"
   artifacts:
-    baseDirectory: /
+    baseDirectory: .
     files:
       - '**/*'
