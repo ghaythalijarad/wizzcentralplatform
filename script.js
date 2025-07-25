@@ -1,47 +1,176 @@
-// DOM Elements
-const loginForm = document.getElementById('loginForm');
-const passwordToggle = document.getElementById('passwordToggle');
-const passwordInput = document.getElementById('password');
-const emailInput = document.getElementById('email');
-const signupLink = document.getElementById('signupLink');
+// WizzCentral Login Script with AWS Cognito
+console.log('Loading login script...');
 
-// Password Toggle Functionality
-passwordToggle.addEventListener('click', function() {
-    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-    passwordInput.setAttribute('type', type);
+// Configuration
+let cognitoConfig = null;
+let isConfigLoaded = false;
+let cognitoUser = null;
+
+// Load configuration on page load
+async function loadConfiguration() {
+    try {
+        console.log('Loading Amplify configuration...');
+        const response = await fetch('./amplify_outputs.json');
+        const config = await response.json();
+        console.log('Configuration loaded:', config);
+        
+        if (config.auth) {
+            cognitoConfig = {
+                region: config.auth.aws_region,
+                userPoolId: config.auth.user_pool_id,
+                clientId: config.auth.user_pool_client_id
+            };
+            
+            // Configure AWS SDK
+            AWS.config.region = cognitoConfig.region;
+            
+            isConfigLoaded = true;
+            console.log('Cognito config extracted:', cognitoConfig);
+        } else {
+            throw new Error('Invalid configuration format');
+        }
+        
+    } catch (error) {
+        console.error('Failed to load configuration:', error);
+        showMessage('Failed to load authentication configuration', 'error');
+    }
+}
+
+// AWS Cognito authentication using AWS SDK
+async function authenticateWithCognito(email, password) {
+    if (!isConfigLoaded || !cognitoConfig) {
+        throw new Error('Configuration not loaded');
+    }
     
-    const icon = this.querySelector('i');
-    icon.classList.toggle('fa-eye');
-    icon.classList.toggle('fa-eye-slash');
+    console.log('Attempting Cognito authentication...');
+    
+    return new Promise((resolve, reject) => {
+        const poolData = {
+            UserPoolId: cognitoConfig.userPoolId,
+            ClientId: cognitoConfig.clientId
+        };
+        
+        const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+        
+        const userData = {
+            Username: email,
+            Pool: userPool
+        };
+        
+        cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+        
+        const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails({
+            Username: email,
+            Password: password
+        });
+        
+        cognitoUser.authenticateUser(authenticationDetails, {
+            onSuccess: function(result) {
+                console.log('Authentication successful:', result);
+                resolve({
+                    success: true,
+                    accessToken: result.getAccessToken().getJwtToken(),
+                    idToken: result.getIdToken().getJwtToken(),
+                    refreshToken: result.getRefreshToken().getToken()
+                });
+            },
+            onFailure: function(err) {
+                console.error('Authentication failed:', err);
+                reject(err);
+            },
+            newPasswordRequired: function(userAttributes, requiredAttributes) {
+                console.log('New password required');
+                reject(new Error('New password required. Please contact support.'));
+            }
+        });
+    });
+}
+
+// Initialize everything when DOM is loaded
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('DOM loaded, initializing...');
+    
+    // Load configuration
+    await loadConfiguration();
+    
+    // Initialize UI
+    initializeUI();
 });
 
-// Form Submission Handler
-loginForm.addEventListener('submit', function(e) {
-    e.preventDefault();
+function initializeUI() {
+    console.log('Initializing UI...');
     
-    const email = emailInput.value.trim();
-    const password = passwordInput.value.trim();
-    const remember = document.getElementById('remember').checked;
-    
-    // Basic validation
-    if (!email || !password) {
-        showMessage('Please fill in all required fields.', 'error');
+    // DOM Elements
+    const loginForm = document.getElementById('loginForm');
+    const passwordToggle = document.getElementById('passwordToggle');
+    const passwordInput = document.getElementById('password');
+    const emailInput = document.getElementById('email');
+
+    if (!loginForm) {
+        console.error('Login form not found');
         return;
     }
+
+    // Password Toggle Functionality
+    if (passwordToggle && passwordInput) {
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye');
+                icon.classList.toggle('fa-eye-slash');
+            }
+        });
+    }
+
+    // Form Submission Handler
+    loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('Form submitted');
+        
+        if (!isConfigLoaded) {
+            showMessage('Authentication system not ready. Please refresh the page.', 'error');
+            return;
+        }
+        
+        const email = emailInput?.value?.trim() || '';
+        const password = passwordInput?.value?.trim() || '';
+        const remember = document.getElementById('remember')?.checked || false;
+        
+        // Basic validation
+        if (!email || !password) {
+            showMessage('Please fill in all required fields.', 'error');
+            return;
+        }
+        
+        if (!isValidEmail(email)) {
+            showMessage('Please enter a valid email address.', 'error');
+            return;
+        }
+        
+        if (password.length < 6) {
+            showMessage('Password must be at least 6 characters long.', 'error');
+            return;
+        }
+        
+        console.log('Validation passed, calling handleLogin');
+        handleLogin(email, password, remember);
+    });
     
-    if (!isValidEmail(email)) {
-        showMessage('Please enter a valid email address.', 'error');
-        return;
+    // Auto-fill remembered email
+    const rememberLogin = localStorage.getItem('rememberLogin');
+    const lastEmail = localStorage.getItem('lastEmail');
+    
+    if (rememberLogin === 'true' && lastEmail && emailInput) {
+        emailInput.value = lastEmail;
+        const rememberCheckbox = document.getElementById('remember');
+        if (rememberCheckbox) rememberCheckbox.checked = true;
     }
     
-    if (password.length < 6) {
-        showMessage('Password must be at least 6 characters long.', 'error');
-        return;
-    }
-    
-    // Simulate login process
-    simulateLogin(email, password, remember);
-});
+    console.log('UI initialized successfully');
+}
 
 // Email validation function
 function isValidEmail(email) {
@@ -49,40 +178,86 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-// Simulate login process
-function simulateLogin(email, password, remember) {
+// Enhanced login handler
+async function handleLogin(email, password, remember) {
     const loginBtn = document.querySelector('.login-btn');
+    if (!loginBtn) return;
+    
     const originalText = loginBtn.innerHTML;
     
-    // Show loading state
+    // Update button state
     loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Signing In...</span>';
     loginBtn.disabled = true;
     
-    // Simulate API call delay
-    setTimeout(() => {
-        // Reset button
-        loginBtn.innerHTML = originalText;
-        loginBtn.disabled = false;
+    try {
+        console.log('Attempting login with email:', email);
         
-        // For demo purposes, check for demo credentials
-        if (email === 'demo@wizz.com' && password === 'demo123') {
+        // Authenticate with Cognito
+        const authResult = await authenticateWithCognito(email, password);
+        
+        if (authResult.success) {
+            console.log('Login successful');
             showMessage('Login successful! Redirecting...', 'success');
             
-            // Store login state
+            // Store authentication tokens
+            sessionStorage.setItem('accessToken', authResult.accessToken);
+            sessionStorage.setItem('idToken', authResult.idToken);
+            sessionStorage.setItem('refreshToken', authResult.refreshToken);
+            sessionStorage.setItem('userEmail', email);
+            
+            // Store remember preference
             if (remember) {
-                localStorage.setItem('userToken', 'demo-token-123');
+                localStorage.setItem('rememberLogin', 'true');
+                localStorage.setItem('lastEmail', email);
             } else {
-                sessionStorage.setItem('userToken', 'demo-token-123');
+                localStorage.removeItem('rememberLogin');
+                localStorage.removeItem('lastEmail');
             }
             
             // Redirect to dashboard
             setTimeout(() => {
                 window.location.href = 'dashboard.html';
             }, 1500);
+            
         } else {
-            showMessage('Invalid credentials. Try demo@wizz.com / demo123', 'error');
+            throw new Error('Authentication failed');
         }
-    }, 2000);
+        
+    } catch (error) {
+        console.error('Login error:', error);
+        handleLoginError(error);
+    } finally {
+        // Reset button state
+        loginBtn.innerHTML = originalText;
+        loginBtn.disabled = false;
+    }
+}
+
+function handleLoginError(error) {
+    let errorMessage = 'Login failed';
+    
+    console.log('Error details:', {
+        name: error.name,
+        message: error.message
+    });
+    
+    const errorString = error.message || error.toString();
+    
+    if (errorString.includes('NotAuthorizedException') || errorString.includes('Incorrect username or password')) {
+        errorMessage = 'Invalid email or password';
+    } else if (errorString.includes('UserNotConfirmedException')) {
+        errorMessage = 'Please verify your email address';
+    } else if (errorString.includes('UserNotFoundException')) {
+        errorMessage = 'User not found';
+    } else if (errorString.includes('TooManyRequestsException')) {
+        errorMessage = 'Too many login attempts. Please try again later.';
+    } else if (errorString.includes('NetworkError') || errorString.includes('fetch')) {
+        errorMessage = 'Network error. Please check your connection.';
+    } else if (error.message && error.message !== 'Authentication failed') {
+        errorMessage = error.message;
+    }
+    
+    showMessage(errorMessage, 'error');
 }
 
 // Message display function
@@ -178,12 +353,6 @@ document.addEventListener('DOMContentLoaded', function() {
     forgotPasswordLink.addEventListener('click', function(e) {
         e.preventDefault();
         showMessage('Password reset functionality is not implemented yet.', 'error');
-    });
-    
-    // Signup link handler
-    signupLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        showMessage('Signup page is not implemented yet.', 'error');
     });
 });
 

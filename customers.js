@@ -1,5 +1,28 @@
 // Customers Management JavaScript
 
+import { Amplify, Auth } from 'https://cdn.jsdelivr.net/npm/aws-amplify@6.4.7/dist/aws-amplify.esm.js';
+
+// Configure Amplify Auth
+Amplify.configure({
+  Auth: {
+    region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
+    userPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
+    userPoolWebClientId: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID,
+    mandatorySignIn: true
+  }
+});
+
+// Redirect to login if not authenticated
+Auth.currentAuthenticatedUser().catch(() => {
+  window.location.href = 'index.html';
+});
+
+// Global logout
+window.logout = async () => {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+};
+
 // Sample customer data
 let customers = [
     {

@@ -1,5 +1,32 @@
 // Dashboard JavaScript functionality
 
+import { Amplify, Auth } from 'aws-amplify';
+import awsExports from './aws-exports';
+
+Amplify.configure(awsExports);
+
+// Configure Amplify Auth
+Amplify.configure({
+  Auth: {
+    region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
+    userPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
+    userPoolWebClientId: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID,
+    identityPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_IDENTITY_POOL_ID,
+    mandatorySignIn: true
+  }
+});
+
+// Redirect to login if not authenticated
+Auth.currentAuthenticatedUser().catch(() => {
+  window.location.href = 'index.html';
+});
+
+// Expose logout() for the logout button
+window.logout = async function() {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+};
+
 // DOM Elements
 const sidebar = document.getElementById('sidebar');
 const mainContent = document.getElementById('mainContent');

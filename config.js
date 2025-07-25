@@ -11,8 +11,9 @@ window.WIZZCENTRAL_CONFIG = {
     
     // AWS Cognito Configuration (if using)
     COGNITO_REGION: 'us-east-1',
-    COGNITO_USER_POOL_ID: 'us-east-1_2NdMHucPP',
-    COGNITO_CLIENT_ID: '3rdgvci5bvi1v295dann1tdoc5',
+    COGNITO_USER_POOL_ID: 'us-east-1_aX8X9oQTV',
+    COGNITO_CLIENT_ID: '3u9frkvcn18lidj5dpm1a94mf2',
+    COGNITO_IDENTITY_POOL_ID: 'us-east-1:38954d71-6b61-431d-942b-406c6a200f7c',
     
     // Feature Flags
     FEATURES: {

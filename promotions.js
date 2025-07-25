@@ -1,5 +1,29 @@
 // Promotions Management JavaScript
 
+import { Amplify, Auth } from 'aws-amplify';
+import config from './config.js';
+
+// Configure Amplify Auth
+Amplify.configure({
+  Auth: {
+    region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
+    userPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
+    userPoolWebClientId: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID,
+    mandatorySignIn: true
+  }
+});
+
+// Redirect to login if not authenticated
+Auth.currentAuthenticatedUser().catch(() => {
+  window.location.href = 'index.html';
+});
+
+// Global logout function
+window.logout = async () => {
+  await Auth.signOut();
+  window.location.href = 'index.html';
+};
+
 // Sample promotion data
 let promotions = [
     {

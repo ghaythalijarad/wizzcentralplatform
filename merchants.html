@@ -7,6 +7,271 @@
     <link rel="stylesheet" href="dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- AWS SDK for DynamoDB -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1589.0.min.js"></script>
+    
+    <!-- API Configuration -->
+    <script src="api-config.js"></script>
+    
+    <style>
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            background: #f3f4f6;
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+        
+        .merchant-details {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .merchant-avatar-large {
+            text-align: center;
+        }
+        
+        .merchant-avatar-large img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .detail-item label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #6b7280;
+        }
+        
+        .detail-item span {
+            font-size: 0.875rem;
+            color: #1f2937;
+        }
+        
+        .status-change-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .merchant-info-compact {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        
+        .merchant-info-compact img {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .merchant-info-compact h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .merchant-info-compact p {
+            margin: 0.25rem 0 0 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .form-control {
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        .btn-secondary:hover {
+            background: #e5e7eb;
+        }
+        
+        /* Status badges with updated colors */
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-badge.verified,
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge.under-review,
+        .status-badge.unknown {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        .status-badge.suspended {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .filter-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+        }
+        
+        .filter-controls select,
+        .filter-controls input {
+            padding: 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+        
+        #refreshBtn {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        #refreshBtn:hover {
+            background: #059669;
+        }
+        
+        #refreshBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body>
     <!-- Sidebar -->
@@ -61,24 +326,8 @@
                 </li>
             </ul>
         </nav>
-        
-        <div class="sidebar-footer">
-            <div class="user-profile">
-                <div class="user-avatar">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="user-info">
-                    <span class="user-name">Admin User</span>
-                    <span class="user-role">Administrator</span>
-                </div>
-            </div>
-            <button class="logout-btn" onclick="logout()">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </button>
-        </div>
     </div>
-
+    
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
         <!-- Top Bar -->
@@ -165,13 +414,11 @@
                 </div>
                 <div class="filter-container">
                     <select id="statusFilter">
-                        <option value="">All Status</option>
-                        <option value="verified">Verified</option>
+                        <option value="">All Statuses</option>
                         <option value="pending">Pending</option>
-                        <option value="under-review">Under Review</option>
+                        <option value="approved">Approved</option>
+                        <option value="unknown">Unknown</option>
                         <option value="suspended">Suspended</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="inactive">Inactive</option>
                     </select>
                     <select id="categoryFilter">
                         <option value="">All Categories</option>
@@ -180,6 +427,9 @@
                         <option value="pharmacy">Pharmacy</option>
                         <option value="retail">Retail</option>
                     </select>
+                    <button id="refreshBtn" title="Refresh data from DynamoDB">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
                 </div>
             </div>
 
@@ -448,7 +698,57 @@
         </div>
     </div>
 
-    <script src="dashboard.js"></script>
-    <script src="merchants.js"></script>
+    <script src="merchants-fixed.js"></script>
+    <script>
+        // Sidebar toggle functionality
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const menuToggle = document.getElementById('menuToggle');
+
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        menuToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Close modal function
+        function closeMerchantStatusModal() {
+            const modal = document.getElementById('merchantStatusModal');
+            modal.classList.remove('open');
+        }
+
+        function closeAddMerchantModal() {
+            const modal = document.getElementById('addMerchantModal');
+            modal.classList.remove('open');
+        }
+
+        // Open modal functions
+        function openAddMerchantModal() {
+            const modal = document.getElementById('addMerchantModal');
+            modal.classList.add('open');
+        }
+
+        function viewMerchant(merchantId) {
+            // View merchant details logic
+        }
+
+        function editMerchant(merchantId) {
+            // Edit merchant logic
+        }
+
+        function suspendMerchant(merchantId) {
+            // Suspend merchant logic
+        }
+
+        function approveMerchant(merchantId) {
+            // Approve merchant logic
+        }
+
+        function rejectMerchant(merchantId) {
+            // Reject merchant logic
+        }
+    </script>
 </body>
 </html>
