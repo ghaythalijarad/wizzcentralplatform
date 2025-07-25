@@ -1,21 +1,10 @@
 version: 1
 frontend:
   phases:
-    preBuild:
-      commands:
-        - echo "Static website - no dependencies to install"
     build:
       commands:
         - echo "Static website - no build step required"
-        - echo "Files are ready for deployment"
   artifacts:
-    baseDirectory: .
+    baseDirectory: /
     files:
       - '**/*'
-      - '!node_modules/**/*'
-      - '!backend/**/*'
-      - '!amplify/**/*'
-      - '!.git/**/*'
-      - '!.gitignore'
-      - '!README.md'
-      - '!LICENSE'
