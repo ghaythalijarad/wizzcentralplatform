@@ -3,16 +3,19 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Installing dependencies..."
-        - npm install
+        - echo "Static website - no dependencies to install"
     build:
       commands:
-        - echo "Building the frontend..."
-        - npm run build
+        - echo "Static website - no build step required"
+        - echo "Files are ready for deployment"
   artifacts:
-    baseDirectory: /
+    baseDirectory: .
     files:
       - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
+      - '!node_modules/**/*'
+      - '!backend/**/*'
+      - '!amplify/**/*'
+      - '!.git/**/*'
+      - '!.gitignore'
+      - '!README.md'
+      - '!LICENSE'
