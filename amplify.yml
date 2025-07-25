@@ -3,14 +3,9 @@ applications:
   - appRoot: .
     frontend:
       phases:
-        preBuild:
-          commands:
-            - npm ci
         build:
           commands:
-            - echo "Building Amplify Gen 2 backend"
-            - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
-            - echo "Static site ready for deployment"
+            - echo "Static site deployment - no build required"
       artifacts:
         baseDirectory: .
         files:
