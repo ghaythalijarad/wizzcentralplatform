@@ -465,316 +465,116 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Merchant</th>
-                            <th>Category</th>
+                            <th>Business & Owner</th>
                             <th>Status</th>
-                            <th>Commission</th>
-                            <th>Orders Today</th>
-                            <th>Revenue Today</th>
-                            <th>Rating</th>
-                            <th>Join Date</th>
+                            <th>Contact Info</th>
+                            <th>Address</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="merchantsTableBody">
+                        <!-- Existing dummy data will be replaced by dynamic data -->
                         <tr>
-                            <td>
-                                <div class="merchant-info">
-                                    <div class="merchant-avatar">
-                                        <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=40&h=40&fit=crop&crop=center" alt="Pizza Palace">
-                                    </div>
-                                    <div>
-                                        <div class="merchant-name">Pizza Palace</div>
-                                        <div class="merchant-id">#MERCH001</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><span class="merchant-category">Restaurant</span></td>
-                            <td><span class="status-badge verified">Verified</span></td>
-                            <td><span class="commission-rate">15%</span></td>
-                            <td>42</td>
-                            <td>$1,250.50</td>
-                            <td>
-                                <div class="rating">
-                                    <span class="rating-stars">
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                    </span>
-                                    <span class="rating-value">4.8</span>
-                                </div>
-                            </td>
-                            <td>Jan 15, 2024</td>
-                            <td>
-                                <div class="actions">
-                                    <button class="btn-action" onclick="viewMerchant('MERCH001')" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="editMerchant('MERCH001')" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn-action danger" onclick="suspendMerchant('MERCH001')" title="Suspend">
-                                        <i class="fas fa-ban"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="merchant-info">
-                                    <div class="merchant-avatar">
-                                        <img src="https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=40&h=40&fit=crop&crop=center" alt="Burger Hub">
-                                    </div>
-                                    <div>
-                                        <div class="merchant-name">Burger Hub</div>
-                                        <div class="merchant-id">#MERCH002</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><span class="merchant-category">Restaurant</span></td>
-                            <td><span class="status-badge verified">Verified</span></td>
-                            <td><span class="commission-rate">12%</span></td>
-                            <td>38</td>
-                            <td>$980.25</td>
-                            <td>
-                                <div class="rating">
-                                    <span class="rating-stars">
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="far fa-star"></i>
-                                    </span>
-                                    <span class="rating-value">4.3</span>
-                                </div>
-                            </td>
-                            <td>Feb 28, 2024</td>
-                            <td>
-                                <div class="actions">
-                                    <button class="btn-action" onclick="viewMerchant('MERCH002')" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="editMerchant('MERCH002')" title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn-action danger" onclick="suspendMerchant('MERCH002')" title="Suspend">
-                                        <i class="fas fa-ban"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div class="merchant-info">
-                                    <div class="merchant-avatar">
-                                        <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=40&h=40&fit=crop&crop=center" alt="Fresh Market">
-                                    </div>
-                                    <div>
-                                        <div class="merchant-name">Fresh Market</div>
-                                        <div class="merchant-id">#MERCH003</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td><span class="merchant-category">Grocery</span></td>
-                            <td><span class="status-badge pending">Pending</span></td>
-                            <td><span class="commission-rate">8%</span></td>
-                            <td>0</td>
-                            <td>$0.00</td>
-                            <td>
-                                <div class="rating">
-                                    <span class="rating-value">New</span>
-                                </div>
-                            </td>
-                            <td>Jul 20, 2024</td>
-                            <td>
-                                <div class="actions">
-                                    <button class="btn-action" onclick="viewMerchant('MERCH003')" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </button>
-                                    <button class="btn-action" onclick="approveMerchant('MERCH003')" title="Approve">
-                                        <i class="fas fa-check"></i>
-                                    </button>
-                                    <button class="btn-action danger" onclick="rejectMerchant('MERCH003')" title="Reject">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
-                            </td>
+                            <td colspan="5" style="text-align: center;">Loading merchants...</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
 
-            <!-- Pagination -->
-            <div class="pagination">
-                <button class="pagination-btn" disabled>
-                    <i class="fas fa-chevron-left"></i>
-                    Previous
-                </button>
-                <div class="pagination-info">
-                    Showing 1-10 of 156 merchants
+    <!-- Modal for Viewing Merchant Details -->
+    <div class="modal-overlay" id="viewMerchantModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Merchant Details</h3>
+                <button class="modal-close" onclick="closeModal('viewMerchantModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="merchant-details" id="merchantDetailsBody">
+                    <!-- Details will be populated dynamically -->
                 </div>
-                <button class="pagination-btn">
-                    Next
-                    <i class="fas fa-chevron-right"></i>
-                </button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('viewMerchantModal')">Close</button>
             </div>
         </div>
     </div>
 
-    <!-- Merchant Status Management Modal -->
-    <div class="modal" id="merchantStatusModal">
+    <!-- Modal for Adding a New Merchant -->
+    <div class="modal-overlay" id="addMerchantModal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="statusModalTitle">Update Merchant Status</h2>
-                <button class="modal-close" onclick="closeMerchantStatusModal()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h3>Add New Merchant</h3>
+                <button class="modal-close" onclick="closeModal('addMerchantModal')">&times;</button>
             </div>
-            <div class="modal-body">
-                <form id="merchantStatusForm">
-                    <input type="hidden" id="statusMerchantId" name="merchantId">
-                    <input type="hidden" id="statusAction" name="action">
-                    
-                    <div class="merchant-status-info">
-                        <div class="merchant-avatar-large">
-                            <img id="statusMerchantAvatar" src="" alt="Merchant">
-                        </div>
-                        <div class="merchant-details">
-                            <h3 id="statusMerchantName"></h3>
-                            <p id="statusMerchantEmail"></p>
-                            <span class="current-status">Current Status: <span id="statusMerchantCurrentStatus"></span></span>
-                        </div>
-                    </div>
-                    
+            <form id="addMerchantForm">
+                <div class="modal-body">
                     <div class="form-group">
-                        <label for="statusReason">Reason/Comment <span class="required">*</span></label>
-                        <textarea id="statusReason" name="reason" rows="4" required 
-                                  placeholder="Please provide a reason for this status change. This message will be sent to the merchant."></textarea>
+                        <label for="businessName">Business Name</label>
+                        <input type="text" id="businessName" class="form-control" required>
                     </div>
-                    
                     <div class="form-group">
-                        <label for="sendEmail">
-                            <input type="checkbox" id="sendEmail" name="sendEmail" checked>
-                            Send email notification to merchant
-                        </label>
+                        <label for="ownerName">Owner Name</label>
+                        <input type="text" id="ownerName" class="form-control" required>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeMerchantStatusModal()">Cancel</button>
-                <button type="submit" form="merchantStatusForm" class="btn-primary" id="statusConfirmBtn">Confirm Action</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Add Merchant Modal -->
-    <div class="modal" id="addMerchantModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add New Merchant</h2>
-                <button class="modal-close" onclick="closeAddMerchantModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="addMerchantForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="merchantName">Business Name</label>
-                            <input type="text" id="merchantName" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="merchantEmail">Email</label>
-                            <input type="email" id="merchantEmail" name="email" required>
-                        </div>
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number</label>
+                        <input type="text" id="phoneNumber" class="form-control" required>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="merchantPhone">Phone Number</label>
-                            <input type="tel" id="merchantPhone" name="phone" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="merchantCategory">Category</label>
-                            <select id="merchantCategory" name="category" required>
-                                <option value="">Select category</option>
-                                <option value="restaurant">Restaurant</option>
-                                <option value="grocery">Grocery</option>
-                                <option value="pharmacy">Pharmacy</option>
-                                <option value="retail">Retail</option>
-                            </select>
-                        </div>
+                    <div class="form-group">
+                        <label for="addressLine1">Address Line 1</label>
+                        <input type="text" id="addressLine1" class="form-control" required>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="merchantAddress">Address</label>
-                            <input type="text" id="merchantAddress" name="address" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="merchantCommission">Commission Rate (%)</label>
-                            <input type="number" id="merchantCommission" name="commission" min="1" max="30" required>
-                        </div>
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" id="city" class="form-control" required>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeAddMerchantModal()">Cancel</button>
-                <button type="submit" form="addMerchantForm" class="btn-primary">Add Merchant</button>
-            </div>
+                    <div class="form-group">
+                        <label for="state">State</label>
+                        <input type="text" id="state" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="zipCode">Zip Code</label>
+                        <input type="text" id="zipCode" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" onclick="closeModal('addMerchantModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Merchant</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <script src="merchants-fixed.js"></script>
     <script>
+        // Basic modal controls
+        function openAddMerchantModal() {
+            document.getElementById('addMerchantModal').style.display = 'flex';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
         // Sidebar toggle functionality
         const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
         const sidebarToggle = document.getElementById('sidebarToggle');
         const menuToggle = document.getElementById('menuToggle');
 
-        sidebarToggle.addEventListener('click', () => {
+        function toggleSidebar() {
             sidebar.classList.toggle('collapsed');
-        });
-
-        menuToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-        });
-
-        // Close modal function
-        function closeMerchantStatusModal() {
-            const modal = document.getElementById('merchantStatusModal');
-            modal.classList.remove('open');
+            mainContent.classList.toggle('expanded');
         }
 
-        function closeAddMerchantModal() {
-            const modal = document.getElementById('addMerchantModal');
-            modal.classList.remove('open');
-        }
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        menuToggle.addEventListener('click', toggleSidebar);
 
-        // Open modal functions
-        function openAddMerchantModal() {
-            const modal = document.getElementById('addMerchantModal');
-            modal.classList.add('open');
-        }
-
-        function viewMerchant(merchantId) {
-            // View merchant details logic
-        }
-
-        function editMerchant(merchantId) {
-            // Edit merchant logic
-        }
-
-        function suspendMerchant(merchantId) {
-            // Suspend merchant logic
-        }
-
-        function approveMerchant(merchantId) {
-            // Approve merchant logic
-        }
-
-        function rejectMerchant(merchantId) {
-            // Reject merchant logic
+        // Close sidebar on smaller screens by default
+        if (window.innerWidth < 768) {
+            toggleSidebar();
         }
     </script>
 </body>

@@ -20,7 +20,7 @@ const schema = a.schema({
       avatar: a.url(),
     })
     .authorization((allow) => [
-      allow.authenticated('identityPool').to(['read', 'update']),
+      allow.authenticated('identityPool').to(['read', 'create', 'update', 'delete']),
       allow.unauthenticated('identityPool').to(['read']),
     ]),
 });

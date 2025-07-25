@@ -4,9 +4,9 @@
  * Deploy script for static hosting with Amplify Gen 2
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 console.log('🚀 Deploying static website to AWS...');
 
@@ -45,9 +45,11 @@ const staticFiles = [
   'customers.js',
   'drivers.js', 
   'merchants.js',
+  'merchants-fixed.js',
   'promotions.js',
   'support.js',
-  'config.js'
+  'config.js',
+  'amplify_outputs.json'
 ];
 
 staticFiles.forEach(file => {

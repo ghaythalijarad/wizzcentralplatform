@@ -3,76 +3,80 @@
 // AWS Configuration - we'll configure this from the amplify_outputs.json
 let dynamoDB = null;
 let awsConfig = null;
+let cognitoCredentials = null; // Store credentials globally after fetching
 
 // Wait for AWS SDK to be loaded
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Initializing merchants management with AWS SDK...');
     
-    // First, check for authentication
-    const accessToken = sessionStorage.getItem('accessToken');
-    if (!accessToken) {
-        // If no token, redirect to login. No need to load AWS config.
-        window.location.href = 'index.html';
-        return;
-    }
-
-    // Check if AWS SDK is loaded
-    if (typeof AWS === 'undefined') {
-        console.error('AWS SDK not loaded. Please check the CDN script.');
-        showMessage('Error: AWS SDK not loaded. Falling back to sample data.', 'error');
-        merchantsData = getSampleMerchantsData();
-        filteredMerchants = [...merchantsData];
-        initializeUI();
-        setupEventListeners();
-        return;
-    }
-
     try {
-        // Load AWS configuration from amplify_outputs.json
+        // 1. Check for auth token
+        const idToken = sessionStorage.getItem('idToken');
+        if (!idToken) {
+            console.log('No ID token found in session storage. Redirecting to login.');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        // 2. Check if AWS SDK is loaded
+        if (typeof AWS === 'undefined') {
+            throw new Error('AWS SDK not loaded. Please check the CDN script.');
+        }
+
+        // 3. Load AWS configuration from amplify_outputs.json
         const response = await fetch('./amplify_outputs.json');
         if (!response.ok) {
             throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
         }
         const outputs = await response.json();
         
-        // Configure AWS SDK
-        awsConfig = {
-            region: outputs.data?.aws_region || 'us-east-1',
-        };
-
+        // 4. Prepare AWS configuration details
+        const region = outputs.data?.aws_region || 'us-east-1';
         const userPoolId = outputs.auth.user_pool_id;
         const identityPoolId = outputs.auth.identity_pool_id;
-        const region = awsConfig.region;
         const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 
-        const credentials = new AWS.CognitoIdentityCredentials({
+        // 5. Set up credentials
+        AWS.config.region = region;
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
             IdentityPoolId: identityPoolId,
             Logins: {
-                [cognitoProvider]: accessToken
+                [cognitoProvider]: idToken
             }
         });
 
-        AWS.config.update({
-            region: region,
-            credentials
-        });
+        // 6. Force credentials to refresh and handle potential errors.
+        try {
+            await AWS.config.credentials.refreshPromise();
+            console.log("Successfully fetched/refreshed AWS credentials.");
+            console.log("Cognito Identity ID:", AWS.config.credentials.identityId);
+        } catch (error) {
+            console.error("Error refreshing credentials:", error);
+            throw new Error("Could not refresh AWS credentials. The authentication token might be invalid or expired. Please try logging in again.");
+        }
 
-        // Initialize DynamoDB client
+        if (!AWS.config.credentials.identityId) {
+            throw new Error("Cognito Identity ID not found after credential refresh. This indicates a problem with the Identity Pool configuration or the provided token.");
+        }
+
+        // 7. Initialize DynamoDB client now that credentials are confirmed
         dynamoDB = new AWS.DynamoDB.DocumentClient();
-        
-        console.log('AWS SDK configured successfully with region:', awsConfig.region);
+        console.log('DynamoDB client initialized successfully.');
+
+        // 8. Initialize the application
+        await initializeMerchantsManagement();
+
     } catch (error) {
-        console.error('Error configuring AWS SDK:', error);
-        showMessage('Error: Could not configure AWS. Using sample data.', 'error');
+        console.error('A critical error occurred during initialization:', error);
+        const errorMessage = `Initialization failed: ${error.message}. Displaying sample data as a fallback.`;
+        showMessage(errorMessage, 'error');
+        
+        // Fallback to sample data on any initialization failure
         merchantsData = getSampleMerchantsData();
         filteredMerchants = [...merchantsData];
         initializeUI();
         setupEventListeners();
-        return;
     }
-    
-    // Initialize merchants management
-    await initializeMerchantsManagement();
 });
 
 // Global logout function
@@ -184,6 +188,13 @@ async function initializeMerchantsManagement() {
     try {
         console.log('Initializing merchants management...');
         showLoader(true, 'Loading merchants...');
+        
+        // The DynamoDB client is already initialized in the DOMContentLoaded event listener.
+        // We can proceed directly to loading data.
+        if (!dynamoDB) {
+            throw new Error("DynamoDB client is not initialized. This should not happen.");
+        }
+
         showMessage('Connecting to the database and fetching merchants...', 'info');
         
         await loadMerchantsFromDynamoDB();
@@ -198,7 +209,7 @@ async function initializeMerchantsManagement() {
         console.error('Failed to load merchants from DynamoDB, falling back to sample data:', error);
         const errorMessage = `Could not connect to the database. Error: ${error.message}. Displaying sample data.`;
         showMessage(errorMessage, 'error');
-        merchantsData = getSampleMerchantsData();
+        merchantsData = getSampleMerchantsData(); // Fallback
     } finally {
         filteredMerchants = [...merchantsData];
         initializeUI();
@@ -226,20 +237,17 @@ async function loadMerchantsFromDynamoDB() {
 
         if (result.Items && result.Items.length > 0) {
             merchantsData = result.Items.map(item => ({
-                id: item.businessId || item.id || 'N/A',
-                name: item.businessName || item.name || 'Unknown Business',
+                id: item.businessId, // Primary key
+                name: item.businessName || 'Unknown Business',
                 email: item.email || 'N/A',
-                phone: item.phoneNumber || item.phone || 'N/A',
-                category: mapBusinessType(item.businessType || item.category),
-                status: item.status || 'unknown',
-                commission: 15, // Default commission
-                ordersToday: 0, // Default orders
-                revenueToday: 0, // Default revenue
-                rating: null, // No rating data
+                phone: item.phoneNumber || 'N/A',
+                address: item.address ? `${item.address.street}, ${item.address.city}` : 'N/A',
+                owner: item.ownerName || 'N/A',
+                isActive: item.isActive !== undefined ? item.isActive : true,
                 joinDate: item.createdAt ? formatDate(item.createdAt) : 'N/A',
-                avatar: item.businessPhotoUrl || generateAvatarUrl(item.businessName || item.name),
-                address: extractAddress(item.address) || 'Address not available',
-                owner: item.ownerName || 'N/A'
+                avatar: item.businessPhotoUrl || generateAvatarUrl(item.businessName),
+                // Keep original data for details view
+                fullData: item 
             }));
 
             console.log(`Successfully loaded ${merchantsData.length} merchants from DynamoDB`);
@@ -252,6 +260,10 @@ async function loadMerchantsFromDynamoDB() {
         }
     } catch (error) {
         console.error('Error loading merchants from DynamoDB:', error);
+        // Provide a more specific error message if it's a credential issue.
+        if (error.code === 'CredentialsError' || error.message.includes('Missing credentials')) {
+            throw new Error('Failed to obtain AWS credentials. Please check the Identity Pool configuration and ensure the auth token is valid.');
+        }
         throw error;
     }
 }
@@ -260,36 +272,58 @@ async function loadMerchantsFromDynamoDB() {
 function mapBusinessType(businessType) {
     const typeMap = {
         'restaurant': 'Restaurant',
-        'store': 'Grocery',
-        'cafe': 'Restaurant',
-        'cloudkitchen': 'Restaurant',
+        'store': 'Grocery Store',
+        'cafe': 'Cafe',
+        'cloudkitchen': 'Cloud Kitchen',
         'pharmacy': 'Pharmacy',
         'retail': 'Retail'
     };
     return typeMap[businessType] || 'Other';
 }
 
-// Helper function to extract address from complex address object
-function extractAddress(address) {
-    if (typeof address === 'string') {
-        return address;
-    }
-    if (address && typeof address === 'object') {
+// Enhanced helper function to extract address from DynamoDB address structure
+function extractAddress(addressObj, city, country) {
+    // Handle complex address object from DynamoDB
+    if (addressObj && typeof addressObj === 'object') {
         const parts = [];
-        if (address.street) parts.push(address.street);
-        if (address.district) parts.push(address.district);
-        if (address.city) parts.push(address.city);
-        if (address.country) parts.push(address.country);
-        return parts.join(', ') || 'Address not available';
+        
+        // Check if it's a DynamoDB attribute value object
+        if (addressObj.country && addressObj.country.S) {
+            // DynamoDB AttributeValue format
+            if (addressObj.street && addressObj.street.S) parts.push(addressObj.street.S);
+            if (addressObj.district && addressObj.district.S) parts.push(addressObj.district.S);
+            if (addressObj.city && addressObj.city.S) parts.push(addressObj.city.S);
+            if (addressObj.country && addressObj.country.S) parts.push(addressObj.country.S);
+        } else {
+            // Regular object format
+            if (addressObj.street) parts.push(addressObj.street);
+            if (addressObj.district) parts.push(addressObj.district);
+            if (addressObj.city) parts.push(addressObj.city);
+            if (addressObj.country) parts.push(addressObj.country);
+        }
+        
+        if (parts.length > 0) {
+            return parts.join(', ');
+        }
     }
-    return 'Address not available';
+    
+    // Fallback to individual city and country fields
+    if (typeof addressObj === 'string') {
+        return addressObj;
+    }
+    
+    const parts = [];
+    if (city) parts.push(city);
+    if (country) parts.push(country);
+    
+    return parts.length > 0 ? parts.join(', ') : 'Address not available';
 }
 
 // Generate avatar URL
 function generateAvatarUrl(name) {
     if (!name) return 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=40&h=40&fit=crop&crop=center';
     const encodedName = encodeURIComponent(name);
-    return `https://ui-avatars.com/api/?name=${encodedName}&size=40&background=random`;
+    return `https://ui-avatars.com/api/?name=${encodedName}&size=40&background=random&color=fff`;
 }
 
 // Get sample merchants data (fallback)
@@ -378,16 +412,10 @@ function setupEventListeners() {
         searchInput.addEventListener('input', filterMerchants);
     }
 
-    // Filter functionality
+    // Filter functionality (simplified for new structure)
     const statusFilter = document.getElementById('statusFilter');
-    const categoryFilter = document.getElementById('categoryFilter');
-    
     if (statusFilter) {
         statusFilter.addEventListener('change', filterMerchants);
-    }
-    
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', filterMerchants);
     }
 
     // Refresh button
@@ -397,48 +425,30 @@ function setupEventListeners() {
     }
 }
 
-// Update status filter dropdown
+// Update status filter dropdown - simplified, can be removed if not used
 function updateStatusFilter() {
-    const statusFilter = document.getElementById('statusFilter');
-    if (!statusFilter) return;
-    
-    // Clear existing options except "All"
-    statusFilter.innerHTML = '<option value="">All Statuses</option>';
-    
-    // Add status options
-    Object.keys(MERCHANT_STATUSES).forEach(status => {
-        const option = document.createElement('option');
-        option.value = status;
-        option.textContent = MERCHANT_STATUSES[status].label;
-        statusFilter.appendChild(option);
-    });
+    // This function can be simplified or removed if the status filter is no longer complex
+    // For now, it does nothing as the primary status is the active toggle.
 }
 
 // Filter merchants based on search and filters
 function filterMerchants() {
     const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
-    const statusFilter = document.getElementById('statusFilter')?.value || '';
-    const categoryFilter = document.getElementById('categoryFilter')?.value || '';
     
     filteredMerchants = merchantsData.filter(merchant => {
-        const matchesSearch = !searchTerm || 
+        return !searchTerm || 
             merchant.name.toLowerCase().includes(searchTerm) ||
-            merchant.email.toLowerCase().includes(searchTerm) ||
+            (merchant.owner && merchant.owner.toLowerCase().includes(searchTerm)) ||
             merchant.id.toLowerCase().includes(searchTerm);
-            
-        const matchesStatus = !statusFilter || merchant.status === statusFilter;
-        const matchesCategory = !categoryFilter || merchant.category.toLowerCase() === categoryFilter.toLowerCase();
-        
-        return matchesSearch && matchesStatus && matchesCategory;
     });
     
     renderMerchantsTable();
     updateMerchantStats();
 }
 
-// Pagination state
-let currentPage = 1;
-const rowsPerPage = 10;
+// Pagination state (can be re-added if needed)
+// let currentPage = 1;
+// const rowsPerPage = 10;
 
 // Get paginated data
 function getPaginatedData(data) {
@@ -475,405 +485,255 @@ function renderPaginationControls(totalItems) {
 
 // Render merchants table
 function renderMerchantsTable() {
-    const tableBody = document.getElementById('merchants-table-body');
+    const tableBody = document.getElementById('merchantsTableBody');
     if (!tableBody) return;
 
-    // Clear previous results
-    tableBody.innerHTML = '';
-    
+    tableBody.innerHTML = ''; // Clear existing rows
+
     if (filteredMerchants.length === 0) {
-        // If there's already a message (e.g., "no data in DB"), don't overwrite it
-        const statusElement = document.getElementById('merchants-table-status');
-        if (!statusElement || statusElement.style.display === 'none') {
-            showMessage('No merchants match the current filters.', 'info');
-        }
-        renderPaginationControls(0);
-        return; // Stop execution if no merchants to render
-    } else {
-        hideMessage(); // Hide any messages if we have data to render
+        tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No merchants found.</td></tr>';
+        return;
     }
 
-    const paginatedData = getPaginatedData(filteredMerchants);
-
-    paginatedData.forEach(merchant => {
+    filteredMerchants.forEach(merchant => {
         const row = createMerchantTableRow(merchant);
         tableBody.appendChild(row);
     });
-
-    renderPaginationControls(filteredMerchants.length);
 }
 
-// Create merchant table row
+// Create a single table row for a merchant
 function createMerchantTableRow(merchant) {
     const row = document.createElement('tr');
-    
-    const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
-    const formattedDate = formatDate(merchant.joinDate);
-    const ratingDisplay = merchant.rating ? 
-        `<span class="rating-value">${merchant.rating}</span>` : 
-        '<span style="color: #ccc;">N/A</span>';
-    
+    row.dataset.merchantId = merchant.id;
+
+    // Business & Owner Cell
     row.innerHTML = `
         <td>
             <div class="merchant-info">
                 <div class="merchant-avatar">
-                    <img src="${merchant.avatar}" alt="${merchant.name}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(merchant.name)}&size=40'">
+                    <img src="${merchant.avatar || 'placeholder.png'}" alt="${merchant.name}">
                 </div>
                 <div>
                     <div class="merchant-name">${merchant.name}</div>
-                    <div class="merchant-id">#${merchant.id}</div>
+                    <div class="merchant-id">${merchant.owner || 'N/A'}</div>
                 </div>
             </div>
         </td>
-        <td><span class="merchant-category">${merchant.category}</span></td>
         <td>
-            <span class="status-badge ${statusInfo.class}" data-status="${merchant.status}">
-                ${statusInfo.label}
-            </span>
+            <label class="switch">
+                <input type="checkbox" ${merchant.isActive ? 'checked' : ''} onchange="toggleActive('${merchant.id}')">
+                <span class="slider round"></span>
+            </label>
         </td>
-        <td><span class="commission-rate">${merchant.commission}%</span></td>
-        <td>${merchant.ordersToday}</td>
-        <td>$${merchant.revenueToday.toFixed(2)}</td>
-        <td>${ratingDisplay}</td>
-        <td>${formattedDate}</td>
+        <td>${merchant.phone || 'N/A'}</td>
+        <td>${merchant.address || 'N/A'}</td>
         <td>
-            <div class="actions">
-                <button class="btn-action" onclick="viewMerchant('${merchant.id}')" title="View Details">
-                    <i class="fas fa-eye"></i>
-                </button>
-                <button class="btn-action" onclick="changeStatus('${merchant.id}')" title="Change Status">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn-action danger" onclick="suspendMerchant('${merchant.id}')" title="Suspend">
-                    <i class="fas fa-ban"></i>
-                </button>
-            </div>
+            <button class="btn-secondary btn-sm" onclick="viewMerchantDetails('${merchant.id}')">View</button>
         </td>
     `;
-    
     return row;
 }
 
-// Format date
-function formatDate(dateString) {
-    if (!dateString || dateString === 'N/A') return 'N/A';
-    
-    try {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
-    } catch (error) {
-        return dateString;
-    }
-}
+// Toggle merchant active status
+async function toggleActive(businessId) {
+    const merchant = merchantsData.find(m => m.id === businessId);
+    if (!merchant) return;
 
-// Update merchant statistics
-function updateMerchantStats() {
-    const totalMerchants = merchantsData.length;
-    const activeMerchants = merchantsData.filter(m => m.status === 'approved').length;
-    const pendingMerchants = merchantsData.filter(m => m.status === 'pending').length;
-    const totalRevenue = merchantsData.reduce((sum, m) => sum + (m.revenueToday || 0), 0);
-    
-    // Update stat cards by finding them and updating content
-    const statCards = document.querySelectorAll('.stat-card');
-    statCards.forEach(card => {
-        const label = card.querySelector('p')?.textContent;
-        const valueElement = card.querySelector('h3');
-        const changeElement = card.querySelector('.stat-change');
-        
-        if (label && valueElement) {
-            if (label.includes('Total Merchants')) {
-                valueElement.textContent = totalMerchants;
-                if (changeElement) changeElement.textContent = `+${totalMerchants}`;
-            } else if (label.includes('Active Merchants')) {
-                valueElement.textContent = activeMerchants;
-                if (changeElement) changeElement.textContent = `+${activeMerchants}`;
-            } else if (label.includes('Commission Today')) {
-                valueElement.textContent = `$${totalRevenue.toFixed(2)}`;
-                if (changeElement) changeElement.textContent = totalRevenue > 0 ? '+15.2%' : '0%';
-            }
+    const newStatus = !merchant.isActive;
+    showLoader(true, `Updating status for ${merchant.name}...`);
+
+    try {
+        await updateMerchantInDB(businessId, { isActive: newStatus });
+        merchant.isActive = newStatus; // Update local data
+        console.log(`Successfully updated status for ${businessId} to ${newStatus}`);
+        updateMerchantStats(); // Recalculate stats
+    } catch (error) {
+        console.error(`Failed to update status for ${businessId}:`, error);
+        showMessage(`Error updating status: ${error.message}`, 'error');
+        // Revert the checkbox if the update fails
+        const checkbox = document.querySelector(`tr[data-merchant-id='${businessId}'] input[type='checkbox']`);
+        if (checkbox) {
+            checkbox.checked = merchant.isActive;
         }
-    });
-}
-
-// Refresh merchants data
-async function refreshMerchantsData() {
-    const refreshBtn = document.getElementById('refreshBtn');
-    if (refreshBtn) {
-        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        refreshBtn.disabled = true;
-    }
-    
-    try {
-        await initializeMerchantsManagement();
-        showMessage('Merchants data refreshed successfully', 'success');
-    } catch (error) {
-        console.error('Failed to refresh merchants data:', error);
-        showMessage('Failed to refresh merchants data', 'error');
-    } finally {
-        if (refreshBtn) {
-            refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
-            refreshBtn.disabled = false;
-        }
-    }
-}
-
-// View merchant details
-window.viewMerchant = function(merchantId) {
-    const merchant = merchantsData.find(m => m.id === merchantId);
-    if (!merchant) return;
-    
-    showMerchantDetailsModal(merchant);
-};
-
-// Change merchant status
-window.changeStatus = function(merchantId) {
-    const merchant = merchantsData.find(m => m.id === merchantId);
-    if (!merchant) return;
-    
-    showStatusChangeModal(merchant);
-};
-
-// Suspend merchant
-window.suspendMerchant = function(merchantId) {
-    const merchant = merchantsData.find(m => m.id === merchantId);
-    if (!merchant) return;
-    
-    if (confirm(`Are you sure you want to suspend ${merchant.name}?`)) {
-        updateMerchantStatus(merchantId, 'suspended');
-    }
-};
-
-// Show merchant details modal
-function showMerchantDetailsModal(merchant) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Merchant Details</h3>
-                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="merchant-details">
-                    <div class="merchant-avatar-large">
-                        <img src="${merchant.avatar}" alt="${merchant.name}">
-                    </div>
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <label>Business Name:</label>
-                            <span>${merchant.name}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Business ID:</label>
-                            <span>#${merchant.id}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Email:</label>
-                            <span>${merchant.email}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Phone:</label>
-                            <span>${merchant.phone}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Category:</label>
-                            <span>${merchant.category}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Status:</label>
-                            <span class="status-badge ${MERCHANT_STATUSES[merchant.status]?.class || 'unknown'}">
-                                ${MERCHANT_STATUSES[merchant.status]?.label || 'Unknown'}
-                            </span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Owner:</label>
-                            <span>${merchant.owner}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Address:</label>
-                            <span>${merchant.address}</span>
-                        </div>
-                        <div class="detail-item">
-                            <label>Join Date:</label>
-                            <span>${formatDate(merchant.joinDate)}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
-                <button class="btn-primary" onclick="changeStatus('${merchant.id}'); this.closest('.modal-overlay').remove();">Change Status</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-// Show status change modal
-function showStatusChangeModal(merchant) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Change Merchant Status</h3>
-                <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="status-change-form">
-                    <div class="merchant-info-compact">
-                        <img src="${merchant.avatar}" alt="${merchant.name}">
-                        <div>
-                            <h4>${merchant.name}</h4>
-                            <p>Current Status: <span class="status-badge ${MERCHANT_STATUSES[merchant.status]?.class || 'unknown'}">${MERCHANT_STATUSES[merchant.status]?.label || 'Unknown'}</span></p>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="newStatus">New Status:</label>
-                        <select id="newStatus" class="form-control">
-                            ${Object.keys(MERCHANT_STATUSES).map(status => 
-                                `<option value="${status}" ${status === merchant.status ? 'selected' : ''}>
-                                    ${MERCHANT_STATUSES[status].label}
-                                </option>`
-                            ).join('')}
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="statusReason">Reason (optional):</label>
-                        <textarea id="statusReason" class="form-control" rows="3" placeholder="Enter reason for status change..."></textarea>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
-                <button class="btn-primary" onclick="confirmStatusChange('${merchant.id}')">Update Status</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-}
-
-// Confirm status change
-window.confirmStatusChange = async function(merchantId) {
-    const newStatus = document.getElementById('newStatus').value;
-    const reason = document.getElementById('statusReason').value;
-    
-    showLoader(true, 'Updating status...');
-    try {
-        await updateMerchantStatus(merchantId, newStatus, reason);
-        document.querySelector('.modal-overlay').remove();
-        showMessage('Merchant status updated successfully', 'success');
-    } catch (error) {
-        console.error('Failed to update merchant status:', error);
-        showMessage('Failed to update merchant status', 'error');
     } finally {
         showLoader(false);
     }
-};
+}
 
-// Update merchant status
-async function updateMerchantStatus(merchantId, newStatus, reason = '') {
-    console.log(`Updating merchant ${merchantId} to ${newStatus} with reason: ${reason}`);
-    
+// Update a merchant in DynamoDB
+async function updateMerchantInDB(businessId, updateData) {
+    if (!dynamoDB) throw new Error("DynamoDB client not initialized.");
+
+    const params = {
+        TableName: MERCHANTS_TABLE,
+        Key: { 'businessId': businessId },
+        UpdateExpression: 'set #isActive = :isActive',
+        ExpressionAttributeNames: { '#isActive': 'isActive' },
+        ExpressionAttributeValues: { ':isActive': updateData.isActive },
+        ReturnValues: 'UPDATED_NEW'
+    };
+
+    console.log('Updating merchant in DynamoDB with params:', params);
+    return dynamoDB.update(params).promise();
+}
+
+
+// View merchant details in a modal
+function viewMerchantDetails(businessId) {
+    const merchant = merchantsData.find(m => m.id === businessId);
+    if (!merchant) return;
+
+    const detailsBody = document.getElementById('merchantDetailsBody');
+    detailsBody.innerHTML = `
+        <div class="merchant-avatar-large">
+            <img src="${merchant.avatar}" alt="${merchant.name}">
+            <h3>${merchant.name}</h3>
+            <p>${merchant.owner}</p>
+        </div>
+        <div class="details-grid">
+            <div class="detail-item"><label>Business ID</label><span>${merchant.id}</span></div>
+            <div class="detail-item"><label>Status</label><span>${merchant.isActive ? 'Active' : 'Inactive'}</span></div>
+            <div class="detail-item"><label>Phone</label><span>${merchant.phone}</span></div>
+            <div class="detail-item"><label>Email</label><span>${merchant.email}</span></div>
+            <div class="detail-item" style="grid-column: 1 / -1;"><label>Address</label><span>${merchant.address}</span></div>
+            <div class="detail-item"><label>Joined On</label><span>${merchant.joinDate}</span></div>
+        </div>
+    `;
+
+    document.getElementById('viewMerchantModal').style.display = 'flex';
+}
+
+// Update merchant stats cards
+function updateMerchantStats() {
+    const totalMerchants = merchantsData.length;
+    const activeMerchants = merchantsData.filter(m => m.isActive).length;
+
+    document.querySelector('.stat-card:nth-child(1) h3').textContent = totalMerchants;
+    document.querySelector('.stat-card:nth-child(2) h3').textContent = activeMerchants;
+    // Other stats can be updated here if data is available
+}
+
+// Handle Add Merchant Form Submission
+document.getElementById('addMerchantForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const merchantData = {
+        businessName: document.getElementById('businessName').value,
+        ownerName: document.getElementById('ownerName').value,
+        phoneNumber: document.getElementById('phoneNumber').value,
+        address: {
+            street: document.getElementById('addressLine1').value,
+            city: document.getElementById('city').value,
+            state: document.getElementById('state').value,
+            zipCode: document.getElementById('zipCode').value,
+            country: 'USA' // Assuming USA for now
+        },
+        // Default values for a new merchant
+        businessId: `biz-${Date.now()}`,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    showLoader(true, 'Adding new merchant...');
     try {
-        if (!dynamoDB) {
-            throw new Error('DynamoDB client not initialized');
-        }
-
-        // Update the item in DynamoDB
-        const params = {
-            TableName: 'order-receiver-businesses-dev',
-            Key: {
-                businessId: merchantId
-            },
-            UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
-            ExpressionAttributeNames: {
-                '#status': 'status'
-            },
-            ExpressionAttributeValues: {
-                ':status': newStatus,
-                ':updatedAt': new Date().toISOString()
-            },
-            ReturnValues: 'ALL_NEW'
-        };
-
-        const result = await dynamoDB.update(params).promise();
-        console.log('Update successful:', result);
-
-        // Update local data and re-render
-        const merchantIndex = merchantsData.findIndex(m => m.id === merchantId);
-        if (merchantIndex !== -1) {
-            merchantsData[merchantIndex].status = newStatus;
-            filterMerchants(); // This will re-render the table and update stats
-        }
-        
+        await addMerchantToDB(merchantData);
+        merchantsData.push({
+            id: merchantData.businessId,
+            name: merchantData.businessName,
+            owner: merchantData.ownerName,
+            phone: merchantData.phoneNumber,
+            address: `${merchantData.address.street}, ${merchantData.address.city}`,
+            isActive: merchantData.isActive,
+            joinDate: formatDate(merchantData.createdAt),
+            avatar: generateAvatarUrl(merchantData.businessName),
+            email: '' // Not in form
+        });
+        filterMerchants(); // This will re-render the table
+        closeModal('addMerchantModal');
+        showMessage('Merchant added successfully!', 'info');
     } catch (error) {
-        console.error('Failed to update merchant status in DynamoDB:', error);
-        // Fallback to local update for demo purposes if API fails
-        const merchantIndex = merchantsData.findIndex(m => m.id === merchantId);
-        if (merchantIndex !== -1) {
-            merchantsData[merchantIndex].status = newStatus;
-            filterMerchants();
-        }
-        throw error; // Re-throw to be handled by the caller
+        console.error('Failed to add merchant:', error);
+        showMessage(`Error adding merchant: ${error.message}`, 'error');
+    } finally {
+        showLoader(false);
+    }
+});
+
+// Add a new merchant to DynamoDB
+async function addMerchantToDB(merchantData) {
+    if (!dynamoDB) throw new Error("DynamoDB client not initialized.");
+
+    const params = {
+        TableName: MERCHANTS_TABLE,
+        Item: merchantData
+    };
+
+    console.log('Adding new merchant to DynamoDB with params:', params);
+    return dynamoDB.put(params).promise();
+}
+
+// Close modal utility
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Format date utility
+function formatDate(isoString) {
+    if (!isoString) return 'N/A';
+    return new Date(isoString).toLocaleDateString();
+}
+
+// Refresh data from DynamoDB
+async function refreshMerchantsData() {
+    showLoader(true, 'Refreshing data from the database...');
+    try {
+        await loadMerchantsFromDynamoDB();
+        filterMerchants();
+        hideMessage();
+    } catch (error) {
+        console.error('Failed to refresh data:', error);
+        showMessage(`Error refreshing data: ${error.message}`, 'error');
+    } finally {
+        showLoader(false);
     }
 }
 
-// Show toast message function
-function showToastMessage(message, type) {
-    // Remove existing messages
-    const existingMessage = document.querySelector('.message');
-    if (existingMessage) {
-        existingMessage.remove();
-    }
-    
-    // Create message element
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}`;
-    messageDiv.innerHTML = `
-        <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-exclamation-circle'}"></i>
-        <span>${message}</span>
-    `;
-    
-    // Add styles
-    messageDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#ef4444'};
-        color: white;
-        padding: 1rem 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        animation: slideInRight 0.3s ease-out;
-        max-width: 300px;
-    `;
-    
-    // Add to page
-    document.body.appendChild(messageDiv);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (messageDiv.parentNode) {
-            messageDiv.remove();
+// Sample data function (if needed for fallback)
+function getSampleMerchantsData() {
+    return [
+        {
+            id: 'biz-001',
+            name: 'Sample Merchant 1',
+            email: 'sample1@example.com',
+            phone: '+1-555-0101',
+            category: 'Restaurant',
+            status: 'approved',
+            commission: 10,
+            ordersToday: 5,
+            revenueToday: 150.00,
+            rating: 4.5,
+            joinDate: '2023-01-10',
+            avatar: 'https://ui-avatars.com/api/?name=Sample+Merchant+1&size=40&background=random',
+            address: '123 Sample St, Sample City',
+            owner: 'Owner 1',
+            isActive: true
+        },
+        {
+            id: 'biz-002',
+            name: 'Sample Merchant 2',
+            email: 'sample2@example.com',
+            phone: '+1-555-0102',
+            category: 'Grocery',
+            status: 'pending',
+            commission: 8,
+            ordersToday: 0,
+            revenueToday: 0,
+            rating: null,
+            joinDate: '2023-07-15',
+            avatar: 'https://ui-avatars.com/api/?name=Sample+Merchant+2&size=40&background=random',
+            address: '456 Example Ave, Example City',
+            owner: 'Owner 2',
+            isActive: true
         }
-    }, 5000);
+    ];
 }
