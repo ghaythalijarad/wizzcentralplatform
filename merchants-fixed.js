@@ -127,7 +127,8 @@ async function initializeMerchantsManagement() {
         
     } catch (error) {
         console.error('Failed to load merchants from DynamoDB, falling back to sample data:', error);
-        showMessage('Could not connect to the database. Displaying sample data for demonstration.', 'error');
+        const errorMessage = `Could not connect to the database. Error: ${error.message}. Displaying sample data.`;
+        showMessage(errorMessage, 'error');
         merchantsData = getSampleMerchantsData();
     } finally {
         filteredMerchants = [...merchantsData];
