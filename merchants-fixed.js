@@ -30,15 +30,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Configure AWS SDK
         awsConfig = {
             region: outputs.data?.aws_region || 'us-east-1',
-            accessKeyId: 'placeholder', // Will be overridden by Cognito credentials
-            secretAccessKey: 'placeholder'
         };
 
+        const userPoolId = outputs.auth.user_pool_id;
+        const userPoolWebClientId = outputs.auth.user_pool_client_id;
+        const identityPoolId = outputs.auth.identity_pool_id;
+        const region = awsConfig.region;
+
+        const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
+        const accessToken = sessionStorage.getItem('accessToken');
+
+        const credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: identityPoolId,
+            Logins: {
+                [cognitoProvider]: accessToken
+            }
+        });
+
         AWS.config.update({
-            region: awsConfig.region,
-            credentials: new AWS.CognitoIdentityCredentials({
-                IdentityPoolId: outputs.auth.identity_pool_id
-            })
+            region: region,
+            credentials
         });
 
         // Initialize DynamoDB client

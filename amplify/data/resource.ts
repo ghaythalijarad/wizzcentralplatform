@@ -21,6 +21,7 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.authenticated('identityPool').to(['read', 'update']),
+      allow.unauthenticated('identityPool').to(['read']),
     ]),
 });
 
