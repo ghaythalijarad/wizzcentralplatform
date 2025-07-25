@@ -215,40 +215,6 @@ function extractAddress(address) {
     return 'Address not available';
 }
 
-        if (errors) {
-            console.error('Failed to fetch merchants from DynamoDB:', errors);
-            throw new Error(JSON.stringify(errors));
-        }
-        
-        if (items && items.length > 0) {
-            merchantsData = items.map(item => ({
-                id: item.id,
-                name: item.name || 'Unknown Business',
-                email: item.email || 'N/A',
-                phone: item.phone || 'N/A',
-                category: item.category || 'Unknown',
-                status: item.status || 'unknown',
-                joinDate: item.createdAt || 'N/A',
-                avatar: item.avatar || generateAvatarUrl(item.name),
-                address: item.address || 'N/A',
-                owner: item.owner || 'N/A',
-                description: item.description || 'N/A',
-                rawData: item
-            }));
-            console.log(`Loaded ${merchantsData.length} merchants from DynamoDB:`, merchantsData);
-        } else {
-            console.log('Connection successful, but no merchants found in DynamoDB.');
-            merchantsData = []; // Explicitly set to empty
-        }
-        
-        console.log('Merchants data loaded successfully');
-        
-    } catch (error) {
-        console.error('Error loading merchants from DynamoDB:', error);
-        throw error; // Re-throw to be caught by the initializer
-    }
-}
-
 // Generate avatar URL
 function generateAvatarUrl(name) {
     if (!name) return 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=40&h=40&fit=crop&crop=center';
