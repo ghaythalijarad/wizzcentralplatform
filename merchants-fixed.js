@@ -47,41 +47,52 @@ const MERCHANT_STATUSES = {
 let merchantsData = [];
 let filteredMerchants = [];
 
+// Helper to display messages in the UI
+function showMessage(message, type = 'info') {
+    const statusElement = document.getElementById('merchants-table-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.className = `table-status-info table-status-${type}`; // e.g., 'info', 'warning', 'error'
+        statusElement.style.display = 'block';
+    }
+}
+
+// Helper to hide messages
+function hideMessage() {
+    const statusElement = document.getElementById('merchants-table-status');
+    if (statusElement) {
+        statusElement.style.display = 'none';
+    }
+}
+
 // Initialize merchants management with fallback
 async function initializeMerchantsManagement() {
     try {
         console.log('Initializing merchants management...');
+        showLoader(true, 'Loading merchants...');
+        showMessage('Connecting to the database and fetching merchants...', 'info');
         
-        // Try to load from DynamoDB, but fallback to sample data if it fails
-        try {
-            await loadMerchantsFromDynamoDB();
-        } catch (dbError) {
-            console.warn('DynamoDB connection failed, using sample data:', dbError);
-            merchantsData = getSampleMerchantsData();
-            filteredMerchants = [...merchantsData];
-            showMessage('Using sample data - Database connection unavailable', 'warning');
+        await loadMerchantsFromDynamoDB();
+        
+        if (merchantsData.length === 0) {
+            showMessage('Connection successful, but no merchants were found in the database.', 'warning');
+        } else {
+            hideMessage();
         }
         
-        // Initialize UI
-        initializeUI();
-        
-        // Set up event listeners
-        setupEventListeners();
-        
-        console.log('Merchants management initialized successfully');
     } catch (error) {
-        console.error('Failed to initialize merchants management:', error);
-        showMessage('Failed to load merchants data', 'error');
-        
-        // Fallback to sample data even if everything fails
+        console.error('Failed to load merchants from DynamoDB, falling back to sample data:', error);
+        showMessage('Could not connect to the database. Displaying sample data for demonstration.', 'error');
         merchantsData = getSampleMerchantsData();
+    } finally {
         filteredMerchants = [...merchantsData];
         initializeUI();
         setupEventListeners();
+        showLoader(false);
     }
 }
 
-// Load merchants data from DynamoDB with simplified auth
+// Load merchants data from DynamoDB using Amplify Data
 async function loadMerchantsFromDynamoDB() {
     console.log('Attempting to load merchants from DynamoDB using Amplify Data...');
     
@@ -90,7 +101,7 @@ async function loadMerchantsFromDynamoDB() {
 
         if (errors) {
             console.error('Failed to fetch merchants from DynamoDB:', errors);
-            throw errors;
+            throw new Error(JSON.stringify(errors));
         }
         
         if (items && items.length > 0) {
@@ -106,17 +117,14 @@ async function loadMerchantsFromDynamoDB() {
                 address: item.address || 'N/A',
                 owner: item.owner || 'N/A',
                 description: item.description || 'N/A',
-                // Include raw data for debugging
                 rawData: item
             }));
-            
             console.log(`Loaded ${merchantsData.length} merchants from DynamoDB:`, merchantsData);
         } else {
-            console.log('No merchants found in DynamoDB, using sample data');
-            merchantsData = getSampleMerchantsData();
+            console.log('Connection successful, but no merchants found in DynamoDB.');
+            merchantsData = []; // Explicitly set to empty
         }
         
-        filteredMerchants = [...merchantsData];
         console.log('Merchants data loaded successfully');
         
     } catch (error) {
@@ -278,24 +286,26 @@ function filterMerchants() {
 
 // Render merchants table
 function renderMerchantsTable() {
-    const tableBody = document.getElementById('merchantsTableBody');
+    const tableBody = document.getElementById('merchants-table-body');
     if (!tableBody) return;
-    
+
+    // Clear previous results
     tableBody.innerHTML = '';
     
     if (filteredMerchants.length === 0) {
-        tableBody.innerHTML = `
-            <tr>
-                <td colspan="9" style="text-align: center; padding: 2rem;">
-                    <i class="fas fa-store" style="font-size: 2rem; color: #ccc; margin-bottom: 1rem;"></i>
-                    <p style="color: #666;">No merchants found</p>
-                </td>
-            </tr>
-        `;
-        return;
+        // If there's already a message (e.g., "no data in DB"), don't overwrite it
+        const statusElement = document.getElementById('merchants-table-status');
+        if (!statusElement || statusElement.style.display === 'none') {
+            showMessage('No merchants match the current filters.', 'info');
+        }
+        return; // Stop execution if no merchants to render
+    } else {
+        hideMessage(); // Hide any messages if we have data to render
     }
-    
-    filteredMerchants.forEach(merchant => {
+
+    const paginatedData = getPaginatedData(filteredMerchants);
+
+    paginatedData.forEach(merchant => {
         const row = createMerchantTableRow(merchant);
         tableBody.appendChild(row);
     });
