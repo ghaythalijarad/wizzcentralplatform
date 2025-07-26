@@ -90,10 +90,25 @@
                 <i class="fas fa-bars"></i>
             </button>
             <h1 class="page-title">Merchants Management</h1>
+            <div class="auth-status" id="authStatus" style="display: flex; align-items: center; gap: 10px;">
+                <span id="authIndicator" style="padding: 5px 10px; border-radius: 4px; font-size: 0.8rem;">Checking...</span>
+                <button id="loginBtn" onclick="window.location.href='../index.html'" style="display: none; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
+                <button id="loadRealDataBtn" onclick="forceLoadRealData()" style="display: none; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Load Real Data</button>
+            </div>
         </div>
 
         <!-- Page Content -->
         <div class="page-content">
+            <!-- Auth and Data Status -->
+            <div id="dataStatus" style="margin-bottom: 1rem; padding: 10px; border-radius: 4px; background: #f8f9fa; border-left: 4px solid #007bff; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>Data Source:</strong> <span id="dataSourceIndicator">Loading...</span>
+                </div>
+                <button id="refreshDataBtn" onclick="refreshMerchantsData()" style="padding: 8px 15px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                    <i class="fas fa-sync-alt"></i> Refresh Data
+                </button>
+            </div>
+            
              <!-- Merchants Table -->
             <div class="table-container">
                 <div id="merchants-table-status"></div>
@@ -110,9 +125,7 @@
                         </tr>
                     </thead>
                     <tbody id="merchantsTableBody">
-                        <tr>
-                            <td colspan="7" style="text-align: center;">Loading...</td>
-                        </tr>
+                        <!-- Merchants will be loaded here -->
                     </tbody>
                 </table>
             </div>
@@ -179,10 +192,10 @@
             return true; // Allow for development
         };
     </script>
+    <!-- Load real merchants.js for live data -->
     <script src="../merchants.js"></script>
     <script>
-        console.log('Merchants script loaded');
+        console.log('Merchants page script merchants.js loaded');
     </script>
-
 </body>
 </html>

@@ -23,15 +23,16 @@ let allMerchants = [];
 let merchantsData = [];
 let filteredMerchants = [];
 
-// Check authentication on page load - MERCHANTS SPECIFIC
+// This function is not currently used in the main flow but is kept for potential future use or reference.
+// The main DOMContentLoaded handler contains the primary authentication and data loading logic.
 function checkMerchantsAuthentication() {
     const token = sessionStorage.getItem('accessToken');
     if (!token) {
         console.log('No access token found, but proceeding for development');
         // For development, we'll allow proceeding without authentication
-        // In production, uncomment the line below:
+        // In production, this should redirect to the login page.
         // window.location.href = '../index.html';
-        return true; // Changed from false to true for development
+        return true; // Allow proceeding for local dev
     }
     return true;
 }
@@ -52,8 +53,21 @@ window.logout = async () => {
 };
 
 // Initialize merchants page when DOM is ready
-document.addEventListener('DOMContentLoaded', async function() {
-    console.log('Merchants page DOM loaded');
+const onDomReady = async function() {
+    console.log('🚀 Merchants page DOM loaded - Starting initialization...');
+    
+    // Protocol check: file:// not supported for fetch
+    if (window.location.protocol === 'file:') {
+        console.error('Page served via file:// protocol - fetch operations will fail');
+        showLoader(false);
+        const tableBody = document.getElementById('merchantsTableBody');
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">Please serve this page via a local HTTP server (e.g., python3 -m http.server) to enable data loading.</td></tr>`;
+        }
+        updateDataSourceIndicator('error', 'File protocol not supported');
+        showMessage('Page loaded via file:// protocol. Data fetch requires HTTP/HTTPS.', 'error');
+        return;
+    }
     
     // Debug: Check if required elements exist
     const tableBody = document.getElementById('merchantsTableBody');
@@ -67,131 +81,304 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    // Initialize dashboard (sidebar, menu)
-    if (typeof initializeDashboard === 'function') {
-        console.log('Initializing dashboard...');
-        initializeDashboard();
-    } else {
-        console.warn('initializeDashboard function not found');
+    // Initialize dashboard (sidebar, menu) - but delay it to avoid conflicts
+    setTimeout(() => {
+        if (typeof initializeDashboard === 'function') {
+            console.log('Initializing dashboard...');
+            initializeDashboard();
+        } else {
+            console.warn('initializeDashboard function not found');
+        }
+    }, 100);
+
+    // Check authentication first
+    const idToken = sessionStorage.getItem('idToken');
+    const accessToken = sessionStorage.getItem('accessToken');
+    
+    console.log('🔑 Authentication check:', {
+        hasIdToken: !!idToken,
+        hasAccessToken: !!accessToken,
+        idTokenLength: idToken ? idToken.length : 0
+    });
+
+    // FOR TESTING: Always try to load real data, even without auth
+    console.log('🧪 TESTING MODE: Attempting to load real data regardless of auth status...');
+
+    // Determine if running in a local development environment
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+        console.log('💻 Running in local development mode. Error fallbacks will be disabled.');
     }
 
-    // Ensure user is authenticated
-    if (!checkMerchantsAuthentication()) {
-        console.log('Authentication check failed, but continuing for development');
-        // return; // Commented out for development
-    }
+    // PRIORITY: Try to load real data from DynamoDB first
+    console.log('🎯 Attempting to load real merchants data from DynamoDB...');
+    showLoader(true, 'Loading merchants from database...');
+    updateDataSourceIndicator('loading', 'Loading real data from database...');
     
-    // IMMEDIATE FALLBACK: Load sample data right away to prevent "Loading..." from persisting
-    console.log('Loading sample data immediately as primary approach for development...');
+    try {
+        // Initialize AWS first
+        console.log('⚙️ Initializing AWS...');
+        await initializeAWS();
+        console.log('✅ AWS initialized successfully');
+        
+        // Try to load real data from DynamoDB
+        console.log('📊 Loading merchants from DynamoDB...');
+        await loadMerchantsFromDynamoDB();
+        
+        if (merchantsData.length > 0) {
+            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} real merchants from DynamoDB`);
+            filteredMerchants = [...merchantsData];
+            renderMerchantsTable();
+            updateMerchantStats();
+            updateDataSourceIndicator('database', `Loaded ${merchantsData.length} real merchants from database`);
+            showMessage(`Loaded ${merchantsData.length} real merchants from database`, 'success');
+            setTimeout(() => hideMessage(), 3000);
+        } else {
+            console.log('⚠️ Database returned no merchants.');
+            // When local, show an empty state message instead of sample data
+            if (isLocal) {
+                const tableBody = document.getElementById('merchantsTableBody');
+                if(tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">Database is empty. No merchants found.</td></tr>';
+                updateDataSourceIndicator('empty', 'Database is empty');
+                showMessage('The database is empty. No merchants to display.', 'info');
+            } else {
+                console.log('⚠️ Database returned no merchants, using sample data');
+                merchantsData = getSampleMerchantsData();
+                filteredMerchants = [...merchantsData];
+                renderMerchantsTable();
+                updateMerchantStats();
+                updateDataSourceIndicator('empty', 'Database is empty - showing sample data');
+                showMessage('Database is empty. Showing sample data for demonstration.', 'warning');
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Failed to load real data:', error);
+        
+        // When local, display the error clearly instead of falling back to sample data
+        if (isLocal) {
+            console.log('💻 LOCAL MODE: Bypassing sample data fallback to show the real error.');
+            const errorMessage = `Failed to load data from DynamoDB: ${error.message}. This is likely an AWS credentials or IAM permission issue. Check the browser console for details.`;
+            const tableBody = document.getElementById('merchantsTableBody');
+            if(tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">${errorMessage}</td></tr>`;
+            updateDataSourceIndicator('error', `Database Error: ${error.message}`);
+            showMessage(errorMessage, 'error');
+        } else {
+            console.log('🔄 Falling back to sample data due to error:', error.message);
+            // Fall back to sample data
+            merchantsData = getSampleMerchantsData();
+            filteredMerchants = [...merchantsData];
+            renderMerchantsTable();
+            updateMerchantStats();
+            updateDataSourceIndicator('error', `Database error: ${error.message}. Showing sample data.`);
+            showMessage(`Database connection failed: ${error.message}. Loading sample data...`, 'warning');
+        }
+    } finally {
+        showLoader(false);
+        setupEventListeners();
+    }
+};
+
+// Helper function to show sample data with a clear message
+function showSampleDataWithMessage(reason) {
+    console.log('Loading sample data as fallback...');
     merchantsData = getSampleMerchantsData();
     filteredMerchants = [...merchantsData];
     
-    // Render table immediately
-    console.log('Rendering table immediately with sample data...');
     renderMerchantsTable();
     updateMerchantStats();
     setupEventListeners();
     
-    // Then try to load real data in background
+    // Show clear message about why we're showing sample data
+    showMessage(`Showing sample data: ${reason}`, 'warning');
+    console.log('Sample data loaded and rendered as fallback');
+}
+
+// Helper function to update the data source indicator
+function updateDataSourceIndicator(status, message) {
+    const indicator = document.getElementById('dataSourceIndicator');
+    const authIndicator = document.getElementById('authIndicator');
+    const loginBtn = document.getElementById('loginBtn');
+    const loadRealDataBtn = document.getElementById('loadRealDataBtn');
+    
+    if (indicator) {
+        indicator.textContent = message;
+    }
+    
+    if (authIndicator) {
+        switch (status) {
+            case 'unauthenticated':
+                authIndicator.textContent = 'Not Logged In';
+                authIndicator.style.backgroundColor = '#ffc107';
+                authIndicator.style.color = '#000';
+                if (loginBtn) loginBtn.style.display = 'inline-block';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
+                break;
+            case 'database':
+                authIndicator.textContent = 'Real Data';
+                authIndicator.style.backgroundColor = '#28a745';
+                authIndicator.style.color = '#fff';
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
+                break;
+            case 'error':
+            case 'empty':
+                authIndicator.textContent = 'Sample Data';
+                authIndicator.style.backgroundColor = '#6c757d';
+                authIndicator.style.color = '#fff';
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'inline-block';
+                break;
+            default:
+                authIndicator.textContent = 'Checking...';
+                authIndicator.style.backgroundColor = '#007bff';
+                authIndicator.style.color = '#fff';
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
+        }
+    }
+}
+
+// Function to force load real data (for the button)
+function forceLoadRealData() {
+    const idToken = sessionStorage.getItem('idToken');
+    const accessToken = sessionStorage.getItem('accessToken');
+    
+    if (!idToken && !accessToken) {
+        alert('You need to log in first to access real data. Redirecting to login page...');
+        window.location.href = '../index.html';
+        return;
+    }
+    
+    // Force reload the page to retry loading real data
+    location.reload();
+}
+
+// Export the forceLoadRealData function to global scope for the button
+window.forceLoadRealData = forceLoadRealData;
+
+// Function to refresh merchants data (for refresh button)
+async function refreshMerchantsData() {
+    showLoader(true, 'Refreshing merchants data...');
+    updateDataSourceIndicator('loading', 'Refreshing data from database...');
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
     try {
-        console.log('Starting background AWS initialization...');
-        showLoader(true, 'Loading merchants from database...');
         await initializeAWS();
-        console.log('AWS initialized, starting merchants management...');
-        await initializeMerchantsManagement();
-        console.log('Merchants management initialized successfully');
-    } catch (err) {
-        console.error('Background merchants management initialization failed:', err);
-        showMessage(`Could not connect to database: ${err.message}. Showing sample data for development.`, 'warning');
+        await loadMerchantsFromDynamoDB();
+        
+        if (merchantsData.length > 0) {
+            filteredMerchants = [...merchantsData];
+            renderMerchantsTable();
+            updateMerchantStats();
+            updateDataSourceIndicator('database', `Showing ${merchantsData.length} real merchants from database`);
+            showMessage(`Refreshed: Loaded ${merchantsData.length} merchants from database`, 'success');
+            setTimeout(() => hideMessage(), 3000);
+        } else {
+            if (isLocal) {
+                const tableBody = document.getElementById('merchantsTableBody');
+                if(tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">Database is empty. No merchants found.</td></tr>';
+                updateDataSourceIndicator('empty', 'Database is empty');
+                showMessage('The database is empty. No merchants to display.', 'info');
+            } else {
+                updateDataSourceIndicator('empty', 'Database is empty - showing sample data');
+                showSampleDataWithMessage('Database is empty after refresh.');
+            }
+        }
+    } catch (error) {
+        console.error('Refresh failed:', error);
+        if (isLocal) {
+            const errorMessage = `Failed to refresh data: ${error.message}. Check console for details.`;
+            const tableBody = document.getElementById('merchantsTableBody');
+            if(tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">${errorMessage}</td></tr>`;
+            updateDataSourceIndicator('error', `Refresh Error: ${error.message}`);
+            showMessage(errorMessage, 'error');
+        } else {
+            updateDataSourceIndicator('error', `Refresh failed - showing sample data (${error.message})`);
+            showMessage(`Refresh failed: ${error.message}`, 'error');
+            showSampleDataWithMessage(`Refresh failed: ${error.message}`);
+        }
     } finally {
         showLoader(false);
     }
-});
+}
+
+// Export for global access
+window.refreshMerchantsData = refreshMerchantsData;
+
+// Function to open debug tool
+function openDebugTool() {
+    window.open('../merchant-data-debug.html', '_blank');
+}
+
+// Export for global access
+window.openDebugTool = openDebugTool;
 
 // Initialize AWS SDK credentials and DynamoDB client for merchants
 async function initializeAWS() {
     try {
-        // Retrieve Cognito ID token if available
         const idToken = sessionStorage.getItem('idToken');
-        if (!idToken) {
-            console.warn('No ID token found, using unauthenticated identities');
-        }
+        const accessToken = sessionStorage.getItem('accessToken');
         
-        // Ensure AWS SDK is loaded
+        console.log('Auth tokens status:', {
+            hasIdToken: !!idToken,
+            hasAccessToken: !!accessToken,
+        });
+
         if (typeof AWS === 'undefined') {
             throw new Error('AWS SDK not loaded.');
         }
-        
-        // Fetch Amplify outputs for configuration
+
         const resp = await fetch('../amplify_outputs.json');
         if (!resp.ok) throw new Error(`Failed to load amplify_outputs.json: ${resp.status}`);
         const outputs = await resp.json();
-        const region = outputs.data?.aws_region || 'us-east-1'; // Default fallback
+        const region = outputs.data?.aws_region || 'us-east-1';
         const userPoolId = outputs.auth.user_pool_id;
         const identityPoolId = outputs.auth.identity_pool_id;
         const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-        
-        // Configure AWS SDK region
+
         AWS.config.update({ region });
-        // Configure credentials: include Logins only if idToken present
+
         const credParams = { IdentityPoolId: identityPoolId };
-        if (idToken && !idToken.startsWith('mock-')) {
+        const hasValidToken = idToken && !idToken.startsWith('mock-') && idToken.length > 50;
+
+        if (hasValidToken) {
+            console.log('Attempting to get AWS credentials using Cognito ID token.');
             credParams.Logins = { [provider]: idToken };
+        } else {
+            console.warn('No valid authentication token found.');
+            console.info('Attempting to get AWS credentials for unauthenticated access.');
+            console.info('ℹ️ For this to work, your Cognito Identity Pool must have "Enable access to unauthenticated identities" checked, and the unauthenticated IAM role must have permissions to access the DynamoDB table.');
         }
+
         AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
-        
-        // Refresh credentials
+
         try {
             await AWS.config.credentials.refreshPromise();
-            console.log('AWS credentials obtained, identityId:', AWS.config.credentials.identityId);
-        } catch(refreshError) {
-            console.error('Failed to refresh AWS credentials:', refreshError);
-            // For development, continue anyway
-            console.warn('Continuing with potentially invalid credentials for development...');
+            console.log('✅ AWS credentials obtained successfully.', {
+                identityId: AWS.config.credentials.identityId,
+                isAuthenticated: AWS.config.credentials.authenticated
+            });
+        } catch (error) {
+            console.error('❌ Failed to refresh AWS credentials:', error);
+            const message = `Could not get AWS credentials. 
+            - If you are not logged in, please check your Cognito Identity Pool settings for unauthenticated access.
+            - The IAM role for your identity (authenticated or unauthenticated) might be missing the required DynamoDB permissions (e.g., dynamodb:Scan).
+            - Original error: ${error.message}`;
+            throw new Error(message);
         }
-        
-        // Initialize DynamoDB DocumentClient
-        dynamoDB = new AWS.DynamoDB.DocumentClient();
+
+        dynamoDB = new AWS.DynamoDB.DocumentClient({
+            convertEmptyValues: true,
+            removeUndefinedValues: true,
+            region: region
+        });
+        console.log('✅ DynamoDB DocumentClient initialized successfully in region:', region);
+
     } catch (err) {
         console.error('Error during AWS initialization:', err);
+        // Re-throw the error so the caller function can handle it (e.g., show an error in the UI)
         throw err;
-    }
-}
-
-// Initialize merchants management with fallback
-async function initializeMerchantsManagement() {
-    try {
-        console.log('Initializing merchants management (background)...');
-        
-        showMessage('Attempting to connect to database...', 'info');
-        
-        try {
-            await loadMerchantsFromDynamoDB();
-            
-            if (merchantsData.length === 0) {
-                console.log('No merchants found in database, keeping sample data...');
-                showMessage('Database is empty. Displaying sample data for development.', 'warning');
-                // Keep existing sample data
-            } else {
-                console.log(`Successfully loaded ${merchantsData.length} merchants from database`);
-                // Update with real data
-                filteredMerchants = [...merchantsData];
-                renderMerchantsTable();
-                updateMerchantStats();
-                hideMessage();
-                showMessage('Connected to database successfully!', 'success');
-                setTimeout(hideMessage, 3000); // Hide success message after 3 seconds
-            }
-        } catch (dbError) {
-            console.error('Database loading failed, keeping sample data:', dbError);
-            showMessage(`Database connection failed: ${dbError.message}. Displaying sample data for development.`, 'warning');
-            // Keep existing sample data - no need to reload
-        }
-        
-    } catch (error) {
-        console.error('Failed to initialize merchants management:', error);
-        showMessage(`Could not initialize merchants management: ${error.message}. Displaying sample data.`, 'error');
-        // Keep existing sample data
     }
 }
 
@@ -215,23 +402,86 @@ async function loadMerchantsFromDynamoDB() {
         console.log('DynamoDB scan result:', result);
 
         if (result.Items && result.Items.length > 0) {
-            merchantsData = result.Items.map(item => ({
-                id: item.id || item.businessId || `merchant-${Date.now()}-${Math.random()}`,
-                name: item.name || item.businessName || 'Unknown Business',
-                email: item.email || 'N/A',
-                phone: item.phone || item.phoneNumber || 'N/A',
-                address: typeof item.address === 'string' ? item.address :
-                         (item.address ? `${item.address.street || ''}, ${item.address.city || ''}` : 'N/A'),
-                owner: item.owner || item.ownerName || 'N/A',
-                status: item.status || (item.isActive ? 'approved' : 'unknown'),
-                isActive: item.isActive !== undefined ? item.isActive : true,
-                joinDate: item.joinDate || (item.createdAt ? formatDate(item.createdAt) : 'N/A'),
-                avatar: item.avatar || item.businessPhotoUrl || generateAvatarUrl(item.name || item.businessName),
-                // Keep original data for details view
-                fullData: item
-            }));
+            console.log(`✅ Found ${result.Items.length} merchants in DynamoDB!`);
+            console.log('Raw DynamoDB items sample:', result.Items[0]);
             
-            console.log(`Successfully loaded ${merchantsData.length} merchants from DynamoDB`);
+            merchantsData = result.Items.map((item, index) => {
+                console.log(`🔄 Processing merchant ${index + 1}:`, item);
+                
+                // Handle address extraction with enhanced logging
+                let address = 'Address not available';
+                try {
+                    if (item.address && typeof item.address === 'object') {
+                        console.log('Address object found:', item.address);
+                        address = extractAddress(item.address, item.city, item.country);
+                    } else if (item.city || item.country) {
+                        const parts = [];
+                        if (item.city) parts.push(item.city);
+                        if (item.country) parts.push(item.country);
+                        address = parts.join(', ');
+                        console.log('Using city/country fallback:', address);
+                    } else if (typeof item.address === 'string') {
+                        address = item.address;
+                        console.log('Using string address:', address);
+                    }
+                } catch (addrError) {
+                    console.error('Error extracting address:', addrError);
+                    address = 'Address extraction failed';
+                }
+                
+                // Create merchant object with comprehensive field mapping
+                const merchant = {
+                    // Primary identification
+                    id: item.businessId || item.id || `merchant-${Date.now()}-${Math.random()}`,
+                    name: item.businessName || item.name || item.title || 'Unknown Business',
+                    
+                    // Contact information
+                    email: item.email || item.businessEmail || 'N/A',
+                    phone: item.phoneNumber || item.phone || item.businessPhone || 'N/A',
+                    
+                    // Business details
+                    category: mapBusinessType(item.businessType || item.category) || 'Other',
+                    status: item.status || (item.isActive !== false ? 'approved' : 'pending'),
+                    isActive: item.isActive !== undefined ? item.isActive : true,
+                    
+                    // Location
+                    address: address,
+                    
+                    // Owner information
+                    owner: item.ownerName || item.owner || item.contactName || 'N/A',
+                    
+                    // Timestamps
+                    joinDate: item.createdAt ? formatDate(item.createdAt) : (item.dateCreated ? formatDate(item.dateCreated) : 'N/A'),
+                    
+                    // Visual
+                    avatar: item.businessPhotoUrl || item.avatar || item.logo || generateAvatarUrl(item.businessName || item.name),
+                    
+                    // Additional fields for potential future use
+                    description: item.description || item.businessDescription || '',
+                    website: item.website || item.businessWebsite || '',
+                    
+                    // Keep original data for details view
+                    fullData: item
+                };
+                
+                console.log(`✅ Mapped merchant ${index + 1}:`, {
+                    id: merchant.id,
+                    name: merchant.name,
+                    phone: merchant.phone,
+                    address: merchant.address,
+                    status: merchant.status
+                });
+                
+                return merchant;
+            });
+            
+            console.log(`✅ Successfully loaded and mapped ${merchantsData.length} merchants from DynamoDB!`);
+            console.log('📊 Summary of loaded merchants:');
+            merchantsData.forEach((merchant, index) => {
+                console.log(`   ${index + 1}. ${merchant.name} (${merchant.id}) - ${merchant.address}`);
+            });
+            
+            console.log('Final merchants data for rendering:', merchantsData);
             return;
         } else {
             console.log('No merchants found in DynamoDB');
@@ -264,19 +514,23 @@ function mapBusinessType(businessType) {
 
 // Enhanced helper function to extract address from DynamoDB address structure
 function extractAddress(addressObj, city, country) {
+    console.log('Extracting address from:', { addressObj, city, country });
+    
     // Handle complex address object from DynamoDB
     if (addressObj && typeof addressObj === 'object') {
         const parts = [];
         
-        // Check if it's a DynamoDB attribute value object
+        // Check if it's a DynamoDB attribute value object (unconverted format)
         if (addressObj.country && addressObj.country.S) {
+            console.log('Processing DynamoDB AttributeValue format');
             // DynamoDB AttributeValue format
             if (addressObj.street && addressObj.street.S) parts.push(addressObj.street.S);
             if (addressObj.district && addressObj.district.S) parts.push(addressObj.district.S);
             if (addressObj.city && addressObj.city.S) parts.push(addressObj.city.S);
             if (addressObj.country && addressObj.country.S) parts.push(addressObj.country.S);
         } else {
-            // Regular object format
+            console.log('Processing converted object format');
+            // Regular object format (DocumentClient converted)
             if (addressObj.street) parts.push(addressObj.street);
             if (addressObj.district) parts.push(addressObj.district);
             if (addressObj.city) parts.push(addressObj.city);
@@ -284,12 +538,15 @@ function extractAddress(addressObj, city, country) {
         }
         
         if (parts.length > 0) {
-            return parts.join(', ');
+            const address = parts.join(', ');
+            console.log('Extracted address:', address);
+            return address;
         }
     }
     
     // Fallback to individual city and country fields
     if (typeof addressObj === 'string') {
+        console.log('Using string address:', addressObj);
         return addressObj;
     }
     
@@ -297,7 +554,9 @@ function extractAddress(addressObj, city, country) {
     if (city) parts.push(city);
     if (country) parts.push(country);
     
-    return parts.length > 0 ? parts.join(', ') : 'Address not available';
+    const fallbackAddress = parts.length > 0 ? parts.join(', ') : 'Address not available';
+    console.log('Fallback address:', fallbackAddress);
+    return fallbackAddress;
 }
 
 // Generate avatar URL
@@ -487,9 +746,15 @@ function renderMerchantsTable() {
     
     const tbody = document.getElementById('merchantsTableBody');
     console.log('Table body element found:', !!tbody);
+    console.log('Table body innerHTML before:', tbody ? tbody.innerHTML.substring(0, 100) + '...' : 'N/A');
     
     if (!tbody) {
         console.error('merchantsTableBody element not found');
+        // Try to find it with alternative methods
+        const allTables = document.querySelectorAll('table');
+        console.log('All tables found:', allTables.length);
+        const allTbodies = document.querySelectorAll('tbody');
+        console.log('All tbody elements found:', allTbodies.length);
         return;
     }
 
@@ -504,47 +769,69 @@ function renderMerchantsTable() {
                 </td>
             </tr>
         `;
+        console.log('Table HTML updated with empty state');
         return;
     }
 
     console.log('Generating table HTML for', filteredMerchants.length, 'merchants');
-    const tableHTML = filteredMerchants.map(merchant => `
-        <tr>
-            <td>
-                <div class="merchant-info">
-                    <div class="merchant-avatar">
-                        <img src="${merchant.avatar}" alt="${merchant.name}" onerror="this.src='https://via.placeholder.com/40x40?text=M'">
-                    </div>
-                    <div class="merchant-name">
-                        <a href="merchant-products.html?businessId=${merchant.id}" class="merchant-link">${merchant.name}</a>
-                    </div>
-                </div>
-            </td>
-            <td>${merchant.owner}</td>
-            <td>
-                <span class="status-badge ${getStatusClass(merchant.status)}">
-                    ${getStatusLabel(merchant.status)}
-                </span>
-            </td>
-            <td>${merchant.email}</td>
-            <td>${merchant.phone}</td>
-            <td>${merchant.address}</td>
-            <td>
-                <div class="actions">
-                    <button class="btn-action" onclick="event.stopPropagation(); viewMerchantDetails('${merchant.id}')" title="View Details">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn-action" onclick="event.stopPropagation(); openStatusModal('${merchant.id}')" title="Edit Status">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
     
-    console.log('Setting table HTML (length:', tableHTML.length, 'characters)');
-    tbody.innerHTML = tableHTML;
-    console.log('Table HTML set successfully');
+    try {
+        const tableHTML = filteredMerchants.map(merchant => {
+            console.log('Processing merchant:', merchant.name);
+            return `
+                <tr>
+                    <td>
+                        <div class="merchant-info">
+                            <div class="merchant-avatar">
+                                <img src="${merchant.avatar}" alt="${merchant.name}" onerror="this.src='https://via.placeholder.com/40x40?text=M'">
+                            </div>
+                            <div class="merchant-name">
+                                <a href="merchant-products.html?businessId=${merchant.id}" class="merchant-link">${merchant.name}</a>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${merchant.owner}</td>
+                    <td>
+                        <span class="status-badge ${getStatusClass(merchant.status)}">
+                            ${getStatusLabel(merchant.status)}
+                        </span>
+                    </td>
+                    <td>${merchant.email}</td>
+                    <td>${merchant.phone}</td>
+                    <td>${merchant.address}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn-action" onclick="event.stopPropagation(); viewMerchantDetails('${merchant.id}')" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-action" onclick="event.stopPropagation(); openStatusModal('${merchant.id}')" title="Edit Status">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        
+        console.log('Generated table HTML (length:', tableHTML.length, 'characters)');
+        console.log('Table HTML preview:', tableHTML.substring(0, 200) + '...');
+        
+        tbody.innerHTML = tableHTML;
+        console.log('Table HTML set successfully');
+        console.log('Table body innerHTML after:', tbody.innerHTML.substring(0, 100) + '...');
+    } catch (error) {
+        console.error('Error generating table HTML:', error);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                    <div>Error rendering table</div>
+                    <div style="font-size: 0.9rem; margin-top: 0.5rem;">${error.message}</div>
+                </td>
+            </tr>
+        `;
+    }
+    
     console.log('=== RENDER MERCHANTS TABLE END ===');
 }
 
@@ -841,3 +1128,7 @@ function formatDate(isoString) {
     if (!isoString) return 'N/A';
     return new Date(isoString).toLocaleDateString();
 }
+
+// Replace original listener binding
+document.removeEventListener('DOMContentLoaded', /* original handler */);
+document.addEventListener('DOMContentLoaded', onDomReady);
