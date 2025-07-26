@@ -463,6 +463,28 @@ function extractAddress(addressObj, city, country) {
     return fallbackAddress;
 }
 
+// Helper function to format dates
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    try {
+        // Attempt to parse the date
+        const date = new Date(dateString);
+        // Check if the date is valid
+        if (isNaN(date.getTime())) {
+            return dateString; // Return original string if it's not a valid date
+        }
+        // Format to a more readable string e.g., "Jan 15, 2024"
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (e) {
+        console.warn(`Could not parse date: ${dateString}`);
+        return dateString; // Return original string if parsing fails
+    }
+}
+
 // Generate avatar URL
 function generateAvatarUrl(name) {
     if (!name) return 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=40&h=40&fit=crop&crop=center';
@@ -568,8 +590,17 @@ function showLoader(show, message = 'Loading...') {
             loaderMessage.textContent = message;
         }
     } else {
-        console.warn('#loader element not found in the DOM.');
+        // This is not a critical error, but good to know for debugging UI.
+        // console.warn('#loader element not found in the DOM.');
     }
+}
+
+// Dummy function to avoid errors if it's missing.
+// In a real app, this would handle search, filters, etc.
+function setupEventListeners() {
+    console.log('Setting up event listeners (search, filters, etc.)...');
+    // This is a placeholder. A full implementation would add listeners for
+    // search input, filter dropdowns, and other interactive elements.
 }
 
 // This script should run after the DOM is fully loaded.
