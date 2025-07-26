@@ -494,7 +494,7 @@ function renderMerchantsTable() {
                     <button class="btn-action" onclick="viewMerchant('${merchant.id}')" title="View Details">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button class="btn-action" onclick="editMerchant('${merchant.id}')" title="Edit">
+                    <button class="btn-action" onclick="openStatusModal('${merchant.id}')" title="Edit Status">
                         <i class="fas fa-edit"></i>
                     </button>
                     <button class="btn-action ${merchant.isActive ? 'danger' : 'success'}" 
@@ -535,13 +535,6 @@ function viewMerchant(id) {
     const merchant = merchantsData.find(m => m.id === id);
     if (merchant) {
         alert(`Viewing merchant: ${merchant.name}\nStatus: ${getStatusLabel(merchant.status)}\nOwner: ${merchant.owner}`);
-    }
-}
-
-function editMerchant(id) {
-    const merchant = merchantsData.find(m => m.id === id);
-    if (merchant) {
-        alert(`Edit functionality for ${merchant.name} would open here`);
     }
 }
 

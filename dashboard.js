@@ -95,11 +95,14 @@ function initializeDashboard() {
 
 // Toggle sidebar visibility
 function toggleSidebar() {
-    sidebar.classList.toggle('active');
-    
-    // Handle backdrop for mobile
+    // On mobile, toggle full overlay sidebar
     if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('active');
         toggleBackdrop();
+    } else {
+        // On desktop, collapse sidebar to icons only
+        sidebar.classList.toggle('collapsed');
+        mainContent.classList.toggle('collapsed-sidebar');
     }
 }
 
