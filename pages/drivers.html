@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Drivers Management</title>
+    <link rel="stylesheet" href="../dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>WizzCentral</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item active">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Drivers Management</h1>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-primary" onclick="openAddDriverModal()">
+                    <i class="fas fa-plus"></i>
+                    Add New Driver
+                </button>
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </button>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Driver Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon online">
+                        <i class="fas fa-motorcycle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>89</h3>
+                        <p>Online Drivers</p>
+                        <span class="stat-change positive">+5.2%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon delivering">
+                        <i class="fas fa-shipping-fast"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>34</h3>
+                        <p>Currently Delivering</p>
+                        <span class="stat-change neutral">-</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon total">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>156</h3>
+                        <p>Total Drivers</p>
+                        <span class="stat-change positive">+3.1%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon rating">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>4.7</h3>
+                        <p>Average Rating</p>
+                        <span class="stat-change positive">+0.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters and Search -->
+            <div class="table-controls">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search drivers..." id="searchInput">
+                </div>
+                <div class="filter-container">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="online">Online</option>
+                        <option value="offline">Offline</option>
+                        <option value="delivering">Delivering</option>
+                        <option value="unavailable">Unavailable</option>
+                    </select>
+                    <select id="ratingFilter">
+                        <option value="">All Ratings</option>
+                        <option value="5">5 Stars</option>
+                        <option value="4">4+ Stars</option>
+                        <option value="3">3+ Stars</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Drivers Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Driver</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            <th>Current Location</th>
+                            <th>Orders Completed</th>
+                            <th>Rating</th>
+                            <th>Earnings Today</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="driversTableBody">
+                        <tr>
+                            <td>
+                                <div class="driver-info">
+                                    <div class="driver-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=1" alt="John Doe">
+                                    </div>
+                                    <div>
+                                        <div class="driver-name">John Doe</div>
+                                        <div class="driver-id">#DRV001</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>+1 (555) 123-4567</td>
+                            <td><span class="status-badge online">Online</span></td>
+                            <td>Downtown Area</td>
+                            <td>47</td>
+                            <td>
+                                <div class="rating">
+                                    <span class="rating-stars">
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                    </span>
+                                    <span class="rating-value">4.9</span>
+                                </div>
+                            </td>
+                            <td>$345.50</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewDriver('DRV001')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editDriver('DRV001')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="suspendDriver('DRV001')" title="Suspend">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="driver-info">
+                                    <div class="driver-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=2" alt="Jane Smith">
+                                    </div>
+                                    <div>
+                                        <div class="driver-name">Jane Smith</div>
+                                        <div class="driver-id">#DRV002</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>+1 (555) 234-5678</td>
+                            <td><span class="status-badge delivering">Delivering</span></td>
+                            <td>North District</td>
+                            <td>62</td>
+                            <td>
+                                <div class="rating">
+                                    <span class="rating-stars">
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="far fa-star"></i>
+                                    </span>
+                                    <span class="rating-value">4.3</span>
+                                </div>
+                            </td>
+                            <td>$289.75</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewDriver('DRV002')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editDriver('DRV002')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="suspendDriver('DRV002')" title="Suspend">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="driver-info">
+                                    <div class="driver-avatar">
+                                        <img src="https://i.pravatar.cc/40?img=3" alt="Mike Johnson">
+                                    </div>
+                                    <div>
+                                        <div class="driver-name">Mike Johnson</div>
+                                        <div class="driver-id">#DRV003</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>+1 (555) 345-6789</td>
+                            <td><span class="status-badge offline">Offline</span></td>
+                            <td>South Area</td>
+                            <td>38</td>
+                            <td>
+                                <div class="rating">
+                                    <span class="rating-stars">
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                    </span>
+                                    <span class="rating-value">4.8</span>
+                                </div>
+                            </td>
+                            <td>$198.25</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewDriver('DRV003')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editDriver('DRV003')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="suspendDriver('DRV003')" title="Suspend">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <div class="pagination-info">
+                    Showing 1-10 of 156 drivers
+                </div>
+                <button class="pagination-btn">
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Driver Modal -->
+    <div class="modal" id="addDriverModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Driver</h2>
+                <button class="modal-close" onclick="closeAddDriverModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addDriverForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="driverName">Full Name</label>
+                            <input type="text" id="driverName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="driverEmail">Email</label>
+                            <input type="email" id="driverEmail" name="email" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="driverPhone">Phone Number</label>
+                            <input type="tel" id="driverPhone" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="driverLicense">License Number</label>
+                            <input type="text" id="driverLicense" name="license" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="vehicleType">Vehicle Type</label>
+                            <select id="vehicleType" name="vehicleType" required>
+                                <option value="">Select vehicle type</option>
+                                <option value="motorcycle">Motorcycle</option>
+                                <option value="bicycle">Bicycle</option>
+                                <option value="car">Car</option>
+                                <option value="scooter">Scooter</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="emergencyContact">Emergency Contact</label>
+                            <input type="tel" id="emergencyContact" name="emergencyContact" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeAddDriverModal()">Cancel</button>
+                <button type="submit" form="addDriverForm" class="btn-primary">Add Driver</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AWS SDK and Configuration Scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../dashboard.js"></script>
+    <script src="../drivers.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+type Business @model @auth(rules: [{allow: private, operations: [read, create, update, delete]}])
+{
+  name: String
+  email: AWSEmail
+  phone: AWSPhone
+  category: String
+  status: BusinessStatus
+  owner: String
+  address: String
+  joinDate: AWSDate
+  avatar: AWSURL
+}
+
+enum BusinessStatus {
+  pending
+  approved
+  rejected
+  under_review
+  pending_verification
+  unknown
+  suspended
+}

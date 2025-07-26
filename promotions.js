@@ -1,93 +1,119 @@
 // Promotions Management JavaScript
 
-import { Amplify, Auth } from 'aws-amplify';
-import config from './config.js';
+// Check authentication on page load - TEMPORARILY DISABLED FOR DEBUGGING
+function checkAuthentication() {
+  // const idToken = sessionStorage.getItem('idToken');
+  // const accessToken = sessionStorage.getItem('accessToken');
+  
+  // if (!idToken || !accessToken) {
+  //   console.warn('No authentication tokens found, redirecting to login');
+  //   window.location.href = 'index.html';
+  //   return false;
+  // }
+  
+  return true;
+}
 
-// Configure Amplify Auth
-Amplify.configure({
-  Auth: {
-    region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
-    userPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
-    userPoolWebClientId: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID,
-    mandatorySignIn: true
-  }
-});
+// AWS SDK and authentication setup
+let dynamodbClient = null;
+const PROMOTIONS_TABLE = 'WizzPromo_promos_dev'; // Assumed table name
 
-// Redirect to login if not authenticated
-Auth.currentAuthenticatedUser().catch(() => {
-  window.location.href = 'index.html';
-});
-
-// Global logout function
+// Global logout function for navigation consistency
 window.logout = async () => {
-  await Auth.signOut();
-  window.location.href = 'index.html';
+  try {
+    if (AWS && AWS.config && AWS.config.credentials) {
+      AWS.config.credentials.clearCachedId();
+    }
+    sessionStorage.clear();
+    localStorage.removeItem('accessToken');
+    window.location.href = 'index.html'; // Will work since we're in pages/
+  } catch (error) {
+    console.error('Logout error:', error);
+    window.location.href = 'index.html'; // Will work since we're in pages/
+  }
 };
 
+// Initialize AWS credentials and DynamoDB client - TEMPORARILY DISABLED FOR DEBUGGING
+async function initializeAWS() {
+    console.log('AWS initialization disabled for debugging - promotions page');
+    // All AWS initialization code temporarily disabled
+    return Promise.resolve();
+}
+
+// Load promotions data from DynamoDB - TEMPORARILY DISABLED FOR DEBUGGING
+async function loadPromotionsData() {
+    console.log('Loading mock promotions data for debugging...');
+    
+    // Mock data for testing
+    promotions = [
+        {
+            id: 'PROMO001',
+            title: 'Summer Sale',
+            description: '20% off all orders',
+            status: 'active',
+            startDate: '2025-07-01',
+            endDate: '2025-07-31',
+            type: 'percentage',
+            value: 20,
+            code: 'SUMMER20',
+            usage: 45,
+            limit: 100
+        },
+        {
+            id: 'PROMO002', 
+            title: 'Free Delivery',
+            description: 'Free delivery on orders over $50',
+            status: 'active',
+            startDate: '2025-07-15',
+            endDate: '2025-08-15',
+            type: 'free_delivery',
+            value: 0,
+            code: 'FREEDEL50',
+            usage: 23,
+            limit: 200
+        }
+    ];
+    
+    console.log('Mock promotions loaded:', promotions);
+    initializePromotionsPage();
+}
+
+
 // Sample promotion data
-let promotions = [
-    {
-        id: 'PROMO001',
-        title: 'Summer Sale 2025',
-        code: 'SUMMER25',
-        type: 'percentage',
-        value: 25,
-        status: 'active',
-        usage: 847,
-        limit: 1000,
-        startDate: '2025-07-01',
-        endDate: '2025-07-31',
-        description: 'Summer discount for all orders',
-        minOrderValue: 30
-    },
-    {
-        id: 'PROMO002',
-        title: 'Free Delivery Week',
-        code: 'FREEDEL',
-        type: 'free_delivery',
-        value: 0,
-        status: 'active',
-        usage: 234,
-        limit: 500,
-        startDate: '2025-07-20',
-        endDate: '2025-07-27',
-        description: 'Free delivery on all orders',
-        minOrderValue: 20
-    },
-    {
-        id: 'PROMO003',
-        title: 'Weekend Special',
-        code: 'WEEKEND15',
-        type: 'percentage',
-        value: 15,
-        status: 'scheduled',
-        usage: 0,
-        limit: 200,
-        startDate: '2025-07-26',
-        endDate: '2025-07-28',
-        description: 'Weekend only discount',
-        minOrderValue: 25
-    },
-    {
-        id: 'PROMO004',
-        title: 'New Customer Bonus',
-        code: 'WELCOME20',
-        type: 'fixed',
-        value: 20,
-        status: 'expired',
-        usage: 156,
-        limit: 100,
-        startDate: '2025-06-01',
-        endDate: '2025-06-30',
-        description: 'Welcome bonus for new customers',
-        minOrderValue: 50
-    }
-];
+let promotions = [];
 
 // Initialize promotions page
+document.addEventListener('DOMContentLoaded', async function() {
+    const tbody = document.getElementById('promotionsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading promotions...</td></tr>`;
+    }
+    
+    try {
+        await initializeAWS();
+        await loadPromotionsData();
+        setupEventListeners();
+    } catch (error) {
+        console.error('Failed to initialize promotions page:', error);
+    }
+});
+
+// Initialize promotions page when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    initializePromotionsPage();
-    setupEventListeners();
+    console.log('Promotions page DOM loaded');
+    
+    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
+    // if (!checkAuthentication()) {
+    //     return;
+    // }
+    
+    // Initialize dashboard functionality (sidebar, etc.)
+    if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
+    }
+    
+    // Load promotions data
+    loadPromotionsData();
 });
 
 function initializePromotionsPage() {

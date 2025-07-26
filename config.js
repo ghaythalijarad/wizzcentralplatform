@@ -23,7 +23,7 @@ window.WIZZCENTRAL_CONFIG = {
     
     // UI Configuration
     THEME: {
-        PRIMARY_COLOR: '#007bff',
+        PRIMARY_COLOR: '#009de0',
         SECONDARY_COLOR: '#6c757d',
         SUCCESS_COLOR: '#28a745',
         WARNING_COLOR: '#ffc107',

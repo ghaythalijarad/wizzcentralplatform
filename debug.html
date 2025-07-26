@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>WizzCentral Platform Debug</h1>
+    
+    <div class="test-section">
+        <h3>Basic HTML Test</h3>
+        <p>This text should be visible if HTML is working</p>
+        <div style="background: blue; color: white; padding: 10px;">This blue box tests CSS</div>
+    </div>
+    
+    <div class="test-section">
+        <h3>JavaScript Test</h3>
+        <p id="js-test">JavaScript not loaded</p>
+    </div>
+    
+    <div class="test-section">
+        <h3>CSS Loading Test</h3>
+        <link rel="stylesheet" href="dashboard.css">
+        <div class="sidebar" style="position: relative; width: 200px; height: 100px; transform: none;">
+            <p style="padding: 10px;">Sidebar CSS Test</p>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Dashboard Content Test</h3>
+        <div class="stat-card" style="display: inline-block; margin: 10px;">
+            <div class="stat-icon orders">
+                <i class="fas fa-shopping-bag"></i>
+            </div>
+            <div class="stat-info">
+                <h3>1,247</h3>
+                <p>Total Orders Today</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('js-test').textContent = 'JavaScript is working!';
+        document.getElementById('js-test').className = 'success';
+        
+        // Test if elements exist
+        console.log('Testing element visibility...');
+        
+        setTimeout(() => {
+            const elements = document.querySelectorAll('*');
+            console.log(`Total elements found: ${elements.length}`);
+            
+            const visibleElements = Array.from(elements).filter(el => {
+                const style = window.getComputedStyle(el);
+                return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            });
+            console.log(`Visible elements: ${visibleElements.length}`);
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -140,10 +140,11 @@
                 "rules": [
                   {
                     "allow": "private",
-                    "provider": "iam",
                     "operations": [
                       "read",
-                      "update"
+                      "create",
+                      "update",
+                      "delete"
                     ]
                   }
                 ]

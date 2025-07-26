@@ -8,31 +8,41 @@ let cognitoUser = null;
 
 // Load configuration on page load
 async function loadConfiguration() {
+    let configData;
     try {
-        console.log('Loading Amplify configuration...');
-        const response = await fetch('./amplify_outputs.json');
-        const config = await response.json();
-        console.log('Configuration loaded:', config);
-        
-        if (config.auth) {
-            cognitoConfig = {
-                region: config.auth.aws_region,
-                userPoolId: config.auth.user_pool_id,
-                clientId: config.auth.user_pool_client_id
-            };
-            
-            // Configure AWS SDK
-            AWS.config.region = cognitoConfig.region;
-            
-            isConfigLoaded = true;
-            console.log('Cognito config extracted:', cognitoConfig);
-        } else {
-            throw new Error('Invalid configuration format');
-        }
-        
+        console.log('Loading amplify_outputs.json...');
+        const response = await fetch('../amplify_outputs.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        configData = await response.json();
+        console.log('amplify_outputs.json loaded:', configData);
     } catch (error) {
-        console.error('Failed to load configuration:', error);
-        showMessage('Failed to load authentication configuration', 'error');
+        console.warn('Could not fetch amplify_outputs.json, falling back to config.js:', error);
+        // Fallback to config.js values
+        if (window.WIZZCENTRAL_CONFIG) {
+            configData = { auth: {
+                aws_region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
+                user_pool_id: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
+                user_pool_client_id: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID
+            } };
+        } else {
+            console.error('No fallback configuration available');
+            showMessage('Authentication configuration missing', 'error');
+            return;
+        }
+    }
+    // Extract Cognito config
+    if (configData.auth) {
+        cognitoConfig = {
+            region: configData.auth.aws_region,
+            userPoolId: configData.auth.user_pool_id,
+            clientId: configData.auth.user_pool_client_id
+        };
+        AWS.config.region = cognitoConfig.region;
+        isConfigLoaded = true;
+        console.log('Cognito config extracted:', cognitoConfig);
+    } else {
+        console.error('Invalid configuration format', configData);
+        showMessage('Invalid authentication configuration', 'error');
     }
 }
 
@@ -214,10 +224,8 @@ async function handleLogin(email, password, remember) {
                 localStorage.removeItem('lastEmail');
             }
             
-            // Redirect to dashboard
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1500);
+            // Redirect to the dashboard page in the pages directory
+            window.location.href = 'dashboard.html';
             
         } else {
             throw new Error('Authentication failed');
@@ -374,17 +382,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
-    // Enter key to submit form
-    if (e.key === 'Enter' && (e.target.type === 'email' || e.target.type === 'password')) {
+    const loginForm = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+
+    // Enter key to submit form when focusing email/password
+    if (loginForm && e.key === 'Enter' && (e.target === emailInput || e.target === passwordInput)) {
         e.preventDefault();
         loginForm.dispatchEvent(new Event('submit'));
     }
     
-    // Escape key to clear form
-    if (e.key === 'Escape') {
+    // Escape key to clear form when focusing email/password
+    if (e.key === 'Escape' && emailInput && passwordInput) {
         emailInput.value = '';
         passwordInput.value = '';
-        document.getElementById('remember').checked = false;
+        const rememberCheckbox = document.getElementById('remember');
+        if (rememberCheckbox) rememberCheckbox.checked = false;
         emailInput.focus();
     }
 });

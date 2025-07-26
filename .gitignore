@@ -166,3 +166,14 @@ amplifytools.xcconfig
 .secret-*
 **.sample
 #amplify-do-not-edit-end
+
+# Ignore backup and duplicate JS files
+*.backup
+*-new.js
+
+# Ignore test HTML and JS files
+test-*.html
+test-*.js
+
+# Ignore generated package files
+package-gen*.json

@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Promotions Management</title>
+    <link rel="stylesheet" href="../dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>WizzCentral</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item active">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Promotions Management</h1>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-primary" onclick="openAddPromotionModal()">
+                    <i class="fas fa-plus"></i>
+                    Create Promotion
+                </button>
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </button>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Promotion Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon active">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>24</h3>
+                        <p>Active Promotions</p>
+                        <span class="stat-change positive">+3</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon orders">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>1,847</h3>
+                        <p>Orders with Promos</p>
+                        <span class="stat-change positive">+18.5%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon revenue">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>$8,450</h3>
+                        <p>Discount Value Today</p>
+                        <span class="stat-change positive">+12.3%</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon conversion">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3>67%</h3>
+                        <p>Conversion Rate</p>
+                        <span class="stat-change positive">+5.2%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters and Search -->
+            <div class="table-controls">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Search promotions..." id="searchInput">
+                </div>
+                <div class="filter-container">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="expired">Expired</option>
+                        <option value="draft">Draft</option>
+                    </select>
+                    <select id="typeFilter">
+                        <option value="">All Types</option>
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                        <option value="free_delivery">Free Delivery</option>
+                        <option value="bogo">Buy One Get One</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Promotions Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Promotion</th>
+                            <th>Type</th>
+                            <th>Discount</th>
+                            <th>Status</th>
+                            <th>Usage</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="promotionsTableBody">
+                        <tr>
+                            <td>
+                                <div class="promotion-info">
+                                    <div class="promotion-icon">
+                                        <i class="fas fa-percentage"></i>
+                                    </div>
+                                    <div>
+                                        <div class="promotion-title">Summer Sale 2025</div>
+                                        <div class="promotion-code">SUMMER25</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>Percentage</td>
+                            <td><span class="discount-badge">25% OFF</span></td>
+                            <td><span class="promotion-status active">Active</span></td>
+                            <td>847 / 1000</td>
+                            <td>Jul 01, 2025</td>
+                            <td>Jul 31, 2025</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewPromotion('PROMO001')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editPromotion('PROMO001')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deactivatePromotion('PROMO001')" title="Deactivate">
+                                        <i class="fas fa-pause"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="promotion-info">
+                                    <div class="promotion-icon">
+                                        <i class="fas fa-truck"></i>
+                                    </div>
+                                    <div>
+                                        <div class="promotion-title">Free Delivery Week</div>
+                                        <div class="promotion-code">FREEDEL</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>Free Delivery</td>
+                            <td><span class="discount-badge">Free Shipping</span></td>
+                            <td><span class="promotion-status active">Active</span></td>
+                            <td>234 / 500</td>
+                            <td>Jul 20, 2025</td>
+                            <td>Jul 27, 2025</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewPromotion('PROMO002')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editPromotion('PROMO002')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deactivatePromotion('PROMO002')" title="Deactivate">
+                                        <i class="fas fa-pause"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="promotion-info">
+                                    <div class="promotion-icon">
+                                        <i class="fas fa-calendar"></i>
+                                    </div>
+                                    <div>
+                                        <div class="promotion-title">Weekend Special</div>
+                                        <div class="promotion-code">WEEKEND15</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>Percentage</td>
+                            <td><span class="discount-badge">15% OFF</span></td>
+                            <td><span class="promotion-status scheduled">Scheduled</span></td>
+                            <td>0 / 200</td>
+                            <td>Jul 26, 2025</td>
+                            <td>Jul 28, 2025</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewPromotion('PROMO003')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="editPromotion('PROMO003')" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="activatePromotion('PROMO003')" title="Activate Now">
+                                        <i class="fas fa-play"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div class="promotion-info">
+                                    <div class="promotion-icon">
+                                        <i class="fas fa-gift"></i>
+                                    </div>
+                                    <div>
+                                        <div class="promotion-title">New Customer Bonus</div>
+                                        <div class="promotion-code">WELCOME20</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>Fixed Amount</td>
+                            <td><span class="discount-badge">$20 OFF</span></td>
+                            <td><span class="promotion-status expired">Expired</span></td>
+                            <td>156 / 100</td>
+                            <td>Jun 01, 2025</td>
+                            <td>Jun 30, 2025</td>
+                            <td>
+                                <div class="actions">
+                                    <button class="btn-action" onclick="viewPromotion('PROMO004')" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn-action" onclick="clonePromotion('PROMO004')" title="Clone">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <button class="btn-action danger" onclick="deletePromotion('PROMO004')" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button class="pagination-btn" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <div class="pagination-info">
+                    Showing 1-10 of 47 promotions
+                </div>
+                <button class="pagination-btn">
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Promotion Modal -->
+    <div class="modal" id="addPromotionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Promotion</h2>
+                <button class="modal-close" onclick="closeAddPromotionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addPromotionForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="promotionTitle">Promotion Title</label>
+                            <input type="text" id="promotionTitle" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="promotionCode">Promo Code</label>
+                            <input type="text" id="promotionCode" name="code" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="promotionType">Discount Type</label>
+                            <select id="promotionType" name="type" required>
+                                <option value="">Select type</option>
+                                <option value="percentage">Percentage</option>
+                                <option value="fixed">Fixed Amount</option>
+                                <option value="free_delivery">Free Delivery</option>
+                                <option value="bogo">Buy One Get One</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="discountValue">Discount Value</label>
+                            <input type="number" id="discountValue" name="value" min="1" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">Start Date</label>
+                            <input type="datetime-local" id="startDate" name="startDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">End Date</label>
+                            <input type="datetime-local" id="endDate" name="endDate" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="usageLimit">Usage Limit</label>
+                            <input type="number" id="usageLimit" name="limit" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="minOrderValue">Min Order Value ($)</label>
+                            <input type="number" id="minOrderValue" name="minOrder" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="promotionDescription">Description</label>
+                        <textarea id="promotionDescription" name="description" rows="3" placeholder="Enter promotion description..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeAddPromotionModal()">Cancel</button>
+                <button type="submit" form="addPromotionForm" class="btn-primary">Create Promotion</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AWS SDK and Configuration Scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../dashboard.js"></script>
+    <script src="../promotions.js"></script>
+</body>
+</html>

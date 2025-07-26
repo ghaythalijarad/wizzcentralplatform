@@ -22,7 +22,7 @@
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-${AWS::Region}",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-${AWS::Region}",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/8cecf055cee9d6bfe847e368706ec63fbfa29e8bea4d5e18fc3208e568e0d78e.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-${AWS::Region}/4907c887a475b8e9204618cb50a22e3091fa48d92fb4373e851f6c1efb410cc1.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -881,12 +881,6 @@
           {
             "type": "aws:cdk:logicalId",
             "data": "amplifyDataBusinessNestedStackBusinessNestedStackResourceC273F05D"
-          }
-        ],
-        "/amplify-wizzcentralplatformgen2-ghaythallaheebi-sandbox-b1037a839c/data/amplifyData/AuthRolePolicy01/Resource": [
-          {
-            "type": "aws:cdk:logicalId",
-            "data": "amplifyDataAuthRolePolicy01567A5654"
           }
         ],
         "/amplify-wizzcentralplatformgen2-ghaythallaheebi-sandbox-b1037a839c/data/amplifyData/AmplifyCodegenAssets/AmplifyCodegenAssetsBucket/Resource": [

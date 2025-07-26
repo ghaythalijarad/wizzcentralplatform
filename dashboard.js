@@ -1,28 +1,76 @@
 // Dashboard JavaScript functionality
 
-// Check if AWS SDK is loaded
-if (typeof AWS === 'undefined') {
-    console.error('AWS SDK not loaded. Please check the CDN script.');
-}
-
-// Expose logout() for the logout button - will be redefined by individual pages
-window.logout = window.logout || function() {
-    console.log('Logout function will be defined by individual pages');
-    window.location.href = 'index.html';
+// Authentication check and logout function
+window.logout = async () => {
+    try {
+        if (AWS && AWS.config && AWS.config.credentials) {
+            AWS.config.credentials.clearCachedId();
+        }
+        sessionStorage.clear();
+        localStorage.removeItem('accessToken');
+        window.location.href = 'index.html';
+    } catch (error) {
+        console.error('Logout error:', error);
+        window.location.href = 'index.html';
+    }
 };
 
-// DOM Elements
-const sidebar = document.getElementById('sidebar');
-const mainContent = document.getElementById('mainContent');
-const menuToggle = document.getElementById('menuToggle');
-const sidebarToggle = document.getElementById('sidebarToggle');
+// Check authentication on dashboard load
+function checkAuthentication() {
+    const idToken = sessionStorage.getItem('idToken');
+    const accessToken = sessionStorage.getItem('accessToken');
+    
+    if (!idToken || !accessToken) {
+        console.warn('No authentication tokens found, redirecting to login');
+        window.location.href = 'index.html';
+        return false;
+    }
+    
+    console.log('Authentication tokens found, proceeding with dashboard');
+    return true;
+}
 
-// Initialize dashboard
+// DOM Elements (will be populated after DOM is ready)
+let sidebar, mainContent, menuToggle, sidebarToggle;
+
+// Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Dashboard DOM loaded');
+    
+    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
+    // if (!checkAuthentication()) {
+    //     return;
+    // }
+    
+    // Get DOM elements
+    sidebar = document.getElementById('sidebar');
+    mainContent = document.getElementById('mainContent');
+    menuToggle = document.getElementById('menuToggle');
+    sidebarToggle = document.getElementById('sidebarToggle');
+    
+    // Verify essential elements exist
+    if (!sidebar || !mainContent) {
+        console.error('Essential dashboard elements not found:', {
+            sidebar: !!sidebar,
+            mainContent: !!mainContent
+        });
+        return;
+    }
+    
+    console.log('Dashboard elements found, initializing...');
     initializeDashboard();
     updateTime();
     setInterval(updateTime, 60000); // Update every minute
+    
+    // Show success message
+    showWelcomeMessage();
 });
+
+// Show welcome message
+function showWelcomeMessage() {
+    const userEmail = sessionStorage.getItem('userEmail');
+    console.log(`Dashboard loaded successfully for user: ${userEmail || 'Unknown'}`);
+}
 
 // Initialize dashboard functionality
 function initializeDashboard() {
@@ -231,18 +279,6 @@ function animateCounter(element, start, end, isCurrency = false) {
     }
     
     requestAnimationFrame(updateCounter);
-}
-
-// Logout functionality
-function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        // Clear any stored authentication data
-        localStorage.removeItem('userToken');
-        sessionStorage.clear();
-        
-        // Redirect to login page
-        window.location.href = 'index.html';
-    }
 }
 
 // Notification system

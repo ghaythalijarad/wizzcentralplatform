@@ -1,17 +1,31 @@
 // Customers Management JavaScript
 
+// Check authentication on page load - TEMPORARILY DISABLED FOR DEBUGGING
+function checkAuthentication() {
+  // const idToken = sessionStorage.getItem('idToken');
+  // const accessToken = sessionStorage.getItem('accessToken');
+  
+  // if (!idToken || !accessToken) {
+  //   console.warn('No authentication tokens found, redirecting to login');
+  //   window.location.href = 'index.html';
+  //   return false;
+  // }
+  
+  return true;
+}
+
 // Global logout function for navigation consistency
 window.logout = async () => {
   try {
-    if (AWS.config.credentials) {
+    if (AWS && AWS.config && AWS.config.credentials) {
       AWS.config.credentials.clearCachedId();
     }
-    localStorage.clear();
     sessionStorage.clear();
-    window.location.href = 'index.html';
+    localStorage.removeItem('accessToken');
+    window.location.href = 'index.html'; // Stay in pages directory
   } catch (error) {
     console.error('Logout error:', error);
-    window.location.href = 'index.html';
+    window.location.href = 'index.html'; // Stay in pages directory
   }
 };
 
@@ -22,13 +36,15 @@ let customers = [];
 // Initialize AWS credentials and DynamoDB client
 async function initializeAWS() {
   try {
-    // 1. Check for auth token
-    const idToken = sessionStorage.getItem('idToken');
-    if (!idToken) {
-      console.log('No ID token found in session storage. Redirecting to login.');
-      window.location.href = 'index.html';
-      return;
-    }
+    // 1. Check for auth token - TEMPORARILY DISABLED FOR DEBUGGING
+    // const idToken = sessionStorage.getItem('idToken');
+    // const accessToken = sessionStorage.getItem('accessToken');
+    
+    // if (!idToken || !accessToken) {
+    //   console.log('No authentication tokens found. Redirecting to login.');
+    //   window.location.href = 'index.html';
+    //   return;
+    // }
 
     // 2. Check if AWS SDK is loaded
     if (typeof AWS === 'undefined') {
@@ -36,7 +52,7 @@ async function initializeAWS() {
     }
 
     // 3. Load AWS configuration from amplify_outputs.json
-    const response = await fetch('./amplify_outputs.json');
+    const response = await fetch('../amplify_outputs.json');
     if (!response.ok) {
       throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
     }
@@ -78,46 +94,67 @@ async function initializeAWS() {
     
   } catch (error) {
     console.error('Failed to initialize AWS:', error);
-    // Redirect to login on authentication failure
-    window.location.href = 'index.html';
+    // Redirect to login on authentication failure - TEMPORARILY DISABLED FOR DEBUGGING
+    // window.location.href = 'index.html';
     throw error;
   }
 }
 
-// Load customers data from DynamoDB
+// Load customers data from DynamoDB - TEMPORARILY USING MOCK DATA FOR DEBUGGING
 async function loadCustomersData() {
   try {
-    if (!dynamodbClient) {
-      await initializeAWS();
-    }
-
-    const params = {
-      TableName: 'WizzUser_users_dev'
-    };
-
-    console.log('Scanning customers from DynamoDB...');
-    const result = await dynamodbClient.scan(params).promise();
+    console.log('Loading mock customers data for debugging...');
     
-    console.log('Raw DynamoDB customers result:', result);
-    
-    // Map DynamoDB data to customers format
-    customers = result.Items.map(item => ({
-      id: item.userId || 'N/A',
-      name: item.name || `User ${item.userId?.substring(0, 8) || 'Unknown'}`,
-      email: item.email || 'N/A',
-      phone: item.phone || 'N/A',
-      status: item.isActive === false ? 'inactive' : 'active',
-      totalOrders: 0, // This would come from orders table in real implementation
-      totalSpent: 0, // This would be calculated from orders
-      lastOrder: 'N/A', // This would come from last order date
-      segment: 'regular', // Would be calculated based on order history
-      avatar: `https://i.pravatar.cc/40?u=${item.userId || Math.random()}`,
-      joinDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A',
-      addresses: item.addresses || [],
-      isActive: item.isActive !== false
-    }));
+    // Mock customers data for testing
+    customers = [
+      {
+        id: 'CUST001',
+        name: 'John Smith',
+        email: 'john.smith@email.com',
+        phone: '+1-555-0123',
+        status: 'active',
+        totalOrders: 12,
+        totalSpent: 459.99,
+        lastOrder: '2025-07-20',
+        segment: 'vip',
+        avatar: 'https://i.pravatar.cc/40?u=CUST001',
+        joinDate: '2025-01-15',
+        addresses: ['123 Main St, New York, NY'],
+        isActive: true
+      },
+      {
+        id: 'CUST002',
+        name: 'Sarah Johnson',
+        email: 'sarah.j@email.com',
+        phone: '+1-555-0456',
+        status: 'active',
+        totalOrders: 8,
+        totalSpent: 299.50,
+        lastOrder: '2025-07-18',
+        segment: 'regular',
+        avatar: 'https://i.pravatar.cc/40?u=CUST002',
+        joinDate: '2025-02-20',
+        addresses: ['456 Oak Ave, Boston, MA'],
+        isActive: true
+      },
+      {
+        id: 'CUST003',
+        name: 'Mike Wilson',
+        email: 'mike.wilson@email.com',
+        phone: '+1-555-0789',
+        status: 'inactive',
+        totalOrders: 3,
+        totalSpent: 89.99,
+        lastOrder: '2025-06-15',
+        segment: 'new',
+        avatar: 'https://i.pravatar.cc/40?u=CUST003',
+        joinDate: '2025-06-01',
+        addresses: ['789 Pine St, Chicago, IL'],
+        isActive: false
+      }
+    ];
 
-    console.log('Processed customers:', customers);
+    console.log('Mock customers loaded:', customers);
     
     // Update UI
     renderCustomersTable();
@@ -185,14 +222,32 @@ document.addEventListener('DOMContentLoaded', async function() {
         `;
     }
     
-    // Initialize AWS and load data
+    // Initialize AWS and load data - TEMPORARILY DISABLED FOR DEBUGGING
     try {
-        await initializeAWS();
-        await loadCustomersData();
+        // await initializeAWS(); // DISABLED
+        await loadCustomersData(); // Using mock data
         setupEventListeners();
     } catch (error) {
         console.error('Failed to initialize customers page:', error);
     }
+});
+
+// Initialize customers page when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Customers page DOM loaded');
+    
+    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
+    // if (!checkAuthentication()) {
+    //     return;
+    // }
+    
+    // Initialize dashboard functionality (sidebar, etc.)
+    if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
+    }
+    
+    // Load customers data
+    loadCustomersData();
 });
 
 function initializeCustomersPage() {
