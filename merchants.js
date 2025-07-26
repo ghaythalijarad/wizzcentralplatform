@@ -603,6 +603,72 @@ function setupEventListeners() {
     // search input, filter dropdowns, and other interactive elements.
 }
 
+// Render the merchants table with the provided data
+function renderMerchantsTable() {
+    const tableBody = document.getElementById('merchantsTableBody');
+    if (!tableBody) {
+        console.error('Cannot render table: tbody element not found.');
+        return;
+    }
+
+    if (filteredMerchants.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants match the current filters.</td></tr>';
+        return;
+    }
+
+    const rows = filteredMerchants.map(merchant => {
+        const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
+        return `
+            <tr data-id="${merchant.id}">
+                <td>
+                    <div class="flex items-center">
+                        <img src="${merchant.avatar}" alt="${merchant.name}" class="w-10 h-10 rounded-full mr-4">
+                        <div>
+                            <div class="font-bold">${merchant.name}</div>
+                            <div class="text-sm text-gray-500">${merchant.category}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>${merchant.owner}</td>
+                <td>
+                    <span class="status-badge" style="background-color: ${statusInfo.color};">
+                        ${statusInfo.label}
+                    </span>
+                </td>
+                <td><a href="mailto:${merchant.email}" class="text-blue-500 hover:underline">${merchant.email}</a></td>
+                <td>${merchant.phone}</td>
+                <td>${merchant.address}</td>
+                <td>
+                    <button class="action-btn view-btn" title="View Details" onclick="viewMerchantDetails('${merchant.id}')"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn edit-btn" title="Edit Status" onclick="openStatusModal('${merchant.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn delete-btn" title="Delete Merchant"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tableBody.innerHTML = rows;
+}
+
+// Update dashboard stats based on loaded merchants
+function updateMerchantStats() {
+    const totalMerchants = merchantsData.length;
+    const approvedCount = merchantsData.filter(m => m.status === 'approved').length;
+    const pendingCount = merchantsData.filter(m => m.status === 'pending' || m.status === 'under_review').length;
+
+    // These elements might be on the page, update them if they exist
+    const totalEl = document.getElementById('totalMerchantsStat');
+    const approvedEl = document.getElementById('approvedMerchantsStat');
+    const pendingEl = document.getElementById('pendingMerchantsStat');
+
+    if (totalEl) totalEl.textContent = totalMerchants;
+    if (approvedEl) approvedEl.textContent = approvedCount;
+    if (pendingEl) pendingEl.textContent = pendingCount;
+
+    console.log(`Stats updated: Total=${totalMerchants}, Approved=${approvedCount}, Pending=${pendingCount}`);
+}
+
+
 // This script should run after the DOM is fully loaded.
 // We'll check the readyState to handle cases where the script is loaded asynchronously
 // after the DOMContentLoaded event has already fired.
