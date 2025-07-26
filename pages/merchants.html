@@ -178,19 +178,7 @@
     </script>
     <script src="/dashboard.js"></script>
     <script>
-        console.log('Dashboard script loaded');
-        
-        // Override the checkAuthentication function from dashboard.js
-        if (typeof checkAuthentication !== 'undefined') {
-            console.log('Overriding dashboard checkAuthentication function');
-            window.originalCheckAuthentication = checkAuthentication;
-        }
-        
-        // Simple authentication check that allows development
-        checkAuthentication = function() {
-            console.log('Using merchants-specific authentication check');
-            return true; // Allow for development
-        };
+        console.log('Dashboard script loaded. Allowing its authentication logic to run.');
     </script>
     <!-- Load real merchants.js for live data -->
     <script src="/merchants.js"></script>
