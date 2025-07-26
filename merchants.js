@@ -81,24 +81,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         // return; // Commented out for development
     }
     
-    // Initialize AWS and load merchants data
-    showLoader(true, 'Loading merchants...');
+    // IMMEDIATE FALLBACK: Load sample data right away to prevent "Loading..." from persisting
+    console.log('Loading sample data immediately as primary approach for development...');
+    merchantsData = getSampleMerchantsData();
+    filteredMerchants = [...merchantsData];
+    
+    // Render table immediately
+    console.log('Rendering table immediately with sample data...');
+    renderMerchantsTable();
+    updateMerchantStats();
+    setupEventListeners();
+    
+    // Then try to load real data in background
     try {
-        console.log('Starting AWS initialization...');
+        console.log('Starting background AWS initialization...');
+        showLoader(true, 'Loading merchants from database...');
         await initializeAWS();
         console.log('AWS initialized, starting merchants management...');
         await initializeMerchantsManagement();
         console.log('Merchants management initialized successfully');
     } catch (err) {
-        console.error('Merchants management initialization failed:', err);
-        showMessage(`Error loading merchants: ${err.message}`, 'error');
-        
-        // Fallback: Load sample data
-        console.log('Loading sample data as fallback...');
-        merchantsData = getSampleMerchantsData();
-        filteredMerchants = [...merchantsData];
-        initializeUI();
-        setupEventListeners();
+        console.error('Background merchants management initialization failed:', err);
+        showMessage(`Could not connect to database: ${err.message}. Showing sample data for development.`, 'warning');
     } finally {
         showLoader(false);
     }
@@ -157,55 +161,38 @@ async function initializeAWS() {
 // Initialize merchants management with fallback
 async function initializeMerchantsManagement() {
     try {
-        console.log('Initializing merchants management...');
-        showLoader(true, 'Loading merchants...');
+        console.log('Initializing merchants management (background)...');
         
-        showMessage('Connecting to the database and fetching merchants...', 'info');
+        showMessage('Attempting to connect to database...', 'info');
         
         try {
             await loadMerchantsFromDynamoDB();
             
             if (merchantsData.length === 0) {
-                console.log('No merchants found in database, loading sample data...');
-                showMessage('Connection successful, but no merchants were found in the database. Loading sample data...', 'warning');
-                merchantsData = getSampleMerchantsData();
+                console.log('No merchants found in database, keeping sample data...');
+                showMessage('Database is empty. Displaying sample data for development.', 'warning');
+                // Keep existing sample data
             } else {
                 console.log(`Successfully loaded ${merchantsData.length} merchants from database`);
+                // Update with real data
+                filteredMerchants = [...merchantsData];
+                renderMerchantsTable();
+                updateMerchantStats();
                 hideMessage();
+                showMessage('Connected to database successfully!', 'success');
+                setTimeout(hideMessage, 3000); // Hide success message after 3 seconds
             }
         } catch (dbError) {
-            console.error('Database loading failed, using sample data:', dbError);
+            console.error('Database loading failed, keeping sample data:', dbError);
             showMessage(`Database connection failed: ${dbError.message}. Displaying sample data for development.`, 'warning');
-            merchantsData = getSampleMerchantsData();
+            // Keep existing sample data - no need to reload
         }
         
     } catch (error) {
         console.error('Failed to initialize merchants management:', error);
-        const errorMessage = `Could not initialize merchants management. Error: ${error.message}. Displaying sample data.`;
-        showMessage(errorMessage, 'error');
-        merchantsData = getSampleMerchantsData(); // Fallback
+        showMessage(`Could not initialize merchants management: ${error.message}. Displaying sample data.`, 'error');
+        // Keep existing sample data
     }
-    
-    // Always ensure we have data before initializing UI
-    if (!merchantsData || merchantsData.length === 0) {
-        console.warn('No merchants data available, loading sample data as final fallback');
-        merchantsData = getSampleMerchantsData();
-    }
-    
-    console.log(`Final merchants data count: ${merchantsData.length}`);
-    console.log('Sample merchants data:', merchantsData);
-    filteredMerchants = [...merchantsData];
-    
-    // Initialize UI after ensuring we have data
-    showLoader(false);
-    initializeUI();
-    setupEventListeners();
-    
-    // Force render the table to replace "Loading..." text
-    setTimeout(() => {
-        console.log('Force rendering table after initialization...');
-        renderMerchantsTable();
-    }, 100);
 }
 
 // Load merchants data from DynamoDB using AWS SDK
@@ -564,13 +551,16 @@ function renderMerchantsTable() {
 // Update merchant statistics
 function updateMerchantStats() {
     const totalMerchants = merchantsData.length;
-    const activeMerchants = merchantsData.filter(m => m.isActive).length;
+    const activeMerchants = merchantsData.filter(m => m.isActive !== false).length;
+    
+    // Try to find stat cards and update them
     const cards = document.querySelectorAll('.stat-card h3');
     if (cards.length >= 2) {
         cards[0].textContent = totalMerchants;
         cards[1].textContent = activeMerchants;
+        console.log(`Updated stats: ${totalMerchants} total, ${activeMerchants} active merchants`);
     } else {
-        console.warn('Not enough stat-card elements to update stats');
+        console.log(`Stats calculated but no stat-card elements found: ${totalMerchants} total, ${activeMerchants} active merchants`);
     }
 }
 
