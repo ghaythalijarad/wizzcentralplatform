@@ -5,7 +5,8 @@ console.log('merchants.js script loaded');
 const MERCHANTS_TABLE = 'order-receiver-businesses-dev';
 
 // DynamoDB client
-let dynamoDB;
+// Use var to avoid "duplicate declaration" errors when dashboard.js is also present.
+var dynamoDB;
 
 // Status options for merchants - aligned with business app
 const MERCHANT_STATUSES = {

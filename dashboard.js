@@ -34,7 +34,7 @@ function checkAuthentication() {
 let sidebar, mainContent, menuToggle, sidebarToggle;
 
 // AWS DynamoDB initialization for stats
-let dynamoDB;
+var dynamoDB;
 async function initializeAWSForDashboard() {
     if (typeof AWS === 'undefined') throw new Error('AWS SDK not loaded');
     const resp = await fetch('../amplify_outputs.json');
