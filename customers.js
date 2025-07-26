@@ -1,75 +1,198 @@
 // Customers Management JavaScript
 
-import { Amplify, Auth } from 'https://cdn.jsdelivr.net/npm/aws-amplify@6.4.7/dist/aws-amplify.esm.js';
-
-// Configure Amplify Auth
-Amplify.configure({
-  Auth: {
-    region: window.WIZZCENTRAL_CONFIG.COGNITO_REGION,
-    userPoolId: window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID,
-    userPoolWebClientId: window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID,
-    mandatorySignIn: true
-  }
-});
-
-// Redirect to login if not authenticated
-Auth.currentAuthenticatedUser().catch(() => {
-  window.location.href = 'index.html';
-});
-
-// Global logout
+// Global logout function for navigation consistency
 window.logout = async () => {
-  await Auth.signOut();
-  window.location.href = 'index.html';
+  try {
+    if (AWS.config.credentials) {
+      AWS.config.credentials.clearCachedId();
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+  } catch (error) {
+    console.error('Logout error:', error);
+    window.location.href = 'index.html';
+  }
 };
 
-// Sample customer data
-let customers = [
-    {
-        id: 'CUST001',
-        name: 'Alice Johnson',
-        email: 'alice.johnson@email.com',
-        phone: '+1 (555) 111-2222',
-        status: 'active',
-        totalOrders: 24,
-        totalSpent: 1245.80,
-        lastOrder: '2 days ago',
-        segment: 'vip',
-        avatar: 'https://i.pravatar.cc/40?img=11',
-        joinDate: '2023-05-15'
-    },
-    {
-        id: 'CUST002',
-        name: 'Bob Wilson',
-        email: 'bob.wilson@email.com',
-        phone: '+1 (555) 222-3333',
-        status: 'active',
-        totalOrders: 8,
-        totalSpent: 567.25,
-        lastOrder: '1 week ago',
-        segment: 'regular',
-        avatar: 'https://i.pravatar.cc/40?img=12',
-        joinDate: '2024-01-10'
-    },
-    {
-        id: 'CUST003',
-        name: 'Carol Davis',
-        email: 'carol.davis@email.com',
-        phone: '+1 (555) 333-4444',
-        status: 'inactive',
-        totalOrders: 3,
-        totalSpent: 89.50,
-        lastOrder: '2 months ago',
-        segment: 'new',
-        avatar: 'https://i.pravatar.cc/40?img=13',
-        joinDate: '2024-06-20'
+// AWS SDK and authentication setup
+let dynamodbClient = null;
+let customers = [];
+
+// Initialize AWS credentials and DynamoDB client
+async function initializeAWS() {
+  try {
+    // 1. Check for auth token
+    const idToken = sessionStorage.getItem('idToken');
+    if (!idToken) {
+      console.log('No ID token found in session storage. Redirecting to login.');
+      window.location.href = 'index.html';
+      return;
     }
-];
+
+    // 2. Check if AWS SDK is loaded
+    if (typeof AWS === 'undefined') {
+      throw new Error('AWS SDK not loaded. Please check the CDN script.');
+    }
+
+    // 3. Load AWS configuration from amplify_outputs.json
+    const response = await fetch('./amplify_outputs.json');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
+    }
+    const outputs = await response.json();
+    
+    // 4. Prepare AWS configuration details
+    const region = outputs.data?.aws_region || 'us-east-1';
+    const userPoolId = outputs.auth.user_pool_id;
+    const identityPoolId = outputs.auth.identity_pool_id;
+    const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
+
+    // 5. Set up credentials
+    AWS.config.region = region;
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+      IdentityPoolId: identityPoolId,
+      Logins: {
+        [cognitoProvider]: idToken
+      }
+    });
+
+    // 6. Force credentials to refresh and handle potential errors
+    try {
+      await AWS.config.credentials.refreshPromise();
+      console.log("Successfully fetched/refreshed AWS credentials for customers.");
+      console.log("Cognito Identity ID:", AWS.config.credentials.identityId);
+    } catch (error) {
+      console.error("Error refreshing credentials:", error);
+      throw new Error("Could not refresh AWS credentials. The authentication token might be invalid or expired. Please try logging in again.");
+    }
+
+    if (!AWS.config.credentials.identityId) {
+      throw new Error("Cognito Identity ID not found after credential refresh. This indicates a problem with the Identity Pool configuration or the provided token.");
+    }
+
+    // Initialize DynamoDB client
+    dynamodbClient = new AWS.DynamoDB.DocumentClient();
+    
+    console.log('AWS initialized successfully for customers');
+    
+  } catch (error) {
+    console.error('Failed to initialize AWS:', error);
+    // Redirect to login on authentication failure
+    window.location.href = 'index.html';
+    throw error;
+  }
+}
+
+// Load customers data from DynamoDB
+async function loadCustomersData() {
+  try {
+    if (!dynamodbClient) {
+      await initializeAWS();
+    }
+
+    const params = {
+      TableName: 'WizzUser_users_dev'
+    };
+
+    console.log('Scanning customers from DynamoDB...');
+    const result = await dynamodbClient.scan(params).promise();
+    
+    console.log('Raw DynamoDB customers result:', result);
+    
+    // Map DynamoDB data to customers format
+    customers = result.Items.map(item => ({
+      id: item.userId || 'N/A',
+      name: item.name || `User ${item.userId?.substring(0, 8) || 'Unknown'}`,
+      email: item.email || 'N/A',
+      phone: item.phone || 'N/A',
+      status: item.isActive === false ? 'inactive' : 'active',
+      totalOrders: 0, // This would come from orders table in real implementation
+      totalSpent: 0, // This would be calculated from orders
+      lastOrder: 'N/A', // This would come from last order date
+      segment: 'regular', // Would be calculated based on order history
+      avatar: `https://i.pravatar.cc/40?u=${item.userId || Math.random()}`,
+      joinDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A',
+      addresses: item.addresses || [],
+      isActive: item.isActive !== false
+    }));
+
+    console.log('Processed customers:', customers);
+    
+    // Update UI
+    renderCustomersTable();
+    updateCustomerStats();
+    
+  } catch (error) {
+    console.error('Error loading customers data:', error);
+    
+    // Show user-friendly error
+    const tbody = document.getElementById('customersTableBody');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="text-center" style="padding: 2rem; color: #e74c3c;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+            <div>Failed to load customers data</div>
+            <div style="font-size: 0.9rem; margin-top: 0.5rem;">${error.message}</div>
+          </td>
+        </tr>
+      `;
+    }
+  }
+}
+
+// Update customer status in DynamoDB
+async function updateCustomerStatus(userId, newStatus) {
+  try {
+    if (!dynamodbClient) {
+      await initializeAWS();
+    }
+
+    const params = {
+      TableName: 'WizzUser_users_dev',
+      Key: { userId: userId },
+      UpdateExpression: 'SET isActive = :status',
+      ExpressionAttributeValues: {
+        ':status': newStatus === 'active'
+      },
+      ReturnValues: 'ALL_NEW'
+    };
+
+    console.log('Updating customer status:', params);
+    const result = await dynamodbClient.update(params).promise();
+    console.log('Customer status updated:', result);
+    
+    return result.Attributes;
+  } catch (error) {
+    console.error('Error updating customer status:', error);
+    throw error;
+  }
+}
 
 // Initialize customers page
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCustomersPage();
-    setupEventListeners();
+document.addEventListener('DOMContentLoaded', async function() {
+    // Show loading state
+    const tbody = document.getElementById('customersTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center" style="padding: 2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem; color: #007bff;"></i>
+                    <div>Loading customers data...</div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Initialize AWS and load data
+    try {
+        await initializeAWS();
+        await loadCustomersData();
+        setupEventListeners();
+    } catch (error) {
+        console.error('Failed to initialize customers page:', error);
+    }
 });
 
 function initializeCustomersPage() {
@@ -181,10 +304,14 @@ function updateCustomerStats() {
 }
 
 // Customer action functions
-function viewCustomer(customerId) {
+async function viewCustomer(customerId) {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
-        alert(`Customer Details:\n\nName: ${customer.name}\nEmail: ${customer.email}\nPhone: ${customer.phone}\nStatus: ${customer.status}\nTotal Orders: ${customer.totalOrders}\nTotal Spent: $${customer.totalSpent}\nSegment: ${customer.segment}\nJoined: ${customer.joinDate}`);
+        const addresses = customer.addresses && customer.addresses.length > 0 
+            ? customer.addresses.map(addr => `${addr.street || ''} ${addr.city || ''}`).join(', ')
+            : 'No addresses on file';
+            
+        alert(`Customer Details:\n\nName: ${customer.name}\nEmail: ${customer.email}\nPhone: ${customer.phone}\nStatus: ${customer.status}\nJoined: ${customer.joinDate}\nAddresses: ${addresses}`);
     }
 }
 
@@ -196,15 +323,75 @@ function editCustomer(customerId) {
     }
 }
 
-function blockCustomer(customerId) {
+async function blockCustomer(customerId) {
     const customer = customers.find(c => c.id === customerId);
-    if (customer && confirm(`Are you sure you want to block ${customer.name}?`)) {
-        customer.status = 'blocked';
-        renderCustomersTable();
-        updateCustomerStats();
-        
-        if (window.dashboardFunctions) {
-            window.dashboardFunctions.showNotification(`${customer.name} has been blocked.`, 'success');
+    if (customer && confirm(`Are you sure you want to ${customer.status === 'active' ? 'block' : 'unblock'} ${customer.name}?`)) {
+        try {
+            const newStatus = customer.status === 'active' ? 'inactive' : 'active';
+            await updateCustomerStatus(customerId, newStatus);
+            
+            // Update local data
+            customer.status = newStatus;
+            customer.isActive = newStatus === 'active';
+            
+            // Re-render table
+            renderCustomersTable();
+            updateCustomerStats();
+            
+            if (window.dashboardFunctions) {
+                window.dashboardFunctions.showNotification(
+                    `${customer.name} has been ${newStatus === 'active' ? 'unblocked' : 'blocked'}.`, 
+                    'success'
+                );
+            }
+        } catch (error) {
+            console.error('Error updating customer status:', error);
+            if (window.dashboardFunctions) {
+                window.dashboardFunctions.showNotification(
+                    'Failed to update customer status. Please try again.', 
+                    'error'
+                );
+            }
+        }
+    }
+}
+
+// Toggle customer status function for switch controls
+async function toggleCustomerStatus(customerId) {
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+        try {
+            const newStatus = customer.status === 'active' ? 'inactive' : 'active';
+            await updateCustomerStatus(customerId, newStatus);
+            
+            // Update local data
+            customer.status = newStatus;
+            customer.isActive = newStatus === 'active';
+            
+            // Re-render table
+            renderCustomersTable();
+            updateCustomerStats();
+            
+            if (window.dashboardFunctions) {
+                window.dashboardFunctions.showNotification(
+                    `${customer.name} status updated to ${newStatus}.`, 
+                    'success'
+                );
+            }
+        } catch (error) {
+            console.error('Error toggling customer status:', error);
+            if (window.dashboardFunctions) {
+                window.dashboardFunctions.showNotification(
+                    'Failed to update customer status. Please try again.', 
+                    'error'
+                );
+            }
+            
+            // Revert the toggle state
+            const toggle = document.querySelector(`[data-customer-id="${customerId}"]`);
+            if (toggle) {
+                toggle.checked = customer.status === 'active';
+            }
         }
     }
 }
@@ -225,5 +412,7 @@ window.customersManager = {
     viewCustomer,
     editCustomer,
     blockCustomer,
-    exportCustomers
+    toggleCustomerStatus,
+    exportCustomers,
+    loadCustomersData
 };

@@ -1,9 +1,7 @@
 // WizzCentral Platform Configuration
 window.WIZZCENTRAL_CONFIG = {
     // API Configuration
-    API_BASE_URL: process.env.NODE_ENV === 'production' 
-        ? 'https://your-api-gateway-url.amazonaws.com/dev'  // This will be updated after backend deployment
-        : 'http://localhost:3001',
+    API_BASE_URL: 'https://your-api-gateway-url.amazonaws.com/dev',  // This will be updated after backend deployment
     
     // Frontend Configuration
     APP_NAME: 'WizzCentral Platform',

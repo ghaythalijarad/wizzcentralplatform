@@ -520,10 +520,15 @@ function createMerchantTableRow(merchant) {
             </div>
         </td>
         <td>
-            <label class="switch">
-                <input type="checkbox" ${merchant.isActive ? 'checked' : ''} onchange="toggleActive('${merchant.id}')">
-                <span class="slider round"></span>
-            </label>
+            <div class="status-controls">
+                <label class="switch" title="Active/Inactive">
+                    <input type="checkbox" ${merchant.isActive ? 'checked' : ''} onchange="toggleActive('${merchant.id}')">
+                    <span class="slider round"></span>
+                </label>
+                <button class="btn-status" onclick="openStatusModal('${merchant.id}')" title="Update Status">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
         </td>
         <td>${merchant.phone || 'N/A'}</td>
         <td>${merchant.address || 'N/A'}</td>
@@ -564,12 +569,26 @@ async function toggleActive(businessId) {
 async function updateMerchantInDB(businessId, updateData) {
     if (!dynamoDB) throw new Error("DynamoDB client not initialized.");
 
+    // Build update expression dynamically based on provided data
+    const updateExpressions = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    Object.keys(updateData).forEach((key, index) => {
+        const attributeName = `#attr${index}`;
+        const attributeValue = `:val${index}`;
+        
+        updateExpressions.push(`${attributeName} = ${attributeValue}`);
+        expressionAttributeNames[attributeName] = key;
+        expressionAttributeValues[attributeValue] = updateData[key];
+    });
+
     const params = {
         TableName: MERCHANTS_TABLE,
         Key: { 'businessId': businessId },
-        UpdateExpression: 'set #isActive = :isActive',
-        ExpressionAttributeNames: { '#isActive': 'isActive' },
-        ExpressionAttributeValues: { ':isActive': updateData.isActive },
+        UpdateExpression: `set ${updateExpressions.join(', ')}`,
+        ExpressionAttributeNames: expressionAttributeNames,
+        ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: 'UPDATED_NEW'
     };
 
@@ -577,11 +596,110 @@ async function updateMerchantInDB(businessId, updateData) {
     return dynamoDB.update(params).promise();
 }
 
+// Open status update modal
+function openStatusModal(businessId) {
+    const merchant = merchantsData.find(m => m.id === businessId);
+    if (!merchant) return;
+
+    const modalBody = document.getElementById('statusModalBody');
+    modalBody.innerHTML = `
+        <div class="merchant-info-compact">
+            <img src="${merchant.avatar}" alt="${merchant.name}">
+            <div>
+                <h4>${merchant.name}</h4>
+                <p>${merchant.owner}</p>
+            </div>
+        </div>
+        <form id="statusUpdateForm">
+            <div class="form-group">
+                <label for="isActiveStatus">Active Status</label>
+                <select id="isActiveStatus" class="form-control">
+                    <option value="true" ${merchant.isActive ? 'selected' : ''}>Active</option>
+                    <option value="false" ${!merchant.isActive ? 'selected' : ''}>Inactive</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="merchantStatus">Business Status</label>
+                <select id="merchantStatus" class="form-control">
+                    <option value="pending" ${merchant.fullData?.status === 'pending' ? 'selected' : ''}>Pending</option>
+                    <option value="approved" ${merchant.fullData?.status === 'approved' ? 'selected' : ''}>Approved</option>
+                    <option value="under_review" ${merchant.fullData?.status === 'under_review' ? 'selected' : ''}>Under Review</option>
+                    <option value="rejected" ${merchant.fullData?.status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                    <option value="suspended" ${merchant.fullData?.status === 'suspended' ? 'selected' : ''}>Suspended</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="statusReason">Reason for Status Change (Optional)</label>
+                <textarea id="statusReason" class="form-control" rows="3" placeholder="Enter reason for status change..."></textarea>
+            </div>
+        </form>
+    `;
+
+    // Store the business ID for form submission
+    document.getElementById('statusUpdateForm').dataset.businessId = businessId;
+    document.getElementById('statusModal').style.display = 'flex';
+}
+
+// Update merchant status
+async function updateMerchantStatus() {
+    const form = document.getElementById('statusUpdateForm');
+    const businessId = form.dataset.businessId;
+    const isActive = document.getElementById('isActiveStatus').value === 'true';
+    const status = document.getElementById('merchantStatus').value;
+    const reason = document.getElementById('statusReason').value;
+
+    const merchant = merchantsData.find(m => m.id === businessId);
+    if (!merchant) return;
+
+    showLoader(true, `Updating status for ${merchant.name}...`);
+
+    try {
+        const updateData = {
+            isActive: isActive,
+            status: status,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Add reason if provided
+        if (reason.trim()) {
+            updateData.statusChangeReason = reason.trim();
+        }
+
+        await updateMerchantInDB(businessId, updateData);
+        
+        // Update local data
+        merchant.isActive = isActive;
+        if (merchant.fullData) {
+            merchant.fullData.status = status;
+        }
+
+        console.log(`Successfully updated status for ${businessId}`);
+        showMessage('Merchant status updated successfully!', 'info');
+        
+        // Refresh the table and stats
+        renderMerchantsTable();
+        updateMerchantStats();
+        
+        // Close modal
+        closeModal('statusModal');
+        
+    } catch (error) {
+        console.error(`Failed to update status for ${businessId}:`, error);
+        showMessage(`Error updating status: ${error.message}`, 'error');
+    } finally {
+        showLoader(false);
+    }
+}
+
 
 // View merchant details in a modal
 function viewMerchantDetails(businessId) {
     const merchant = merchantsData.find(m => m.id === businessId);
     if (!merchant) return;
+
+    // Get status info for display
+    const statusInfo = MERCHANT_STATUSES[merchant.fullData?.status] || MERCHANT_STATUSES['unknown'];
+    const statusBadge = `<span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color}; border: 1px solid ${statusInfo.color}40; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">${statusInfo.label}</span>`;
 
     const detailsBody = document.getElementById('merchantDetailsBody');
     detailsBody.innerHTML = `
@@ -592,11 +710,14 @@ function viewMerchantDetails(businessId) {
         </div>
         <div class="details-grid">
             <div class="detail-item"><label>Business ID</label><span>${merchant.id}</span></div>
-            <div class="detail-item"><label>Status</label><span>${merchant.isActive ? 'Active' : 'Inactive'}</span></div>
+            <div class="detail-item"><label>Active Status</label><span>${merchant.isActive ? '✅ Active' : '❌ Inactive'}</span></div>
+            <div class="detail-item"><label>Business Status</label><span>${statusBadge}</span></div>
             <div class="detail-item"><label>Phone</label><span>${merchant.phone}</span></div>
             <div class="detail-item"><label>Email</label><span>${merchant.email}</span></div>
             <div class="detail-item" style="grid-column: 1 / -1;"><label>Address</label><span>${merchant.address}</span></div>
             <div class="detail-item"><label>Joined On</label><span>${merchant.joinDate}</span></div>
+            ${merchant.fullData?.statusChangeReason ? `<div class="detail-item" style="grid-column: 1 / -1;"><label>Last Status Change Reason</label><span>${merchant.fullData.statusChangeReason}</span></div>` : ''}
+            ${merchant.fullData?.updatedAt ? `<div class="detail-item"><label>Last Updated</label><span>${formatDate(merchant.fullData.updatedAt)}</span></div>` : ''}
         </div>
     `;
 

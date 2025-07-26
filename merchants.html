@@ -266,12 +266,93 @@
         #refreshBtn:hover {
             background: #059669;
         }
-        
-        #refreshBtn:disabled {
+         #refreshBtn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
-        
+
+        /* Status controls styling */
+        .status-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-status {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+        }
+
+        .btn-status:hover {
+            background: #4b5563;
+        }
+
+        /* Toggle switch styling */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+        }
+
+        input:checked + .slider {
+            background-color: #10b981;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #10b981;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .slider.round {
+            border-radius: 28px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
         /* Status message styles */
         .table-status-info {
             padding: 1rem;
@@ -544,6 +625,23 @@
                     <button type="submit" class="btn-primary">Add Merchant</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal for Updating Merchant Status -->
+    <div class="modal-overlay" id="statusModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Update Merchant Status</h3>
+                <button class="modal-close" onclick="closeModal('statusModal')">&times;</button>
+            </div>
+            <div class="modal-body" id="statusModalBody">
+                <!-- Content will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('statusModal')">Cancel</button>
+                <button class="btn-primary" onclick="updateMerchantStatus()">Update Status</button>
+            </div>
         </div>
     </div>
 
