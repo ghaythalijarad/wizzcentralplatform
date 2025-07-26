@@ -224,7 +224,10 @@ async function handleLogin(email, password, remember) {
                 localStorage.removeItem('lastEmail');
             }
             
-            // Redirect to the dashboard page in the pages directory
+            // Redirect to the dashboard page (since we're already in pages directory)
+            console.log('About to redirect to dashboard.html');
+            console.log('Current URL:', window.location.href);
+            console.log('Redirect target: dashboard.html');
             window.location.href = 'dashboard.html';
             
         } else {

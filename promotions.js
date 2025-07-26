@@ -25,7 +25,7 @@ window.logout = async () => {
       AWS.config.credentials.clearCachedId();
     }
     sessionStorage.clear();
-    localStorage.removeItem('accessToken');
+    localStorage.clear(); // Clear both just to be safe
     window.location.href = 'index.html'; // Will work since we're in pages/
   } catch (error) {
     console.error('Logout error:', error);
@@ -114,6 +114,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load promotions data
     loadPromotionsData();
+    
+    // Load merchant discounts
+    if (window.dataService) {
+        loadMerchantDiscounts();
+    } else {
+        console.warn('Data service not available, merchant discounts will not be loaded');
+        // Try again after a delay in case the service is still loading
+        setTimeout(() => {
+            if (window.dataService) {
+                loadMerchantDiscounts();
+            }
+        }, 1000);
+    }
 });
 
 function initializePromotionsPage() {
@@ -441,22 +454,220 @@ function deletePromotion(promotionId) {
     }
 }
 
-// Close modal when clicking outside
-window.addEventListener('click', function(e) {
-    const modal = document.getElementById('addPromotionModal');
-    if (e.target === modal) {
-        closeAddPromotionModal();
-    }
-});
+// Merchant Discounts Management
+let merchantDiscounts = [];
+let businessesData = {};
 
-// Export functions
-window.promotionsManager = {
-    openAddPromotionModal,
-    closeAddPromotionModal,
-    viewPromotion,
-    editPromotion,
-    deactivatePromotion,
-    activatePromotion,
-    clonePromotion,
-    deletePromotion
-};
+// Load merchant discounts from data service
+async function loadMerchantDiscounts() {
+    try {
+        console.log('Starting loadMerchantDiscounts...');
+        
+        if (!window.dataService) {
+            console.warn('Data service not available for merchant discounts');
+            showMerchantDiscountError();
+            return;
+        }
+        
+        console.log('Data service available, initializing...');
+        await window.dataService.initialize();
+        console.log('Data service initialized successfully');
+        
+        // Load both discounts and businesses data
+        console.log('Loading discounts and businesses data...');
+        const [discounts, businesses] = await Promise.all([
+            window.dataService.getMerchantDiscounts(),
+            window.dataService.getBusinesses()
+        ]);
+        
+        console.log(`Raw discounts loaded: ${discounts.length} items`);
+        console.log(`Raw businesses loaded: ${businesses.length} items`);
+        
+        merchantDiscounts = discounts;
+        
+        // Create a lookup map for business names
+        businessesData = {};
+        businesses.forEach(business => {
+            businessesData[business.id] = business;
+        });
+        
+        console.log('Final merchant discounts:', merchantDiscounts);
+        console.log('Final businesses data:', businessesData);
+        
+        // Update stats
+        updateMerchantDiscountStats();
+        
+        // Render table
+        renderMerchantDiscountsTable();
+        
+    } catch (error) {
+        console.error('Error loading merchant discounts:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            dataServiceAvailable: !!window.dataService,
+            discountsLength: merchantDiscounts.length,
+            businessesDataKeys: Object.keys(businessesData)
+        });
+        showMerchantDiscountError();
+    }
+}
+
+// Refresh merchant discounts manually
+async function refreshMerchantDiscounts() {
+    console.log('Manual refresh of merchant discounts triggered');
+    
+    // Reset variables
+    merchantDiscounts = [];
+    businessesData = {};
+    
+    // Update table to show loading state
+    const tbody = document.getElementById('merchantDiscountsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                    <div>Refreshing merchant discounts...</div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    // Reset stats
+    const totalEl = document.getElementById('totalMerchantDiscounts');
+    const activeEl = document.getElementById('activeMerchantDiscounts');
+    if (totalEl) totalEl.textContent = '0';
+    if (activeEl) activeEl.textContent = '0';
+    
+    // Load fresh data
+    await loadMerchantDiscounts();
+}
+
+// Update merchant discount statistics
+function updateMerchantDiscountStats() {
+    const totalDiscounts = merchantDiscounts.length;
+    const activeDiscounts = merchantDiscounts.filter(d => d.status === 'active').length;
+    
+    const totalEl = document.getElementById('totalMerchantDiscounts');
+    const activeEl = document.getElementById('activeMerchantDiscounts');
+    
+    if (totalEl) totalEl.textContent = totalDiscounts;
+    if (activeEl) activeEl.textContent = activeDiscounts;
+}
+
+// Render merchant discounts table
+function renderMerchantDiscountsTable() {
+    const tbody = document.getElementById('merchantDiscountsTableBody');
+    if (!tbody) return;
+    
+    if (merchantDiscounts.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                    <i class="fas fa-tags" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                    <div>No merchant discounts found</div>
+                    <div style="font-size: 0.9rem; margin-top: 0.5rem;">Merchants haven't created any discounts yet</div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = merchantDiscounts.map(discount => {
+        const merchantName = getMerchantName(discount.businessId);
+        const discountValue = formatDiscountValue(discount);
+        const validUntil = discount.validTo ? new Date(discount.validTo).toLocaleDateString() : 'No expiry';
+        const usage = discount.usageLimit ? `${discount.usageCount} / ${discount.usageLimit}` : discount.usageCount.toString();
+        
+        return `
+            <tr>
+                <td>
+                    <div class="promotion-info">
+                        <div class="promotion-icon">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                        <div>
+                            <div class="promotion-title">${discount.title}</div>
+                            <div class="promotion-code">${discount.description}</div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div class="merchant-info">
+                        <span class="merchant-name">${merchantName}</span>
+                        <small style="color: #666; display: block;">ID: ${discount.businessId.substring(0, 8)}...</small>
+                    </div>
+                </td>
+                <td><span class="type-badge ${discount.type}">${discount.type.charAt(0).toUpperCase() + discount.type.slice(1)}</span></td>
+                <td><span class="discount-badge">${discountValue}</span></td>
+                <td><span class="promotion-status ${discount.status}">${discount.status.charAt(0).toUpperCase() + discount.status.slice(1)}</span></td>
+                <td>${usage}</td>
+                <td>${validUntil}</td>
+                <td>
+                    <div class="actions">
+                        <button class="btn-action" onclick="viewMerchantDiscount('${discount.id}')" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-action" onclick="contactMerchant('${discount.businessId}')" title="Contact Merchant">
+                            <i class="fas fa-envelope"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Helper function to get merchant name from business ID
+function getMerchantName(businessId) {
+    // Look up the business name from the loaded business data
+    const business = businessesData[businessId];
+    if (business) {
+        return business.name || business.businessName || 'Unknown Business';
+    }
+    return `Business ${businessId.substring(0, 8)}...`; // Fallback with truncated ID
+}
+
+// Helper function to format discount value
+function formatDiscountValue(discount) {
+    if (discount.type === 'percentage') {
+        return `${discount.value}% OFF`;
+    } else if (discount.type === 'fixed') {
+        return `$${discount.value} OFF`;
+    } else {
+        return `${discount.value}`;
+    }
+}
+
+// Show error when merchant discounts fail to load
+function showMerchantDiscountError() {
+    const tbody = document.getElementById('merchantDiscountsTableBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" style="text-align: center; padding: 2rem; color: #e74c3c;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                <div>Failed to load merchant discounts</div>
+                <div style="font-size: 0.9rem; margin-top: 0.5rem;">Please check your connection and try again</div>
+            </td>
+        </tr>
+    `;
+}
+
+// Merchant discount action functions
+function viewMerchantDiscount(discountId) {
+    const discount = merchantDiscounts.find(d => d.id === discountId);
+    if (!discount) return;
+    
+    alert(`Discount Details:\n\nTitle: ${discount.title}\nType: ${discount.type}\nValue: ${formatDiscountValue(discount)}\nStatus: ${discount.status}\nCreated: ${new Date(discount.createdAt).toLocaleDateString()}`);
+}
+
+function contactMerchant(businessId) {
+    // This would open a contact form or redirect to merchant details
+    console.log('Contact merchant:', businessId);
+    alert('Contact merchant functionality would be implemented here');
+}
+
+// Initialize promotions page when DOM is ready

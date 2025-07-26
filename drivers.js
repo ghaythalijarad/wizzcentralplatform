@@ -25,7 +25,7 @@ window.logout = async () => {
             AWS.config.credentials.clearCachedId();
         }
         sessionStorage.clear();
-        localStorage.removeItem('accessToken');
+        localStorage.clear(); // Clear both just to be safe
         window.location.href = 'index.html'; // Stay in pages directory
     } catch (error) {
         console.error('Logout error:', error);

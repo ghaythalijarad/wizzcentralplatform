@@ -99,195 +99,58 @@
                 <div class="notifications">
                     <button class="notification-btn">
                         <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
-                    </button>
-                </div>
-                <div class="user-menu">
-                    <button class="user-menu-btn">
-                        <i class="fas fa-user-circle"></i>
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Dashboard Content -->
-        <div class="dashboard-content">
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon orders">
-                        <i class="fas fa-shopping-bag"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>1,247</h3>
-                        <p>Total Orders Today</p>
-                        <span class="stat-change positive">+12.5%</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon drivers">
-                        <i class="fas fa-motorcycle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>89</h3>
-                        <p>Active Drivers</p>
-                        <span class="stat-change positive">+5.2%</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon revenue">
-                        <i class="fas fa-dollar-sign"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>$24,350</h3>
-                        <p>Revenue Today</p>
-                        <span class="stat-change positive">+8.1%</span>
-                    </div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-icon merchants">
-                        <i class="fas fa-store"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3>156</h3>
-                        <p>Active Merchants</p>
-                        <span class="stat-change neutral">0%</span>
-                    </div>
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon customers"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <h3 id="customersCount">0</h3>
+                    <p>Customers</p>
                 </div>
             </div>
-
-            <!-- Charts and Recent Activity -->
-            <div class="dashboard-grid">
-                <!-- Orders Chart -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h3>Orders Overview</h3>
-                        <div class="card-actions">
-                            <select class="time-filter">
-                                <option>Last 7 days</option>
-                                <option>Last 30 days</option>
-                                <option>Last 3 months</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="card-content">
-                        <div class="chart-placeholder">
-                            <i class="fas fa-chart-line"></i>
-                            <p>Orders chart will be displayed here</p>
-                        </div>
-                    </div>
+            <div class="stat-card">
+                <div class="stat-icon merchants"><i class="fas fa-store"></i></div>
+                <div class="stat-info">
+                    <h3 id="merchantsCount">0</h3>
+                    <p>Merchants</p>
                 </div>
+            </div>
+        </div>
 
-                <!-- Recent Orders -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h3>Recent Orders</h3>
-                        <a href="#" class="view-all">View All</a>
-                    </div>
-                    <div class="card-content">
-                        <div class="order-list">
-                            <div class="order-item">
-                                <div class="order-info">
-                                    <span class="order-id">#ORD-001</span>
-                                    <span class="customer-name">John Doe</span>
-                                </div>
-                                <div class="order-details">
-                                    <span class="order-amount">$25.50</span>
-                                    <span class="order-status pending">Pending</span>
-                                </div>
-                            </div>
-                            <div class="order-item">
-                                <div class="order-info">
-                                    <span class="order-id">#ORD-002</span>
-                                    <span class="customer-name">Jane Smith</span>
-                                </div>
-                                <div class="order-details">
-                                    <span class="order-amount">$18.75</span>
-                                    <span class="order-status delivered">Delivered</span>
-                                </div>
-                            </div>
-                            <div class="order-item">
-                                <div class="order-info">
-                                    <span class="order-id">#ORD-003</span>
-                                    <span class="customer-name">Mike Johnson</span>
-                                </div>
-                                <div class="order-details">
-                                    <span class="order-amount">$32.00</span>
-                                    <span class="order-status in-progress">In Progress</span>
-                                </div>
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Dashboard Content -->
+            <div class="dashboard-content">
+
+
+                <!-- Charts and Recent Activity -->
+                <div class="dashboard-grid">
+
+
+
+
+
+
+
+
+                    <!-- Recent Businesses -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>Recent Businesses</h3>
+                            <a href="merchants.html" class="view-all">View All</a>
+                        </div>
+                        <div class="card-content">
+                            <div class="merchant-list" id="recentBusinessesList">
+                                <!-- Recent businesses will populate here -->
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Top Merchants -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h3>Top Performing Merchants</h3>
-                        <a href="merchants.html" class="view-all">View All</a>
-                    </div>
-                    <div class="card-content">
-                        <div class="merchant-list">
-                            <div class="merchant-item">
-                                <div class="merchant-avatar">
-                                    <i class="fas fa-utensils"></i>
-                                </div>
-                                <div class="merchant-info">
-                                    <span class="merchant-name">Pizza Palace</span>
-                                    <span class="merchant-orders">42 orders today</span>
-                                </div>
-                                <div class="merchant-revenue">$1,250</div>
-                            </div>
-                            <div class="merchant-item">
-                                <div class="merchant-avatar">
-                                    <i class="fas fa-hamburger"></i>
-                                </div>
-                                <div class="merchant-info">
-                                    <span class="merchant-name">Burger Hub</span>
-                                    <span class="merchant-orders">38 orders today</span>
-                                </div>
-                                <div class="merchant-revenue">$980</div>
-                            </div>
-                            <div class="merchant-item">
-                                <div class="merchant-avatar">
-                                    <i class="fas fa-ice-cream"></i>
-                                </div>
-                                <div class="merchant-info">
-                                    <span class="merchant-name">Sweet Treats</span>
-                                    <span class="merchant-orders">25 orders today</span>
-                                </div>
-                                <div class="merchant-revenue">$650</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Driver Status -->
-                <div class="dashboard-card">
-                    <div class="card-header">
-                        <h3>Driver Status</h3>
-                        <a href="drivers.html" class="view-all">Manage Drivers</a>
-                    </div>
-                    <div class="card-content">
-                        <div class="driver-stats">
-                            <div class="driver-stat">
-                                <div class="stat-label">Online</div>
-                                <div class="stat-value online">89</div>
-                            </div>
-                            <div class="driver-stat">
-                                <div class="stat-label">Delivering</div>
-                                <div class="stat-value delivering">34</div>
-                            </div>
-                            <div class="driver-stat">
-                                <div class="stat-label">Offline</div>
-                                <div class="stat-value offline">15</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                </div> <!-- close dashboard-grid -->
             </div>
         </div>
     </div>
@@ -295,6 +158,7 @@
     <!-- AWS SDK and Configuration Scripts -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
     <script src="../config.js"></script>
+    <script src="../data-service.js"></script>
     <script src="../dashboard.js"></script>
     <script src="../assets/js/sidebar.js"></script>
 </body>

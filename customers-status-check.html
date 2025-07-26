@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Customers Page Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .success { color: green; background: #e6ffe6; padding: 10px; border: 1px solid green; margin: 10px 0; }
+        .error { color: red; background: #ffe6e6; padding: 10px; border: 1px solid red; margin: 10px 0; }
+        .info { color: blue; background: #e6f3ff; padding: 10px; border: 1px solid blue; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>Customers Page Status Check</h1>
+    <div id="status">Checking...</div>
+
+    <script>
+        async function checkCustomersPage() {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                // Test direct access to customers page
+                statusDiv.innerHTML = '<div class="info">Testing customers page access...</div>';
+                
+                // Open customers page
+                window.open('http://localhost:8003/pages/customers.html', '_blank');
+                
+                statusDiv.innerHTML = `
+                    <div class="success">✅ Customers page opened!</div>
+                    <div class="info">
+                        <strong>Expected to see:</strong><br>
+                        - MohammedSattar (usa.iraq.lover@gmail.com)<br>
+                        - Mohammed Alwersh (moh.al.daash@gmail.com)<br>
+                        - Mohammed Ali (+9647800868280)<br>
+                        - Mohammed Alwersh (+9647800868289)<br>
+                        <br>
+                        <strong>Check the browser console for detailed logs</strong>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-run check
+        window.addEventListener('load', checkCustomersPage);
+    </script>
+</body>
+</html>

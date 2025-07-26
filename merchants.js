@@ -1,5 +1,16 @@
-// Merchants Management JavaScript
+// Merchants Management JavaScript - Using Centralized Data Service
 console.log('merchants.js script loaded');
+
+// Check authentication on page load
+function checkAuthentication() {
+    const token = sessionStorage.getItem('accessToken');
+    if (!token) {
+        console.log('No access token found, redirecting to login');
+        window.location.href = 'index.html';
+        return false;
+    }
+    return true;
+}
 
 // Global logout function
 window.logout = async () => {
@@ -8,34 +19,13 @@ window.logout = async () => {
             AWS.config.credentials.clearCachedId();
         }
         sessionStorage.clear();
-        localStorage.removeItem('accessToken');
+        localStorage.clear(); // Clear both just to be safe
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Logout error:', error);
         window.location.href = 'index.html';
     }
 };
-
-// Check authentication - allow unauthenticated access for merchants
-function checkAuthentication() {
-    const idToken = sessionStorage.getItem('idToken');
-    const accessToken = sessionStorage.getItem('accessToken');
-    if (!idToken || !accessToken) {
-        console.warn('No authentication tokens found. Continuing with unauthenticated DynamoDB access.');
-        return true; // allow unauthenticated access
-    }
-    console.log('Authentication tokens found, proceeding with authenticated access');
-    return true;
-}
-
-// AWS Configuration - we'll configure this from the amplify_outputs.json
-let dynamoDB = null;
-let awsConfig = null;
-let cognitoCredentials = null;
-
-// Configuration for DynamoDB table
-const MERCHANTS_TABLE = 'order-receiver-businesses-dev';
-const AWS_REGION = 'us-east-1';
 
 // Status options for merchants - aligned with business app
 const MERCHANT_STATUSES = {
@@ -49,6 +39,20 @@ const MERCHANT_STATUSES = {
 };
 
 // Global merchants data
+let allMerchants = [];
+
+// Load merchants data using centralized data service
+async function loadMerchantsData() {
+    try {
+        console.log('Loading merchants using data service...');
+        allMerchants = await window.dataService.getBusinesses();
+        console.log(`Loaded ${allMerchants.length} merchants:`, allMerchants);
+    } catch (error) {
+        console.error('Error loading merchants data:', error);
+        displayError(error);
+        allMerchants = [];
+    }
+}
 let merchantsData = [];
 let filteredMerchants = [];
 
@@ -461,14 +465,16 @@ function renderMerchantsTable() {
     }
 
     tbody.innerHTML = filteredMerchants.map(merchant => `
-        <tr>
+        <tr style="cursor: pointer;" onclick="viewMerchant('${merchant.id}')">
             <td>
                 <div class="merchant-info">
                     <div class="merchant-avatar">
                         <img src="${merchant.avatar}" alt="${merchant.name}" onerror="this.src='https://via.placeholder.com/40x40?text=M'">
                     </div>
                     <div>
-                        <div class="merchant-name">${merchant.name}</div>
+                        <div class="merchant-name">
+                            <a href="merchant-products.html?businessId=${merchant.id}" class="merchant-link">${merchant.name}</a>
+                        </div>
                         <div class="merchant-owner">Owner: ${merchant.owner}</div>
                     </div>
                 </div>
@@ -532,10 +538,8 @@ function getStatusLabel(status) {
 
 // Placeholder action functions
 function viewMerchant(id) {
-    const merchant = merchantsData.find(m => m.id === id);
-    if (merchant) {
-        alert(`Viewing merchant: ${merchant.name}\nStatus: ${getStatusLabel(merchant.status)}\nOwner: ${merchant.owner}`);
-    }
+    // Redirect to products page for this merchant
+    window.location.href = `merchant-products.html?businessId=${id}`;
 }
 
 function toggleMerchantStatus(id) {

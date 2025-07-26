@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple DynamoDB Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Direct DynamoDB Table Test</h1>
+    <div id="results"></div>
+    <button onclick="testTables()">Test Tables</button>
+
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script src="config.js"></script>
+    
+    <script>
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(message);
+        }
+
+        async function testTables() {
+            document.getElementById('results').innerHTML = '';
+            
+            try {
+                // Configure AWS
+                if (!window.WIZZCENTRAL_CONFIG) {
+                    log('❌ Configuration not loaded', 'error');
+                    return;
+                }
+                
+                const config = window.WIZZCENTRAL_CONFIG;
+                log(`✅ Using region: ${config.COGNITO_REGION}`, 'success');
+                
+                AWS.config.update({ region: config.COGNITO_REGION });
+                
+                // Set up credentials (unauthenticated)
+                AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                    IdentityPoolId: config.COGNITO_IDENTITY_POOL_ID,
+                });
+                
+                await AWS.config.credentials.refreshPromise();
+                log('✅ AWS credentials refreshed', 'success');
+                
+                const dynamoDB = new AWS.DynamoDB.DocumentClient();
+                
+                // Test Users table
+                log('Testing Users table...', 'info');
+                try {
+                    const usersResult = await dynamoDB.scan({
+                        TableName: 'WizzUser_users_dev',
+                        Select: 'COUNT'
+                    }).promise();
+                    
+                    log(`✅ Users table: ${usersResult.Count} records found`, 'success');
+                } catch (error) {
+                    log(`❌ Users table error: ${error.message}`, 'error');
+                    
+                    // Try alternate table name
+                    try {
+                        const altResult = await dynamoDB.scan({
+                            TableName: 'users',
+                            Select: 'COUNT'
+                        }).promise();
+                        log(`✅ Found alternate users table: ${altResult.Count} records`, 'warning');
+                    } catch (altError) {
+                        log(`❌ Alternate users table also failed: ${altError.message}`, 'error');
+                    }
+                }
+                
+                // Test Businesses table  
+                log('Testing Businesses table...', 'info');
+                try {
+                    const businessResult = await dynamoDB.scan({
+                        TableName: 'order-receiver-businesses-dev',
+                        Select: 'COUNT'
+                    }).promise();
+                    
+                    log(`✅ Businesses table: ${businessResult.Count} records found`, 'success');
+                } catch (error) {
+                    log(`❌ Businesses table error: ${error.message}`, 'error');
+                    
+                    // Try alternate table names
+                    const altNames = ['businesses', 'merchants', 'businesses-dev'];
+                    for (const tableName of altNames) {
+                        try {
+                            const altResult = await dynamoDB.scan({
+                                TableName: tableName,
+                                Select: 'COUNT'
+                            }).promise();
+                            log(`✅ Found alternate businesses table '${tableName}': ${altResult.Count} records`, 'warning');
+                            break;
+                        } catch (altError) {
+                            log(`❌ Table '${tableName}' failed: ${altError.message}`, 'error');
+                        }
+                    }
+                }
+                
+                // List all available tables
+                log('Listing all available tables...', 'info');
+                const dynamoDBClient = new AWS.DynamoDB();
+                const tablesResult = await dynamoDBClient.listTables().promise();
+                log(`Available tables: ${JSON.stringify(tablesResult.TableNames, null, 2)}`, 'info');
+                
+            } catch (error) {
+                log(`❌ General error: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        }
+        
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testTables, 1000);
+        });
+    </script>
+</body>
+</html>

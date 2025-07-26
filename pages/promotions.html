@@ -94,6 +94,10 @@
                 <h1 class="page-title">Promotions Management</h1>
             </div>
             <div class="top-bar-right">
+                <button class="btn-secondary" onclick="refreshMerchantDiscounts()" style="margin-right: 10px;">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh Discounts
+                </button>
                 <button class="btn-primary" onclick="openAddPromotionModal()">
                     <i class="fas fa-plus"></i>
                     Create Promotion
@@ -348,6 +352,63 @@
                 </button>
             </div>
         </div>
+
+        <!-- Merchant Discounts Section -->
+        <div class="page-content">
+            <div class="content-header">
+                <h2>Merchant Created Discounts</h2>
+                <p>Discounts and offers created by individual merchants</p>
+            </div>
+
+            <!-- Merchant Discounts Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon discounts">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalMerchantDiscounts">0</h3>
+                        <p>Total Merchant Discounts</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon active-discounts">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="activeMerchantDiscounts">0</h3>
+                        <p>Active Discounts</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merchant Discounts Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Discount</th>
+                            <th>Merchant</th>
+                            <th>Type</th>
+                            <th>Value</th>
+                            <th>Status</th>
+                            <th>Usage</th>
+                            <th>Valid Until</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="merchantDiscountsTableBody">
+                        <!-- Merchant discounts will be populated here -->
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                <i class="fas fa-tags" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                                <div>Loading merchant discounts...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Add Promotion Modal -->
@@ -423,6 +484,7 @@
     <!-- AWS SDK and Configuration Scripts -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
     <script src="../config.js"></script>
+    <script src="../data-service.js"></script>
     <script src="../dashboard.js"></script>
     <script src="../promotions.js"></script>
 </body>

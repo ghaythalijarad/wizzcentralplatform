@@ -1,314 +1,311 @@
 // Customers Management JavaScript
 
-// Check authentication on page load - TEMPORARILY DISABLED FOR DEBUGGING
+// Check authentication on page load
 function checkAuthentication() {
-  // const idToken = sessionStorage.getItem('idToken');
-  // const accessToken = sessionStorage.getItem('accessToken');
-  
-  // if (!idToken || !accessToken) {
-  //   console.warn('No authentication tokens found, redirecting to login');
-  //   window.location.href = 'index.html';
-  //   return false;
-  // }
-  
-  return true;
+    const token = sessionStorage.getItem('accessToken');
+    console.log('Checking authentication - token found:', !!token);
+    if (!token) {
+        console.log('No access token found, but continuing for testing purposes');
+        // Temporarily bypass authentication for testing
+        // window.location.href = 'index.html';
+        // return false;
+    }
+    console.log('Authentication check passed (or bypassed for testing)');
+    return true;
 }
 
-// Global logout function for navigation consistency
+// Global logout function
 window.logout = async () => {
-  try {
-    if (AWS && AWS.config && AWS.config.credentials) {
-      AWS.config.credentials.clearCachedId();
+    try {
+        if (AWS && AWS.config && AWS.config.credentials) {
+            AWS.config.credentials.clearCachedId();
+        }
+        sessionStorage.clear();
+        localStorage.clear(); // Clear both just to be safe
+        window.location.href = 'index.html';
+    } catch (error) {
+        console.error('Logout error:', error);
+        window.location.href = 'index.html';
     }
-    sessionStorage.clear();
-    localStorage.removeItem('accessToken');
-    window.location.href = 'index.html'; // Stay in pages directory
-  } catch (error) {
-    console.error('Logout error:', error);
-    window.location.href = 'index.html'; // Stay in pages directory
-  }
 };
 
-// AWS SDK and authentication setup
-let dynamodbClient = null;
+// Customer management variables
 let customers = [];
-
-// Initialize AWS credentials and DynamoDB client
-async function initializeAWS() {
-  try {
-    // 1. Check for auth token - TEMPORARILY DISABLED FOR DEBUGGING
-    // const idToken = sessionStorage.getItem('idToken');
-    // const accessToken = sessionStorage.getItem('accessToken');
-    
-    // if (!idToken || !accessToken) {
-    //   console.log('No authentication tokens found. Redirecting to login.');
-    //   window.location.href = 'index.html';
-    //   return;
-    // }
-
-    // 2. Check if AWS SDK is loaded
-    if (typeof AWS === 'undefined') {
-      throw new Error('AWS SDK not loaded. Please check the CDN script.');
-    }
-
-    // 3. Load AWS configuration from amplify_outputs.json
-    const response = await fetch('../amplify_outputs.json');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
-    }
-    const outputs = await response.json();
-    
-    // 4. Prepare AWS configuration details
-    const region = outputs.data?.aws_region || 'us-east-1';
-    const userPoolId = outputs.auth.user_pool_id;
-    const identityPoolId = outputs.auth.identity_pool_id;
-    const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-
-    // 5. Set up credentials
-    AWS.config.region = region;
-    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-      IdentityPoolId: identityPoolId,
-      Logins: {
-        [cognitoProvider]: idToken
-      }
-    });
-
-    // 6. Force credentials to refresh and handle potential errors
-    try {
-      await AWS.config.credentials.refreshPromise();
-      console.log("Successfully fetched/refreshed AWS credentials for customers.");
-      console.log("Cognito Identity ID:", AWS.config.credentials.identityId);
-    } catch (error) {
-      console.error("Error refreshing credentials:", error);
-      throw new Error("Could not refresh AWS credentials. The authentication token might be invalid or expired. Please try logging in again.");
-    }
-
-    if (!AWS.config.credentials.identityId) {
-      throw new Error("Cognito Identity ID not found after credential refresh. This indicates a problem with the Identity Pool configuration or the provided token.");
-    }
-
-    // Initialize DynamoDB client
-    dynamodbClient = new AWS.DynamoDB.DocumentClient();
-    
-    console.log('AWS initialized successfully for customers');
-    
-  } catch (error) {
-    console.error('Failed to initialize AWS:', error);
-    // Redirect to login on authentication failure - TEMPORARILY DISABLED FOR DEBUGGING
-    // window.location.href = 'index.html';
-    throw error;
-  }
-}
-
-// Load customers data from DynamoDB - TEMPORARILY USING MOCK DATA FOR DEBUGGING
-async function loadCustomersData() {
-  try {
-    console.log('Loading mock customers data for debugging...');
-    
-    // Mock customers data for testing
-    customers = [
-      {
-        id: 'CUST001',
-        name: 'John Smith',
-        email: 'john.smith@email.com',
-        phone: '+1-555-0123',
-        status: 'active',
-        totalOrders: 12,
-        totalSpent: 459.99,
-        lastOrder: '2025-07-20',
-        segment: 'vip',
-        avatar: 'https://i.pravatar.cc/40?u=CUST001',
-        joinDate: '2025-01-15',
-        addresses: ['123 Main St, New York, NY'],
-        isActive: true
-      },
-      {
-        id: 'CUST002',
-        name: 'Sarah Johnson',
-        email: 'sarah.j@email.com',
-        phone: '+1-555-0456',
-        status: 'active',
-        totalOrders: 8,
-        totalSpent: 299.50,
-        lastOrder: '2025-07-18',
-        segment: 'regular',
-        avatar: 'https://i.pravatar.cc/40?u=CUST002',
-        joinDate: '2025-02-20',
-        addresses: ['456 Oak Ave, Boston, MA'],
-        isActive: true
-      },
-      {
-        id: 'CUST003',
-        name: 'Mike Wilson',
-        email: 'mike.wilson@email.com',
-        phone: '+1-555-0789',
-        status: 'inactive',
-        totalOrders: 3,
-        totalSpent: 89.99,
-        lastOrder: '2025-06-15',
-        segment: 'new',
-        avatar: 'https://i.pravatar.cc/40?u=CUST003',
-        joinDate: '2025-06-01',
-        addresses: ['789 Pine St, Chicago, IL'],
-        isActive: false
-      }
-    ];
-
-    console.log('Mock customers loaded:', customers);
-    
-    // Update UI
-    renderCustomersTable();
-    updateCustomerStats();
-    
-  } catch (error) {
-    console.error('Error loading customers data:', error);
-    
-    // Show user-friendly error
-    const tbody = document.getElementById('customersTableBody');
-    if (tbody) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" class="text-center" style="padding: 2rem; color: #e74c3c;">
-            <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-            <div>Failed to load customers data</div>
-            <div style="font-size: 0.9rem; margin-top: 0.5rem;">${error.message}</div>
-          </td>
-        </tr>
-      `;
-    }
-  }
-}
-
-// Update customer status in DynamoDB
-async function updateCustomerStatus(userId, newStatus) {
-  try {
-    if (!dynamodbClient) {
-      await initializeAWS();
-    }
-
-    const params = {
-      TableName: 'WizzUser_users_dev',
-      Key: { userId: userId },
-      UpdateExpression: 'SET isActive = :status',
-      ExpressionAttributeValues: {
-        ':status': newStatus === 'active'
-      },
-      ReturnValues: 'ALL_NEW'
-    };
-
-    console.log('Updating customer status:', params);
-    const result = await dynamodbClient.update(params).promise();
-    console.log('Customer status updated:', result);
-    
-    return result.Attributes;
-  } catch (error) {
-    console.error('Error updating customer status:', error);
-    throw error;
-  }
-}
+let filteredCustomers = [];
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
 
 // Initialize customers page
-document.addEventListener('DOMContentLoaded', async function() {
-    // Show loading state
-    const tbody = document.getElementById('customersTableBody');
-    if (tbody) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="9" class="text-center" style="padding: 2rem;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem; color: #007bff;"></i>
-                    <div>Loading customers data...</div>
-                </td>
-            </tr>
-        `;
-    }
+async function initializeCustomersPage() {
+    console.log('Initializing customers page...');
     
-    // Initialize AWS and load data - TEMPORARILY DISABLED FOR DEBUGGING
     try {
-        // await initializeAWS(); // DISABLED
-        await loadCustomersData(); // Using mock data
+        // Load customers data from DynamoDB
+        console.log('About to load customers data...');
+        await loadCustomersData();
+        console.log('Customers data loaded successfully');
+        
+        // Setup event listeners
         setupEventListeners();
+        
+        // Render page
+        renderCustomersTable();
+        updateStatCards();
+        updatePagination();
+        
+        console.log('Customers page initialization complete');
     } catch (error) {
-        console.error('Failed to initialize customers page:', error);
+        console.error('Error initializing customers page:', error);
+        // Show error in UI
+        const tbody = document.querySelector('#customersTable tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">Error loading customers: ${error.message}</td></tr>`;
+        }
     }
-});
-
-// Initialize customers page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Customers page DOM loaded');
-    
-    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
-    // if (!checkAuthentication()) {
-    //     return;
-    // }
-    
-    // Initialize dashboard functionality (sidebar, etc.)
-    if (typeof initializeDashboard === 'function') {
-        initializeDashboard();
-    }
-    
-    // Load customers data
-    loadCustomersData();
-});
-
-function initializeCustomersPage() {
-    renderCustomersTable();
-    updateCustomerStats();
 }
 
+// Load customers data from DynamoDB with proper permissions
+async function loadCustomersData() {
+    try {
+        console.log('Loading customers data from DynamoDB...');
+        
+        // Configure AWS with proper credentials
+        console.log('Configuring AWS with updated permissions...');
+        const { COGNITO_REGION, COGNITO_IDENTITY_POOL_ID } = window.WIZZCENTRAL_CONFIG;
+        
+        AWS.config.update({ 
+            region: COGNITO_REGION,
+            maxRetries: 3
+        });
+
+        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+            IdentityPoolId: COGNITO_IDENTITY_POOL_ID,
+        });
+
+        console.log('Refreshing credentials with DynamoDB permissions...');
+        await AWS.config.credentials.refreshPromise();
+        
+        console.log('Creating DynamoDB client...');
+        const dynamoDB = new AWS.DynamoDB.DocumentClient();
+        
+        console.log('Scanning WizzUser_users_dev table with proper permissions...');
+        
+        const params = {
+            TableName: 'WizzUser_users_dev'
+        };
+        
+        const result = await dynamoDB.scan(params).promise();
+        console.log('✅ DynamoDB scan successful! Result:', result);
+        console.log('📊 Items returned:', result.Items ? result.Items.length : 0);
+        
+        if (!result.Items || result.Items.length === 0) {
+            console.warn('No users found in DynamoDB table');
+            customers = [];
+            filteredCustomers = [];
+            return;
+        }
+        
+        console.log(`🎉 Successfully found ${result.Items.length} users in DynamoDB!`);
+        
+        // Map your real DynamoDB users to the customers management UI format
+        customers = result.Items.map((user, index) => {
+            console.log(`Processing user ${index + 1}:`, user);
+            
+            const customer = {
+                id: user.userId,
+                name: user.name || 'N/A',
+                email: user.email || 'N/A',
+                phone: user.phone || 'N/A',
+                status: user.isActive ? 'active' : 'inactive',
+                totalOrders: 0, // Will be populated from orders table later
+                totalSpent: 0, // Will be populated from orders table later
+                lastOrder: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never',
+                segment: user.name && user.email ? 'regular' : 'new',
+                joinDate: user.createdAt,
+                avatar: `https://i.pravatar.cc/40?u=${user.userId}`,
+                isActive: user.isActive,
+                // Additional fields from your DynamoDB table
+                cognitoUsername: user.cognitoUsername,
+                countryCode: user.countryCode,
+                gender: user.gender,
+                preferredLanguage: user.preferredLanguage,
+                marketingConsent: user.marketingConsent,
+                privacyAccepted: user.privacyAccepted,
+                termsAccepted: user.termsAccepted,
+                addresses: user.addresses || []
+            };
+            
+            console.log(`✅ Mapped customer ${index + 1} for UI:`, customer);
+            return customer;
+        });
+        
+        filteredCustomers = [...customers];
+        console.log('🎯 Final customers array ready for UI:', customers);
+        console.log(`📈 Total customers mapped: ${customers.length}`);
+        
+    } catch (error) {
+        console.error('❌ Error loading customers data:', error);
+        console.error('Error details:', error.code, error.message);
+        
+        // Display error in UI and re-throw
+        customers = [];
+        filteredCustomers = [];
+        throw new Error(`Failed to load customers: ${error.message}`);
+    }
+}
+
+// Determine customer segment based on spending and orders
+function determineCustomerSegment(totalSpent, totalOrders) {
+    if (totalSpent > 500 || totalOrders > 20) {
+        return 'vip';
+    } else if (totalSpent >= 100 && totalSpent <= 500) {
+        return 'regular';
+    } else if (totalOrders <= 3) {
+        return 'new';
+    } else {
+        return 'regular';
+    }
+}
+
+// Setup event listeners
 function setupEventListeners() {
     // Search functionality
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
-        searchInput.addEventListener('input', filterCustomers);
+        searchInput.addEventListener('input', handleSearch);
     }
-
+    
     // Filter functionality
     const statusFilter = document.getElementById('statusFilter');
     const segmentFilter = document.getElementById('segmentFilter');
     
     if (statusFilter) {
-        statusFilter.addEventListener('change', filterCustomers);
+        statusFilter.addEventListener('change', handleFilter);
     }
     
     if (segmentFilter) {
-        segmentFilter.addEventListener('change', filterCustomers);
+        segmentFilter.addEventListener('change', handleFilter);
+    }
+    
+    // Pagination
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderCustomersTable();
+                updatePagination();
+            }
+        });
+    }
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderCustomersTable();
+                updatePagination();
+            }
+        });
     }
 }
 
-function renderCustomersTable(customersList = customers) {
+// Handle search functionality
+function handleSearch(event) {
+    const searchTerm = event.target.value.toLowerCase().trim();
+    
+    if (searchTerm === '') {
+        filteredCustomers = [...customers];
+    } else {
+        filteredCustomers = customers.filter(customer => 
+            customer.name.toLowerCase().includes(searchTerm) ||
+            customer.email.toLowerCase().includes(searchTerm) ||
+            customer.phone.includes(searchTerm)
+        );
+    }
+    
+    currentPage = 1;
+    renderCustomersTable();
+    updatePagination();
+}
+
+// Handle filter functionality
+function handleFilter() {
+    const statusFilter = document.getElementById('statusFilter')?.value || '';
+    const segmentFilter = document.getElementById('segmentFilter')?.value || '';
+    
+    filteredCustomers = customers.filter(customer => {
+        const matchesStatus = !statusFilter || customer.status === statusFilter;
+        const matchesSegment = !segmentFilter || customer.segment === segmentFilter;
+        return matchesStatus && matchesSegment;
+    });
+    
+    currentPage = 1;
+    renderCustomersTable();
+    updatePagination();
+}
+
+// Render customers table
+function renderCustomersTable() {
     const tbody = document.getElementById('customersTableBody');
     if (!tbody) return;
-
-    tbody.innerHTML = customersList.map(customer => `
+    
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const pageCustomers = filteredCustomers.slice(startIndex, endIndex);
+    
+    if (pageCustomers.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center" style="padding: 2rem; color: #666;">
+                    <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                    <br>
+                    No customers found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = pageCustomers.map(customer => `
         <tr>
             <td>
                 <div class="customer-info">
-                    <div class="customer-avatar">
-                        <img src="${customer.avatar}" alt="${customer.name}">
-                    </div>
+                    <img src="${customer.avatar}" alt="${customer.name}" class="customer-avatar">
                     <div>
                         <div class="customer-name">${customer.name}</div>
-                        <div class="customer-id">#${customer.id}</div>
+                        <div class="customer-id">ID: ${customer.id}</div>
                     </div>
                 </div>
             </td>
             <td>${customer.email}</td>
             <td>${customer.phone}</td>
-            <td><span class="status-badge ${customer.status}">${capitalizeFirst(customer.status)}</span></td>
+            <td>
+                <span class="status-badge ${customer.status}">
+                    ${customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
+                </span>
+            </td>
             <td>${customer.totalOrders}</td>
             <td>$${customer.totalSpent.toFixed(2)}</td>
-            <td>${customer.lastOrder}</td>
-            <td><span class="segment-badge ${customer.segment}">${customer.segment.toUpperCase()}</span></td>
+            <td>${formatDate(customer.lastOrder)}</td>
             <td>
-                <div class="actions">
-                    <button class="btn-action" onclick="viewCustomer('${customer.id}')" title="View Details">
+                <span class="segment-badge ${customer.segment}">
+                    ${customer.segment.toUpperCase()}
+                </span>
+            </td>
+            <td>
+                <div class="action-buttons">
+                    <button class="action-btn view" onclick="viewCustomer('${customer.id}')" title="View Details">
                         <i class="fas fa-eye"></i>
                     </button>
-                    <button class="btn-action" onclick="editCustomer('${customer.id}')" title="Edit">
+                    <button class="action-btn edit" onclick="editCustomer('${customer.id}')" title="Edit Customer">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-action danger" onclick="blockCustomer('${customer.id}')" title="Block">
-                        <i class="fas fa-ban"></i>
+                    <button class="action-btn toggle" onclick="toggleCustomerStatus('${customer.id}')" title="Toggle Status">
+                        <i class="fas fa-toggle-${customer.status === 'active' ? 'on' : 'off'}"></i>
                     </button>
                 </div>
             </td>
@@ -316,158 +313,178 @@ function renderCustomersTable(customersList = customers) {
     `).join('');
 }
 
-function capitalizeFirst(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+// Update statistics cards
+function updateStatCards() {
+    const totalCustomersEl = document.querySelector('.stat-card h3');
+    const activeCustomersEl = document.querySelectorAll('.stat-card h3')[1];
+    const avgOrderValueEl = document.querySelectorAll('.stat-card h3')[2];
+    
+    if (totalCustomersEl) {
+        totalCustomersEl.textContent = customers.length.toString();
+    }
+    
+    if (activeCustomersEl) {
+        const activeCount = customers.filter(c => c.status === 'active').length;
+        activeCustomersEl.textContent = activeCount.toString();
+    }
+    
+    if (avgOrderValueEl && customers.length > 0) {
+        const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+        const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0);
+        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+        avgOrderValueEl.textContent = `$${avgOrderValue.toFixed(2)}`;
+    }
 }
 
-function filterCustomers() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const statusFilter = document.getElementById('statusFilter').value;
-    const segmentFilter = document.getElementById('segmentFilter').value;
-
-    let filteredCustomers = customers.filter(customer => {
-        const matchesSearch = customer.name.toLowerCase().includes(searchTerm) ||
-                            customer.email.toLowerCase().includes(searchTerm) ||
-                            customer.id.toLowerCase().includes(searchTerm) ||
-                            customer.phone.includes(searchTerm);
-        
-        const matchesStatus = !statusFilter || customer.status === statusFilter;
-        const matchesSegment = !segmentFilter || customer.segment === segmentFilter;
-
-        return matchesSearch && matchesStatus && matchesSegment;
-    });
-
-    renderCustomersTable(filteredCustomers);
+// Update pagination
+function updatePagination() {
+    const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+    const paginationInfo = document.getElementById('paginationInfo');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (paginationInfo) {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+        const endIndex = Math.min(currentPage * ITEMS_PER_PAGE, filteredCustomers.length);
+        paginationInfo.textContent = `Showing ${startIndex}-${endIndex} of ${filteredCustomers.length} customers`;
+    }
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentPage === 1;
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = currentPage >= totalPages;
+    }
 }
 
-function updateCustomerStats() {
-    const totalCustomers = customers.length;
-    const activeCustomers = customers.filter(c => c.status === 'active').length;
-    const avgOrders = (customers.reduce((sum, c) => sum + c.totalOrders, 0) / customers.length).toFixed(1);
-    const avgSpent = (customers.reduce((sum, c) => sum + c.totalSpent, 0) / customers.length).toFixed(2);
-
-    // Update stat cards - this would normally come from an API
-    // For demo purposes, we'll use static values that look realistic
-    const statCards = document.querySelectorAll('.stat-card');
-    if (statCards.length >= 4) {
-        // These are demo values - in real app would come from backend
-        statCards[0].querySelector('h3').textContent = '2,847';
-        statCards[1].querySelector('h3').textContent = '1,456';
-        statCards[2].querySelector('h3').textContent = '4.2';
-        statCards[3].querySelector('h3').textContent = '$68.50';
+// Utility functions
+function formatDate(dateString) {
+    if (!dateString || dateString === 'Never') return 'Never';
+    try {
+        return new Date(dateString).toLocaleDateString();
+    } catch {
+        return 'Invalid Date';
     }
 }
 
 // Customer action functions
-async function viewCustomer(customerId) {
+function viewCustomer(customerId) {
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
-        const addresses = customer.addresses && customer.addresses.length > 0 
-            ? customer.addresses.map(addr => `${addr.street || ''} ${addr.city || ''}`).join(', ')
-            : 'No addresses on file';
-            
-        alert(`Customer Details:\n\nName: ${customer.name}\nEmail: ${customer.email}\nPhone: ${customer.phone}\nStatus: ${customer.status}\nJoined: ${customer.joinDate}\nAddresses: ${addresses}`);
+        alert(`Customer Details:\n\nName: ${customer.name}\nEmail: ${customer.email}\nPhone: ${customer.phone}\nStatus: ${customer.status}\nTotal Orders: ${customer.totalOrders}\nTotal Spent: $${customer.totalSpent.toFixed(2)}`);
     }
 }
 
 function editCustomer(customerId) {
-    const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-        // For demo purposes, just show an alert
-        alert(`Edit functionality for ${customer.name} would open here.`);
-    }
+    // TODO: Implement edit customer functionality
+    alert(`Edit customer functionality not yet implemented for customer ID: ${customerId}`);
 }
 
-async function blockCustomer(customerId) {
-    const customer = customers.find(c => c.id === customerId);
-    if (customer && confirm(`Are you sure you want to ${customer.status === 'active' ? 'block' : 'unblock'} ${customer.name}?`)) {
-        try {
-            const newStatus = customer.status === 'active' ? 'inactive' : 'active';
-            await updateCustomerStatus(customerId, newStatus);
-            
-            // Update local data
-            customer.status = newStatus;
-            customer.isActive = newStatus === 'active';
-            
-            // Re-render table
-            renderCustomersTable();
-            updateCustomerStats();
-            
-            if (window.dashboardFunctions) {
-                window.dashboardFunctions.showNotification(
-                    `${customer.name} has been ${newStatus === 'active' ? 'unblocked' : 'blocked'}.`, 
-                    'success'
-                );
-            }
-        } catch (error) {
-            console.error('Error updating customer status:', error);
-            if (window.dashboardFunctions) {
-                window.dashboardFunctions.showNotification(
-                    'Failed to update customer status. Please try again.', 
-                    'error'
-                );
-            }
-        }
-    }
-}
-
-// Toggle customer status function for switch controls
 async function toggleCustomerStatus(customerId) {
-    const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-        try {
-            const newStatus = customer.status === 'active' ? 'inactive' : 'active';
-            await updateCustomerStatus(customerId, newStatus);
-            
-            // Update local data
-            customer.status = newStatus;
-            customer.isActive = newStatus === 'active';
-            
-            // Re-render table
-            renderCustomersTable();
-            updateCustomerStats();
-            
-            if (window.dashboardFunctions) {
-                window.dashboardFunctions.showNotification(
-                    `${customer.name} status updated to ${newStatus}.`, 
-                    'success'
-                );
-            }
-        } catch (error) {
-            console.error('Error toggling customer status:', error);
-            if (window.dashboardFunctions) {
-                window.dashboardFunctions.showNotification(
-                    'Failed to update customer status. Please try again.', 
-                    'error'
-                );
-            }
-            
-            // Revert the toggle state
-            const toggle = document.querySelector(`[data-customer-id="${customerId}"]`);
-            if (toggle) {
-                toggle.checked = customer.status === 'active';
-            }
-        }
-    }
-}
-
-function exportCustomers() {
-    // Simulate export functionality
-    if (window.dashboardFunctions) {
-        window.dashboardFunctions.showNotification('Customer data export started...', 'info');
+    try {
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer) return;
         
-        setTimeout(() => {
-            window.dashboardFunctions.showNotification('Customer data exported successfully!', 'success');
-        }, 2000);
+        const newStatus = !customer.isActive;
+        
+        // Update status in DynamoDB using direct access
+        const dynamoDB = new AWS.DynamoDB.DocumentClient();
+        
+        const updateParams = {
+            TableName: 'WizzUser_users_dev',
+            Key: { userId: customerId },
+            UpdateExpression: 'SET isActive = :status',
+            ExpressionAttributeValues: { ':status': newStatus },
+            ReturnValues: 'ALL_NEW'
+        };
+        
+        await dynamoDB.update(updateParams).promise();
+        
+        // Update local data
+        customer.status = newStatus ? 'active' : 'inactive';
+        customer.isActive = newStatus;
+        
+        // Update filtered customers
+        const filteredIndex = filteredCustomers.findIndex(c => c.id === customerId);
+        if (filteredIndex >= 0) {
+            filteredCustomers[filteredIndex] = { ...customer };
+        }
+        
+        // Re-render table
+        renderCustomersTable();
+        updateStatCards();
+        
+        console.log(`Customer ${customerId} status toggled to: ${newStatus ? 'active' : 'inactive'}`);
+        
+    } catch (error) {
+        console.error('Error toggling customer status:', error);
+        alert('Failed to update customer status. Please try again.');
     }
 }
 
-// Export functions
-window.customersManager = {
-    viewCustomer,
-    editCustomer,
-    blockCustomer,
-    toggleCustomerStatus,
-    exportCustomers,
-    loadCustomersData
-};
+// Export customers data
+function exportCustomers() {
+    try {
+        if (customers.length === 0) {
+            alert('No customer data to export');
+            return;
+        }
+
+        // Prepare CSV data
+        const headers = ['ID', 'Name', 'Email', 'Phone', 'Status', 'Total Orders', 'Total Spent', 'Last Order', 'Segment', 'Join Date'];
+        
+        const csvData = [
+            headers.join(','),
+            ...customers.map(customer => [
+                customer.id,
+                `"${customer.name}"`,
+                customer.email,
+                customer.phone,
+                customer.status,
+                customer.totalOrders,
+                customer.totalSpent.toFixed(2),
+                customer.lastOrder,
+                customer.segment,
+                formatDate(customer.joinDate)
+            ].join(','))
+        ].join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', `customers-export-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('Customer data exported successfully');
+        
+    } catch (error) {
+        console.error('Error exporting customer data:', error);
+        alert('Failed to export customer data. Please try again.');
+    }
+}
+
+// Make export function globally available
+window.exportCustomers = exportCustomers;
+
+// Initialize page when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, checking authentication...');
+    
+    if (checkAuthentication()) {
+        console.log('Authentication valid, initializing customers page...');
+        // Initialize directly without waiting for data service
+        setTimeout(() => {
+            initializeCustomersPage();
+        }, 1000); // Give time for AWS SDK to load
+    }
+});
+
+console.log('Customers management script loaded');

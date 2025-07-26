@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real DynamoDB Users Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .user { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .user h3 { margin: 0 0 10px 0; color: #333; }
+        .field { margin: 5px 0; }
+        .label { font-weight: bold; display: inline-block; width: 150px; }
+        .error { color: red; padding: 20px; border: 1px solid red; background: #ffe6e6; }
+        .success { color: green; padding: 20px; border: 1px solid green; background: #e6ffe6; }
+        .loading { color: blue; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Real DynamoDB Users Data Test</h1>
+    <div id="status" class="loading">Loading users from DynamoDB...</div>
+    <div id="results"></div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <!-- App Configuration -->
+    <script src="../config.js"></script>
+    <!-- Centralized Data Service -->
+    <script src="../data-service.js"></script>
+
+    <script>
+        async function testRealDynamoDBUsers() {
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                statusDiv.textContent = 'Initializing data service...';
+                
+                // Initialize data service
+                if (!window.dataService) {
+                    throw new Error('Data service not available');
+                }
+                
+                await window.dataService.initialize();
+                statusDiv.textContent = 'Data service initialized. Fetching users...';
+                
+                // Get users from DynamoDB
+                const users = await window.dataService.getUsers();
+                
+                if (!users || users.length === 0) {
+                    statusDiv.innerHTML = '<div class="error">No users found in DynamoDB table</div>';
+                    return;
+                }
+                
+                statusDiv.innerHTML = `<div class="success">Successfully loaded ${users.length} users from DynamoDB!</div>`;
+                
+                // Display users
+                resultsDiv.innerHTML = users.map((user, index) => `
+                    <div class="user">
+                        <h3>User ${index + 1}</h3>
+                        <div class="field"><span class="label">ID:</span> ${user.id}</div>
+                        <div class="field"><span class="label">Name:</span> ${user.name || 'N/A'}</div>
+                        <div class="field"><span class="label">Email:</span> ${user.email || 'N/A'}</div>
+                        <div class="field"><span class="label">Phone:</span> ${user.phone || 'N/A'}</div>
+                        <div class="field"><span class="label">Status:</span> ${user.isActive ? 'Active' : 'Inactive'}</div>
+                        <div class="field"><span class="label">Country Code:</span> ${user.countryCode || 'N/A'}</div>
+                        <div class="field"><span class="label">Gender:</span> ${user.gender || 'N/A'}</div>
+                        <div class="field"><span class="label">Language:</span> ${user.preferredLanguage || 'N/A'}</div>
+                        <div class="field"><span class="label">Created:</span> ${user.joinDate || 'N/A'}</div>
+                        <div class="field"><span class="label">Segment:</span> ${user.segment || 'N/A'}</div>
+                        <div class="field"><span class="label">Avatar:</span> <img src="${user.avatar}" width="30" height="30" style="border-radius: 50%;"></div>
+                    </div>
+                `).join('');
+                
+                // Also show mapping for customers page
+                const customersForUI = users.map(user => ({
+                    id: user.id,
+                    name: user.name || 'N/A',
+                    email: user.email || 'N/A',
+                    phone: user.phone || 'N/A',
+                    status: user.isActive ? 'active' : 'inactive',
+                    totalOrders: 0,
+                    totalSpent: 0,
+                    lastOrder: user.lastOrder || 'Never',
+                    segment: user.segment || 'new',
+                    joinDate: user.joinDate,
+                    avatar: user.avatar
+                }));
+                
+                console.log('Users for customers page UI:', customersForUI);
+                
+            } catch (error) {
+                console.error('Error testing DynamoDB users:', error);
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                
+                // Try direct DynamoDB access
+                statusDiv.innerHTML += '<br>Trying direct DynamoDB access...';
+                
+                try {
+                    // Configure AWS directly
+                    AWS.config.region = awsConfig.region;
+                    AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                        IdentityPoolId: awsConfig.identityPoolId
+                    });
+                    
+                    const dynamoDB = new AWS.DynamoDB.DocumentClient();
+                    
+                    const params = {
+                        TableName: 'WizzUser_users_dev'
+                    };
+                    
+                    const result = await dynamoDB.scan(params).promise();
+                    console.log('Direct DynamoDB scan result:', result);
+                    
+                    if (result.Items && result.Items.length > 0) {
+                        statusDiv.innerHTML = `<div class="success">Direct DynamoDB access successful! Found ${result.Items.length} users.</div>`;
+                        
+                        resultsDiv.innerHTML = '<h2>Raw DynamoDB Data:</h2>' + result.Items.map((item, index) => `
+                            <div class="user">
+                                <h3>Raw User ${index + 1}</h3>
+                                <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto;">
+${JSON.stringify(item, null, 2)}
+                                </pre>
+                            </div>
+                        `).join('');
+                        
+                    } else {
+                        statusDiv.innerHTML += '<div class="error">Direct access returned no items</div>';
+                    }
+                    
+                } catch (directError) {
+                    console.error('Direct DynamoDB access failed:', directError);
+                    statusDiv.innerHTML += `<div class="error">Direct access also failed: ${directError.message}</div>`;
+                }
+            }
+        }
+        
+        // Wait for scripts to load
+        window.addEventListener('load', () => {
+            setTimeout(testRealDynamoDBUsers, 1000);
+        });
+    </script>
+</body>
+</html>

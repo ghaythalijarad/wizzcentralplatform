@@ -7,7 +7,7 @@ window.logout = async () => {
             AWS.config.credentials.clearCachedId();
         }
         sessionStorage.clear();
-        localStorage.removeItem('accessToken');
+        localStorage.clear(); // Clear both just to be safe
         window.location.href = 'index.html';
     } catch (error) {
         console.error('Logout error:', error);
@@ -33,10 +33,87 @@ function checkAuthentication() {
 // DOM Elements (will be populated after DOM is ready)
 let sidebar, mainContent, menuToggle, sidebarToggle;
 
+// AWS DynamoDB initialization for stats
+let dynamoDB;
+async function initializeAWSForDashboard() {
+    if (typeof AWS === 'undefined') throw new Error('AWS SDK not loaded');
+    const resp = await fetch('../amplify_outputs.json');
+    if (!resp.ok) throw new Error(`Failed loading config: ${resp.status}`);
+    const cfg = await resp.json();
+    const region = cfg.data.aws_region || 'us-east-1';
+    const userPoolId = cfg.auth.user_pool_id;
+    const identityPoolId = cfg.auth.identity_pool_id;
+    const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
+    AWS.config.update({ region });
+    const idToken = sessionStorage.getItem('idToken');
+    const credParams = { IdentityPoolId: identityPoolId };
+    if (idToken) credParams.Logins = { [provider]: idToken };
+    AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
+    await AWS.config.credentials.refreshPromise();
+    dynamoDB = new AWS.DynamoDB.DocumentClient();
+}
+
+async function fetchTableCount(tableName) {
+    const res = await dynamoDB.scan({ TableName: tableName, Select: 'COUNT' }).promise();
+    return res.Count || 0;
+}
+
+async function loadDashboardStats() {
+    try {
+        const stats = await window.dataService.getAllStats();
+        
+        const customersCountEl = document.getElementById('customersCount');
+        const merchantsCountEl = document.getElementById('merchantsCount');
+        
+        const usersCount = stats.users || 0;
+        const businessesCount = stats.businesses || 0;
+        
+        if (customersCountEl) {
+            customersCountEl.textContent = usersCount;
+        }
+        if (merchantsCountEl) {
+            merchantsCountEl.textContent = businessesCount;
+        }
+        
+    } catch (e) {
+        console.error('Error loading dashboard stats:', e);
+        // Set fallback values in case of error
+        const customersCountEl = document.getElementById('customersCount');
+        const merchantsCountEl = document.getElementById('merchantsCount');
+        if (customersCountEl) customersCountEl.textContent = '0';
+        if (merchantsCountEl) merchantsCountEl.textContent = '0';
+    }
+}
+
+async function loadRecentBusinesses() {
+    try {
+        const recentBusinesses = await window.dataService.getRecentBusinesses(5);
+        
+        const container = document.getElementById('recentBusinessesList');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        recentBusinesses.forEach(business => {
+            const joinDate = business.joinDate ? new Date(business.joinDate).toLocaleDateString() : 'Unknown';
+            const div = document.createElement('div');
+            div.className = 'merchant-item';
+            div.innerHTML = `
+                <div class="merchant-avatar"><i class="fas fa-store"></i></div>
+                <div class="merchant-info">
+                    <span class="merchant-name">${business.name}</span>
+                    <span class="merchant-orders">Joined: ${joinDate}</span>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+        
+    } catch (e) {
+        console.error('Error loading recent businesses:', e);
+    }
+}
+
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Dashboard DOM loaded');
-    
     // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
     // if (!checkAuthentication()) {
     //     return;
@@ -57,19 +134,45 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    console.log('Dashboard elements found, initializing...');
     initializeDashboard();
     updateTime();
     setInterval(updateTime, 60000); // Update every minute
     
     // Show success message
     showWelcomeMessage();
+    
+    // Load statistics using data service
+    if (window.dataService) {
+        // Initialize data service first
+        window.dataService.initialize()
+            .then(() => {
+                return loadDashboardStats();
+            })
+            .then(() => loadRecentBusinesses())
+            .catch(error => {
+                console.error('Data service initialization failed:', error);
+                // Show fallback data
+                showFallbackStats();
+            });
+    } else {
+        console.warn('Data service not available, loading fallback stats');
+        showFallbackStats();
+    }
 });
 
 // Show welcome message
 function showWelcomeMessage() {
     const userEmail = sessionStorage.getItem('userEmail');
-    console.log(`Dashboard loaded successfully for user: ${userEmail || 'Unknown'}`);
+}
+
+// Show fallback statistics when data service is unavailable
+function showFallbackStats() {
+    const customersCountEl = document.getElementById('customersCount');
+    const merchantsCountEl = document.getElementById('merchantsCount');
+    
+    // Show zero values when unable to connect
+    if (customersCountEl) customersCountEl.textContent = '0';
+    if (merchantsCountEl) merchantsCountEl.textContent = '0';
 }
 
 // Initialize dashboard functionality
@@ -203,58 +306,11 @@ function initializeInteractiveElements() {
 
 // Start real-time data updates simulation
 function startDataUpdates() {
-    // Simulate live order updates
-    setInterval(updateOrderCount, 30000); // Every 30 seconds
-    
-    // Simulate driver status updates
-    setInterval(updateDriverStatus, 45000); // Every 45 seconds
-    
-    // Simulate revenue updates
-    setInterval(updateRevenue, 60000); // Every minute
+    // Keep basic functionality for any remaining dynamic elements
+    console.log('Dashboard initialized with basic update functionality');
 }
 
-// Update order count with animation
-function updateOrderCount() {
-    const orderCountElement = document.querySelector('.stat-card .stat-info h3');
-    if (orderCountElement) {
-        const currentCount = parseInt(orderCountElement.textContent.replace(',', ''));
-        const newCount = currentCount + Math.floor(Math.random() * 5) + 1;
-        
-        animateCounter(orderCountElement, currentCount, newCount);
-    }
-}
 
-// Update driver status
-function updateDriverStatus() {
-    const onlineDrivers = document.querySelector('.stat-value.online');
-    const deliveringDrivers = document.querySelector('.stat-value.delivering');
-    
-    if (onlineDrivers && deliveringDrivers) {
-        const currentOnline = parseInt(onlineDrivers.textContent);
-        const currentDelivering = parseInt(deliveringDrivers.textContent);
-        
-        // Simulate small changes
-        const onlineChange = Math.floor(Math.random() * 6) - 3; // -3 to +3
-        const deliveringChange = Math.floor(Math.random() * 4) - 2; // -2 to +2
-        
-        const newOnline = Math.max(80, Math.min(100, currentOnline + onlineChange));
-        const newDelivering = Math.max(20, Math.min(40, currentDelivering + deliveringChange));
-        
-        animateCounter(onlineDrivers, currentOnline, newOnline);
-        animateCounter(deliveringDrivers, currentDelivering, newDelivering);
-    }
-}
-
-// Update revenue
-function updateRevenue() {
-    const revenueElement = document.querySelector('.stat-icon.revenue').nextElementSibling.querySelector('h3');
-    if (revenueElement) {
-        const currentRevenue = parseFloat(revenueElement.textContent.replace('$', '').replace(',', ''));
-        const newRevenue = currentRevenue + (Math.random() * 100) + 50;
-        
-        animateCounter(revenueElement, currentRevenue, newRevenue, true);
-    }
-}
 
 // Animate counter with smooth transition
 function animateCounter(element, start, end, isCurrency = false) {

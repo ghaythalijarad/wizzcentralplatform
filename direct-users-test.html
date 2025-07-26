@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct DynamoDB Users Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; overflow-x: auto; border-radius: 4px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .user-card { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 4px; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Direct DynamoDB Users Table Test</h1>
+        <p>This test directly accesses the WizzUser_users_dev table to diagnose the issue.</p>
+        
+        <button onclick="testDirectAccess()">Test Direct DynamoDB Access</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <!-- App Configuration -->
+    <script src="config.js"></script>
+
+    <script>
+        let dynamodbClient;
+        
+        function logResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            resultsDiv.appendChild(div);
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function initializeAWS() {
+            try {
+                logResult('🚀 Initializing AWS SDK...', 'info');
+                
+                if (typeof AWS === 'undefined') {
+                    throw new Error('AWS SDK not loaded');
+                }
+
+                logResult(`📍 Using AWS Config - Region: ${AWS_CONFIG.region}`, 'info');
+                logResult(`🔐 Identity Pool ID: ${AWS_CONFIG.identityPoolId}`, 'info');
+
+                // Configure AWS
+                AWS.config.region = AWS_CONFIG.region;
+                AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                    IdentityPoolId: AWS_CONFIG.identityPoolId
+                });
+
+                logResult('🔄 Getting credentials...', 'info');
+
+                // Get credentials
+                await new Promise((resolve, reject) => {
+                    AWS.config.credentials.get((err) => {
+                        if (err) {
+                            logResult(`❌ Credentials error: ${err.message}`, 'error');
+                            reject(err);
+                        } else {
+                            logResult('✅ Credentials obtained successfully', 'success');
+                            logResult(`🆔 Access Key ID: ${AWS.config.credentials.accessKeyId}`, 'info');
+                            resolve();
+                        }
+                    });
+                });
+
+                dynamodbClient = new AWS.DynamoDB.DocumentClient();
+                logResult('✅ DynamoDB DocumentClient created', 'success');
+                return true;
+            } catch (error) {
+                logResult(`❌ AWS initialization failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testDirectAccess() {
+            clearResults();
+            
+            try {
+                // Initialize AWS
+                const awsInitialized = await initializeAWS();
+                if (!awsInitialized) return;
+
+                // Test table scan
+                logResult('📊 Scanning WizzUser_users_dev table...', 'info');
+                
+                const params = {
+                    TableName: 'WizzUser_users_dev',
+                    Limit: 10
+                };
+
+                logResult(`📋 Scan parameters: <pre>${JSON.stringify(params, null, 2)}</pre>`, 'info');
+                
+                const result = await dynamodbClient.scan(params).promise();
+
+                logResult(`✅ Scan successful!`, 'success');
+                logResult(`📊 Items found: ${result.Items.length}`, 'success');
+                logResult(`📈 Scanned count: ${result.ScannedCount}`, 'info');
+                logResult(`📏 Response size: ${JSON.stringify(result).length} characters`, 'info');
+                
+                if (result.Items && result.Items.length > 0) {
+                    logResult('<h3>👥 User Data Found:</h3>', 'success');
+                    
+                    result.Items.forEach((user, index) => {
+                        const userHtml = `
+                            <div class="user-card">
+                                <h4>User ${index + 1}</h4>
+                                <p><strong>ID:</strong> ${user.userId || 'N/A'}</p>
+                                <p><strong>Name:</strong> ${user.name || 'N/A'}</p>
+                                <p><strong>Email:</strong> ${user.email || 'N/A'}</p>
+                                <p><strong>Phone:</strong> ${user.phone || 'N/A'}</p>
+                                <p><strong>Active:</strong> ${user.isActive ? 'Yes' : 'No'}</p>
+                                <p><strong>Created:</strong> ${user.createdAt || 'N/A'}</p>
+                                <details>
+                                    <summary>Raw Data</summary>
+                                    <pre>${JSON.stringify(user, null, 2)}</pre>
+                                </details>
+                            </div>
+                        `;
+                        logResult(userHtml, 'success');
+                    });
+
+                    // Test data mapping
+                    logResult('<h3>🔄 Testing Data Mapping:</h3>', 'info');
+                    const mappedUsers = result.Items.map(user => ({
+                        id: user.userId,
+                        name: user.name || user.email || 'N/A',
+                        email: user.email || 'N/A',
+                        phone: user.phone || 'N/A',
+                        status: user.isActive ? 'active' : 'inactive',
+                        totalOrders: user.totalOrders || 0,
+                        totalSpent: user.totalSpent || 0,
+                        lastOrder: user.lastOrderAt || user.lastLoginAt || 'Never',
+                        joinDate: user.createdAt,
+                        isActive: !!user.isActive
+                    }));
+
+                    logResult(`🎯 Mapped ${mappedUsers.length} users successfully`, 'success');
+                    logResult(`<pre>${JSON.stringify(mappedUsers, null, 2)}</pre>`, 'success');
+
+                } else {
+                    logResult('⚠️ No users found in table', 'error');
+                }
+
+            } catch (error) {
+                logResult(`❌ Error testing table access: ${error.message}`, 'error');
+                logResult(`🔍 Error code: ${error.code || 'Unknown'}`, 'error');
+                logResult(`📋 Full error: <pre>${JSON.stringify(error, null, 2)}</pre>`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

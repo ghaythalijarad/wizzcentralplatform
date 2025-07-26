@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Customers Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Customers Data Fetching</h1>
+    <div id="results"></div>
+    
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <!-- Config -->
+    <script src="config.js"></script>
+    <!-- Data Service -->
+    <script src="data-service.js"></script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        async function runTests() {
+            try {
+                addResult('🔄 Starting debug tests...', 'info');
+                
+                // Test 1: Check if AWS SDK is loaded
+                if (typeof AWS !== 'undefined') {
+                    addResult('✅ AWS SDK loaded successfully', 'success');
+                } else {
+                    addResult('❌ AWS SDK not loaded', 'error');
+                    return;
+                }
+                
+                // Test 2: Check if config is loaded
+                if (typeof awsConfig !== 'undefined') {
+                    addResult('✅ AWS Config loaded successfully', 'success');
+                    addResult(`📍 Region: ${awsConfig.region}`, 'info');
+                    addResult(`🆔 Identity Pool: ${awsConfig.identityPoolId}`, 'info');
+                } else {
+                    addResult('❌ AWS Config not loaded', 'error');
+                    return;
+                }
+                
+                // Test 3: Check if data service is available
+                if (window.dataService) {
+                    addResult('✅ Data Service available', 'success');
+                } else {
+                    addResult('❌ Data Service not available', 'error');
+                    return;
+                }
+                
+                // Test 4: Initialize data service
+                addResult('🔄 Initializing data service...', 'info');
+                await window.dataService.initialize();
+                addResult('✅ Data Service initialized', 'success');
+                
+                // Test 5: Test direct DynamoDB scan
+                addResult('🔄 Testing direct DynamoDB scan...', 'info');
+                
+                const params = {
+                    TableName: 'WizzUser_users_dev',
+                    Limit: 10
+                };
+                
+                const dynamoClient = window.dataService.dynamodbClient;
+                const scanResult = await dynamoClient.scan(params).promise();
+                
+                addResult(`✅ Direct scan successful - Found ${scanResult.Items.length} items`, 'success');
+                addResult(`<pre>${JSON.stringify(scanResult.Items, null, 2)}</pre>`, 'info');
+                
+                // Test 6: Test data service getUsers method
+                addResult('🔄 Testing data service getUsers method...', 'info');
+                const users = await window.dataService.getUsers();
+                addResult(`✅ getUsers successful - Found ${users.length} users`, 'success');
+                addResult(`<pre>${JSON.stringify(users, null, 2)}</pre>`, 'info');
+                
+            } catch (error) {
+                addResult(`❌ Error: ${error.message}`, 'error');
+                addResult(`<pre>${error.stack}</pre>`, 'error');
+            }
+        }
+        
+        // Run tests when page loads
+        window.onload = () => {
+            setTimeout(runTests, 1000); // Give scripts time to load
+        };
+    </script>
+</body>
+</html>

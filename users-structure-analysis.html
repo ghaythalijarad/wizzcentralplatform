@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DynamoDB Users Structure Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .user-item { border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .field { margin: 5px 0; }
+        .field strong { color: #333; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <h1>DynamoDB Users Structure Analysis</h1>
+    <div id="status">Loading...</div>
+    <div id="results"></div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <!-- App Configuration -->
+    <script src="config.js"></script>
+    
+    <script>
+        async function analyzeUsersStructure() {
+            const statusEl = document.getElementById('status');
+            const resultsEl = document.getElementById('results');
+            
+            try {
+                statusEl.textContent = 'Connecting to DynamoDB...';
+                
+                // Configure AWS
+                AWS.config.region = awsConfig.region;
+                AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+                    IdentityPoolId: awsConfig.identityPoolId
+                });
+                
+                const dynamoDB = new AWS.DynamoDB.DocumentClient();
+                
+                statusEl.textContent = 'Scanning WizzUser_users_dev table...';
+                
+                const params = {
+                    TableName: 'WizzUser_users_dev'
+                };
+                
+                const result = await dynamoDB.scan(params).promise();
+                
+                statusEl.textContent = `Found ${result.Items.length} users. Analyzing structure...`;
+                
+                let output = `<h2>Users Found: ${result.Items.length}</h2>`;
+                
+                // Analyze structure
+                const allFields = new Set();
+                result.Items.forEach(item => {
+                    Object.keys(item).forEach(key => allFields.add(key));
+                });
+                
+                output += `<h3>All Available Fields:</h3>`;
+                output += `<p>${Array.from(allFields).sort().join(', ')}</p>`;
+                
+                // Show each user
+                result.Items.forEach((user, index) => {
+                    output += `<div class="user-item">`;
+                    output += `<h3>User ${index + 1}</h3>`;
+                    
+                    // Show key fields clearly
+                    output += `<div class="field"><strong>userId:</strong> ${user.userId || 'N/A'}</div>`;
+                    output += `<div class="field"><strong>name:</strong> ${user.name || 'N/A'}</div>`;
+                    output += `<div class="field"><strong>email:</strong> ${user.email || 'N/A'}</div>`;
+                    output += `<div class="field"><strong>phone:</strong> ${user.phone || 'N/A'}</div>`;
+                    output += `<div class="field"><strong>isActive:</strong> ${user.isActive}</div>`;
+                    output += `<div class="field"><strong>createdAt:</strong> ${user.createdAt || 'N/A'}</div>`;
+                    output += `<div class="field"><strong>lastLoginAt:</strong> ${user.lastLoginAt || 'N/A'}</div>`;
+                    
+                    // Show full object for debugging
+                    output += `<details><summary>Full Raw Data</summary><pre>${JSON.stringify(user, null, 2)}</pre></details>`;
+                    output += `</div>`;
+                });
+                
+                resultsEl.innerHTML = output;
+                
+            } catch (error) {
+                statusEl.textContent = `Error: ${error.message}`;
+                resultsEl.innerHTML = `<div style="color: red;"><h3>Error Details:</h3><pre>${JSON.stringify(error, null, 2)}</pre></div>`;
+                console.error('Analysis failed:', error);
+            }
+        }
+        
+        // Run analysis when page loads
+        window.onload = analyzeUsersStructure;
+    </script>
+</body>
+</html>
