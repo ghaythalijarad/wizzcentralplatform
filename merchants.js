@@ -329,7 +329,8 @@ async function initializeAWS() {
             throw new Error('AWS SDK not loaded.');
         }
 
-        const resp = await fetch('../amplify_outputs.json');
+        // Replace relative fetch with absolute path
+        const resp = await fetch('/amplify_outputs.json'); // use absolute path
         if (!resp.ok) throw new Error(`Failed to load amplify_outputs.json: ${resp.status}`);
         const outputs = await resp.json();
         const region = outputs.data?.aws_region || 'us-east-1';
