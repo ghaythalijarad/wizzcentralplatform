@@ -1111,6 +1111,10 @@ function formatDate(isoString) {
     return new Date(isoString).toLocaleDateString();
 }
 
-// Replace original listener binding
-document.removeEventListener('DOMContentLoaded', /* original handler */);
-document.addEventListener('DOMContentLoaded', onDomReady);
+// Replace original listener binding with robust readyState check
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onDomReady);
+} else {
+    // DOM already loaded, invoke handler directly
+    onDomReady();
+}
