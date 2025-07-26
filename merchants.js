@@ -618,11 +618,28 @@ function renderMerchantsTable() {
 
     const rows = filteredMerchants.map(merchant => {
         const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
+        // The address can be a JSON string, so we need to parse it safely.
+        let displayAddress = merchant.address;
+        try {
+            const addressObj = JSON.parse(merchant.address);
+            if (addressObj && typeof addressObj === 'object') {
+                // Reconstruct address from parsed object
+                displayAddress = [
+                    addressObj.street?.S,
+                    addressObj.district?.S,
+                    addressObj.city?.S,
+                    addressObj.country?.S
+                ].filter(Boolean).join(', ');
+            }
+        } catch (e) {
+            // It's not a JSON string, so use it as is.
+        }
+
         return `
             <tr data-id="${merchant.id}">
                 <td>
-                    <div class="flex items-center">
-                        <img src="${merchant.avatar}" alt="${merchant.name}" class="w-10 h-10 rounded-full mr-4">
+                    <div class="business-info">
+                        <img src="${merchant.avatar}" alt="${merchant.name}" class="avatar">
                         <div>
                             <div class="font-bold">${merchant.name}</div>
                             <div class="text-sm text-gray-500">${merchant.category}</div>
@@ -635,13 +652,13 @@ function renderMerchantsTable() {
                         ${statusInfo.label}
                     </span>
                 </td>
-                <td><a href="mailto:${merchant.email}" class="text-blue-500 hover:underline">${merchant.email}</a></td>
+                <td><a href="mailto:${merchant.email}" class="table-link">${merchant.email}</a></td>
                 <td>${merchant.phone}</td>
-                <td>${merchant.address}</td>
-                <td>
-                    <button class="action-btn view-btn" title="View Details" onclick="viewMerchantDetails('${merchant.id}')"><i class="fas fa-eye"></i></button>
-                    <button class="action-btn edit-btn" title="Edit Status" onclick="openStatusModal('${merchant.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn delete-btn" title="Delete Merchant"><i class="fas fa-trash"></i></button>
+                <td>${displayAddress}</td>
+                <td class="actions">
+                    <button class="action-btn" title="View Details" onclick="viewMerchantDetails('${merchant.id}')"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn" title="Edit Status" onclick="openStatusModal('${merchant.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn" title="Delete Merchant"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
         `;
