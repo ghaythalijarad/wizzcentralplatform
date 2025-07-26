@@ -16,14 +16,37 @@ window.logout = async () => {
     }
 };
 
-// Always allow unauthenticated access for orders page
+// Check authentication on page load
 function checkAuthentication() {
     const idToken = sessionStorage.getItem('idToken');
     const accessToken = sessionStorage.getItem('accessToken');
+    
     if (!idToken || !accessToken) {
-        console.warn('No authentication tokens found. Continuing with unauthenticated DynamoDB access.');
-        return true;
+        console.warn('No authentication tokens found, redirecting to login');
+        window.location.href = 'index.html';
+        return false;
     }
+    
+    // Validate token expiration
+    if (idToken) {
+        try {
+            const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
+            const currentTime = Math.floor(Date.now() / 1000);
+            
+            if (tokenPayload.exp && tokenPayload.exp < currentTime) {
+                console.warn('Authentication token has expired. Redirecting to login.');
+                sessionStorage.clear();
+                window.location.href = 'index.html';
+                return false;
+            }
+        } catch (error) {
+            console.error('Invalid token format. Redirecting to login.');
+            sessionStorage.clear();
+            window.location.href = 'index.html';
+            return false;
+        }
+    }
+    
     console.log('Authentication tokens found, proceeding with authenticated access');
     return true;
 }

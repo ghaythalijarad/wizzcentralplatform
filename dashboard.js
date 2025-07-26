@@ -114,10 +114,10 @@ async function loadRecentBusinesses() {
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
-    // if (!checkAuthentication()) {
-    //     return;
-    // }
+    // Check authentication first
+    if (!checkAuthentication()) {
+        return; // Exit if authentication fails
+    }
     
     // Get DOM elements
     sidebar = document.getElementById('sidebar');

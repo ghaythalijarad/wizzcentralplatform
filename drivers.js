@@ -1,16 +1,37 @@
 // Drivers Management JavaScript
 
-// Check authentication on page load - TEMPORARILY DISABLED FOR DEBUGGING
+// Check authentication on page load
 function checkAuthentication() {
-  // const idToken = sessionStorage.getItem('idToken');
-  // const accessToken = sessionStorage.getItem('accessToken');
+  const idToken = sessionStorage.getItem('idToken');
+  const accessToken = sessionStorage.getItem('accessToken');
   
-  // if (!idToken || !accessToken) {
-  //   console.warn('No authentication tokens found, redirecting to login');
-  //   window.location.href = 'index.html';
-  //   return false;
-  // }
+  if (!idToken || !accessToken) {
+    console.warn('No authentication tokens found, redirecting to login');
+    window.location.href = 'index.html';
+    return false;
+  }
   
+  // Validate token expiration
+  if (idToken) {
+    try {
+      const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      if (tokenPayload.exp && tokenPayload.exp < currentTime) {
+        console.warn('Authentication token has expired. Redirecting to login.');
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+        return false;
+      }
+    } catch (error) {
+      console.error('Invalid token format. Redirecting to login.');
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+      return false;
+    }
+  }
+  
+  console.log('Authentication check passed');
   return true;
 }
 
@@ -36,14 +57,14 @@ window.logout = async () => {
 // Initialize AWS credentials and DynamoDB client
 async function initializeAWS() {
     try {
-        // const idToken = sessionStorage.getItem('idToken');
-        // const accessToken = sessionStorage.getItem('accessToken');
+        const idToken = sessionStorage.getItem('idToken');
+        const accessToken = sessionStorage.getItem('accessToken');
         
-        // if (!idToken || !accessToken) {
-        //     console.log('No authentication tokens found. Redirecting to login.');
-        //     window.location.href = 'index.html';
-        //     return;
-        // }
+        if (!idToken || !accessToken) {
+            console.log('No authentication tokens found. Redirecting to login.');
+            window.location.href = 'index.html';
+            return;
+        }
 
         if (typeof AWS === 'undefined') {
             throw new Error('AWS SDK not loaded.');
@@ -75,7 +96,7 @@ async function initializeAWS() {
         console.log('AWS initialized successfully for drivers.');
     } catch (error) {
         console.error('Failed to initialize AWS for drivers:', error);
-        // window.location.href = 'index.html'; // TEMPORARILY DISABLED FOR DEBUGGING
+        window.location.href = 'index.html';
         throw error;
     }
 }

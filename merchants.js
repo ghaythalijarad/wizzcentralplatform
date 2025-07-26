@@ -1,5 +1,4 @@
 // Merchants Management JavaScript - Using Centralized Data Service
-// Force deployment trigger for Amplify
 console.log('merchants.js script loaded');
 
 // DynamoDB table name
@@ -25,17 +24,37 @@ let allMerchants = [];
 let merchantsData = [];
 let filteredMerchants = [];
 
-// This function is not currently used in the main flow but is kept for potential future use or reference.
-// The main DOMContentLoaded handler contains the primary authentication and data loading logic.
+// Enhanced authentication check with proper token validation
 function checkMerchantsAuthentication() {
     const token = sessionStorage.getItem('accessToken');
-    if (!token) {
-        console.log('No access token found, but proceeding for development');
-        // For development, we'll allow proceeding without authentication
-        // In production, this should redirect to the login page.
-        // window.location.href = '../index.html';
-        return true; // Allow proceeding for local dev
+    const idToken = sessionStorage.getItem('idToken');
+    
+    if (!token && !idToken) {
+        console.warn('No authentication tokens found. Redirecting to login.');
+        window.location.href = '../index.html';
+        return false;
     }
+    
+    // Validate token expiration
+    if (idToken) {
+        try {
+            const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
+            const currentTime = Math.floor(Date.now() / 1000);
+            
+            if (tokenPayload.exp && tokenPayload.exp < currentTime) {
+                console.warn('Authentication token has expired. Redirecting to login.');
+                sessionStorage.clear();
+                window.location.href = '../index.html';
+                return false;
+            }
+        } catch (error) {
+            console.error('Invalid token format. Redirecting to login.');
+            sessionStorage.clear();
+            window.location.href = '../index.html';
+            return false;
+        }
+    }
+    
     return true;
 }
 
@@ -267,14 +286,6 @@ async function refreshMerchantsData() {
 
 // Export for global access
 window.refreshMerchantsData = refreshMerchantsData;
-
-// Function to open debug tool
-function openDebugTool() {
-    window.open('../merchant-data-debug.html', '_blank');
-}
-
-// Export for global access
-window.openDebugTool = openDebugTool;
 
 // Initialize AWS SDK credentials and DynamoDB client for merchants
 async function initializeAWS() {
