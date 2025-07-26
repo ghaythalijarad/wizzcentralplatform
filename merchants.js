@@ -166,9 +166,11 @@ async function initializeMerchantsManagement() {
             await loadMerchantsFromDynamoDB();
             
             if (merchantsData.length === 0) {
+                console.log('No merchants found in database, loading sample data...');
                 showMessage('Connection successful, but no merchants were found in the database. Loading sample data...', 'warning');
                 merchantsData = getSampleMerchantsData();
             } else {
+                console.log(`Successfully loaded ${merchantsData.length} merchants from database`);
                 hideMessage();
             }
         } catch (dbError) {
@@ -182,12 +184,28 @@ async function initializeMerchantsManagement() {
         const errorMessage = `Could not initialize merchants management. Error: ${error.message}. Displaying sample data.`;
         showMessage(errorMessage, 'error');
         merchantsData = getSampleMerchantsData(); // Fallback
-    } finally {
-        filteredMerchants = [...merchantsData];
-        initializeUI();
-        setupEventListeners();
-        showLoader(false);
     }
+    
+    // Always ensure we have data before initializing UI
+    if (!merchantsData || merchantsData.length === 0) {
+        console.warn('No merchants data available, loading sample data as final fallback');
+        merchantsData = getSampleMerchantsData();
+    }
+    
+    console.log(`Final merchants data count: ${merchantsData.length}`);
+    console.log('Sample merchants data:', merchantsData);
+    filteredMerchants = [...merchantsData];
+    
+    // Initialize UI after ensuring we have data
+    showLoader(false);
+    initializeUI();
+    setupEventListeners();
+    
+    // Force render the table to replace "Loading..." text
+    setTimeout(() => {
+        console.log('Force rendering table after initialization...');
+        renderMerchantsTable();
+    }, 100);
 }
 
 // Load merchants data from DynamoDB using AWS SDK
@@ -476,14 +494,20 @@ function filterMerchants() {
 
 // Render merchants table
 function renderMerchantsTable() {
+    console.log('=== RENDER MERCHANTS TABLE START ===');
     console.log('Rendering merchants table with', filteredMerchants.length, 'entries');
+    console.log('Filtered merchants data:', filteredMerchants);
+    
     const tbody = document.getElementById('merchantsTableBody');
+    console.log('Table body element found:', !!tbody);
+    
     if (!tbody) {
         console.error('merchantsTableBody element not found');
         return;
     }
 
     if (filteredMerchants.length === 0) {
+        console.log('No merchants to display, showing empty state');
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 2rem; color: #666;">
@@ -496,7 +520,8 @@ function renderMerchantsTable() {
         return;
     }
 
-    tbody.innerHTML = filteredMerchants.map(merchant => `
+    console.log('Generating table HTML for', filteredMerchants.length, 'merchants');
+    const tableHTML = filteredMerchants.map(merchant => `
         <tr>
             <td>
                 <div class="merchant-info">
@@ -529,6 +554,11 @@ function renderMerchantsTable() {
             </td>
         </tr>
     `).join('');
+    
+    console.log('Setting table HTML (length:', tableHTML.length, 'characters)');
+    tbody.innerHTML = tableHTML;
+    console.log('Table HTML set successfully');
+    console.log('=== RENDER MERCHANTS TABLE END ===');
 }
 
 // Update merchant statistics
