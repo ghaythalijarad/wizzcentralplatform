@@ -645,32 +645,36 @@ function renderMerchantsTable() {
         }
 
         return `
-            <tr class="hover:bg-gray-50 transition-colors duration-200">
-                <td class="p-4 border-b border-gray-200">
-                    <div class="flex items-center">
-                        <img src="${merchant.avatar}" alt="${merchant.name}" class="w-10 h-10 rounded-full object-cover mr-4">
-                        <div>
-                            <div class="font-semibold text-gray-800">${merchant.name}</div>
-                            <div class="text-sm text-gray-500">${merchant.category}</div>
+            <tr>
+                <td>
+                    <div class="business-info">
+                        <img src="${merchant.avatar}" alt="${merchant.name}" class="business-avatar">
+                        <div class="business-details">
+                            <h4>${merchant.name}</h4>
+                            <p>${merchant.category || 'Business'}</p>
                         </div>
                     </div>
                 </td>
-                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.owner}</td>
-                <td class="p-4 border-b border-gray-200">
-                    <span class="px-3 py-1 text-sm font-medium rounded-full" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
+                <td>${merchant.owner}</td>
+                <td>
+                    <span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
                         ${statusInfo.label}
                     </span>
                 </td>
-                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.email}</td>
-                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.phone}</td>
-                <td class="p-4 border-b border-gray-200 text-gray-600 text-sm">${displayAddress}</td>
-                <td class="p-4 border-b border-gray-200">
-                    <button class="text-blue-600 hover:text-blue-800" onclick="viewMerchantDetails('${merchant.id}')">
-                        <i class="material-icons">visibility</i>
-                    </button>
-                    <button class="text-green-600 hover:text-green-800 ml-2" onclick="editMerchant('${merchant.id}')">
-                        <i class="material-icons">edit</i>
-                    </button>
+                <td>${merchant.email}</td>
+                <td>${merchant.phone}</td>
+                <td>
+                    <div class="address-info">${displayAddress}</div>
+                </td>
+                <td>
+                    <div class="actions">
+                        <button class="btn-action" onclick="viewMerchantDetails('${merchant.id}')" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-action" onclick="editMerchant('${merchant.id}')" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
@@ -697,6 +701,72 @@ function updateMerchantStats() {
     }).length;
 
     if (newThisMonth) newThisMonth.textContent = thisMonthCount;
+}
+
+// Modal functions for merchant management
+function viewMerchantDetails(merchantId) {
+    const merchant = filteredMerchants.find(m => m.id === merchantId);
+    if (!merchant) {
+        console.error('Merchant not found:', merchantId);
+        return;
+    }
+
+    // Format address display
+    let displayAddress = merchant.address || 'Not provided';
+    try {
+        const parsedAddress = JSON.parse(merchant.address);
+        displayAddress = [
+            parsedAddress.street,
+            parsedAddress.city,
+            parsedAddress.country
+        ].filter(Boolean).join(', ');
+    } catch (e) {
+        // Use address as is if not JSON
+    }
+
+    const modalBody = document.getElementById('merchantDetailsBody');
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div style="display: grid; gap: 1rem;">
+                <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                    <img src="${merchant.avatar}" alt="${merchant.name}" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover;">
+                    <div>
+                        <h4 style="margin: 0; color: #1e293b;">${merchant.name}</h4>
+                        <p style="margin: 0; color: #64748b; font-size: 0.9rem;">${merchant.category || 'Business'}</p>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div><strong>Owner:</strong> ${merchant.owner}</div>
+                    <div><strong>Status:</strong> <span class="status-badge ${MERCHANT_STATUSES[merchant.status]?.class || 'unknown'}">${MERCHANT_STATUSES[merchant.status]?.label || 'Unknown'}</span></div>
+                    <div><strong>Email:</strong> ${merchant.email}</div>
+                    <div><strong>Phone:</strong> ${merchant.phone}</div>
+                    <div style="grid-column: 1 / -1;"><strong>Address:</strong> ${displayAddress}</div>
+                    <div><strong>Join Date:</strong> ${merchant.joinDate ? new Date(merchant.joinDate).toLocaleDateString() : 'N/A'}</div>
+                    <div><strong>Commission:</strong> ${merchant.commission || 0}%</div>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('viewMerchantModal').style.display = 'flex';
+    }
+}
+
+function editMerchant(merchantId) {
+    const merchant = filteredMerchants.find(m => m.id === merchantId);
+    if (!merchant) {
+        console.error('Merchant not found:', merchantId);
+        return;
+    }
+    
+    // For now, just show an alert - this would open an edit form in a full implementation
+    alert(`Edit functionality would open for: ${merchant.name}\n\nThis would typically open a form to edit merchant details, status, commission rates, etc.`);
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 // Make sure the DOM is ready before executing the main logic
