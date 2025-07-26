@@ -618,47 +618,47 @@ function renderMerchantsTable() {
 
     const rows = filteredMerchants.map(merchant => {
         const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
-        // The address can be a JSON string, so we need to parse it safely.
-        let displayAddress = merchant.address;
+        
+        let displayAddress = merchant.address || 'N/A';
         try {
-            const addressObj = JSON.parse(merchant.address);
-            if (addressObj && typeof addressObj === 'object') {
-                // Reconstruct address from parsed object
-                displayAddress = [
-                    addressObj.street?.S,
-                    addressObj.district?.S,
-                    addressObj.city?.S,
-                    addressObj.country?.S
-                ].filter(Boolean).join(', ');
-            }
+            // The address might be a JSON string, so we parse it.
+            const parsedAddress = JSON.parse(merchant.address);
+            displayAddress = [
+                parsedAddress.street,
+                parsedAddress.city,
+                parsedAddress.country
+            ].filter(Boolean).join(', ');
         } catch (e) {
-            // It's not a JSON string, so use it as is.
+            // If it's not a JSON string, use it as is.
         }
 
         return `
-            <tr data-id="${merchant.id}">
-                <td>
-                    <div class="business-info">
-                        <img src="${merchant.avatar}" alt="${merchant.name}" class="avatar">
+            <tr class="hover:bg-gray-50 transition-colors duration-200">
+                <td class="p-4 border-b border-gray-200">
+                    <div class="flex items-center">
+                        <img src="${merchant.avatar}" alt="${merchant.name}" class="w-10 h-10 rounded-full object-cover mr-4">
                         <div>
-                            <div class="font-bold">${merchant.name}</div>
+                            <div class="font-semibold text-gray-800">${merchant.name}</div>
                             <div class="text-sm text-gray-500">${merchant.category}</div>
                         </div>
                     </div>
                 </td>
-                <td>${merchant.owner}</td>
-                <td>
-                    <span class="status-badge" style="background-color: ${statusInfo.color};">
+                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.owner}</td>
+                <td class="p-4 border-b border-gray-200">
+                    <span class="px-3 py-1 text-sm font-medium rounded-full" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
                         ${statusInfo.label}
                     </span>
                 </td>
-                <td><a href="mailto:${merchant.email}" class="table-link">${merchant.email}</a></td>
-                <td>${merchant.phone}</td>
-                <td>${displayAddress}</td>
-                <td class="actions">
-                    <button class="action-btn" title="View Details" onclick="viewMerchantDetails('${merchant.id}')"><i class="fas fa-eye"></i></button>
-                    <button class="action-btn" title="Edit Status" onclick="openStatusModal('${merchant.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn" title="Delete Merchant"><i class="fas fa-trash"></i></button>
+                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.email}</td>
+                <td class="p-4 border-b border-gray-200 text-gray-700">${merchant.phone}</td>
+                <td class="p-4 border-b border-gray-200 text-gray-600 text-sm">${displayAddress}</td>
+                <td class="p-4 border-b border-gray-200">
+                    <button class="text-blue-600 hover:text-blue-800" onclick="viewMerchantDetails('${merchant.id}')">
+                        <i class="material-icons">visibility</i>
+                    </button>
+                    <button class="text-green-600 hover:text-green-800 ml-2" onclick="editMerchant('${merchant.id}')">
+                        <i class="material-icons">edit</i>
+                    </button>
                 </td>
             </tr>
         `;
@@ -669,31 +669,27 @@ function renderMerchantsTable() {
 
 // Update dashboard stats based on loaded merchants
 function updateMerchantStats() {
-    const totalMerchants = merchantsData.length;
-    const approvedCount = merchantsData.filter(m => m.status === 'approved').length;
-    const pendingCount = merchantsData.filter(m => m.status === 'pending' || m.status === 'under_review').length;
+    const totalMerchants = document.getElementById('total-merchants');
+    const approvedMerchants = document.getElementById('approved-merchants');
+    const pendingMerchants = document.getElementById('pending-merchants');
+    const newThisMonth = document.getElementById('new-this-month');
 
-    // These elements might be on the page, update them if they exist
-    const totalEl = document.getElementById('totalMerchantsStat');
-    const approvedEl = document.getElementById('approvedMerchantsStat');
-    const pendingEl = document.getElementById('pendingMerchantsStat');
+    if (totalMerchants) totalMerchants.textContent = merchantsData.length;
+    if (approvedMerchants) approvedMerchants.textContent = merchantsData.filter(m => m.status === 'approved').length;
+    if (pendingMerchants) pendingMerchants.textContent = merchantsData.filter(m => m.status === 'pending' || m.status === 'under_review').length;
+    
+    const thisMonthCount = merchantsData.filter(m => {
+        const joinDate = new Date(m.joinDate);
+        const today = new Date();
+        return joinDate.getMonth() === today.getMonth() && joinDate.getFullYear() === today.getFullYear();
+    }).length;
 
-    if (totalEl) totalEl.textContent = totalMerchants;
-    if (approvedEl) approvedEl.textContent = approvedCount;
-    if (pendingEl) pendingEl.textContent = pendingCount;
-
-    console.log(`Stats updated: Total=${totalMerchants}, Approved=${approvedCount}, Pending=${pendingCount}`);
+    if (newThisMonth) newThisMonth.textContent = thisMonthCount;
 }
 
-
-// This script should run after the DOM is fully loaded.
-// We'll check the readyState to handle cases where the script is loaded asynchronously
-// after the DOMContentLoaded event has already fired.
+// Make sure the DOM is ready before executing the main logic
 if (document.readyState === 'loading') {
-    // Loading hasn't finished yet
     document.addEventListener('DOMContentLoaded', onDomReady);
 } else {
-    // `DOMContentLoaded` has already fired
-    console.log('DOM already loaded, running onDomReady immediately.');
     onDomReady();
 }
