@@ -368,8 +368,52 @@ class WizzDataService {
 
     // Merchant Discounts methods
     async getMerchantDiscounts(useCache = true) {
-        const result = await this.scan(this.tables.DISCOUNTS, {}, useCache);
-        return (result.Items || []).map(this._mapDiscountItem);
+        try {
+            console.log('🔄 Starting getMerchantDiscounts...');
+            const result = await this.scan(this.tables.DISCOUNTS, {}, useCache);
+            console.log(`📊 Raw scan result: ${result.Items?.length || 0} items`);
+            
+            if (!result.Items || result.Items.length === 0) {
+                console.log('⚠️ No items found in discounts table');
+                return [];
+            }
+            
+            // Log first item structure for debugging
+            console.log('🔍 First raw item structure:', JSON.stringify(result.Items[0], null, 2));
+            
+            const mappedItems = result.Items.map(item => {
+                try {
+                    return this._mapDiscountItem(item);
+                } catch (mappingError) {
+                    console.error('❌ Error mapping discount item:', mappingError);
+                    console.error('Problematic item:', JSON.stringify(item, null, 2));
+                    // Return a basic fallback item to prevent complete failure
+                    return {
+                        id: item.id || item.discountId || `error-${Date.now()}`,
+                        businessId: item.businessId || 'unknown',
+                        title: 'Error loading discount',
+                        description: 'This discount had mapping errors',
+                        type: 'percentage',
+                        value: 0,
+                        status: 'inactive',
+                        _error: mappingError.message,
+                        _rawData: item
+                    };
+                }
+            });
+            
+            console.log(`✅ Successfully mapped ${mappedItems.length} discount items`);
+            return mappedItems;
+            
+        } catch (error) {
+            console.error('❌ Error in getMerchantDiscounts:', error);
+            console.error('Error details:', {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            throw error;
+        }
     }
 
     async getActiveDiscounts(useCache = true) {
@@ -383,26 +427,29 @@ class WizzDataService {
     }
 
     _mapDiscountItem(item) {
+        // Handle various field name variations and ensure robust mapping
         return {
-            id: item.discountId || item.id,
-            businessId: item.businessId,
-            title: item.title || 'Unnamed Discount',
-            description: item.description || '',
-            type: item.type || 'percentage', // percentage, fixed, etc.
-            value: item.value || 0,
-            status: item.status || 'active',
-            applicability: item.applicability || 'all', // all, specificItems, category
-            minimumOrderAmount: item.minimum_order_amount || 0,
-            usageCount: item.usage_count || 0,
-            usageLimit: item.usage_limit || null,
-            validFrom: item.valid_from,
-            validTo: item.valid_to,
-            createdAt: item.created_at,
-            updatedAt: item.updated_at,
-            conditionalRule: item.conditional_rule,
-            conditionalParameters: item.conditional_parameters || {},
-            applicableItemIds: item.applicable_item_ids || [],
-            applicableCategoryIds: item.applicable_category_ids || []
+            id: item.discountId || item.id || item.discount_id || `discount-${Date.now()}`,
+            businessId: item.businessId || item.business_id || item.merchant_id || item.merchantId,
+            title: item.title || item.name || item.discount_name || 'Unnamed Discount',
+            description: item.description || item.desc || item.details || '',
+            type: item.type || item.discount_type || 'percentage', // percentage, fixed, etc.
+            value: item.value || item.discount_value || item.amount || 0,
+            status: item.status || item.discount_status || 'active',
+            applicability: item.applicability || item.applicable_to || 'all', // all, specificItems, category
+            minimumOrderAmount: item.minimum_order_amount || item.min_order || item.minimumOrder || 0,
+            usageCount: item.usage_count || item.usageCount || item.used_count || 0,
+            usageLimit: item.usage_limit || item.usageLimit || item.max_usage || null,
+            validFrom: item.valid_from || item.validFrom || item.start_date || item.startDate,
+            validTo: item.valid_to || item.validTo || item.end_date || item.endDate,
+            createdAt: item.created_at || item.createdAt || item.date_created || new Date().toISOString(),
+            updatedAt: item.updated_at || item.updatedAt || item.date_updated || new Date().toISOString(),
+            conditionalRule: item.conditional_rule || item.conditionalRule || item.rule,
+            conditionalParameters: item.conditional_parameters || item.conditionalParameters || {},
+            applicableItemIds: item.applicable_item_ids || item.applicableItemIds || [],
+            applicableCategoryIds: item.applicable_category_ids || item.applicableCategoryIds || [],
+            // Add raw data for debugging
+            _rawData: item
         };
     }
 

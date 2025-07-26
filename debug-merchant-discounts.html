@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Service Debug - Merchant Discounts</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 10px 0; border-radius: 5px; font-family: monospace; max-height: 400px; overflow-y: auto; }
+        .data-display { background: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; margin: 10px 0; border-radius: 5px; max-height: 400px; overflow-y: auto; }
+        h1 { color: #333; margin-bottom: 20px; }
+        h2 { color: #495057; margin-top: 30px; margin-bottom: 15px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #dee2e6; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Data Service Debug - Merchant Discounts</h1>
+        <p>This debug page will help identify why merchant discounts are failing to load.</p>
+
+        <div class="test-section">
+            <h2>Quick Actions</h2>
+            <button onclick="runFullDiagnostic()">🔬 Run Full Diagnostic</button>
+            <button onclick="testDataServiceInit()">🚀 Test Data Service Init</button>
+            <button onclick="testDiscountsLoad()">📊 Test Discounts Load</button>
+            <button onclick="testDirectDynamoAccess()">🔑 Test Direct DynamoDB Access</button>
+            <button onclick="testBusinessesLoad()">🏪 Test Businesses Load</button>
+            <button onclick="clearLogs()">🧹 Clear Logs</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Service Status</h2>
+            <div id="serviceStatus">Ready to test...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>Debug Log</h2>
+            <div class="log" id="debugLog">No logs yet. Click a test button to start...</div>
+        </div>
+
+        <div class="test-section">
+            <h2>Data Results</h2>
+            <div class="data-display" id="dataResults">No data loaded yet...</div>
+        </div>
+    </div>
+
+    <!-- Include required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../data-service.js"></script>
+    <script src="../test-discounts-debug.js"></script>
+
+    <script>
+        let logs = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push(`[${timestamp}] ${message}`);
+            
+            const logDiv = document.getElementById('debugLog');
+            const statusDiv = document.getElementById('serviceStatus');
+            
+            logDiv.innerHTML = logs.join('<br>');
+            logDiv.scrollTop = logDiv.scrollHeight;
+            
+            // Update status
+            const statusClass = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            statusDiv.innerHTML = `<div class="status ${statusClass}">${message}</div>`;
+        }
+
+        function clearLogs() {
+            logs = [];
+            document.getElementById('debugLog').innerHTML = 'Logs cleared.';
+            document.getElementById('dataResults').innerHTML = 'Data cleared.';
+            document.getElementById('serviceStatus').innerHTML = 'Ready to test...';
+        }
+
+        function displayData(title, data) {
+            const dataDiv = document.getElementById('dataResults');
+            dataDiv.innerHTML = `<h3>${title}</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+        }
+
+        async function testDataServiceInit() {
+            log('🔄 Testing data service initialization...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    window.dataService = WizzDataService.getInstance();
+                    log('✅ Data service instance created', 'success');
+                }
+                
+                log('🔄 Initializing data service...', 'info');
+                await window.dataService.initialize();
+                log('✅ Data service initialized successfully', 'success');
+                
+                // Test basic connectivity
+                log('🔄 Testing basic DynamoDB connectivity...', 'info');
+                const testResult = await window.dataService.scan('order-receiver-businesses-dev', { Limit: 1 });
+                log(`✅ DynamoDB connectivity test passed. Found ${testResult.Items?.length || 0} items in sample query`, 'success');
+                
+            } catch (error) {
+                log(`❌ Data service initialization failed: ${error.message}`, 'error');
+                console.error('Initialization error:', error);
+            }
+        }
+
+        async function testDiscountsLoad() {
+            log('🔄 Testing discounts table access...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    await testDataServiceInit();
+                }
+                
+                log('🔄 Scanning discounts table: order-receiver-discounts-dev', 'info');
+                const discounts = await window.dataService.getMerchantDiscounts(false);
+                log(`✅ Discounts loaded successfully: ${discounts.length} items`, 'success');
+                
+                displayData('Merchant Discounts', discounts);
+                
+                if (discounts.length === 0) {
+                    log('⚠️ No discounts found in the table', 'warning');
+                } else {
+                    log(`📊 Sample discount: ${discounts[0].title || 'Untitled'}`, 'info');
+                    // Show details of first discount for debugging
+                    const firstDiscount = discounts[0];
+                    log(`📋 First discount details:`, 'info');
+                    log(`   - ID: ${firstDiscount.id}`, 'info');
+                    log(`   - Business ID: ${firstDiscount.businessId}`, 'info');
+                    log(`   - Title: ${firstDiscount.title}`, 'info');
+                    log(`   - Type: ${firstDiscount.type}`, 'info');
+                    log(`   - Value: ${firstDiscount.value}`, 'info');
+                    log(`   - Status: ${firstDiscount.status}`, 'info');
+                    if (firstDiscount._error) {
+                        log(`   - ⚠️ Mapping Error: ${firstDiscount._error}`, 'warning');
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Failed to load discounts: ${error.message}`, 'error');
+                console.error('Discounts load error:', error);
+                
+                // Try direct table scan
+                try {
+                    log('🔄 Attempting direct table scan...', 'info');
+                    const directResult = await window.dataService.scan('order-receiver-discounts-dev', { Limit: 10 });
+                    log(`📊 Direct scan result: ${directResult.Items?.length || 0} items`, 'info');
+                    displayData('Direct Scan Result', directResult);
+                    
+                    if (directResult.Items && directResult.Items.length > 0) {
+                        log('🔍 Raw item structure from DynamoDB:', 'info');
+                        log(JSON.stringify(directResult.Items[0], null, 2), 'info');
+                    }
+                } catch (directError) {
+                    log(`❌ Direct scan also failed: ${directError.message}`, 'error');
+                    console.error('Direct scan error details:', directError);
+                }
+            }
+        }
+
+        async function testBusinessesLoad() {
+            log('🔄 Testing businesses table access...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    await testDataServiceInit();
+                }
+                
+                log('🔄 Loading businesses data...', 'info');
+                const businesses = await window.dataService.getBusinesses(false);
+                log(`✅ Businesses loaded successfully: ${businesses.length} items`, 'success');
+                
+                displayData('Businesses Data', businesses.slice(0, 5)); // Show first 5
+                
+                if (businesses.length === 0) {
+                    log('⚠️ No businesses found in the table', 'warning');
+                } else {
+                    log(`📊 Sample business: ${businesses[0].name || 'Unnamed Business'}`, 'info');
+                }
+                
+            } catch (error) {
+                log(`❌ Failed to load businesses: ${error.message}`, 'error');
+                console.error('Businesses load error:', error);
+            }
+        }
+
+        async function testDirectDynamoAccess() {
+            log('🔑 Testing direct DynamoDB access for discounts table...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    await testDataServiceInit();
+                }
+                
+                // Test with various scan parameters
+                log('🔄 Test 1: Basic scan with no filters...', 'info');
+                try {
+                    const result1 = await window.dataService.dynamodbClient.scan({
+                        TableName: 'order-receiver-discounts-dev'
+                    }).promise();
+                    log(`✅ Basic scan successful: ${result1.Items?.length || 0} items`, 'success');
+                    displayData('Basic Scan Result', result1);
+                } catch (err) {
+                    log(`❌ Basic scan failed: ${err.message}`, 'error');
+                    console.error('Basic scan error:', err);
+                }
+                
+                log('🔄 Test 2: Scan with limit...', 'info');
+                try {
+                    const result2 = await window.dataService.dynamodbClient.scan({
+                        TableName: 'order-receiver-discounts-dev',
+                        Limit: 5
+                    }).promise();
+                    log(`✅ Limited scan successful: ${result2.Items?.length || 0} items`, 'success');
+                } catch (err) {
+                    log(`❌ Limited scan failed: ${err.message}`, 'error');
+                }
+                
+                log('🔄 Test 3: Describe table...', 'info');
+                try {
+                    const result3 = await window.dataService.dynamodbClient.describeTable({
+                        TableName: 'order-receiver-discounts-dev'
+                    }).promise();
+                    log(`✅ Table description successful`, 'success');
+                    displayData('Table Description', {
+                        tableName: result3.Table.TableName,
+                        status: result3.Table.TableStatus,
+                        itemCount: result3.Table.ItemCount,
+                        keySchema: result3.Table.KeySchema,
+                        attributeDefinitions: result3.Table.AttributeDefinitions
+                    });
+                } catch (err) {
+                    log(`❌ Describe table failed: ${err.message}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Direct DynamoDB access test failed: ${error.message}`, 'error');
+                console.error('Direct access error:', error);
+            }
+        }
+
+        async function runFullDiagnostic() {
+            log('🚀 Starting full diagnostic...', 'info');
+            clearLogs();
+            
+            // Step 1: Check dependencies
+            log('🔍 Step 1: Checking dependencies...', 'info');
+            
+            if (typeof AWS === 'undefined') {
+                log('❌ AWS SDK not loaded', 'error');
+                return;
+            } else {
+                log('✅ AWS SDK loaded', 'success');
+            }
+            
+            if (!window.WIZZCENTRAL_CONFIG) {
+                log('❌ Config not loaded', 'error');
+                return;
+            } else {
+                log('✅ Configuration loaded', 'success');
+            }
+            
+            if (!WizzDataService) {
+                log('❌ Data service class not available', 'error');
+                return;
+            } else {
+                log('✅ Data service class available', 'success');
+            }
+            
+            // Step 2: Initialize service
+            log('🔍 Step 2: Initializing data service...', 'info');
+            await testDataServiceInit();
+            
+            // Step 3: Test table access
+            log('🔍 Step 3: Testing table access...', 'info');
+            await testBusinessesLoad();
+            await testDirectDynamoAccess();
+            await testDiscountsLoad();
+            
+            log('🎯 Full diagnostic complete!', 'success');
+        }
+
+        // Auto-run basic diagnostic on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('📄 Debug page loaded. Ready for testing.', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -522,37 +522,74 @@ let businessesData = {};
 // Load merchant discounts from data service
 async function loadMerchantDiscounts() {
     try {
-        console.log('Starting loadMerchantDiscounts...');
+        console.log('🔄 Starting loadMerchantDiscounts...');
         
         if (!window.dataService) {
-            console.warn('Data service not available for merchant discounts');
+            console.warn('❌ Data service not available for merchant discounts');
             showMerchantDiscountError();
             return;
         }
         
-        console.log('Data service available, initializing...');
+        console.log('✅ Data service available, initializing...');
         await window.dataService.initialize();
-        console.log('Data service initialized successfully');
+        console.log('✅ Data service initialized successfully');
         
-        // Load both discounts and businesses data
-        console.log('Loading discounts and businesses data...');
-        const [discounts, businesses] = await Promise.all([
-            window.dataService.getMerchantDiscounts(),
-            window.dataService.getBusinesses()
-        ]);
+        // Load both discounts and businesses data with individual error handling
+        console.log('🔄 Loading discounts and businesses data...');
         
-        console.log(`Raw discounts loaded: ${discounts.length} items`);
-        console.log(`Raw businesses loaded: ${businesses.length} items`);
+        let discounts = [];
+        let businesses = [];
+        
+        try {
+            console.log('🔄 Loading merchant discounts...');
+            discounts = await window.dataService.getMerchantDiscounts(false); // Force fresh data
+            console.log(`✅ Raw discounts loaded: ${discounts.length} items`);
+            if (discounts.length > 0) {
+                console.log('📋 Sample discount:', discounts[0]);
+            }
+        } catch (discountError) {
+            console.error('❌ Failed to load discounts:', discountError);
+            console.error('Discount error details:', {
+                message: discountError.message,
+                code: discountError.code,
+                stack: discountError.stack
+            });
+            // Continue with empty discounts array
+        }
+        
+        try {
+            console.log('🔄 Loading businesses data...');
+            businesses = await window.dataService.getBusinesses(false); // Force fresh data
+            console.log(`✅ Raw businesses loaded: ${businesses.length} items`);
+        } catch (businessError) {
+            console.error('❌ Failed to load businesses:', businessError);
+            console.error('Business error details:', {
+                message: businessError.message,
+                code: businessError.code,
+                stack: businessError.stack
+            });
+            // Continue with empty businesses array
+        }
         
         merchantDiscounts = discounts;
         
         // Create a lookup map for business names
         businessesData = {};
         businesses.forEach(business => {
-            businessesData[business.id] = business;
+            const id = business.id || business.businessId;
+            if (id) {
+                businessesData[id] = business;
+            }
         });
         
-        console.log('Final merchant discounts:', merchantDiscounts);
+        console.log('📊 Final processing results:');
+        console.log(`- Merchant discounts: ${merchantDiscounts.length}`);
+        console.log(`- Businesses data: ${Object.keys(businessesData).length}`);
+        console.log('- Sample businessesData keys:', Object.keys(businessesData).slice(0, 5));
+        console.log('📊 Final processing results:');
+        console.log(`- Merchant discounts: ${merchantDiscounts.length}`);
+        console.log(`- Businesses data: ${Object.keys(businessesData).length}`);
+        console.log('- Sample businessesData keys:', Object.keys(businessesData).slice(0, 5));
         console.log('Final businesses data:', businessesData);
         
         // Update stats
@@ -561,8 +598,10 @@ async function loadMerchantDiscounts() {
         // Render table
         renderMerchantDiscountsTable();
         
+        console.log('✅ loadMerchantDiscounts completed successfully');
+        
     } catch (error) {
-        console.error('Error loading merchant discounts:', error);
+        console.error('❌ Critical error in loadMerchantDiscounts:', error);
         console.error('Error details:', {
             message: error.message,
             stack: error.stack,
@@ -623,12 +662,29 @@ function renderMerchantDiscountsTable() {
     if (!tbody) return;
     
     if (merchantDiscounts.length === 0) {
+        // Check if we have no discounts due to an error or truly empty
+        const hasError = merchantDiscounts._error || false;
+        const errorMessage = hasError ? 
+            'Failed to load merchant discounts. Check console for details.' :
+            'No merchant discounts found. Merchants haven\'t created any discounts yet.';
+        const iconClass = hasError ? 'fas fa-exclamation-triangle' : 'fas fa-tags';
+        const iconColor = hasError ? '#e74c3c' : '#ccc';
+        
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                    <i class="fas fa-tags" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
-                    <div>No merchant discounts found</div>
-                    <div style="font-size: 0.9rem; margin-top: 0.5rem;">Merchants haven't created any discounts yet</div>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: ${hasError ? '#e74c3c' : '#666'};">
+                    <i class="${iconClass}" style="font-size: 3rem; margin-bottom: 1rem; color: ${iconColor};"></i>
+                    <div>${errorMessage}</div>
+                    ${hasError ? `
+                        <div style="font-size: 0.9rem; margin-top: 0.5rem;">
+                            <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
+                                <i class="fas fa-sync-alt"></i> Retry Loading
+                            </button>
+                            <button onclick="window.debugMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 1rem; margin-left: 0.5rem;">
+                                <i class="fas fa-bug"></i> Debug in Console
+                            </button>
+                        </div>
+                    ` : `<div style="font-size: 0.9rem; margin-top: 0.5rem;">Discounts created by merchants will appear here</div>`}
                 </td>
             </tr>
         `;
@@ -710,8 +766,11 @@ function showMerchantDiscountError() {
         <tr>
             <td colspan="8" style="text-align: center; padding: 2rem; color: #e74c3c;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                <div>Failed to load merchant discounts</div>
-                <div style="font-size: 0.9rem; margin-top: 0.5rem;">Please check your connection and try again</div>
+                <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">Failed to load merchant discounts</div>
+                <div style="font-size: 0.9rem; margin-bottom: 1rem;">Please check the console for detailed error information</div>
+                <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <i class="fas fa-sync-alt"></i> Try Again
+                </button>
             </td>
         </tr>
     `;
@@ -730,5 +789,70 @@ function contactMerchant(businessId) {
     console.log('Contact merchant:', businessId);
     alert('Contact merchant functionality would be implemented here');
 }
+
+// Debug function for merchant discounts - can be called from browser console
+window.debugMerchantDiscounts = async function() {
+    console.log('🔍 === MERCHANT DISCOUNTS DEBUG START ===');
+    
+    try {
+        // Test 1: Check if data service exists
+        console.log('1️⃣ Checking data service availability...');
+        if (!window.dataService) {
+            console.error('❌ window.dataService is not available');
+            return;
+        }
+        console.log('✅ Data service is available');
+        
+        // Test 2: Initialize data service
+        console.log('2️⃣ Initializing data service...');
+        await window.dataService.initialize();
+        console.log('✅ Data service initialized');
+        
+        // Test 3: Test direct scan of discounts table
+        console.log('3️⃣ Testing direct scan of discounts table...');
+        const scanResult = await window.dataService.scan('order-receiver-discounts-dev', { Limit: 5 });
+        console.log('✅ Direct scan result:', scanResult);
+        console.log(`Found ${scanResult.Items?.length || 0} raw items`);
+        if (scanResult.Items && scanResult.Items.length > 0) {
+            console.log('First raw item:', JSON.stringify(scanResult.Items[0], null, 2));
+        }
+        
+        // Test 4: Test getMerchantDiscounts method
+        console.log('4️⃣ Testing getMerchantDiscounts method...');
+        const discounts = await window.dataService.getMerchantDiscounts(false);
+        console.log('✅ getMerchantDiscounts result:', discounts);
+        console.log(`Mapped ${discounts.length} discount items`);
+        if (discounts.length > 0) {
+            console.log('First mapped discount:', JSON.stringify(discounts[0], null, 2));
+        }
+        
+        // Test 5: Test businesses loading
+        console.log('5️⃣ Testing businesses loading...');
+        const businesses = await window.dataService.getBusinesses(false);
+        console.log('✅ Businesses result:', businesses);
+        console.log(`Loaded ${businesses.length} businesses`);
+        
+        console.log('🎯 === DEBUG COMPLETED SUCCESSFULLY ===');
+        return {
+            scanResult,
+            discounts,
+            businesses,
+            summary: {
+                rawItems: scanResult.Items?.length || 0,
+                mappedDiscounts: discounts.length,
+                businesses: businesses.length
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ DEBUG FAILED:', error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+        });
+        throw error;
+    }
+};
 
 // Initialize promotions page when DOM is ready
