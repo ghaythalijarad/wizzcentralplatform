@@ -157,6 +157,129 @@
             </div>
         </div>
 
+        <!-- Edit Merchant Modal -->
+        <div id="editMerchantModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index: 1000;">
+            <div class="modal-content" style="background:white; padding:1.5rem; border-radius:8px; max-width:700px; width:95%; max-height:90vh; overflow-y:auto; position:relative;">
+                <button onclick="closeModal('editMerchantModal')" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280; padding:4px;">&times;</button>
+                
+                <h3 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.5rem;">Edit Merchant</h3>
+                
+                <form id="editMerchantForm" style="display: grid; gap: 1rem;">
+                    <!-- Basic Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editBusinessName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business Name</label>
+                            <input type="text" id="editBusinessName" name="name" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editOwnerName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Owner Name</label>
+                            <input type="text" id="editOwnerName" name="ownerName" 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editEmail" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Email</label>
+                            <input type="email" id="editEmail" name="email" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editPhone" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Phone</label>
+                            <input type="tel" id="editPhone" name="phone" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Category and Commission -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editCategory" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Category</label>
+                            <select id="editCategory" name="category" 
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <option value="restaurant">Restaurant</option>
+                                <option value="grocery">Grocery</option>
+                                <option value="pharmacy">Pharmacy</option>
+                                <option value="retail">Retail</option>
+                                <option value="electronics">Electronics</option>
+                                <option value="clothing">Clothing</option>
+                                <option value="beauty">Beauty</option>
+                                <option value="books">Books</option>
+                                <option value="sports">Sports</option>
+                                <option value="home">Home</option>
+                                <option value="automotive">Automotive</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="editCommission" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Commission (%)</label>
+                            <input type="number" id="editCommission" name="commission" min="1" max="30" step="0.1" 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Address -->
+                    <div>
+                        <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #374151;">Address</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <input type="text" id="editStreet" name="address.street" placeholder="Street Address" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCity" name="address.city" placeholder="City" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <input type="text" id="editState" name="address.state" placeholder="State" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editZipCode" name="address.zipCode" placeholder="ZIP Code" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCountry" name="address.country" placeholder="Country" value="US" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Description and Website -->
+                    <div>
+                        <label for="editDescription" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Description</label>
+                        <textarea id="editDescription" name="description" rows="3" maxlength="500" 
+                                  style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; resize: vertical;"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="editWebsite" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Website</label>
+                        <input type="url" id="editWebsite" name="website" placeholder="https://example.com" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+
+                    <!-- Form Messages -->
+                    <div id="editFormMessages" style="display: none;"></div>
+
+                    <!-- Submit Buttons -->
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeModal('editMerchantModal')" 
+                                style="padding: 0.75rem 1.5rem; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Cancel
+                        </button>
+                        <button type="submit" id="saveEditBtn" 
+                                style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     <!-- AWS SDK and Core Scripts -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
     <script>

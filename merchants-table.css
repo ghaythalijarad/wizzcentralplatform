@@ -119,6 +119,157 @@
     border-color: #bfdbfe;
 }
 
+/* Enhanced modal styling */
+.modal {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* Form styling enhancements */
+#editMerchantForm input:focus,
+#editMerchantForm select:focus,
+#editMerchantForm textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+#editMerchantForm input:invalid {
+    border-color: #ef4444;
+}
+
+#editMerchantForm button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+#editMerchantForm button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Enhanced form field validation styles */
+#editMerchantForm input.success,
+#editMerchantForm select.success,
+#editMerchantForm textarea.success {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+#editMerchantForm input.error,
+#editMerchantForm select.error,
+#editMerchantForm textarea.error {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+/* Auto-save indicator */
+.form-auto-saved {
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    background: #10b981;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.form-auto-saved.show {
+    opacity: 1;
+}
+
+/* Enhanced submit button states */
+#saveEditBtn:disabled {
+    background: #9ca3af !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+#saveEditBtn.loading {
+    position: relative;
+}
+
+#saveEditBtn.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    margin: auto;
+    border: 2px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Improved modal backdrop */
+.modal {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+/* Enhanced form layout for better UX */
+#editMerchantForm label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+#editMerchantForm input:required + label::after,
+#editMerchantForm select:required + label::after {
+    content: ' *';
+    color: #ef4444;
+}
+
+/* Focus ring improvements */
+#editMerchantForm input:focus-visible,
+#editMerchantForm select:focus-visible,
+#editMerchantForm textarea:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Better spacing for form sections */
+#editMerchantForm > div {
+    margin-bottom: 1.25rem;
+}
+
+#editMerchantForm > div:last-child {
+    margin-bottom: 0;
+}
+
 /* Responsive adjustments for mobile */
 @media (max-width: 768px) {
     .business-avatar {
@@ -143,5 +294,16 @@
         width: 28px;
         height: 28px;
         padding: 0.375rem;
+    }
+    
+    .modal-content {
+        width: 100% !important;
+        max-width: none !important;
+        margin: 1rem;
+        max-height: calc(100vh - 2rem);
+    }
+    
+    #editMerchantForm > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
     }
 }

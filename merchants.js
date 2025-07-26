@@ -755,19 +755,518 @@ function editMerchant(merchantId) {
     const merchant = filteredMerchants.find(m => m.id === merchantId);
     if (!merchant) {
         console.error('Merchant not found:', merchantId);
+        showEditFormMessage('Merchant not found', 'error');
+        return;
+    }
+
+    // Clear any previous messages
+    hideEditFormMessage();
+
+    // Populate form fields with current merchant data
+    populateEditForm(merchant);
+    
+    // Store the merchant ID for submission
+    document.getElementById('editMerchantForm').setAttribute('data-merchant-id', merchantId);
+    
+    // Show the modal
+    document.getElementById('editMerchantModal').style.display = 'flex';
+    
+    // Set up form submission handler
+    setupEditFormSubmission();
+}
+
+function populateEditForm(merchant) {
+    // Basic information
+    document.getElementById('editBusinessName').value = merchant.name || '';
+    document.getElementById('editOwnerName').value = merchant.owner || '';
+    document.getElementById('editEmail').value = merchant.email || '';
+    document.getElementById('editPhone').value = merchant.phone || '';
+    
+    // Category and commission
+    document.getElementById('editCategory').value = merchant.category?.toLowerCase() || 'other';
+    document.getElementById('editCommission').value = merchant.commission || '';
+    
+    // Address - handle both string and object formats
+    let address = {};
+    if (typeof merchant.address === 'string') {
+        try {
+            address = JSON.parse(merchant.address);
+        } catch (e) {
+            // If it's not JSON, treat as a simple string
+            address = { street: merchant.address };
+        }
+    } else if (typeof merchant.address === 'object' && merchant.address !== null) {
+        address = merchant.address;
+    }
+    
+    document.getElementById('editStreet').value = address.street || '';
+    document.getElementById('editCity').value = address.city || '';
+    document.getElementById('editState').value = address.state || '';
+    document.getElementById('editZipCode').value = address.zipCode || '';
+    document.getElementById('editCountry').value = address.country || 'US';
+    
+    // Additional fields
+    document.getElementById('editDescription').value = merchant.description || '';
+    document.getElementById('editWebsite').value = merchant.website || '';
+}
+
+function setupEditFormSubmission() {
+    const form = document.getElementById('editMerchantForm');
+    
+    // Remove any existing event listeners
+    const newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    
+    // Add new event listener
+    newForm.addEventListener('submit', handleEditFormSubmission);
+}
+
+async function handleEditFormSubmission(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const merchantId = form.getAttribute('data-merchant-id');
+    const saveBtn = document.getElementById('saveEditBtn');
+    
+    if (!merchantId) {
+        showEditFormMessage('Error: Merchant ID not found', 'error');
         return;
     }
     
-    // For now, just show an alert - this would open an edit form in a full implementation
-    alert(`Edit functionality would open for: ${merchant.name}\n\nThis would typically open a form to edit merchant details, status, commission rates, etc.`);
+    // Disable submit button and show loading state
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    try {
+        // Collect form data
+        const formData = collectEditFormData(form);
+        
+        // Validate form data
+        const validation = validateEditFormData(formData);
+        if (!validation.isValid) {
+            showEditFormMessage(`Validation Error: ${validation.errors.join(', ')}`, 'error');
+            return;
+        }
+        
+        // Submit to backend
+        const result = await submitMerchantUpdate(merchantId, formData);
+        
+        if (result.success) {
+            showEditFormMessage('Merchant updated successfully!', 'success');
+            
+            // Trigger success event for auto-save cleanup
+            form.dispatchEvent(new CustomEvent('formSubmitSuccess'));
+            
+            // Update the table immediately with new data
+            renderMerchantsTable();
+            updateMerchantStats();
+            
+            // Close modal after a brief delay
+            setTimeout(() => {
+                closeModal('editMerchantModal');
+                // Optionally refresh data from server
+                if (!window.location.hostname.includes('localhost')) {
+                    refreshMerchantsData();
+                }
+            }, 1500);
+        } else {
+            showEditFormMessage(`Update failed: ${result.error}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error updating merchant:', error);
+        showEditFormMessage(`Update failed: ${error.message}`, 'error');
+    } finally {
+        // Re-enable submit button
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+    }
+}
+
+function collectEditFormData(form) {
+    const formData = new FormData(form);
+    const data = {};
+    
+    // Basic fields
+    data.name = formData.get('name')?.trim();
+    data.ownerName = formData.get('ownerName')?.trim();
+    data.email = formData.get('email')?.trim();
+    data.phone = formData.get('phone')?.trim();
+    data.category = formData.get('category');
+    data.description = formData.get('description')?.trim();
+    data.website = formData.get('website')?.trim();
+    
+    // Commission (convert to number)
+    const commission = formData.get('commission');
+    if (commission && commission.trim()) {
+        data.commission = parseFloat(commission);
+    }
+    
+    // Address object
+    const address = {};
+    const street = formData.get('address.street')?.trim();
+    const city = formData.get('address.city')?.trim();
+    const state = formData.get('address.state')?.trim();
+    const zipCode = formData.get('address.zipCode')?.trim();
+    const country = formData.get('address.country')?.trim();
+    
+    if (street) address.street = street;
+    if (city) address.city = city;
+    if (state) address.state = state;
+    if (zipCode) address.zipCode = zipCode;
+    if (country) address.country = country;
+    
+    if (Object.keys(address).length > 0) {
+        data.address = address;
+    }
+    
+    // Remove empty fields
+    Object.keys(data).forEach(key => {
+        if (data[key] === '' || data[key] === null || data[key] === undefined) {
+            delete data[key];
+        }
+    });
+    
+    return data;
+}
+
+function validateEditFormData(data) {
+    const errors = [];
+    
+    // Required fields
+    if (!data.name || data.name.length < 2) {
+        errors.push('Business name must be at least 2 characters');
+    }
+    
+    if (!data.email) {
+        errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        errors.push('Invalid email format');
+    }
+    
+    if (!data.phone) {
+        errors.push('Phone number is required');
+    } else if (!/^[\+]?[1-9][\d]{0,15}$/.test(data.phone.replace(/[\s\-\(\)]/g, ''))) {
+        errors.push('Invalid phone number format');
+    }
+    
+    // Optional field validations
+    if (data.website && !/^https?:\/\/.+/.test(data.website)) {
+        errors.push('Website must be a valid URL starting with http:// or https://');
+    }
+    
+    if (data.commission !== undefined && (data.commission < 1 || data.commission > 30)) {
+        errors.push('Commission must be between 1% and 30%');
+    }
+    
+    if (data.description && data.description.length > 500) {
+        errors.push('Description must be less than 500 characters');
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors: errors
+    };
+}
+
+async function submitMerchantUpdate(merchantId, updateData) {
+    try {
+        console.log('Submitting merchant update:', { merchantId, updateData });
+        
+        // Check if we're in a development environment
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        if (isDevelopment) {
+            // In development, simulate the API call and update local data
+            console.log('Development mode: Simulating API call');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Update the local data
+            const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
+            if (merchantIndex !== -1) {
+                // Update the merchant object with new data
+                Object.assign(filteredMerchants[merchantIndex], updateData);
+                
+                // Also update in the main merchants data array
+                const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
+                if (mainIndex !== -1) {
+                    Object.assign(merchantsData[mainIndex], updateData);
+                }
+            }
+            
+            return { success: true };
+        } else {
+            // In production, make actual API call
+            const accessToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
+            
+            if (!accessToken) {
+                throw new Error('Authentication token not found. Please login again.');
+            }
+            
+            const response = await fetch(`/api/merchants/${merchantId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            });
+            
+            if (!response.ok) {
+                let errorMessage = 'Update failed';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                } catch (e) {
+                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const result = await response.json();
+            
+            // Update local data with the response from server
+            if (result.merchant) {
+                const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
+                if (merchantIndex !== -1) {
+                    Object.assign(filteredMerchants[merchantIndex], result.merchant);
+                    
+                    const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
+                    if (mainIndex !== -1) {
+                        Object.assign(merchantsData[mainIndex], result.merchant);
+                    }
+                }
+            }
+            
+            return { success: true, data: result };
+        }
+        
+    } catch (error) {
+        console.error('API call failed:', error);
+        
+        // Provide more specific error messages
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            return { success: false, error: 'Network error. Please check your connection and try again.' };
+        } else if (error.message.includes('401')) {
+            return { success: false, error: 'Authentication failed. Please login again.' };
+        } else if (error.message.includes('403')) {
+            return { success: false, error: 'You do not have permission to edit this merchant.' };
+        } else if (error.message.includes('404')) {
+            return { success: false, error: 'Merchant not found.' };
+        } else {
+            return { success: false, error: error.message };
+        }
+    }
+}
+
+function showEditFormMessage(message, type = 'info') {
+    const messageContainer = document.getElementById('editFormMessages');
+    const typeStyles = {
+        success: 'background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;',
+        error: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;',
+        warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',
+        info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
+    };
+    
+    messageContainer.innerHTML = `
+        <div style="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">
+            ${message}
+        </div>
+    `;
+    messageContainer.style.display = 'block';
+}
+
+function hideEditFormMessage() {
+    const messageContainer = document.getElementById('editFormMessages');
+    if (messageContainer) {
+        messageContainer.style.display = 'none';
+        messageContainer.innerHTML = '';
+    }
 }
 
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.display = 'none';
+        
+        // Special handling for edit modal
+        if (modalId === 'editMerchantModal') {
+            resetEditForm();
+            
+            // Clear auto-saved data if user manually closes modal
+            const form = document.getElementById('editMerchantForm');
+            const merchantId = form?.getAttribute('data-merchant-id');
+            if (merchantId) {
+                const saveKey = `editForm_${merchantId}`;
+                localStorage.removeItem(saveKey);
+            }
+        }
+        
+        // Remove focus from any active elements
+        if (document.activeElement) {
+            document.activeElement.blur();
+        }
     }
 }
+
+// Enhanced form handling functions
+
+function resetEditForm() {
+    const form = document.getElementById('editMerchantForm');
+    if (form) {
+        form.reset();
+        hideEditFormMessage();
+        
+        // Reset any custom styling
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => {
+            input.classList.remove('error', 'success');
+            input.style.borderColor = '';
+        });
+    }
+}
+
+function handleFormFieldValidation() {
+    // Add real-time validation to form fields
+    const form = document.getElementById('editMerchantForm');
+    if (!form) return;
+    
+    const fields = {
+        editBusinessName: (value) => value && value.length >= 2,
+        editEmail: (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        editPhone: (value) => value && /^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/[\s\-\(\)]/g, '')),
+        editWebsite: (value) => !value || /^https?:\/\/.+/.test(value),
+        editCommission: (value) => !value || (parseFloat(value) >= 1 && parseFloat(value) <= 30)
+    };
+    
+    Object.keys(fields).forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('blur', function() {
+                const isValid = fields[fieldId](this.value.trim());
+                if (isValid) {
+                    this.style.borderColor = '#10b981';
+                    this.classList.remove('error');
+                    this.classList.add('success');
+                } else if (this.value.trim()) {
+                    this.style.borderColor = '#ef4444';
+                    this.classList.remove('success');
+                    this.classList.add('error');
+                } else {
+                    this.style.borderColor = '';
+                    this.classList.remove('error', 'success');
+                }
+            });
+            
+            field.addEventListener('focus', function() {
+                this.style.borderColor = '#3b82f6';
+                this.classList.remove('error', 'success');
+            });
+        }
+    });
+}
+
+function addFormAutoSave() {
+    // Add auto-save functionality for form data
+    const form = document.getElementById('editMerchantForm');
+    if (!form) return;
+    
+    const merchantId = form.getAttribute('data-merchant-id');
+    if (!merchantId) return;
+    
+    const saveKey = `editForm_${merchantId}`;
+    
+    // Load saved data
+    const savedData = localStorage.getItem(saveKey);
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            Object.keys(data).forEach(key => {
+                const field = document.getElementById(key);
+                if (field && data[key]) {
+                    field.value = data[key];
+                }
+            });
+        } catch (e) {
+            console.warn('Failed to load auto-saved form data:', e);
+        }
+    }
+    
+    // Save data on input
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            const formData = {};
+            inputs.forEach(inp => {
+                if (inp.value.trim()) {
+                    formData[inp.id] = inp.value.trim();
+                }
+            });
+            localStorage.setItem(saveKey, JSON.stringify(formData));
+        });
+    });
+    
+    // Clear saved data when form is submitted successfully
+    form.addEventListener('formSubmitSuccess', function() {
+        localStorage.removeItem(saveKey);
+    });
+}
+
+function enhanceEditModal() {
+    // Add keyboard shortcuts and accessibility improvements
+    const modal = document.getElementById('editMerchantModal');
+    if (!modal) return;
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal('editMerchantModal');
+        }
+    });
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            closeModal('editMerchantModal');
+        }
+    });
+    
+    // Focus management
+    const firstInput = modal.querySelector('input:not([disabled])');
+    if (firstInput) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    if (modal.style.display === 'flex') {
+                        setTimeout(() => firstInput.focus(), 100);
+                    }
+                }
+            });
+        });
+        observer.observe(modal, { attributes: true });
+    }
+}
+
+// Initialize enhanced features when DOM is ready
+function initializeEditEnhancements() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                handleFormFieldValidation();
+                enhanceEditModal();
+            }, 500);
+        });
+    } else {
+        setTimeout(() => {
+            handleFormFieldValidation();
+            enhanceEditModal();
+        }, 500);
+    }
+}
+
+// Call initialization
+initializeEditEnhancements();
 
 // Make sure the DOM is ready before executing the main logic
 if (document.readyState === 'loading') {

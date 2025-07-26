@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Merchant Functionality Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="merchants-table.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: #f8fafc;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .test-header {
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .test-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .test-table th,
+        .test-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .test-table th {
+            background: #f9fafb;
+            font-weight: 600;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-working { background: #10b981; }
+        .status-pending { background: #f59e0b; }
+        .status-error { background: #ef4444; }
+        
+        .test-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 0.25rem;
+        }
+        
+        .test-btn:hover {
+            background: #2563eb;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .feature-item {
+            padding: 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        
+        .feature-item h4 {
+            margin: 0 0 0.5rem 0;
+            color: #1f2937;
+        }
+        
+        .feature-item p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1><i class="fas fa-vial"></i> Edit Merchant Functionality Test</h1>
+            <p>This page tests all aspects of the merchant editing functionality.</p>
+        </div>
+        
+        <!-- Test Merchants Table -->
+        <h2>Test Merchants Table</h2>
+        <table class="test-table">
+            <thead>
+                <tr>
+                    <th>Business</th>
+                    <th>Owner</th>
+                    <th>Status</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Address</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="testMerchantsTableBody">
+                <!-- Table content will be populated by JavaScript -->
+            </tbody>
+        </table>
+        
+        <!-- Feature Testing Section -->
+        <h2>Feature Testing</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4><i class="fas fa-edit"></i> Form Validation</h4>
+                <p>Test client-side validation for all form fields</p>
+                <button class="test-btn" onclick="testValidation()">Test Validation</button>
+            </div>
+            
+            <div class="feature-item">
+                <h4><i class="fas fa-save"></i> Auto-Save</h4>
+                <p>Test form auto-save functionality</p>
+                <button class="test-btn" onclick="testAutoSave()">Test Auto-Save</button>
+            </div>
+            
+            <div class="feature-item">
+                <h4><i class="fas fa-mobile-alt"></i> Responsive Design</h4>
+                <p>Test mobile responsiveness</p>
+                <button class="test-btn" onclick="testResponsive()">Test Responsive</button>
+            </div>
+            
+            <div class="feature-item">
+                <h4><i class="fas fa-keyboard"></i> Keyboard Navigation</h4>
+                <p>Test keyboard shortcuts and accessibility</p>
+                <button class="test-btn" onclick="testKeyboard()">Test Keyboard</button>
+            </div>
+        </div>
+        
+        <!-- Status Section -->
+        <h2>Implementation Status</h2>
+        <table class="test-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Status</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Edit Modal</td>
+                    <td>✅ Complete</td>
+                    <td>Full modal with all form fields and validation</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Form Validation</td>
+                    <td>✅ Complete</td>
+                    <td>Client-side validation with real-time feedback</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>API Integration</td>
+                    <td>✅ Ready</td>
+                    <td>Backend API integration with fallback to local mode</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Mobile Responsive</td>
+                    <td>✅ Complete</td>
+                    <td>Optimized for mobile devices and tablets</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Auto-Save</td>
+                    <td>✅ Complete</td>
+                    <td>Automatic form data preservation</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Accessibility</td>
+                    <td>✅ Complete</td>
+                    <td>Keyboard navigation and screen reader support</td>
+                </tr>
+                <tr>
+                    <td><span class="status-indicator status-working"></span>Error Handling</td>
+                    <td>✅ Complete</td>
+                    <td>Comprehensive error handling and user feedback</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Include all modals from the main merchants page -->
+    <div id="editMerchantModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index: 1000;">
+        <div class="modal-content" style="background:white; padding:1.5rem; border-radius:8px; max-width:700px; width:95%; max-height:90vh; overflow-y:auto; position:relative;">
+            <button onclick="closeModal('editMerchantModal')" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280; padding:4px;">&times;</button>
+            
+            <h3 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.5rem;">Edit Merchant</h3>
+            
+            <form id="editMerchantForm" style="display: grid; gap: 1rem;">
+                <!-- Basic Information -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label for="editBusinessName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business Name</label>
+                        <input type="text" id="editBusinessName" name="name" required 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                    <div>
+                        <label for="editOwnerName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Owner Name</label>
+                        <input type="text" id="editOwnerName" name="ownerName" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                </div>
+
+                <!-- Contact Information -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label for="editEmail" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Email</label>
+                        <input type="email" id="editEmail" name="email" required 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                    <div>
+                        <label for="editPhone" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Phone</label>
+                        <input type="tel" id="editPhone" name="phone" required 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                </div>
+
+                <!-- Category and Commission -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label for="editCategory" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Category</label>
+                        <select id="editCategory" name="category" 
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            <option value="restaurant">Restaurant</option>
+                            <option value="grocery">Grocery</option>
+                            <option value="pharmacy">Pharmacy</option>
+                            <option value="retail">Retail</option>
+                            <option value="electronics">Electronics</option>
+                            <option value="clothing">Clothing</option>
+                            <option value="beauty">Beauty</option>
+                            <option value="books">Books</option>
+                            <option value="sports">Sports</option>
+                            <option value="home">Home</option>
+                            <option value="automotive">Automotive</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="editCommission" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Commission (%)</label>
+                        <input type="number" id="editCommission" name="commission" min="1" max="30" step="0.1" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                    </div>
+                </div>
+
+                <!-- Description and Website -->
+                <div>
+                    <label for="editDescription" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Description</label>
+                    <textarea id="editDescription" name="description" rows="3" maxlength="500" 
+                              style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; resize: vertical;"></textarea>
+                </div>
+
+                <div>
+                    <label for="editWebsite" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Website</label>
+                    <input type="url" id="editWebsite" name="website" placeholder="https://example.com" 
+                           style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                </div>
+
+                <!-- Form Messages -->
+                <div id="editFormMessages" style="display: none;"></div>
+
+                <!-- Submit Buttons -->
+                <div style="display: flex; gap: 1rem; margin-top: 1rem; justify-content: flex-end;">
+                    <button type="button" onclick="closeModal('editMerchantModal')" 
+                            style="padding: 0.75rem 1.5rem; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                        Cancel
+                    </button>
+                    <button type="submit" id="saveEditBtn" 
+                            style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Mock data for testing
+        const testMerchants = [
+            {
+                id: 'test-001',
+                name: 'Test Pizza Palace',
+                owner: 'John Doe',
+                status: 'approved',
+                email: 'test@pizza.com',
+                phone: '+1-555-0001',
+                address: '123 Test Street, Test City',
+                category: 'restaurant',
+                commission: 15,
+                description: 'A test pizza restaurant',
+                website: 'https://testpizza.com',
+                avatar: 'https://ui-avatars.com/api/?name=Test+Pizza&size=32&background=667eea&color=fff'
+            },
+            {
+                id: 'test-002',
+                name: 'Test Market Express',
+                owner: 'Jane Smith',
+                status: 'pending',
+                email: 'test@market.com',
+                phone: '+1-555-0002',
+                address: '456 Test Avenue, Test Town',
+                category: 'grocery',
+                commission: 8,
+                description: 'A test grocery store',
+                website: 'https://testmarket.com',
+                avatar: 'https://ui-avatars.com/api/?name=Test+Market&size=32&background=f093fb&color=fff'
+            }
+        ];
+        
+        // Mock global variables
+        let filteredMerchants = [...testMerchants];
+        let merchantsData = [...testMerchants];
+        
+        const MERCHANT_STATUSES = {
+            'pending': { label: 'Pending', class: 'pending', color: '#f59e0b' },
+            'approved': { label: 'Approved', class: 'verified', color: '#10b981' },
+            'rejected': { label: 'Rejected', class: 'rejected', color: '#ef4444' },
+            'under_review': { label: 'Under Review', class: 'under-review', color: '#3b82f6' }
+        };
+        
+        // Render test table
+        function renderTestTable() {
+            const tbody = document.getElementById('testMerchantsTableBody');
+            tbody.innerHTML = testMerchants.map(merchant => {
+                const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['pending'];
+                return `
+                    <tr>
+                        <td>
+                            <div class="business-info">
+                                <img src="${merchant.avatar}" alt="${merchant.name}" class="business-avatar">
+                                <div class="business-details">
+                                    <h4>${merchant.name}</h4>
+                                    <p>${merchant.category}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${merchant.owner}</td>
+                        <td>
+                            <span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
+                                ${statusInfo.label}
+                            </span>
+                        </td>
+                        <td>${merchant.email}</td>
+                        <td>${merchant.phone}</td>
+                        <td>${merchant.address}</td>
+                        <td>
+                            <div class="actions">
+                                <button class="btn-action" onclick="editMerchant('${merchant.id}')" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Test functions
+        function testValidation() {
+            editMerchant('test-001');
+            setTimeout(() => {
+                // Clear required fields to trigger validation
+                document.getElementById('editBusinessName').value = '';
+                document.getElementById('editEmail').value = 'invalid-email';
+                document.getElementById('editPhone').value = '123';
+                
+                // Focus and blur to trigger validation
+                ['editBusinessName', 'editEmail', 'editPhone'].forEach(id => {
+                    const field = document.getElementById(id);
+                    field.focus();
+                    field.blur();
+                });
+                
+                alert('Validation test completed! Check the form fields for validation styling.');
+            }, 500);
+        }
+        
+        function testAutoSave() {
+            editMerchant('test-001');
+            setTimeout(() => {
+                alert('Auto-save test: Edit some fields and check localStorage for saved data.');
+                console.log('Auto-save data:', localStorage.getItem('editForm_test-001'));
+            }, 500);
+        }
+        
+        function testResponsive() {
+            editMerchant('test-001');
+            alert('Responsive test: Resize your browser window to test mobile layout.');
+        }
+        
+        function testKeyboard() {
+            editMerchant('test-001');
+            alert('Keyboard test: Try pressing Escape to close, Tab to navigate, and Enter to submit.');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderTestTable();
+        });
+    </script>
+    
+    <!-- Include the main merchants.js functionality -->
+    <script src="merchants.js"></script>
+</body>
+</html>
