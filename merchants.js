@@ -135,45 +135,26 @@ const onDomReady = async function() {
             setTimeout(() => hideMessage(), 3000);
         } else {
             console.log('⚠️ Database returned no merchants.');
-            // When local, show an empty state message instead of sample data
-            if (isLocal) {
-                const tableBody = document.getElementById('merchantsTableBody');
-                if(tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">Database is empty. No merchants found.</td></tr>';
-                updateDataSourceIndicator('empty', 'Database is empty');
-                showMessage('The database is empty. No merchants to display.', 'info');
-            } else {
-                console.log('⚠️ Database returned no merchants, using sample data');
-                merchantsData = getSampleMerchantsData();
-                filteredMerchants = [...merchantsData];
-                renderMerchantsTable();
-                updateMerchantStats();
-                updateDataSourceIndicator('empty', 'Database is empty - showing sample data');
-                showMessage('Database is empty. Showing sample data for demonstration.', 'warning');
+            // Display empty state without sample data fallback
+            const tableBody = document.getElementById('merchantsTableBody');
+            if (tableBody) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">Database is empty. No merchants found.</td></tr>';
             }
+            updateDataSourceIndicator('empty', 'Database is empty');
+            showMessage('The database is empty. No merchants to display.', 'info');
         }
         
     } catch (error) {
         console.error('❌ Failed to load real data:', error);
-        
-        // When local, display the error clearly instead of falling back to sample data
-        if (isLocal) {
-            console.log('💻 LOCAL MODE: Bypassing sample data fallback to show the real error.');
-            const errorMessage = `Failed to load data from DynamoDB: ${error.message}. This is likely an AWS credentials or IAM permission issue. Check the browser console for details.`;
-            const tableBody = document.getElementById('merchantsTableBody');
-            if(tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">${errorMessage}</td></tr>`;
-            updateDataSourceIndicator('error', `Database Error: ${error.message}`);
-            showMessage(errorMessage, 'error');
-        } else {
-            console.log('🔄 Falling back to sample data due to error:', error.message);
-            // Fall back to sample data
-            merchantsData = getSampleMerchantsData();
-            filteredMerchants = [...merchantsData];
-            renderMerchantsTable();
-            updateMerchantStats();
-            updateDataSourceIndicator('error', `Database error: ${error.message}. Showing sample data.`);
-            showMessage(`Database connection failed: ${error.message}. Loading sample data...`, 'warning');
+        const errorMessage = `Failed to load data from DynamoDB: ${error.message}. This is likely an AWS credentials or network issue. Check browser console.`;
+        const tableBody = document.getElementById('merchantsTableBody');
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan=\"8\" class=\"text-center p-8 text-red-600 bg-red-50 border border-red-200\">${errorMessage}</td></tr>`;
         }
-    } finally {
+        updateDataSourceIndicator('error', `Database Error: ${error.message}`);
+        showMessage(errorMessage, 'error');
+    }
+    finally {
         showLoader(false);
         setupEventListeners();
     }
