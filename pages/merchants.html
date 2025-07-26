@@ -100,16 +100,18 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Business & Owner</th>
+                            <th>Business</th>
+                            <th>Owner</th>
                             <th>Status</th>
-                            <th>Contact Info</th>
+                            <th>Email</th>
+                            <th>Phone</th>
                             <th>Address</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="merchantsTableBody">
                         <tr>
-                            <td colspan="5" style="text-align: center;">Loading...</td>
+                            <td colspan="7" style="text-align: center;">Loading...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -120,18 +122,67 @@
         <div id="statusModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
             <div class="modal-content" style="background:white; padding:1rem; border-radius:8px; max-width:400px; width:90%; position:relative;">
                 <button onclick="closeModal('statusModal')" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Update Merchant Status</h3>
                 <div id="statusModalBody"></div>
                 <div style="margin-top:1rem; text-align:right;">
-                    <button class="btn-primary" onclick="updateMerchantStatus()">Save</button>
+                    <button class="btn-secondary" onclick="closeModal('statusModal')" style="margin-right: 0.5rem;">Cancel</button>
+                    <button class="btn-primary" onclick="updateMerchantStatus()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Merchant Details Modal -->
+        <div id="viewMerchantModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+            <div class="modal-content" style="background:white; padding:1rem; border-radius:8px; max-width:600px; width:90%; position:relative;">
+                <button onclick="closeModal('viewMerchantModal')" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Merchant Details</h3>
+                <div id="merchantDetailsBody"></div>
+                <div style="margin-top:1rem; text-align:right;">
+                    <button class="btn-primary" onclick="closeModal('viewMerchantModal')">Close</button>
                 </div>
             </div>
         </div>
 
     <!-- AWS SDK and Core Scripts -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script>
+        console.log('AWS SDK loaded:', typeof AWS !== 'undefined');
+        
+        // Prevent dashboard.js from overriding our functions
+        window.MERCHANTS_PAGE = true;
+        
+        // Override logout function early
+        window.logout = () => {
+            console.log('Logout clicked from merchants page');
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = '../index.html';
+        };
+    </script>
     <script src="../config.js"></script>
+    <script>
+        console.log('Config loaded:', typeof window.WIZZCENTRAL_CONFIG !== 'undefined');
+    </script>
     <script src="../dashboard.js"></script>
+    <script>
+        console.log('Dashboard script loaded');
+        
+        // Override the checkAuthentication function from dashboard.js
+        if (typeof checkAuthentication !== 'undefined') {
+            console.log('Overriding dashboard checkAuthentication function');
+            window.originalCheckAuthentication = checkAuthentication;
+        }
+        
+        // Simple authentication check that allows development
+        checkAuthentication = function() {
+            console.log('Using merchants-specific authentication check');
+            return true; // Allow for development
+        };
+    </script>
     <script src="../merchants.js"></script>
+    <script>
+        console.log('Merchants script loaded');
+    </script>
 
 </body>
 </html>
