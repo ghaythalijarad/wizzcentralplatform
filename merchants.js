@@ -1,4 +1,5 @@
 // Merchants Management JavaScript - Using Centralized Data Service
+// Force deployment trigger for Amplify
 console.log('merchants.js script loaded');
 
 // DynamoDB table name
