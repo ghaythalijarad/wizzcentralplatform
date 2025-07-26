@@ -307,3 +307,99 @@
         grid-template-columns: 1fr !important;
     }
 }
+
+/* Status Change Styling for Edit Modal */
+#statusReasonSection {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 200px;
+    }
+}
+
+#statusReasonSection label {
+    color: #92400e !important;
+    font-weight: 600 !important;
+}
+
+#statusReasonSection small {
+    display: block;
+    margin-top: 0.5rem;
+    font-style: italic;
+}
+
+#editStatusReason {
+    border-color: #f59e0b !important;
+    background-color: #fffbeb !important;
+}
+
+#editStatusReason:focus {
+    border-color: #d97706 !important;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.1) !important;
+}
+
+/* Status field highlighting when changed */
+#editStatus.status-changed {
+    border-color: #f59e0b !important;
+    background-color: #fef3c7 !important;
+    font-weight: 600;
+}
+
+/* Enhanced status badge colors for better visibility */
+.status-badge.pending {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.status-badge.verified {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.status-badge.rejected {
+    background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%);
+    color: #991b1b;
+    border: 1px solid #ef4444;
+}
+
+.status-badge.under-review {
+    background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
+    color: #1e40af;
+    border: 1px solid #3b82f6;
+}
+
+.status-badge.suspended {
+    background: linear-gradient(135deg, #f3f4f6 0%, #d1d5db 100%);
+    color: #374151;
+    border: 1px solid #6b7280;
+}
+
+/* Status update success message styling */
+.edit-form-message.status-update-success {
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+    border-left: 4px solid #10b981;
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+}
+
+.edit-form-message.status-update-success::before {
+    content: "✅ ";
+    font-size: 1.1em;
+}

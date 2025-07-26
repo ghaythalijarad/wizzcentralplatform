@@ -782,9 +782,13 @@ function populateEditForm(merchant) {
     document.getElementById('editEmail').value = merchant.email || '';
     document.getElementById('editPhone').value = merchant.phone || '';
     
-    // Category and commission
+    // Category, commission, and status
     document.getElementById('editCategory').value = merchant.category?.toLowerCase() || 'other';
     document.getElementById('editCommission').value = merchant.commission || '';
+    document.getElementById('editStatus').value = merchant.status || 'pending';
+    
+    // Store original status for comparison
+    document.getElementById('editMerchantForm').setAttribute('data-original-status', merchant.status || 'pending');
     
     // Address - handle both string and object formats
     let address = {};
@@ -808,6 +812,45 @@ function populateEditForm(merchant) {
     // Additional fields
     document.getElementById('editDescription').value = merchant.description || '';
     document.getElementById('editWebsite').value = merchant.website || '';
+    
+    // Set up status change monitoring
+    setupStatusChangeHandler();
+}
+
+function setupStatusChangeHandler() {
+    const statusSelect = document.getElementById('editStatus');
+    const reasonSection = document.getElementById('statusReasonSection');
+    const reasonTextarea = document.getElementById('editStatusReason');
+    const form = document.getElementById('editMerchantForm');
+    
+    if (!statusSelect || !reasonSection || !reasonTextarea || !form) return;
+    
+    const originalStatus = form.getAttribute('data-original-status');
+    
+    statusSelect.addEventListener('change', function() {
+        const newStatus = this.value;
+        const statusChanged = newStatus !== originalStatus;
+        
+        if (statusChanged) {
+            reasonSection.style.display = 'block';
+            reasonTextarea.required = true;
+            
+            // Add visual indicator that status changed
+            statusSelect.style.borderColor = '#f59e0b';
+            statusSelect.style.backgroundColor = '#fef3c7';
+            
+            // Auto-focus the reason field
+            setTimeout(() => reasonTextarea.focus(), 100);
+        } else {
+            reasonSection.style.display = 'none';
+            reasonTextarea.required = false;
+            reasonTextarea.value = '';
+            
+            // Reset status field styling
+            statusSelect.style.borderColor = '#d1d5db';
+            statusSelect.style.backgroundColor = 'white';
+        }
+    });
 }
 
 function setupEditFormSubmission() {
@@ -896,6 +939,19 @@ function collectEditFormData(form) {
     data.description = formData.get('description')?.trim();
     data.website = formData.get('website')?.trim();
     
+    // Status and reason
+    const newStatus = formData.get('status');
+    const originalStatus = form.getAttribute('data-original-status');
+    const statusReason = formData.get('statusReason')?.trim();
+    
+    if (newStatus && newStatus !== originalStatus) {
+        data.statusUpdate = {
+            newStatus: newStatus,
+            previousStatus: originalStatus,
+            reason: statusReason || 'Status updated via merchant edit form'
+        };
+    }
+    
     // Commission (convert to number)
     const commission = formData.get('commission');
     if (commission && commission.trim()) {
@@ -950,6 +1006,22 @@ function validateEditFormData(data) {
         errors.push('Invalid phone number format');
     }
     
+    // Status change validation
+    if (data.statusUpdate) {
+        const validStatuses = ['pending', 'verified', 'under-review', 'rejected', 'suspended'];
+        if (!validStatuses.includes(data.statusUpdate.newStatus)) {
+            errors.push('Invalid status selected');
+        }
+        
+        if (!data.statusUpdate.reason || data.statusUpdate.reason.length < 10) {
+            errors.push('Status change reason must be at least 10 characters');
+        }
+        
+        if (data.statusUpdate.reason && data.statusUpdate.reason.length > 500) {
+            errors.push('Status change reason must be less than 500 characters');
+        }
+    }
+    
     // Optional field validations
     if (data.website && !/^https?:\/\/.+/.test(data.website)) {
         errors.push('Website must be a valid URL starting with http:// or https://');
@@ -984,62 +1056,133 @@ async function submitMerchantUpdate(merchantId, updateData) {
             // Update the local data
             const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
             if (merchantIndex !== -1) {
-                // Update the merchant object with new data
-                Object.assign(filteredMerchants[merchantIndex], updateData);
+                // Handle status update
+                if (updateData.statusUpdate) {
+                    filteredMerchants[merchantIndex].status = updateData.statusUpdate.newStatus;
+                    console.log(`Status updated to: ${updateData.statusUpdate.newStatus}`);
+                    // Remove statusUpdate from regular update data
+                    const { statusUpdate, ...regularUpdates } = updateData;
+                    Object.assign(filteredMerchants[merchantIndex], regularUpdates);
+                } else {
+                    // Regular update without status change
+                    Object.assign(filteredMerchants[merchantIndex], updateData);
+                }
                 
                 // Also update in the main merchants data array
                 const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
                 if (mainIndex !== -1) {
-                    Object.assign(merchantsData[mainIndex], updateData);
+                    if (updateData.statusUpdate) {
+                        merchantsData[mainIndex].status = updateData.statusUpdate.newStatus;
+                        const { statusUpdate, ...regularUpdates } = updateData;
+                        Object.assign(merchantsData[mainIndex], regularUpdates);
+                    } else {
+                        Object.assign(merchantsData[mainIndex], updateData);
+                    }
                 }
             }
             
             return { success: true };
         } else {
-            // In production, make actual API call
+            // In production, make actual API calls
             const accessToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
             
             if (!accessToken) {
                 throw new Error('Authentication token not found. Please login again.');
             }
             
-            const response = await fetch(`/api/merchants/${merchantId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(updateData)
-            });
-            
-            if (!response.ok) {
-                let errorMessage = 'Update failed';
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
-                } catch (e) {
-                    errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            // Handle status update first if present
+            if (updateData.statusUpdate) {
+                console.log('Submitting status update:', updateData.statusUpdate);
+                
+                // Map status to action for the backend API
+                const statusActionMap = {
+                    'verified': 'approve',
+                    'rejected': 'reject',
+                    'suspended': 'suspend', 
+                    'under-review': 'review',
+                    'pending': 'reactivate' 
+                };
+                
+                const action = statusActionMap[updateData.statusUpdate.newStatus];
+                if (!action) {
+                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
                 }
-                throw new Error(errorMessage);
+                
+                const statusResponse = await fetch(`/api/merchants/${merchantId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        reason: updateData.statusUpdate.reason,
+                        sendEmail: true
+                    })
+                });
+                
+                if (!statusResponse.ok) {
+                    let errorMessage = 'Status update failed';
+                    try {
+                        const errorData = await statusResponse.json();
+                        errorMessage = errorData.message || errorData.error || `Server error: ${statusResponse.status}`;
+                    } catch (e) {
+                        errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                console.log('Status update successful');
             }
             
-            const result = await response.json();
+            // Remove statusUpdate from regular update data
+            const { statusUpdate, ...regularUpdateData } = updateData;
             
-            // Update local data with the response from server
-            if (result.merchant) {
-                const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
-                if (merchantIndex !== -1) {
-                    Object.assign(filteredMerchants[merchantIndex], result.merchant);
-                    
-                    const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
-                    if (mainIndex !== -1) {
-                        Object.assign(merchantsData[mainIndex], result.merchant);
+            // If there are other fields to update, make a separate call
+            if (Object.keys(regularUpdateData).length > 0) {
+                console.log('Submitting regular merchant update:', regularUpdateData);
+                
+                const response = await fetch(`/api/merchants/${merchantId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(regularUpdateData)
+                });
+                
+                if (!response.ok) {
+                    let errorMessage = 'Update failed';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                    } catch (e) {
+                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+                
+                const result = await response.json();
+                
+                // Update local data with the response from server
+                if (result.merchant) {
+                    const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
+                    if (merchantIndex !== -1) {
+                        Object.assign(filteredMerchants[merchantIndex], result.merchant);
+                        
+                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
+                        if (mainIndex !== -1) {
+                            Object.assign(merchantsData[mainIndex], result.merchant);
+                        }
                     }
                 }
+                
+                return { success: true, data: result };
             }
             
-            return { success: true, data: result };
+            return { success: true };
         }
         
     } catch (error) {
@@ -1117,6 +1260,26 @@ function resetEditForm() {
     if (form) {
         form.reset();
         hideEditFormMessage();
+        
+        // Hide status reason section
+        const statusReasonSection = document.getElementById('statusReasonSection');
+        if (statusReasonSection) {
+            statusReasonSection.style.display = 'none';
+        }
+        
+        // Reset status reason field
+        const statusReasonField = document.getElementById('editStatusReason');
+        if (statusReasonField) {
+            statusReasonField.required = false;
+            statusReasonField.value = '';
+        }
+        
+        // Reset status field styling
+        const statusField = document.getElementById('editStatus');
+        if (statusField) {
+            statusField.style.borderColor = '#d1d5db';
+            statusField.style.backgroundColor = 'white';
+        }
         
         // Reset any custom styling
         const inputs = form.querySelectorAll('input, select, textarea');
