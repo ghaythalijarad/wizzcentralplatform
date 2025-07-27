@@ -406,7 +406,7 @@ exports.authorize = async (event, context, callback) => {
     // Verifier that expects an access token
     const verifier = CognitoJwtVerifier.create({
       userPoolId: USER_POOL_ID,
-      tokenUse: "access", // or "id"
+      tokenUse: "id", // or "id"
       clientId: CLIENT_ID,
     });
 
