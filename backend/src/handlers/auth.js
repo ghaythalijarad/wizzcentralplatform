@@ -421,6 +421,18 @@ exports.authorize = async (event, context, callback) => {
     
     const principalId = payload.sub;
     
+    // Get user details from database to include role
+    let userRole = 'customer'; // default role
+    try {
+      const user = await database.findByEmail(USERS_TABLE, payload.email);
+      if (user) {
+        userRole = user.role || 'customer';
+      }
+    } catch (dbError) {
+      console.warn('Could not fetch user role from database:', dbError);
+      // Continue with default role
+    }
+    
     const policy = {
       principalId: principalId,
       policyDocument: {
@@ -434,8 +446,16 @@ exports.authorize = async (event, context, callback) => {
         ]
       },
       context: {
+        // These will be available as event.requestContext.authorizer.{key}
         userId: payload.sub,
         email: payload.email,
+        role: userRole,
+        // Also provide as stringKey for backward compatibility
+        stringKey: JSON.stringify({
+          userId: payload.sub,
+          email: payload.email,
+          role: userRole
+        })
       }
     };
 
