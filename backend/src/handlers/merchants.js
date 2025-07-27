@@ -80,24 +80,22 @@ exports.getMerchant = async (event) => {
       return responseHelper.cors();
     }
 
-    const { id } = event.pathParameters;
+    const merchantId = event.pathParameters.merchantId;
 
-    if (!id) {
+    if (!merchantId) {
       return responseHelper.validation([
-        { field: 'id', message: 'Merchant ID is required' }
+        { field: 'merchantId', message: 'Merchant ID is required' }
       ]);
     }
 
     // Get merchant from database
-    const merchant = await database.getById(MERCHANTS_TABLE, id);
+    const merchant = await database.getById(MERCHANTS_TABLE, merchantId);
 
     if (!merchant) {
       return responseHelper.notFound('Merchant not found');
     }
 
-    return responseHelper.success({
-      merchant
-    });
+    return responseHelper.success({ merchant });
 
   } catch (error) {
     console.error('Get merchant error:', error);
@@ -184,12 +182,12 @@ exports.updateMerchant = async (event) => {
       return responseHelper.cors();
     }
 
-    const { id } = event.pathParameters;
+    const merchantId = event.pathParameters.merchantId;
     const body = JSON.parse(event.body);
 
-    if (!id) {
+    if (!merchantId) {
       return responseHelper.validation([
-        { field: 'id', message: 'Merchant ID is required' }
+        { field: 'merchantId', message: 'Merchant ID is required' }
       ]);
     }
 
@@ -204,7 +202,7 @@ exports.updateMerchant = async (event) => {
     const updates = validation.data;
 
     // Check if merchant exists
-    const existingMerchant = await database.getById(MERCHANTS_TABLE, 'businessId', id);
+    const existingMerchant = await database.getById(MERCHANTS_TABLE, merchantId);
     if (!existingMerchant) {
       return responseHelper.notFound('Merchant not found');
     }
@@ -218,16 +216,105 @@ exports.updateMerchant = async (event) => {
     }
 
     // Update merchant
-    const updatedMerchant = await database.update(MERCHANTS_TABLE, 'businessId', id, updates);
+    const updatedMerchant = await database.update(MERCHANTS_TABLE, merchantId, updates);
 
-    return responseHelper.success({
-      merchant: updatedMerchant,
-      message: 'Merchant updated successfully'
-    });
+    return responseHelper.success({ merchant: updatedMerchant, message: 'Merchant updated successfully' });
 
   } catch (error) {
     console.error('Update merchant error:', error);
     return responseHelper.serverError('Failed to update merchant');
+  }
+};
+
+// Delete merchant (soft delete)
+exports.deleteMerchant = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.getById(MERCHANTS_TABLE, merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Soft delete by updating status
+    await database.update(MERCHANTS_TABLE, merchantId, {
+      status: 'deleted',
+      deletedAt: new Date().toISOString(),
+      deletedBy: JSON.parse(event.requestContext.authorizer.stringKey).userId
+    });
+
+    return responseHelper.success({ message: 'Merchant deleted successfully' });
+
+  } catch (error) {
+    console.error('Delete merchant error:', error);
+    return responseHelper.serverError('Failed to delete merchant');
+  }
+};
+
+// Get merchant analytics/stats
+exports.getMerchantAnalytics = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.getById(MERCHANTS_TABLE, merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // In a real implementation, you would fetch this data from orders table
+    // For now, we'll return mock analytics data
+    const analytics = {
+      totalOrders: merchant.totalOrders || 0,
+      totalRevenue: merchant.totalRevenue || 0,
+      ordersToday: merchant.ordersToday || 0,
+      revenueToday: merchant.revenueToday || 0,
+      averageOrderValue: merchant.totalOrders > 0 ? (merchant.totalRevenue / merchant.totalOrders) : 0,
+      rating: merchant.rating || null,
+      monthlyStats: {
+        orders: Array.from({ length: 12 }, (_, i) => ({
+          month: i + 1,
+          orders: Math.floor(Math.random() * 100),
+          revenue: Math.floor(Math.random() * 5000)
+        }))
+      },
+      topItems: [
+        { name: 'Popular Item 1', orders: 45, revenue: 675 },
+        { name: 'Popular Item 2', orders: 38, revenue: 570 },
+        { name: 'Popular Item 3', orders: 32, revenue: 480 }
+      ]
+    };
+
+    return responseHelper.success({
+      analytics
+    });
+
+  } catch (error) {
+    console.error('Get merchant analytics error:', error);
+    return responseHelper.serverError('Failed to get merchant analytics');
   }
 };
 
@@ -239,6 +326,7 @@ exports.updateMerchantStatus = async (event) => {
       return responseHelper.cors();
     }
 
+    const merchantId = event.pathParameters.merchantId;
     // Get user context from authorizer
     const userContext = JSON.parse(event.requestContext.authorizer.stringKey);
 
@@ -247,27 +335,24 @@ exports.updateMerchantStatus = async (event) => {
       return responseHelper.forbidden('Insufficient permissions to update merchant status');
     }
 
-    const { id } = event.pathParameters;
-    const body = JSON.parse(event.body);
-
-    if (!id) {
+    if (!merchantId) {
       return responseHelper.validation([
-        { field: 'id', message: 'Merchant ID is required' }
+        { field: 'merchantId', message: 'Merchant ID is required' }
       ]);
     }
 
     // Validate input
+    const body = JSON.parse(event.body);
     const validator = validate(merchantSchemas.updateStatus);
     const validation = validator(body);
 
     if (!validation.isValid) {
       return responseHelper.validation(validation.errors);
     }
-
     const { action, reason, sendEmail = true } = validation.data;
 
     // Check if merchant exists
-    const merchant = await database.getById(MERCHANTS_TABLE, id);
+    const merchant = await database.getById(MERCHANTS_TABLE, merchantId);
     if (!merchant) {
       return responseHelper.notFound('Merchant not found');
     }
@@ -325,7 +410,7 @@ exports.updateMerchantStatus = async (event) => {
     }
 
     // Update merchant status
-    const updatedMerchant = await database.update(MERCHANTS_TABLE, id, updateData);
+    const updatedMerchant = await database.update(MERCHANTS_TABLE, merchantId, updateData);
 
     // Send email notification if requested
     if (sendEmail) {
@@ -360,107 +445,5 @@ exports.updateMerchantStatus = async (event) => {
   } catch (error) {
     console.error('Update merchant status error:', error);
     return responseHelper.serverError('Failed to update merchant status');
-  }
-};
-
-// Delete merchant (soft delete)
-exports.deleteMerchant = async (event) => {
-  try {
-    // Handle CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-      return responseHelper.cors();
-    }
-
-    // Get user context from authorizer
-    const userContext = JSON.parse(event.requestContext.authorizer.stringKey);
-
-    // Check if user has permission to delete merchants
-    if (userContext.role !== 'admin') {
-      return responseHelper.forbidden('Admin access required to delete merchants');
-    }
-
-    const { id } = event.pathParameters;
-
-    if (!id) {
-      return responseHelper.validation([
-        { field: 'id', message: 'Merchant ID is required' }
-      ]);
-    }
-
-    // Check if merchant exists
-    const merchant = await database.getById(MERCHANTS_TABLE, id);
-    if (!merchant) {
-      return responseHelper.notFound('Merchant not found');
-    }
-
-    // Soft delete by updating status
-    await database.update(MERCHANTS_TABLE, id, {
-      status: 'deleted',
-      deletedAt: new Date().toISOString(),
-      deletedBy: userContext.userId
-    });
-
-    return responseHelper.success({
-      message: 'Merchant deleted successfully'
-    });
-
-  } catch (error) {
-    console.error('Delete merchant error:', error);
-    return responseHelper.serverError('Failed to delete merchant');
-  }
-};
-
-// Get merchant analytics/stats
-exports.getMerchantAnalytics = async (event) => {
-  try {
-    // Handle CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-      return responseHelper.cors();
-    }
-
-    const { id } = event.pathParameters;
-
-    if (!id) {
-      return responseHelper.validation([
-        { field: 'id', message: 'Merchant ID is required' }
-      ]);
-    }
-
-    // Check if merchant exists
-    const merchant = await database.getById(MERCHANTS_TABLE, id);
-    if (!merchant) {
-      return responseHelper.notFound('Merchant not found');
-    }
-
-    // In a real implementation, you would fetch this data from orders table
-    // For now, we'll return mock analytics data
-    const analytics = {
-      totalOrders: merchant.totalOrders || 0,
-      totalRevenue: merchant.totalRevenue || 0,
-      ordersToday: merchant.ordersToday || 0,
-      revenueToday: merchant.revenueToday || 0,
-      averageOrderValue: merchant.totalOrders > 0 ? (merchant.totalRevenue / merchant.totalOrders) : 0,
-      rating: merchant.rating || null,
-      monthlyStats: {
-        orders: Array.from({ length: 12 }, (_, i) => ({
-          month: i + 1,
-          orders: Math.floor(Math.random() * 100),
-          revenue: Math.floor(Math.random() * 5000)
-        }))
-      },
-      topItems: [
-        { name: 'Popular Item 1', orders: 45, revenue: 675 },
-        { name: 'Popular Item 2', orders: 38, revenue: 570 },
-        { name: 'Popular Item 3', orders: 32, revenue: 480 }
-      ]
-    };
-
-    return responseHelper.success({
-      analytics
-    });
-
-  } catch (error) {
-    console.error('Get merchant analytics error:', error);
-    return responseHelper.serverError('Failed to get merchant analytics');
   }
 };

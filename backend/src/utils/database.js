@@ -57,8 +57,8 @@ class Database {
   }
 
   // Backward compatibility
-  async getById(tableName, keyName = 'id', id) {
-    return this.get(tableName, keyName, id);
+  async getById(tableName, id) {
+    return this.get(tableName, 'id', id);
   }
 
   // Get by userId
@@ -67,7 +67,7 @@ class Database {
   }
 
   // Update item
-  async update(tableName, keyName, keyValue, updates) {
+  async update(tableName, id, updates) {
     const updateExpression = [];
     const expressionAttributeNames = {};
     const expressionAttributeValues = {};
@@ -85,7 +85,7 @@ class Database {
 
     const params = {
       TableName: tableName,
-      Key: { [keyName]: keyValue },
+      Key: { id: id },
       UpdateExpression: `SET ${updateExpression.join(', ')}`,
       ExpressionAttributeNames: expressionAttributeNames,
       ExpressionAttributeValues: expressionAttributeValues,

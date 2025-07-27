@@ -1108,8 +1108,8 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
                 }
                 
-                const statusResponse = await fetch(`/api/merchants/${merchantId}/status`, {
-                    method: 'PUT',
+                const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                    method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${accessToken}`,
@@ -1143,7 +1143,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
             if (Object.keys(regularUpdateData).length > 0) {
                 console.log('Submitting regular merchant update:', regularUpdateData);
                 
-                const response = await fetch(`/api/merchants/${merchantId}`, {
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
