@@ -384,13 +384,13 @@ exports.getUser = async (event) => {
 };
 
 // Authorization handler for API Gateway
-exports.authorize = async (event) => {
+exports.authorize = async (event, context, callback) => {
   try {
     const token = event.authorizationToken;
     
     if (!token) {
       console.log('No authorization token provided');
-      throw new Error('Unauthorized');
+      return callback('Unauthorized');
     }
 
     // Extract the token (remove 'Bearer ' prefix if present)
@@ -398,13 +398,28 @@ exports.authorize = async (event) => {
     
     if (!cleanToken) {
       console.log('Invalid token format');
-      throw new Error('Unauthorized');
+      return callback('Unauthorized');
     }
 
-    console.log('Token received, length:', cleanToken.length);
+    console.log('Token received, verifying...');
+
+    // Verifier that expects an access token
+    const verifier = CognitoJwtVerifier.create({
+      userPoolId: USER_POOL_ID,
+      tokenUse: "access", // or "id"
+      clientId: CLIENT_ID,
+    });
+
+    let payload;
+    try {
+      payload = await verifier.verify(cleanToken);
+      console.log("Token is valid. Payload:", payload);
+    } catch (e) {
+      console.log("Token not valid!", e);
+      return callback('Unauthorized');
+    }
     
-    // For now, allow all requests with valid tokens - you can implement proper JWT verification here
-    const principalId = 'user'; // You could decode the JWT to get the actual user ID
+    const principalId = payload.sub;
     
     const policy = {
       principalId: principalId,
@@ -419,16 +434,16 @@ exports.authorize = async (event) => {
         ]
       },
       context: {
-        // You can add user context here if needed
-        tokenType: 'jwt'
+        userId: payload.sub,
+        email: payload.email,
       }
     };
 
     console.log('Authorization successful for principal:', principalId);
-    return policy;
+    callback(null, policy);
 
   } catch (error) {
     console.error('Authorization error:', error);
-    throw new Error('Unauthorized');
+    callback('Unauthorized');
   }
 };
