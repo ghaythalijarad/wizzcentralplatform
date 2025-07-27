@@ -1068,6 +1068,7 @@ function validateEditFormData(data) {
 async function submitMerchantUpdate(merchantId, updateData) {
     try {
         console.log('Submitting merchant update:', { merchantId, updateData });
+        console.log('API_BASE_URL resolved to:', API_BASE_URL);
         
         // Check if we're in a development environment
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -1132,6 +1133,16 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 if (!action) {
                     throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
                 }
+
+                const requestBody = {
+                    action: action,
+                    reason: updateData.statusUpdate.reason,
+                    sendEmail: true
+                };
+                
+                console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
+                console.log('Status update request body:', requestBody);
+                console.log('Access token (first 20 chars):', accessToken ? accessToken.substring(0, 20) + '...' : 'None');
                 
                 const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
                     method: 'PATCH',
@@ -1140,29 +1151,27 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         'Authorization': `Bearer ${accessToken}`,
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({
-                        action: action,
-                        reason: updateData.statusUpdate.reason,
-                        sendEmail: true
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 
                 if (!statusResponse.ok) {
                     let errorMessage = 'Status update failed';
+                    let errorDetails = null;
                     try {
-                        const errorData = await statusResponse.json();
-                        errorMessage = errorData.message || errorData.error || `Server error: ${statusResponse.status}`;
-                        console.error('Status update error details:', errorData);
+                        const responseText = await statusResponse.text();
+                        console.error('Raw error response text:', responseText);
+                        
+                        // Try to parse as JSON
+                        if (responseText.trim().startsWith('{')) {
+                            errorDetails = JSON.parse(responseText);
+                            errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                        } else {
+                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
+                        }
+                        console.error('Status update error details:', errorDetails || responseText);
                     } catch (e) {
                         console.error('Failed to parse error response:', e);
-                        // Try to get response text if JSON parsing fails
-                        try {
-                            const errorText = await statusResponse.text();
-                            console.error('Error response text:', errorText);
-                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${errorText.substring(0, 200)}`;
-                        } catch (textError) {
-                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
-                        }
+                        errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
                     }
                     throw new Error(errorMessage);
                 }
@@ -1230,20 +1239,29 @@ async function submitMerchantUpdate(merchantId, updateData) {
         
     } catch (error) {
         console.error('API call failed:', error);
+        console.error('Error type:', typeof error);
+        console.error('Error message:', error?.message);
+        console.error('Error stack:', error?.stack);
         
         // Extract meaningful error message
         let errorMessage = 'Unknown error occurred';
         
-        if (typeof error === 'string') {
+        if (error instanceof Error) {
+            errorMessage = error.message || 'Unknown error occurred';
+        } else if (typeof error === 'string') {
             errorMessage = error;
-        } else if (error && error.message) {
-            errorMessage = error.message;
         } else if (error && typeof error === 'object') {
             // Try to extract error information from response object
-            if (error.status) {
+            if (error.message) {
+                errorMessage = error.message;
+            } else if (error.status) {
                 errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
             } else {
-                errorMessage = JSON.stringify(error);
+                try {
+                    errorMessage = JSON.stringify(error);
+                } catch (e) {
+                    errorMessage = 'Failed to parse error object';
+                }
             }
         }
         
