@@ -277,6 +277,19 @@ const validate = (schema) => {
   };
 };
 
+// Direct validation function used by handlers
+const validateInput = (data, schema) => {
+  const { error, value } = schema.validate(data, { abortEarly: false });
+  if (error) {
+    const details = error.details.map(detail => ({
+      field: detail.path.join('.'),
+      message: detail.message
+    }));
+    return { isValid: false, errors: details };
+  }
+  return { isValid: true, data: value };
+};
+
 module.exports = {
   userSchemas,
   merchantSchemas,
@@ -285,5 +298,6 @@ module.exports = {
   orderSchemas,
   promotionSchemas,
   supportSchemas,
-  validate
+  validate,
+  validateInput
 };
