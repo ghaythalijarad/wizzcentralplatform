@@ -431,7 +431,7 @@ async function handleAddPromotion(e) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}`
+                'Authorization': idToken // REMOVED 'Bearer ' prefix
             },
             body: JSON.stringify(payload)
         });

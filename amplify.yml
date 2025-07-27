@@ -6,7 +6,7 @@ applications:
         preBuild:
           commands:
             - echo "Substituting API_BASE_URL in config.js and promotions.html"
-            - if [ ! -z "$API_BASE_URL" ]; then sed -i "s|\${API_BASE_URL}|$API_BASE_URL|g" config.js; sed -i "s|\${API_BASE_URL}|$API_BASE_URL|g" pages/promotions.html; fi
+            - if [ ! -z "$API_BASE_URL" ]; then sed -i "s|\${API_BASE_URL}|${API_BASE_URL}|g" config.js pages/promotions.html; fi
         build:
           commands:
             - echo "Static site deployment - no build required"
