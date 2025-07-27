@@ -110,7 +110,7 @@ async function loadPromotionsData() {
     try {
         const idToken = sessionStorage.getItem('idToken');
         const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`, {
-            headers: { 'Authorization': `Bearer ${idToken}` }
+            headers: { 'Authorization': idToken }
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
