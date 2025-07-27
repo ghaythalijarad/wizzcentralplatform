@@ -437,7 +437,11 @@ async function handleAddPromotion(e) {
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.error?.message || 'Failed to create promotion');
+            console.error('Backend create error:', result);
+            const details = Array.isArray(result.error.details)
+                ? result.error.details.join('; ')
+                : result.error.message || 'Failed to create promotion';
+            throw new Error(details);
         }
         // Refresh promotions from backend
         await loadPromotionsData();

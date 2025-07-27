@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Live Merchants Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow: auto; max-height: 400px; }
+        .log-entry { padding: 5px; margin: 2px 0; border-left: 3px solid #ccc; background: #f9f9f9; }
+        .log-error { border-left-color: #dc3545; }
+        .log-warn { border-left-color: #ffc107; }
+        .log-info { border-left-color: #17a2b8; }
+        .log-success { border-left-color: #28a745; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Live Merchants Debug - Why Still Fake Data?</h1>
+    <p>Let's debug why the merchants page is showing sample data instead of real DynamoDB data.</p>
+    
+    <div class="status info">
+        <strong>Current Status:</strong> Page shows fake data (Pizza Palace, Fresh Market Express) instead of real data (زيت و زعتر, صاج الريف)
+    </div>
+    
+    <div>
+        <button onclick="debugAuthentication()">1️⃣ Check Authentication</button>
+        <button onclick="debugAWSConfig()">2️⃣ Check AWS Config</button>
+        <button onclick="debugDynamoDBAccess()">3️⃣ Test DynamoDB Access</button>
+        <button onclick="debugMerchantsLoading()">4️⃣ Debug Merchants Loading</button>
+        <button onclick="simulateRealDataLoad()">5️⃣ Force Real Data Load</button>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+    </div>
+    
+    <div id="logs"></div>
+    <div id="results"></div>
+
+    <!-- Load required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script src="config.js"></script>
+
+    <script>
+        // Global variables for debugging
+        let debugData = {
+            authentication: {},
+            awsConfig: {},
+            dynamoDB: null,
+            merchantsData: []
+        };
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            document.getElementById('logs').appendChild(div);
+            console.log(`[${type.toUpperCase()}]`, message);
+        }
+
+        function addResult(title, content, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<h3>${title}</h3><div>${content}</div>`;
+            document.getElementById('results').appendChild(div);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function debugAuthentication() {
+            log('🔍 Checking authentication status...', 'info');
+            
+            const idToken = sessionStorage.getItem('idToken');
+            const accessToken = sessionStorage.getItem('accessToken');
+            const userEmail = sessionStorage.getItem('userEmail');
+            
+            debugData.authentication = {
+                hasIdToken: !!idToken,
+                hasAccessToken: !!accessToken,
+                hasUserEmail: !!userEmail,
+                idTokenLength: idToken ? idToken.length : 0,
+                accessTokenLength: accessToken ? accessToken.length : 0
+            };
+            
+            if (idToken && accessToken) {
+                log('✅ Authentication tokens found!', 'success');
+                log(`ID Token length: ${idToken.length}`, 'info');
+                log(`Access Token length: ${accessToken.length}`, 'info');
+                if (userEmail) log(`User email: ${userEmail}`, 'info');
+                
+                addResult('Authentication Status', 
+                    `✅ ID Token: Present (${idToken.length} chars)<br>` +
+                    `✅ Access Token: Present (${accessToken.length} chars)<br>` +
+                    `✅ User Email: ${userEmail || 'Not set'}`, 
+                    'success');
+            } else {
+                log('❌ Missing authentication tokens!', 'error');
+                log('This is likely why sample data is being shown', 'warning');
+                
+                addResult('Authentication Status', 
+                    `❌ ID Token: ${idToken ? 'Present' : 'Missing'}<br>` +
+                    `❌ Access Token: ${accessToken ? 'Present' : 'Missing'}<br>` +
+                    `⚠️ This explains why sample data is shown`, 
+                    'error');
+            }
+            
+            return debugData.authentication;
+        }
+
+        async function debugAWSConfig() {
+            log('🔍 Checking AWS configuration...', 'info');
+            
+            try {
+                if (!window.amplifyConfig) {
+                    throw new Error('Amplify configuration not loaded');
+                }
+
+                const region = window.amplifyConfig.data?.aws_region || 'us-east-1';
+                const userPoolId = window.amplifyConfig.auth.user_pool_id;
+                const identityPoolId = window.amplifyConfig.auth.identity_pool_id;
+
+                debugData.awsConfig = {
+                    region,
+                    userPoolId,
+                    identityPoolId,
+                    hasAmplifyConfig: true
+                };
+
+                log(`✅ AWS Region: ${region}`, 'success');
+                log(`✅ User Pool ID: ${userPoolId}`, 'success');
+                log(`✅ Identity Pool ID: ${identityPoolId}`, 'success');
+
+                addResult('AWS Configuration', 
+                    `✅ Region: ${region}<br>` +
+                    `✅ User Pool: ${userPoolId}<br>` +
+                    `✅ Identity Pool: ${identityPoolId}`, 
+                    'success');
+
+                return debugData.awsConfig;
+
+            } catch (error) {
+                log(`❌ AWS Config error: ${error.message}`, 'error');
+                addResult('AWS Configuration', `❌ Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function debugDynamoDBAccess() {
+            log('🔍 Testing DynamoDB access...', 'info');
+            
+            try {
+                // First ensure we have auth and AWS config
+                await debugAuthentication();
+                await debugAWSConfig();
+
+                // Configure AWS
+                AWS.config.update({ region: debugData.awsConfig.region });
+
+                // Set up credentials
+                const idToken = sessionStorage.getItem('idToken');
+                const credParams = { IdentityPoolId: debugData.awsConfig.identityPoolId };
+                
+                if (idToken && idToken.length > 50) {
+                    const provider = `cognito-idp.${debugData.awsConfig.region}.amazonaws.com/${debugData.awsConfig.userPoolId}`;
+                    credParams.Logins = { [provider]: idToken };
+                    log('🔑 Using authenticated credentials', 'info');
+                } else {
+                    log('⚠️ Using unauthenticated credentials', 'warning');
+                }
+
+                AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
+                await AWS.config.credentials.refreshPromise();
+
+                log(`✅ AWS credentials obtained`, 'success');
+                log(`Identity ID: ${AWS.config.credentials.identityId}`, 'info');
+                log(`Authenticated: ${AWS.config.credentials.authenticated}`, 'info');
+
+                // Test DynamoDB access
+                const dynamoDB = new AWS.DynamoDB.DocumentClient({
+                    convertEmptyValues: true,
+                    removeUndefinedValues: true,
+                    region: debugData.awsConfig.region
+                });
+
+                debugData.dynamoDB = dynamoDB;
+
+                // Try to scan the merchants table
+                const params = {
+                    TableName: 'order-receiver-businesses-dev',
+                    Limit: 5
+                };
+
+                log('📊 Scanning merchants table...', 'info');
+                const result = await dynamoDB.scan(params).promise();
+
+                if (result.Items && result.Items.length > 0) {
+                    log(`✅ Found ${result.Items.length} merchants in database!`, 'success');
+                    
+                    result.Items.forEach((item, index) => {
+                        const name = item.businessName || item.name || 'Unknown';
+                        log(`   ${index + 1}. ${name}`, 'info');
+                    });
+
+                    addResult('DynamoDB Access Test', 
+                        `✅ Successfully connected to DynamoDB<br>` +
+                        `✅ Found ${result.Items.length} merchants<br>` +
+                        `✅ Sample: ${result.Items[0].businessName || result.Items[0].name}`, 
+                        'success');
+
+                    return result;
+                } else {
+                    log('⚠️ Table is empty or no data found', 'warning');
+                    addResult('DynamoDB Access Test', '⚠️ Table exists but no data found', 'warning');
+                    return { Items: [] };
+                }
+
+            } catch (error) {
+                log(`❌ DynamoDB access failed: ${error.message}`, 'error');
+                log(`Error code: ${error.code}`, 'error');
+                addResult('DynamoDB Access Test', 
+                    `❌ Failed: ${error.message}<br>` +
+                    `❌ Code: ${error.code}<br>` +
+                    `💡 This explains why sample data is shown`, 
+                    'error');
+                throw error;
+            }
+        }
+
+        async function debugMerchantsLoading() {
+            log('🔍 Debugging merchants loading process...', 'info');
+            
+            try {
+                const result = await debugDynamoDBAccess();
+                
+                if (result.Items && result.Items.length > 0) {
+                    log('🔄 Processing merchants data...', 'info');
+                    
+                    const processedMerchants = result.Items.map((item, index) => {
+                        log(`Processing merchant ${index + 1}: ${item.businessName || item.name}`, 'info');
+                        
+                        // Test address extraction
+                        let address = 'Address not available';
+                        if (item.address && typeof item.address === 'object') {
+                            if (item.address.country && item.address.country.S) {
+                                // DynamoDB AttributeValue format
+                                const parts = [];
+                                if (item.address.street && item.address.street.S) parts.push(item.address.street.S);
+                                if (item.address.district && item.address.district.S) parts.push(item.address.district.S);
+                                if (item.address.city && item.address.city.S) parts.push(item.address.city.S);
+                                if (item.address.country && item.address.country.S) parts.push(item.address.country.S);
+                                address = parts.join(', ');
+                                log(`   📍 Extracted address: ${address}`, 'success');
+                            } else {
+                                // Regular object format
+                                const parts = [];
+                                if (item.address.street) parts.push(item.address.street);
+                                if (item.address.district) parts.push(item.address.district);
+                                if (item.address.city) parts.push(item.address.city);
+                                if (item.address.country) parts.push(item.address.country);
+                                address = parts.join(', ');
+                                log(`   📍 Extracted address: ${address}`, 'success');
+                            }
+                        }
+
+                        return {
+                            id: item.businessId || item.id,
+                            name: item.businessName || item.name,
+                            owner: item.ownerName || item.owner || 'N/A',
+                            phone: item.phoneNumber || item.phone || 'N/A',
+                            email: item.email || 'N/A',
+                            address: address,
+                            status: item.status || (item.isActive ? 'approved' : 'pending'),
+                            fullData: item
+                        };
+                    });
+
+                    debugData.merchantsData = processedMerchants;
+                    
+                    log(`✅ Successfully processed ${processedMerchants.length} merchants`, 'success');
+                    
+                    addResult('Merchants Processing Test', 
+                        `✅ Processed ${processedMerchants.length} merchants<br>` +
+                        processedMerchants.map(m => `• ${m.name} - ${m.address}`).join('<br>'), 
+                        'success');
+
+                    return processedMerchants;
+                } else {
+                    log('❌ No merchants data to process', 'error');
+                    return [];
+                }
+
+            } catch (error) {
+                log(`❌ Merchants loading failed: ${error.message}`, 'error');
+                addResult('Merchants Processing Test', `❌ Failed: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        async function simulateRealDataLoad() {
+            log('🚀 Simulating real data load process...', 'info');
+            
+            try {
+                const merchants = await debugMerchantsLoading();
+                
+                if (merchants && merchants.length > 0) {
+                    log('🎯 Real data loaded successfully! Here\'s what should be shown:', 'success');
+                    
+                    let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%;">';
+                    tableHTML += '<tr><th>Name</th><th>Owner</th><th>Phone</th><th>Address</th><th>Status</th></tr>';
+                    
+                    merchants.forEach(merchant => {
+                        tableHTML += `<tr>
+                            <td>${merchant.name}</td>
+                            <td>${merchant.owner}</td>
+                            <td>${merchant.phone}</td>
+                            <td>${merchant.address}</td>
+                            <td>${merchant.status}</td>
+                        </tr>`;
+                    });
+                    
+                    tableHTML += '</table>';
+                    
+                    addResult('🎯 Real Data That Should Be Displayed', tableHTML, 'success');
+                    
+                    log('💡 If you\'re still seeing sample data, there might be an issue with:', 'warning');
+                    log('   1. Authentication not working properly', 'warning');
+                    log('   2. Error handling falling back to sample data', 'warning');
+                    log('   3. Cached sample data not being replaced', 'warning');
+                    
+                } else {
+                    log('❌ No real data available', 'error');
+                    addResult('Real Data Load', '❌ No real data available', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Real data load simulation failed: ${error.message}`, 'error');
+                addResult('Real Data Load', `❌ Failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run initial checks
+        setTimeout(() => {
+            log('🚀 Starting automatic debug checks...', 'info');
+            debugAuthentication();
+        }, 1000);
+    </script>
+</body>
+</html>

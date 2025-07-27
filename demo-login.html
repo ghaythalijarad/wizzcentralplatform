@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral - Demo Login</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .demo-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .demo-btn {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            margin: 1rem 0;
+            background: #007cba;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+        }
+        .demo-btn:hover {
+            background: #005a8b;
+        }
+        .note {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 4px solid #007cba;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🚀 WizzCentral Demo Access</h1>
+        <p>Welcome to the WizzCentral Platform demo. Choose your access method:</p>
+        
+        <div class="note">
+            <strong>Development Mode:</strong> This demo bypasses authentication for testing purposes.
+        </div>
+        
+        <button class="demo-btn" onclick="quickLogin()">
+            🔐 Quick Demo Login (Bypass Auth)
+        </button>
+        
+        <a href="pages/index.html" class="demo-btn">
+            📋 Try Real Login Form
+        </a>
+        
+        <a href="pages/merchants.html" class="demo-btn">
+            🏪 Direct Access - Merchants Page
+        </a>
+        
+        <a href="pages/dashboard.html" class="demo-btn">
+            📊 Direct Access - Dashboard
+        </a>
+        
+        <div class="note">
+            <strong>Demo Credentials (if using real login):</strong><br>
+            Email: demo@wizz.com<br>
+            Password: demo123
+        </div>
+    </div>
+
+    <script>
+        function quickLogin() {
+            // Set mock authentication tokens for development
+            sessionStorage.setItem('accessToken', 'demo-access-token-' + Date.now());
+            sessionStorage.setItem('idToken', 'demo-id-token-' + Date.now());
+            sessionStorage.setItem('refreshToken', 'demo-refresh-token-' + Date.now());
+            sessionStorage.setItem('userEmail', 'demo@wizz.com');
+            
+            alert('Demo authentication tokens set! Redirecting to dashboard...');
+            window.location.href = 'pages/dashboard.html';
+        }
+        
+        // Add keyboard shortcut - press 'D' for quick demo login
+        document.addEventListener('keydown', function(e) {
+            if (e.key.toLowerCase() === 'd') {
+                quickLogin();
+            }
+        });
+    </script>
+</body>
+</html>
