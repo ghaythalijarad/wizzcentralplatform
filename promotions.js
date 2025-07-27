@@ -398,56 +398,104 @@ function closeAddPromotionModal() {
 async function handleAddPromotion(e) {
     e.preventDefault();
     const formData = new FormData(e.target);
+
+    // --- Form Data Extraction and Validation ---
     const title = formData.get('title');
     const code = formData.get('code').toUpperCase();
     const type = formData.get('type');
-    const value = parseFloat(formData.get('value'));
-    const limit = parseInt(formData.get('limit'));
-    const minOrder = parseFloat(formData.get('minOrder')) || 0;
-    const startDateISO = formData.get('startDate');
-    const endDateISO = formData.get('endDate');
+    const description = formData.get('description');
+    const startDateValue = formData.get('startDate');
+    const endDateValue = formData.get('endDate');
+    const valueStr = formData.get('value');
+    const limitStr = formData.get('limit');
+    const minOrderStr = formData.get('minOrder');
 
-    // Prepare payload for backend
+    // --- Client-Side Validation ---
+    if (!title || !code || !type || !description || !startDateValue || !endDateValue || !valueStr) {
+        window.dashboardFunctions?.showNotification('Please fill out all required fields.', 'error');
+        return;
+    }
+
+    if (new Date(endDateValue) <= new Date(startDateValue)) {
+        window.dashboardFunctions?.showNotification('End Date must be after Start Date.', 'error');
+        return;
+    }
+
     const payload = {
         name: title,
-        description: formData.get('description'),
+        description: description,
         type: type,
         code: code,
-        value: value,
-        minOrderAmount: minOrder,
-        usageLimit: limit,
-        startDate: new Date(startDateISO).toISOString(),
-        endDate: new Date(endDateISO).toISOString()
+        startDate: new Date(startDateValue).toISOString(),
+        endDate: new Date(endDateValue).toISOString(),
+        isActive: true, // Default to active
+        customerSegments: ['all'] // Default segment
     };
 
+    // Validate and parse numeric fields
+    const value = parseFloat(valueStr);
+    if (isNaN(value) || value <= 0) {
+        window.dashboardFunctions?.showNotification('Discount Value must be a positive number.', 'error');
+        return;
+    }
+    payload.value = value;
+
+    if (minOrderStr) {
+        const minOrderAmount = parseFloat(minOrderStr);
+        if (!isNaN(minOrderAmount) && minOrderAmount >= 0) {
+            payload.minOrderAmount = minOrderAmount;
+        } else {
+            window.dashboardFunctions?.showNotification('Min Order Value must be a valid, non-negative number.', 'error');
+            return;
+        }
+    }
+
+    if (limitStr) {
+        const usageLimit = parseInt(limitStr, 10);
+        if (!isNaN(usageLimit) && usageLimit > 0) {
+            payload.usageLimit = usageLimit;
+        } else {
+            window.dashboardFunctions?.showNotification('Usage Limit must be a valid, positive whole number.', 'error');
+            return;
+        }
+    }
+
+    // --- API Call ---
     try {
         const idToken = sessionStorage.getItem('idToken');
         console.log('🔍 Debug handleAddPromotion POST:', window.WIZZCENTRAL_CONFIG.API_BASE_URL + '/promotions', 'Payload:', payload, 'Authorization:', `Bearer ${idToken}`);
+        
         const urlPost = `${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`;
         const headersPost = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${idToken}`
         };
+
         const response = await fetch(urlPost, {
             method: 'POST',
             headers: headersPost,
             body: JSON.stringify(payload)
         });
+
         const result = await response.json();
-        if (!response.ok || !result.success) {
+
+        if (!response.ok) {
             console.error('Backend create error:', result);
-            const details = Array.isArray(result.error.details)
-                ? result.error.details.join('; ')
-                : result.error.message || 'Failed to create promotion';
+            // Improved error message parsing from Joi
+            const details = result.error?.details 
+                ? result.error.details.map(d => d.message).join('; ')
+                : result.error?.message || 'An unknown error occurred.';
             throw new Error(details);
         }
+
         // Refresh promotions from backend
         await loadPromotionsData();
         closeAddPromotionModal();
         window.dashboardFunctions?.showNotification('Promotion created successfully!', 'success');
+
     } catch (error) {
         console.error('Error creating promotion:', error);
-        window.dashboardFunctions?.showNotification(`Error creating promotion: ${error.message}`, 'error');
+        window.dashboardFunctions?.showNotification(`Error: ${error.message}`, 'error');
     }
 }
 
