@@ -40,7 +40,9 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+          Resource: 
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/order-receiver-discounts-dev"
         - Effect: Allow
           Action:
             - ses:SendEmail
@@ -335,6 +337,15 @@ functions:
           cors: true
           authorizer: authorize
           
+  getPromotions:
+    handler: src/handlers/promotions.getPromotions
+    events:
+      - http:
+          path: promotions
+          method: get
+          cors: true
+          authorizer: authorize
+          
   getPromotion:
     handler: src/handlers/promotions.getPromotion
     events:
@@ -536,6 +547,15 @@ functions:
   # Authorization Function
   authorize:
     handler: src/handlers/auth.authorize
+
+  # Hello World Function
+  hello:
+    handler: src/handlers/hello.hello
+    events:
+      - http:
+          path: hello
+          method: get
+          cors: true
 
 resources:
   Resources:
