@@ -21,10 +21,10 @@ provider:
     SUPPORT_TICKETS_TABLE: ${self:service}-support-tickets-${self:provider.stage}
     FAQS_TABLE: ${self:service}-faqs-${self:provider.stage}
     KNOWLEDGE_BASE_TABLE: ${self:service}-knowledge-base-${self:provider.stage}
-    COGNITO_USER_POOL_ID: us-east-1_2NdMHucPP
-    COGNITO_USER_POOL_ARN: arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_2NdMHucPP
-    COGNITO_JWKS_URL: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_2NdMHucPP/.well-known/jwks.json
-    COGNITO_CLIENT_ID: 3rdgvci5bvi1v295dann1tdoc5
+    COGNITO_USER_POOL_ID: us-east-1_aX8X9oQTV
+    COGNITO_USER_POOL_ARN: arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV
+    COGNITO_JWKS_URL: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_aX8X9oQTV/.well-known/jwks.json
+    COGNITO_CLIENT_ID: 3u9frkvcn18lidj5dpm1a94mf2
     COGNITO_CLIENT_SECRET: h017ovuq5gv490hgtisr9sj33gq2c3tlvubrutl2v6to765k6o
     COGNITO_REGION: us-east-1
     JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
@@ -61,7 +61,7 @@ provider:
             - cognito-idp:AdminInitiateAuth
             - cognito-idp:AdminRespondToAuthChallenge
             - cognito-idp:ListUsers
-          Resource: "arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_2NdMHucPP"
+          Resource: "arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV"
 
 functions:
   # Authentication Functions
@@ -71,6 +71,14 @@ functions:
       - http:
           path: auth/login
           method: post
+          cors: true
+
+  getUser:
+    handler: src/handlers/auth.getUser
+    events:
+      - http:
+          path: auth/user
+          method: get
           cors: true
           
   register:

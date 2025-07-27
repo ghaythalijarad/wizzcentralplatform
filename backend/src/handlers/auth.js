@@ -23,14 +23,6 @@ const cognitoClient = new CognitoIdentityProviderClient({
 const USERS_TABLE = process.env.USERS_TABLE;
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID;
-const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET;
-
-// Create secret hash for Cognito
-function createSecretHash(username) {
-  const message = username + CLIENT_ID;
-  const key = CLIENT_SECRET;
-  return crypto.createHmac('sha256', key).update(message).digest('base64');
-}
 
 // User registration with Cognito
 exports.register = async (event) => {
@@ -59,7 +51,6 @@ exports.register = async (event) => {
     }
 
     const userId = uuidv4();
-    const secretHash = createSecretHash(email);
 
     // Create user in Cognito
     const createUserCommand = new AdminCreateUserCommand({
@@ -146,17 +137,15 @@ exports.login = async (event) => {
     }
 
     const { email, password } = validation.data;
-    const secretHash = createSecretHash(email);
 
-    // Authenticate with Cognito
+    // Authenticate with Cognito using Admin flow
     const authCommand = new AdminInitiateAuthCommand({
       UserPoolId: USER_POOL_ID,
       ClientId: CLIENT_ID,
-      AuthFlow: 'ADMIN_NO_SRP_AUTH',
+      AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
       AuthParameters: {
         USERNAME: email,
-        PASSWORD: password,
-        SECRET_HASH: secretHash
+        PASSWORD: password
       }
     });
 
@@ -183,8 +172,7 @@ exports.login = async (event) => {
         });
       }
 
-      return responseHelper.success(200, {
-        message: 'Login successful',
+      return responseHelper.success({
         tokens: {
           accessToken: tokens.AccessToken,
           idToken: tokens.IdToken,
@@ -211,7 +199,8 @@ exports.login = async (event) => {
       }
       // Provide a generic error for other Cognito issues
       return responseHelper.error('An authentication error occurred', 500, {
-        errorName: cognitoError.name
+        errorName: cognitoError.name,
+        errorMessage: cognitoError.message
       });
     }
 
@@ -236,15 +225,12 @@ exports.refreshToken = async (event) => {
       return responseHelper.badRequest('Refresh token and email are required');
     }
 
-    const secretHash = createSecretHash(email);
-
     const authCommand = new AdminInitiateAuthCommand({
       UserPoolId: USER_POOL_ID,
       ClientId: CLIENT_ID,
       AuthFlow: 'REFRESH_TOKEN_AUTH',
       AuthParameters: {
         REFRESH_TOKEN: refreshToken,
-        SECRET_HASH: secretHash
       }
     });
 
@@ -352,21 +338,76 @@ exports.changePassword = async (event) => {
   }
 };
 
+// Get user details from Cognito for debugging
+exports.getUser = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const email = event.queryStringParameters && event.queryStringParameters.email;
+
+    if (!email) {
+      return responseHelper.badRequest('Email query parameter is required');
+    }
+
+    const command = new AdminGetUserCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: email,
+    });
+
+    try {
+      const { UserStatus, UserCreateDate, UserLastModifiedDate, Enabled, UserAttributes } = await cognitoClient.send(command);
+      
+      const userDetails = {
+        UserStatus,
+        UserCreateDate,
+        UserLastModifiedDate,
+        Enabled,
+        UserAttributes,
+      };
+
+      return responseHelper.success(200, userDetails, 'User details fetched successfully');
+
+    } catch (cognitoError) {
+      if (cognitoError.name === 'UserNotFoundException') {
+        return responseHelper.notFound('User not found in Cognito');
+      }
+      console.error('Cognito getUser error:', cognitoError);
+      return responseHelper.error('Error fetching user from Cognito', 500, { errorName: cognitoError.name });
+    }
+  } catch (error) {
+    console.error('Get user error:', error);
+    return responseHelper.error('An internal server error occurred', 500);
+  }
+};
+
 // Authorization handler for API Gateway
 exports.authorize = async (event) => {
   try {
     const token = event.authorizationToken;
     
     if (!token) {
+      console.log('No authorization token provided');
       throw new Error('Unauthorized');
     }
 
     // Extract the token (remove 'Bearer ' prefix if present)
     const cleanToken = token.replace(/^Bearer\s+/, '');
     
-    // For now, allow all requests - you can implement proper JWT verification here
-    return {
-      principalId: 'user',
+    if (!cleanToken) {
+      console.log('Invalid token format');
+      throw new Error('Unauthorized');
+    }
+
+    console.log('Token received, length:', cleanToken.length);
+    
+    // For now, allow all requests with valid tokens - you can implement proper JWT verification here
+    const principalId = 'user'; // You could decode the JWT to get the actual user ID
+    
+    const policy = {
+      principalId: principalId,
       policyDocument: {
         Version: '2012-10-17',
         Statement: [
@@ -376,8 +417,15 @@ exports.authorize = async (event) => {
             Resource: event.methodArn
           }
         ]
+      },
+      context: {
+        // You can add user context here if needed
+        tokenType: 'jwt'
       }
     };
+
+    console.log('Authorization successful for principal:', principalId);
+    return policy;
 
   } catch (error) {
     console.error('Authorization error:', error);
