@@ -1,6 +1,7 @@
 const { 
   CognitoIdentityProviderClient, 
   AdminInitiateAuthCommand,
+  InitiateAuthCommand,
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
@@ -129,7 +130,12 @@ exports.login = async (event) => {
       return responseHelper.cors();
     }
 
-    const body = JSON.parse(event.body);
+    let body;
+    try {
+      body = JSON.parse(event.body);
+    } catch (e) {
+      return responseHelper.badRequest('Invalid JSON in request body');
+    }
     
     // Validate input
     const validator = validate(userSchemas.login);
@@ -158,7 +164,10 @@ exports.login = async (event) => {
       const authResponse = await cognitoClient.send(authCommand);
       
       if (authResponse.ChallengeName) {
-        return responseHelper.error('Authentication challenge required', 400);
+        // This can be extended to handle challenges like MFA
+        return responseHelper.error('Authentication challenge required', 400, {
+          challenge: authResponse.ChallengeName
+        });
       }
 
       const tokens = authResponse.AuthenticationResult;
@@ -167,14 +176,14 @@ exports.login = async (event) => {
       const user = await database.findByEmail(USERS_TABLE, email);
       
       if (user) {
-        // Update last login
+        // Update last login timestamp
         await database.update(USERS_TABLE, 'userId', user.userId, {
           lastLoginAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
       }
 
-      return responseHelper.success({
+      return responseHelper.success(200, {
         message: 'Login successful',
         tokens: {
           accessToken: tokens.AccessToken,
@@ -194,15 +203,21 @@ exports.login = async (event) => {
       if (cognitoError.name === 'NotAuthorizedException') {
         return responseHelper.unauthorized('Invalid email or password');
       }
-      if (cognitoError.name === 'UserNotConfirmedException') {
-        return responseHelper.error('User not confirmed', 400);
+      if (cognitoError.name === 'UserNotFoundException') {
+        return responseHelper.notFound('User not found');
       }
-      throw cognitoError;
+      if (cognitoError.name === 'UserNotConfirmedException') {
+        return responseHelper.forbidden('User account is not confirmed');
+      }
+      // Provide a generic error for other Cognito issues
+      return responseHelper.error('An authentication error occurred', 500, {
+        errorName: cognitoError.name
+      });
     }
 
   } catch (error) {
     console.error('Login error:', error);
-    return responseHelper.error('Login failed', 500);
+    return responseHelper.error('An internal server error occurred during login', 500);
   }
 };
 

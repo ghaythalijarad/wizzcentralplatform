@@ -2,7 +2,7 @@
 window.WIZZCENTRAL_CONFIG = {
     // API Configuration
     // API Gateway URL (can be overridden via Amplify Console env var 'API_BASE_URL')
-    API_BASE_URL: window.__API_BASE_URL__ || 'https://your-api-gateway-url.amazonaws.com/dev',  // This will be updated after backend deployment
+    API_BASE_URL: window.__API_BASE_URL__ || 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev',  // Updated with deployed AWS API endpoint
     
     // Frontend Configuration
     APP_NAME: 'WizzCentral Platform',

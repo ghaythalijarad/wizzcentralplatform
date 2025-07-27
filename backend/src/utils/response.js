@@ -1,7 +1,17 @@
 // HTTP response utilities for Lambda functions
 
 class ResponseHelper {
-  static success(data, statusCode = 200) {
+  static success(statusCode = 200, data = null, message = null) {
+    const response = {
+      success: true,
+      data,
+      timestamp: new Date().toISOString()
+    };
+    
+    if (message) {
+      response.message = message;
+    }
+    
     return {
       statusCode,
       headers: {
@@ -11,15 +21,11 @@ class ResponseHelper {
         'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
         'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
       },
-      body: JSON.stringify({
-        success: true,
-        data,
-        timestamp: new Date().toISOString()
-      })
+      body: JSON.stringify(response)
     };
   }
 
-  static error(message, statusCode = 400, details = null) {
+  static error(statusCode = 400, message = 'An error occurred', details = null) {
     return {
       statusCode,
       headers: {
@@ -42,31 +48,31 @@ class ResponseHelper {
   }
 
   static validation(errors) {
-    return this.error('Validation failed', 422, errors);
+    return this.error(422, 'Validation failed', errors);
   }
 
   static badRequest(message = 'Bad request') {
-    return this.error(message, 400);
+    return this.error(400, message);
   }
 
   static unauthorized(message = 'Unauthorized') {
-    return this.error(message, 401);
+    return this.error(401, message);
   }
 
   static forbidden(message = 'Forbidden') {
-    return this.error(message, 403);
+    return this.error(403, message);
   }
 
   static notFound(message = 'Resource not found') {
-    return this.error(message, 404);
+    return this.error(404, message);
   }
 
   static conflict(message = 'Resource already exists') {
-    return this.error(message, 409);
+    return this.error(409, message);
   }
 
   static serverError(message = 'Internal server error') {
-    return this.error(message, 500);
+    return this.error(500, message);
   }
 
   static cors() {

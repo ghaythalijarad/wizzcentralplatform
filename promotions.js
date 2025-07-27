@@ -148,11 +148,23 @@ async function loadPromotionsData() {
 // Sample promotion data
 let promotions = [];
 
-// Initialize promotions page
+// Initialize promotions page - single DOMContentLoaded listener
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Promotions page DOM loaded');
+    
     const tbody = document.getElementById('promotionsTableBody');
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading promotions...</td></tr>`;
+    }
+    
+    // Check authentication first
+    if (!checkAuthentication()) {
+        return;
+    }
+    
+    // Initialize dashboard functionality (sidebar, etc.)
+    if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
     }
     
     try {
@@ -162,24 +174,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch (error) {
         console.error('Failed to initialize promotions page:', error);
     }
-});
-
-// Initialize promotions page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Promotions page DOM loaded');
-    
-    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
-    // if (!checkAuthentication()) {
-    //     return;
-    // }
-    
-    // Initialize dashboard functionality (sidebar, etc.)
-    if (typeof initializeDashboard === 'function') {
-        initializeDashboard();
-    }
-    
-    // Load promotions data
-    loadPromotionsData();
     
     // Load merchant discounts
     if (window.dataService) {

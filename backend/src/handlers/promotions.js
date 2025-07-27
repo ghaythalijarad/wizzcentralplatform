@@ -102,7 +102,17 @@ exports.createPromotion = async (event) => {
     return responseHelper.success(201, promotion, 'Promotion created successfully');
   } catch (error) {
     console.error('Error creating promotion:', error);
-    return responseHelper.error(500, 'Internal server error');
+    
+    // Provide more specific error information for debugging
+    if (error.name === 'ResourceNotFoundException') {
+      return responseHelper.error(503, 'Database table not found - service unavailable');
+    } else if (error.name === 'NetworkingError') {
+      return responseHelper.error(503, 'Database connection failed - service unavailable');
+    } else if (error.name === 'ValidationException') {
+      return responseHelper.error(400, `Database validation error: ${error.message}`);
+    }
+    
+    return responseHelper.error(500, `Internal server error: ${error.message}`);
   }
 };
 
@@ -272,7 +282,15 @@ exports.listPromotions = async (event) => {
     });
   } catch (error) {
     console.error('Error listing promotions:', error);
-    return responseHelper.error(500, 'Internal server error');
+    
+    // Provide more specific error information for debugging
+    if (error.name === 'ResourceNotFoundException') {
+      return responseHelper.error(503, 'Database table not found - service unavailable');
+    } else if (error.name === 'NetworkingError') {
+      return responseHelper.error(503, 'Database connection failed - service unavailable');
+    }
+    
+    return responseHelper.error(500, `Internal server error: ${error.message}`);
   }
 };
 

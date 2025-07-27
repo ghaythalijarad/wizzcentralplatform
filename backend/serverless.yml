@@ -63,14 +63,6 @@ provider:
             - cognito-idp:ListUsers
           Resource: "arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_2NdMHucPP"
 
-plugins:
-  - serverless-offline
-
-custom:
-  serverless-offline:
-    httpPort: 3000
-    host: 0.0.0.0
-
 functions:
   # Authentication Functions
   login:
