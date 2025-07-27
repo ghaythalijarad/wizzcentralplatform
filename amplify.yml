@@ -3,6 +3,10 @@ applications:
   - appRoot: .
     frontend:
       phases:
+        preBuild:
+          commands:
+            - echo "Substituting API_BASE_URL in config.js"
+            - if [ ! -z "$API_BASE_URL" ]; then sed -i "s|\${API_BASE_URL}|$API_BASE_URL|g" config.js; fi
         build:
           commands:
             - echo "Static site deployment - no build required"

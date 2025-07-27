@@ -103,39 +103,43 @@ async function initializeAWS() {
 
 // Load promotions data from DynamoDB - TEMPORARILY DISABLED FOR DEBUGGING
 async function loadPromotionsData() {
-    console.log('Loading mock promotions data for debugging...');
-    
-    // Mock data for testing
-    promotions = [
-        {
-            id: 'PROMO001',
-            title: 'Summer Sale',
-            description: '20% off all orders',
-            status: 'active',
-            startDate: '2025-07-01',
-            endDate: '2025-07-31',
-            type: 'percentage',
-            value: 20,
-            code: 'SUMMER20',
-            usage: 45,
-            limit: 100
-        },
-        {
-            id: 'PROMO002', 
-            title: 'Free Delivery',
-            description: 'Free delivery on orders over $50',
-            status: 'active',
-            startDate: '2025-07-15',
-            endDate: '2025-08-15',
-            type: 'free_delivery',
-            value: 0,
-            code: 'FREEDEL50',
-            usage: 23,
-            limit: 200
+    const tbody = document.getElementById('promotionsTableBody');
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading promotions...</td></tr>`;
+    }
+    try {
+        const idToken = sessionStorage.getItem('idToken');
+        const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`, {
+            headers: { 'Authorization': `Bearer ${idToken}` }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error?.message || 'Failed to load promotions');
         }
-    ];
-    
-    console.log('Mock promotions loaded:', promotions);
+        const backendPromos = result.data.promotions || [];
+        promotions = backendPromos.map(p => ({
+            id: p.promotionId,
+            title: p.name,
+            code: p.code,
+            type: p.type,
+            value: p.value,
+            status: p.isActive ? 'active' : (new Date() < new Date(p.startDate) ? 'scheduled' : 'expired'),
+            usage: p.currentUsage || 0,
+            limit: p.usageLimit || 0,
+            startDate: p.startDate.split('T')[0],
+            endDate: p.endDate.split('T')[0],
+            description: p.description,
+            minOrderValue: p.minOrderAmount || 0
+        }));
+    } catch (error) {
+        console.error('Error loading promotions from backend:', error);
+        // Display error message on UI
+        const tbody = document.getElementById('promotionsTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Error loading promotions: ${error.message}</td></tr>`;
+        }
+        return;
+    }
     initializePromotionsPage();
 }
 
@@ -396,45 +400,52 @@ function closeAddPromotionModal() {
     }
 }
 
-function handleAddPromotion(e) {
+async function handleAddPromotion(e) {
     e.preventDefault();
-    
     const formData = new FormData(e.target);
-    const startDate = new Date(formData.get('startDate'));
-    const endDate = new Date(formData.get('endDate'));
-    const now = new Date();
-    
-    // Determine status based on dates
-    let status = 'draft';
-    if (startDate <= now && endDate >= now) {
-        status = 'active';
-    } else if (startDate > now) {
-        status = 'scheduled';
-    }
-    
-    const newPromotion = {
-        id: 'PROMO' + String(promotions.length + 1).padStart(3, '0'),
-        title: formData.get('title'),
-        code: formData.get('code').toUpperCase(),
-        type: formData.get('type'),
-        value: parseFloat(formData.get('value')),
-        status: status,
-        usage: 0,
-        limit: parseInt(formData.get('limit')),
-        startDate: formData.get('startDate').split('T')[0],
-        endDate: formData.get('endDate').split('T')[0],
+    const title = formData.get('title');
+    const code = formData.get('code').toUpperCase();
+    const type = formData.get('type');
+    const value = parseFloat(formData.get('value'));
+    const limit = parseInt(formData.get('limit'));
+    const minOrder = parseFloat(formData.get('minOrder')) || 0;
+    const startDateISO = formData.get('startDate');
+    const endDateISO = formData.get('endDate');
+
+    // Prepare payload for backend
+    const payload = {
+        name: title,
         description: formData.get('description'),
-        minOrderValue: parseFloat(formData.get('minOrder')) || 0
+        type: type,
+        code: code,
+        value: value,
+        minOrderAmount: minOrder,
+        usageLimit: limit,
+        startDate: new Date(startDateISO).toISOString(),
+        endDate: new Date(endDateISO).toISOString()
     };
 
-    promotions.push(newPromotion);
-    renderPromotionsTable();
-    updatePromotionStats();
-    closeAddPromotionModal();
-    
-    // Show success message
-    if (window.dashboardFunctions) {
-        window.dashboardFunctions.showNotification('Promotion created successfully!', 'success');
+    try {
+        const idToken = sessionStorage.getItem('idToken');
+        const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error?.message || 'Failed to create promotion');
+        }
+        // Refresh promotions from backend
+        await loadPromotionsData();
+        closeAddPromotionModal();
+        window.dashboardFunctions?.showNotification('Promotion created successfully!', 'success');
+    } catch (error) {
+        console.error('Error creating promotion:', error);
+        window.dashboardFunctions?.showNotification(`Error creating promotion: ${error.message}`, 'error');
     }
 }
 

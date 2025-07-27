@@ -1,11 +1,14 @@
 // WizzCentral Platform Configuration
 window.WIZZCENTRAL_CONFIG = {
     // API Configuration
-    API_BASE_URL: 'https://your-api-gateway-url.amazonaws.com/dev',  // This will be updated after backend deployment
+    // API Gateway URL (can be overridden via Amplify Console env var 'API_BASE_URL')
+    API_BASE_URL: window.__API_BASE_URL__ || 'https://your-api-gateway-url.amazonaws.com/dev',  // This will be updated after backend deployment
     
     // Frontend Configuration
     APP_NAME: 'WizzCentral Platform',
     APP_VERSION: '1.0.0',
+    // Deployment stage for API paths
+    STAGE: 'dev',
     
     // AWS Cognito Configuration (if using)
     COGNITO_REGION: 'us-east-1',
@@ -30,6 +33,8 @@ window.WIZZCENTRAL_CONFIG = {
         DANGER_COLOR: '#dc3545'
     }
 };
+
+// Note: For local development use, use the built-in override or set window.__API_BASE_URL__ before loading scripts
 
 // Environment Detection
 if (typeof module !== 'undefined' && module.exports) {

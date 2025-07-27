@@ -182,7 +182,7 @@
                     <select id="typeFilter">
                         <option value="">All Types</option>
                         <option value="percentage">Percentage</option>
-                        <option value="fixed">Fixed Amount</option>
+                        <option value="fixed_amount">Fixed Amount</option>
                         <option value="free_delivery">Free Delivery</option>
                         <option value="bogo">Buy One Get One</option>
                     </select>
@@ -438,7 +438,7 @@
                             <select id="promotionType" name="type" required>
                                 <option value="">Select type</option>
                                 <option value="percentage">Percentage</option>
-                                <option value="fixed">Fixed Amount</option>
+                                <option value="fixed_amount">Fixed Amount</option>
                                 <option value="free_delivery">Free Delivery</option>
                                 <option value="bogo">Buy One Get One</option>
                             </select>
@@ -482,6 +482,10 @@
     </div>
 
     <!-- AWS SDK and Configuration Scripts -->
+    <script>
+      // Amplify Console will substitute ${API_BASE_URL} with your environment variable
+      window.__API_BASE_URL__ = window.__API_BASE_URL__ || '${API_BASE_URL}';
+    </script>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
     <script src="../config.js"></script>
     <script src="../data-service.js"></script>
