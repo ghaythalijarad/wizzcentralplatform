@@ -54,10 +54,18 @@ const merchantSchemas = {
   }),
 
   update: Joi.object({
-    name: Joi.string().min(2).max(100),
+    businessName: Joi.string().min(2).max(100),
+    name: Joi.string().min(2).max(100), // Keep both for backwards compatibility
     email: Joi.string().email(),
-    phone: Joi.string().min(1),
-    category: Joi.string().valid('restaurant', 'grocery', 'pharmacy', 'retail', 'electronics', 'clothing', 'beauty', 'books', 'sports', 'home', 'automotive', 'other'),
+    phoneNumber: Joi.string().min(1),
+    phone: Joi.string().min(1), // Keep both for backwards compatibility
+    businessType: Joi.string().valid('restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'),
+    category: Joi.string().valid('restaurant', 'grocery', 'pharmacy', 'retail', 'electronics', 'clothing', 'beauty', 'books', 'sports', 'home', 'automotive', 'other'), // Keep for backwards compatibility
+    ownerName: Joi.string().min(2).max(100),
+    street: Joi.string(),
+    city: Joi.string(),
+    district: Joi.string(),
+    country: Joi.string(),
     address: Joi.object({
       street: Joi.string(),
       city: Joi.string(),
@@ -76,7 +84,8 @@ const merchantSchemas = {
     }),
     website: Joi.string().uri(),
     commission: Joi.number().min(0).max(100),
-    description: Joi.string().max(500)
+    description: Joi.string().max(500),
+    updatedAt: Joi.string().isoDate()
   }).min(1),
 
   updateStatus: Joi.object({

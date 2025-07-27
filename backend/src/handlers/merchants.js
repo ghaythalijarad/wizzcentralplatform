@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const database = require('../utils/database');
 const emailService = require('../utils/email');
 const responseHelper = require('../utils/response');
@@ -202,7 +203,7 @@ exports.updateMerchant = async (event) => {
     const updates = validation.data;
 
     // Check if merchant exists
-    const existingMerchant = await database.getById(MERCHANTS_TABLE, merchantId);
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
     if (!existingMerchant) {
       return responseHelper.notFound('Merchant not found');
     }
@@ -215,8 +216,33 @@ exports.updateMerchant = async (event) => {
       }
     }
 
-    // Update merchant
-    const updatedMerchant = await database.update(MERCHANTS_TABLE, merchantId, updates);
+    // Update merchant with correct key
+    const updateExpression = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    Object.keys(updates).forEach(key => {
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = updates[key];
+    });
+
+    // Always update the updatedAt timestamp
+    updateExpression.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    const updateParams = {
+      TableName: MERCHANTS_TABLE,
+      Key: { businessId: merchantId }, // Use correct primary key
+      UpdateExpression: `SET ${updateExpression.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: 'ALL_NEW'
+    };
+
+    const result = await database.client.send(new UpdateCommand(updateParams));
+    const updatedMerchant = result.Attributes;
 
     return responseHelper.success({ merchant: updatedMerchant, message: 'Merchant updated successfully' });
 
@@ -352,18 +378,18 @@ exports.updateMerchantStatus = async (event) => {
     const { action, reason, sendEmail = true } = validation.data;
 
     // Check if merchant exists
-    const merchant = await database.getById(MERCHANTS_TABLE, merchantId);
+    const merchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
     if (!merchant) {
       return responseHelper.notFound('Merchant not found');
     }
 
     // Map actions to statuses
     const statusMap = {
-      approve: 'verified',
+      approve: 'approved', // Use 'approved' to match DynamoDB data
       reject: 'rejected',
       suspend: 'suspended',
       review: 'under-review',
-      reactivate: 'verified'
+      reactivate: 'approved' // Reactivate to approved status
     };
 
     const newStatus = statusMap[action];
@@ -375,10 +401,11 @@ exports.updateMerchantStatus = async (event) => {
 
     // Validate status transition
     const validTransitions = {
-      pending: ['verified', 'rejected', 'under-review'],
-      'under-review': ['verified', 'rejected', 'suspended'],
-      verified: ['suspended', 'under-review'],
-      suspended: ['verified', 'under-review'],
+      pending: ['approved', 'rejected', 'under-review'],
+      'under-review': ['approved', 'rejected', 'suspended'],
+      approved: ['suspended', 'under-review'],
+      verified: ['suspended', 'under-review'], // Keep for backwards compatibility
+      suspended: ['approved', 'under-review'],
       rejected: ['under-review'] // Allow rejected merchants to be reviewed again
     };
 
@@ -409,8 +436,33 @@ exports.updateMerchantStatus = async (event) => {
       updateData.rating = 5.0; // Start with perfect rating
     }
 
-    // Update merchant status
-    const updatedMerchant = await database.update(MERCHANTS_TABLE, merchantId, updateData);
+    // Update merchant status using correct primary key
+    const updateExpression = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    Object.keys(updateData).forEach(key => {
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = updateData[key];
+    });
+
+    // Always update the updatedAt timestamp
+    updateExpression.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    const updateParams = {
+      TableName: MERCHANTS_TABLE,
+      Key: { businessId: merchantId }, // Use correct primary key
+      UpdateExpression: `SET ${updateExpression.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: 'ALL_NEW'
+    };
+
+    const result = await database.client.send(new UpdateCommand(updateParams));
+    const updatedMerchant = result.Attributes;
 
     // Send email notification if requested
     if (sendEmail) {

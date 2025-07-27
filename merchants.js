@@ -933,14 +933,38 @@ function collectEditFormData(form) {
     const formData = new FormData(form);
     const data = {};
     
-    // Basic fields
-    data.name = formData.get('name')?.trim();
-    data.ownerName = formData.get('ownerName')?.trim();
-    data.email = formData.get('email')?.trim();
-    data.phone = formData.get('phone')?.trim();
-    data.category = formData.get('category');
-    data.description = formData.get('description')?.trim();
-    data.website = formData.get('website')?.trim();
+    // Map form fields to DynamoDB field names
+    const businessName = formData.get('name')?.trim();
+    if (businessName) data.businessName = businessName;
+    
+    const ownerName = formData.get('ownerName')?.trim();
+    if (ownerName) data.ownerName = ownerName;
+    
+    const email = formData.get('email')?.trim();
+    if (email) data.email = email;
+    
+    const phoneNumber = formData.get('phone')?.trim();
+    if (phoneNumber) data.phoneNumber = phoneNumber;
+    
+    const businessType = formData.get('category');
+    if (businessType && businessType !== 'other') {
+        // Map display categories back to database values
+        const typeMap = {
+            'restaurant': 'restaurant',
+            'grocery store': 'store',
+            'cafe': 'cafe',
+            'cloud kitchen': 'cloudkitchen',
+            'pharmacy': 'pharmacy',
+            'retail': 'retail'
+        };
+        data.businessType = typeMap[businessType.toLowerCase()] || businessType;
+    }
+    
+    const description = formData.get('description')?.trim();
+    if (description) data.description = description;
+    
+    const website = formData.get('website')?.trim();
+    if (website) data.website = website;
     
     // Status and reason
     const newStatus = formData.get('status');
@@ -961,23 +985,21 @@ function collectEditFormData(form) {
         data.commission = parseFloat(commission);
     }
     
-    // Address object
-    const address = {};
+    // Address fields - map to individual DynamoDB fields instead of nested object
     const street = formData.get('address.street')?.trim();
     const city = formData.get('address.city')?.trim();
     const state = formData.get('address.state')?.trim();
     const zipCode = formData.get('address.zipCode')?.trim();
     const country = formData.get('address.country')?.trim();
+    const district = state; // Use state field as district since that's what DynamoDB expects
     
-    if (street) address.street = street;
-    if (city) address.city = city;
-    if (state) address.state = state;
-    if (zipCode) address.zipCode = zipCode;
-    if (country) address.country = country;
+    if (street) data.street = street;
+    if (city) data.city = city;
+    if (district) data.district = district;
+    if (country) data.country = country;
     
-    if (Object.keys(address).length > 0) {
-        data.address = address;
-    }
+    // Add updatedAt timestamp
+    data.updatedAt = new Date().toISOString();
     
     // Remove empty fields
     Object.keys(data).forEach(key => {
@@ -992,8 +1014,8 @@ function collectEditFormData(form) {
 function validateEditFormData(data) {
     const errors = [];
     
-    // Required fields
-    if (!data.name || data.name.length < 2) {
+    // Required fields - using correct DynamoDB field names
+    if (!data.businessName || data.businessName.length < 2) {
         errors.push('Business name must be at least 2 characters');
     }
     
@@ -1003,15 +1025,14 @@ function validateEditFormData(data) {
         errors.push('Invalid email format');
     }
     
-    if (!data.phone) {
+    if (!data.phoneNumber) {
         errors.push('Phone number is required');
-    } else if (!/^[\+]?[1-9][\d]{0,15}$/.test(data.phone.replace(/[\s\-\(\)]/g, ''))) {
-        errors.push('Invalid phone number format');
     }
+    // Remove strict phone validation as per earlier requirement
     
     // Status change validation
     if (data.statusUpdate) {
-        const validStatuses = ['pending', 'verified', 'under-review', 'rejected', 'suspended'];
+        const validStatuses = ['pending', 'verified', 'under-review', 'rejected', 'suspended', 'approved'];
         if (!validStatuses.includes(data.statusUpdate.newStatus)) {
             errors.push('Invalid status selected');
         }
@@ -1100,6 +1121,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 // Map status to action for the backend API
                 const statusActionMap = {
                     'verified': 'approve',
+                    'approved': 'approve', // Handle both verified and approved status
                     'rejected': 'reject',
                     'suspended': 'suspend', 
                     'under-review': 'review',
@@ -1130,8 +1152,17 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     try {
                         const errorData = await statusResponse.json();
                         errorMessage = errorData.message || errorData.error || `Server error: ${statusResponse.status}`;
+                        console.error('Status update error details:', errorData);
                     } catch (e) {
-                        errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                        console.error('Failed to parse error response:', e);
+                        // Try to get response text if JSON parsing fails
+                        try {
+                            const errorText = await statusResponse.text();
+                            console.error('Error response text:', errorText);
+                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${errorText.substring(0, 200)}`;
+                        } catch (textError) {
+                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                        }
                     }
                     throw new Error(errorMessage);
                 }
@@ -1161,8 +1192,17 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     try {
                         const errorData = await response.json();
                         errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                        console.error('Merchant update error details:', errorData);
                     } catch (e) {
-                        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        console.error('Failed to parse error response:', e);
+                        // Try to get response text if JSON parsing fails
+                        try {
+                            const errorText = await response.text();
+                            console.error('Error response text:', errorText);
+                            errorMessage = `HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 200)}`;
+                        } catch (textError) {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
                     }
                     throw new Error(errorMessage);
                 }
@@ -1191,17 +1231,35 @@ async function submitMerchantUpdate(merchantId, updateData) {
     } catch (error) {
         console.error('API call failed:', error);
         
-        // Provide more specific error messages
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        // Extract meaningful error message
+        let errorMessage = 'Unknown error occurred';
+        
+        if (typeof error === 'string') {
+            errorMessage = error;
+        } else if (error && error.message) {
+            errorMessage = error.message;
+        } else if (error && typeof error === 'object') {
+            // Try to extract error information from response object
+            if (error.status) {
+                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
+            } else {
+                errorMessage = JSON.stringify(error);
+            }
+        }
+        
+        // Provide more specific error messages based on content
+        if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
             return { success: false, error: 'Network error. Please check your connection and try again.' };
-        } else if (error.message.includes('401')) {
+        } else if (errorMessage.includes('401')) {
             return { success: false, error: 'Authentication failed. Please login again.' };
-        } else if (error.message.includes('403')) {
+        } else if (errorMessage.includes('403')) {
             return { success: false, error: 'You do not have permission to edit this merchant.' };
-        } else if (error.message.includes('404')) {
+        } else if (errorMessage.includes('404')) {
             return { success: false, error: 'Merchant not found.' };
+        } else if (errorMessage.includes('500')) {
+            return { success: false, error: 'Server error occurred. Please try again or contact support.' };
         } else {
-            return { success: false, error: error.message };
+            return { success: false, error: errorMessage };
         }
     }
 }
