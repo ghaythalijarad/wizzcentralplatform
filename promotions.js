@@ -109,9 +109,10 @@ async function loadPromotionsData() {
     }
     try {
         const idToken = sessionStorage.getItem('idToken');
-        const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`, {
-            headers: { 'Authorization': idToken }
-        });
+        console.log('🔍 Debug loadPromotionsData:', window.WIZZCENTRAL_CONFIG.API_BASE_URL + '/promotions', 'Authorization:', `Bearer ${idToken}`);
+        const urlLoad = `${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`;
+        const headersLoad = { 'Authorization': `Bearer ${idToken}` };
+        const response = await fetch(urlLoad, { headers: headersLoad });
         const result = await response.json();
         if (!response.ok || !result.success) {
             throw new Error(result.error?.message || 'Failed to load promotions');
@@ -427,12 +428,15 @@ async function handleAddPromotion(e) {
 
     try {
         const idToken = sessionStorage.getItem('idToken');
-        const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`, {
+        console.log('🔍 Debug handleAddPromotion POST:', window.WIZZCENTRAL_CONFIG.API_BASE_URL + '/promotions', 'Payload:', payload, 'Authorization:', `Bearer ${idToken}`);
+        const urlPost = `${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`;
+        const headersPost = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+        };
+        const response = await fetch(urlPost, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': idToken // REMOVED 'Bearer ' prefix
-            },
+            headers: headersPost,
             body: JSON.stringify(payload)
         });
         const result = await response.json();
