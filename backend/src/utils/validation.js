@@ -30,7 +30,7 @@ const merchantSchemas = {
   create: Joi.object({
     name: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
-    phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
+    phone: Joi.string().min(1).required(),
     category: Joi.string().valid('restaurant', 'grocery', 'pharmacy', 'retail', 'electronics', 'clothing', 'beauty', 'books', 'sports', 'home', 'automotive', 'other').required(),
     address: Joi.object({
       street: Joi.string().required(),
@@ -48,19 +48,15 @@ const merchantSchemas = {
       saturday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
       sunday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() })
     }),
-    commission: Joi.number().min(1).max(30).required(),
-    description: Joi.string().max(500),
     website: Joi.string().uri(),
-    socialMedia: Joi.object({
-      facebook: Joi.string().uri(),
-      instagram: Joi.string().uri(),
-      twitter: Joi.string().uri()
-    })
+    commission: Joi.number().min(0).max(100),
+    description: Joi.string().max(500)
   }),
 
   update: Joi.object({
     name: Joi.string().min(2).max(100),
-    phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/),
+    email: Joi.string().email(),
+    phone: Joi.string().min(1),
     category: Joi.string().valid('restaurant', 'grocery', 'pharmacy', 'retail', 'electronics', 'clothing', 'beauty', 'books', 'sports', 'home', 'automotive', 'other'),
     address: Joi.object({
       street: Joi.string(),
@@ -78,14 +74,9 @@ const merchantSchemas = {
       saturday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
       sunday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() })
     }),
-    commission: Joi.number().min(1).max(30),
-    description: Joi.string().max(500),
     website: Joi.string().uri(),
-    socialMedia: Joi.object({
-      facebook: Joi.string().uri(),
-      instagram: Joi.string().uri(),
-      twitter: Joi.string().uri()
-    })
+    commission: Joi.number().min(0).max(100),
+    description: Joi.string().max(500)
   }).min(1),
 
   updateStatus: Joi.object({
@@ -100,7 +91,7 @@ const driverSchemas = {
   create: Joi.object({
     name: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
-    phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
+    phone: Joi.string().min(1).required(),
     licenseNumber: Joi.string().required(),
     vehicleType: Joi.string().valid('bike', 'scooter', 'motorcycle', 'car').required(),
     vehicleModel: Joi.string().required(),
@@ -114,15 +105,14 @@ const driverSchemas = {
     }).required(),
     emergencyContact: Joi.object({
       name: Joi.string().required(),
-      phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
+      phone: Joi.string().min(1).required(),
       relationship: Joi.string().required()
     }).required()
   }),
 
   update: Joi.object({
     name: Joi.string().min(2).max(100),
-    phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/),
-    licenseNumber: Joi.string(),
+    phone: Joi.string().min(1),
     vehicleType: Joi.string().valid('bike', 'scooter', 'motorcycle', 'car'),
     vehicleModel: Joi.string(),
     vehiclePlate: Joi.string(),
@@ -135,10 +125,10 @@ const driverSchemas = {
     }),
     emergencyContact: Joi.object({
       name: Joi.string(),
-      phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/),
+      phone: Joi.string().min(1),
       relationship: Joi.string()
     }),
-    status: Joi.string().valid('online', 'offline', 'delivering', 'suspended')
+    status: Joi.string().valid('active', 'inactive', 'pending', 'approved', 'rejected')
   }).min(1)
 };
 

@@ -57,8 +57,8 @@ class Database {
   }
 
   // Backward compatibility
-  async getById(tableName, id) {
-    return this.get(tableName, 'id', id);
+  async getById(tableName, keyName = 'id', id) {
+    return this.get(tableName, keyName, id);
   }
 
   // Get by userId

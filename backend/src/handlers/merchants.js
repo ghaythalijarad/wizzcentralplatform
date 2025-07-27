@@ -204,7 +204,7 @@ exports.updateMerchant = async (event) => {
     const updates = validation.data;
 
     // Check if merchant exists
-    const existingMerchant = await database.getById(MERCHANTS_TABLE, id);
+    const existingMerchant = await database.getById(MERCHANTS_TABLE, 'businessId', id);
     if (!existingMerchant) {
       return responseHelper.notFound('Merchant not found');
     }
@@ -218,7 +218,7 @@ exports.updateMerchant = async (event) => {
     }
 
     // Update merchant
-    const updatedMerchant = await database.update(MERCHANTS_TABLE, id, updates);
+    const updatedMerchant = await database.update(MERCHANTS_TABLE, 'businessId', id, updates);
 
     return responseHelper.success({
       merchant: updatedMerchant,
