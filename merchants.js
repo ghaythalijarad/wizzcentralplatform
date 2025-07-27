@@ -1,6 +1,9 @@
 // Merchants Management JavaScript - Using Centralized Data Service
 console.log('merchants.js script loaded');
 
+// API Base URL from configuration
+const API_BASE_URL = window.WIZZCENTRAL_CONFIG.API_BASE_URL;
+
 // DynamoDB table name
 const MERCHANTS_TABLE = 'order-receiver-businesses-dev';
 
