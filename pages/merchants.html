@@ -275,36 +275,15 @@
             </div>
         </div>
 
+    </div> <!-- end main-content -->
+
     <!-- AWS SDK and Core Scripts -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
-    <script>
-        console.log('AWS SDK loaded:', typeof AWS !== 'undefined');
-        
-        // Prevent dashboard.js from overriding our functions
-        window.MERCHANTS_PAGE = true;
-        
-        // Override logout function early
-        window.logout = () => {
-            console.log('Logout clicked from merchants page');
-            sessionStorage.clear();
-            localStorage.clear();
-            window.location.href = '../index.html';
-        };
-    </script>
     <script src="/config.js"></script>
-    <script>
-        console.log('Config loaded:', typeof window.WIZZCENTRAL_CONFIG !== 'undefined');
-    </script>
+    <script src="/auth.js"></script>
     <script src="/dashboard.js"></script>
-    <script>
-        console.log('Dashboard script loaded. Allowing its authentication logic to run.');
-    </script>
-    <!-- Load simple merchants fix for table rendering -->
-    <script src="/merchants-simple-fix.js"></script>
-    <script>console.log('Simple merchants fix script loaded');</script>
+    <script src="/merchants.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', onDomReady);</script>
 
-    <p style="padding:1rem; background:#fff3cd; color:#856404; text-align:center;">
-        If you are not redirected automatically, <a href="../index.html">click here</a> to log in.
-    </p>
 </body>
 </html>
