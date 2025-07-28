@@ -10,8 +10,12 @@ const MERCHANTS_TABLE = process.env.MERCHANTS_TABLE;
 // Get all merchants
 exports.getMerchants = async (event) => {
   try {
+    console.log('=== GET MERCHANTS START ===');
+    console.log('Event:', JSON.stringify(event, null, 2));
+    
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
+      console.log('CORS preflight request, returning cors response');
       return responseHelper.cors();
     }
 
@@ -24,26 +28,41 @@ exports.getMerchants = async (event) => {
       lastKey
     } = event.queryStringParameters || {};
 
+    console.log('Query parameters:', { status, category, search, limit, lastKey });
+
     let filters = {};
     if (status) filters.status = status;
     if (category) filters.category = category;
 
+    console.log('Applied filters:', filters);
+    console.log('Scanning table:', MERCHANTS_TABLE);
+
     // Get merchants from database
-    let merchants = await database.scan(MERCHANTS_TABLE, filters);
+    const rawMerchants = await database.scan(MERCHANTS_TABLE, filters);
+    // Normalize DynamoDB items to API schema
+    let merchants = rawMerchants.map(item => ({
+      businessId: item.businessId,
+      businessName: item.businessName,
+      email: item.email,
+      status: item.status,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt
+      // ...include other fields as needed...
+    }));
 
     // Apply search filter if provided
     if (search) {
       const searchLower = search.toLowerCase();
-      merchants = merchants.filter(merchant =>
-        merchant.name.toLowerCase().includes(searchLower) ||
-        merchant.email.toLowerCase().includes(searchLower) ||
-        merchant.id.toLowerCase().includes(searchLower)
+      merchants = merchants.filter(m =>
+        m.businessName.toLowerCase().includes(searchLower) ||
+        m.email.toLowerCase().includes(searchLower) ||
+        m.businessId.toLowerCase().includes(searchLower)
       );
     }
 
     // Sort by creation date (newest first)
     merchants.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+    
     // Apply pagination if needed
     let paginatedMerchants = merchants;
     if (limit) {
@@ -69,6 +88,7 @@ exports.getMerchants = async (event) => {
 
   } catch (error) {
     console.error('Get merchants error:', error);
+    console.error('Error stack:', error.stack);
     return responseHelper.serverError('Failed to get merchants');
   }
 };
