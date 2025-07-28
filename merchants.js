@@ -928,12 +928,19 @@ async function handleEditFormSubmission(event) {
                 }
             }, 1500);
         } else {
-            showEditFormMessage(`Update failed: ${result.error}`, 'error');
+            // Ensure error is a string
+            const errorMsg = typeof result.error === 'string' ? result.error : 
+                           result.error?.message || 
+                           JSON.stringify(result.error) || 
+                           'Unknown error occurred';
+            showEditFormMessage(`Update failed: ${errorMsg}`, 'error');
         }
         
     } catch (error) {
         console.error('Error updating merchant:', error);
-        showEditFormMessage(`Update failed: ${error.message}`, 'error');
+        // Ensure error message is a string
+        const errorMsg = error?.message || error?.toString() || 'Unknown error occurred';
+        showEditFormMessage(`Update failed: ${errorMsg}`, 'error');
     } finally {
         // Re-enable submit button
         saveBtn.disabled = false;
@@ -1063,10 +1070,12 @@ async function submitMerchantUpdate(merchantId, updateData) {
         console.log('Submitting merchant update:', { merchantId, updateData });
         console.log('API_BASE_URL resolved to:', API_BASE_URL);
         
-        // Check if we're in a development environment
+        // Check if we're in a development environment - but allow real API calls if tokens are available
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const hasAuthToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
         
-        if (isDevelopment) {
+        // Use simulation only if in development AND no auth token is available
+        if (isDevelopment && !hasAuthToken) {
             // In development, simulate the API call and update local data
             console.log('Development mode: Simulating API call');
             await new Promise(resolve => setTimeout(resolve, 1000));
