@@ -133,8 +133,8 @@ const onDomReady = async function() {
         } else {
             console.log('⚠️ API returned no merchants.');
             document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
-            updateDataSourceIndicator('empty', 'No merchants found');
-            showMessage('No merchants found via API.', 'info');
+            updateDataSourceIndicator('empty', 'No merchants to display');
+            showMessage('No merchants to display.', 'info');
         }
 
     } catch (error) {
@@ -170,21 +170,6 @@ async function fetchMerchantsFromApi() {
     filteredMerchants = [...merchantsData];
 }
 
-// Helper function to show sample data with a clear message
-function showSampleDataWithMessage(reason) {
-    console.log('Loading sample data as fallback...');
-    merchantsData = getSampleMerchantsData();
-    filteredMerchants = [...merchantsData];
-    
-    renderMerchantsTable();
-    updateMerchantStats();
-    setupEventListeners();
-    
-    // Show clear message about why we're showing sample data
-    showMessage(`Showing sample data: ${reason}`, 'warning');
-    console.log('Sample data loaded and rendered as fallback');
-}
-
 // Helper function to update the data source indicator
 function updateDataSourceIndicator(status, message) {
     const indicator = document.getElementById('dataSourceIndicator');
@@ -205,6 +190,7 @@ function updateDataSourceIndicator(status, message) {
                 if (loginBtn) loginBtn.style.display = 'inline-block';
                 if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
                 break;
+            case 'api':
             case 'database':
                 authIndicator.textContent = 'Real Data';
                 authIndicator.style.backgroundColor = '#28a745';
@@ -212,13 +198,19 @@ function updateDataSourceIndicator(status, message) {
                 if (loginBtn) loginBtn.style.display = 'none';
                 if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
                 break;
-            case 'error':
             case 'empty':
-                authIndicator.textContent = 'Sample Data';
+                authIndicator.textContent = 'No Data';
                 authIndicator.style.backgroundColor = '#6c757d';
                 authIndicator.style.color = '#fff';
                 if (loginBtn) loginBtn.style.display = 'none';
-                if (loadRealDataBtn) loadRealDataBtn.style.display = 'inline-block';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
+                break;
+            case 'error':
+                authIndicator.textContent = 'Error';
+                authIndicator.style.backgroundColor = '#dc3545';
+                authIndicator.style.color = '#fff';
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
                 break;
             default:
                 authIndicator.textContent = 'Checking...';
@@ -229,24 +221,6 @@ function updateDataSourceIndicator(status, message) {
         }
     }
 }
-
-// Function to force load real data (for the button)
-function forceLoadRealData() {
-    const idToken = sessionStorage.getItem('idToken');
-    const accessToken = sessionStorage.getItem('accessToken');
-    
-    if (!idToken && !accessToken) {
-        alert('You need to log in first to access real data. Redirecting to login page...');
-        window.location.href = '../index.html';
-        return;
-    }
-    
-    // Force reload the page to retry loading real data
-    location.reload();
-}
-
-// Export the forceLoadRealData function to global scope for the button
-window.forceLoadRealData = forceLoadRealData;
 
 // Function to refresh merchants data (for refresh button)
 async function refreshMerchantsData() {
@@ -266,28 +240,24 @@ async function refreshMerchantsData() {
             showMessage(`Refreshed: Loaded ${merchantsData.length} merchants from database`, 'success');
             setTimeout(() => hideMessage(), 3000);
         } else {
-            if (isLocal) {
-                const tableBody = document.getElementById('merchantsTableBody');
-                if(tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">Database is empty. No merchants found.</td></tr>';
-                updateDataSourceIndicator('empty', 'Database is empty');
-                showMessage('The database is empty. No merchants to display.', 'info');
-            } else {
-                updateDataSourceIndicator('empty', 'Database is empty - showing sample data');
-                showSampleDataWithMessage('Database is empty after refresh.');
-            }
+            const tableBody = document.getElementById('merchantsTableBody');
+            if (tableBody) tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">No merchants to display.</td></tr>';
+            updateDataSourceIndicator('empty', 'No merchants to display');
+            showMessage('No merchants to display.', 'info');
         }
     } catch (error) {
         console.error('Refresh failed:', error);
         if (isLocal) {
             const errorMessage = `Failed to refresh data: ${error.message}. Check console for details.`;
             const tableBody = document.getElementById('merchantsTableBody');
-            if(tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">${errorMessage}</td></tr>`;
+            if(tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50">${errorMessage}</td></tr>`;
             updateDataSourceIndicator('error', `Refresh Error: ${error.message}`);
             showMessage(errorMessage, 'error');
         } else {
-            updateDataSourceIndicator('error', `Refresh failed - showing sample data (${error.message})`);
-            showMessage(`Refresh failed: ${error.message}`, 'error');
-            showSampleDataWithMessage(`Refresh failed: ${error.message}`);
+            const tableBody = document.getElementById('merchantsTableBody');
+            if (tableBody) tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50">Failed to refresh data: ${error.message}</td></tr>`;
+            updateDataSourceIndicator('error', `Refresh failed: ${error.message}`);
+            showMessage(`Failed to refresh data: ${error.message}`, 'error');
         }
     } finally {
         showLoader(false);
@@ -505,76 +475,6 @@ function generateAvatarUrl(name) {
     if (!name) return 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=40&h=40&fit=crop&crop=center';
     const encodedName = encodeURIComponent(name);
     return `https://ui-avatars.com/api/?name=${encodedName}&size=40&background=random&color=fff`;
-}
-
-// Get sample merchants data (fallback)
-function getSampleMerchantsData() {
-    return [
-        {
-            id: 'biz-001',
-            name: 'Pizza Palace Downtown',
-            email: 'contact@pizzapalace.com',
-            phone: '+1-555-0123',
-            category: 'Restaurant',
-            status: 'approved',
-            commission: 15,
-            ordersToday: 42,
-            revenueToday: 1250.50,
-            rating: 4.8,
-            joinDate: '2024-01-15',
-            avatar: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=40&h=40&fit=crop&crop=center',
-            address: '123 Main St, Downtown',
-            owner: 'John Smith'
-        },
-        {
-            id: 'biz-002',
-            name: 'Fresh Market Express',
-            email: 'info@freshmarket.com',
-            phone: '+1-555-0124',
-            category: 'Grocery',
-            status: 'pending',
-            commission: 8,
-            ordersToday: 0,
-            revenueToday: 0,
-            rating: null,
-            joinDate: '2024-07-20',
-            avatar: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=40&h=40&fit=crop&crop=center',
-            address: '456 Oak Avenue',
-            owner: 'Sarah Johnson'
-        },
-        {
-            id: 'biz-003',
-            name: 'Coffee Corner Cafe',
-            email: 'hello@coffeecorner.com',
-            phone: '+1-555-0125',
-            category: 'Restaurant',
-            status: 'under_review',
-            commission: 18,
-            ordersToday: 0,
-            revenueToday: 0,
-            rating: null,
-            joinDate: '2024-07-22',
-            avatar: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=40&h=40&fit=crop&crop=center',
-            address: '789 Pine Street',
-            owner: 'Mike Wilson'
-        },
-        {
-            id: 'biz-004',
-            name: 'Quick Pharmacy Plus',
-            email: 'support@quickpharmacy.com',
-            phone: '+1-555-0126',
-            category: 'Pharmacy',
-            status: 'rejected',
-            commission: 12,
-            ordersToday: 0,
-            revenueToday: 0,
-            rating: 3.2,
-            joinDate: '2024-05-10',
-            avatar: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=40&h=40&fit=crop&crop=center',
-            address: '321 Health Avenue',
-            owner: 'Dr. Emily Chen'
-        }
-    ];
 }
 
 // Helper to display messages in the UI
@@ -1037,7 +937,7 @@ function validateEditFormData(data) {
     
     // Status change validation
     if (data.statusUpdate) {
-        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];w', 'rejected'];
+        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];
         if (!validStatuses.includes(data.statusUpdate.newStatus)) {
             errors.push('Invalid status selected');
         }
@@ -1133,27 +1033,23 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 };
                 
                 const action = statusActionMap[updateData.statusUpdate.newStatus];
-                if (!action) {dStatus = updateData.statusUpdate.newStatus;
-                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);replace(/_/g, '-')];
-                }f (!action) {
-                    throw new Error(`Invalid status change: ${requestedStatus}`);
+                if (!action) {
+                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
+                }
                 const requestBody = {
                     action: action,
                     reason: updateData.statusUpdate.reason,
                     sendEmail: true
-                };  reason: updateData.statusUpdate.reason,
-                    sendEmail: true
+                };
                 console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
                 console.log('Status update request body:', requestBody);
-                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));tus`);
-                console.log('Access token (first 20 chars):', accessToken ? accessToken.substring(0, 20) + '...' : 'None');
                 console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
-                const statusUpdateUrl = `${API_BASE_URL}/merchants/${merchantId}/status`;0) + '...' : 'None');
+                const statusUpdateUrl = `${API_BASE_URL}/merchants/${merchantId}/status`;
                 const statusUpdatePayload = requestBody;
-                sponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
                 try {
                     // Make the API call to update status
-                    const statusUpdateResult = await apiCall(statusUpdateUrl, 'PATCH', statusUpdatePayload, accessToken);/json',
+                    const statusUpdateResult = await apiCall(statusUpdateUrl, 'PATCH', statusUpdatePayload, accessToken);
                     console.log('Status update API call successful:', statusUpdateResult);  'Authorization': `Bearer ${accessToken}`,
 
                     // The backend returns { success: true, merchant: updatedMerchant } },

@@ -1,60 +1,24 @@
 // Orders Management JavaScript
 console.log('orders.js script loaded');
+// Ensure user is authenticated
+Auth.requireAuthentication();
 
-// Global logout function
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html';
-    }
+// Global logout using Auth utility
+window.logout = () => {
+    Auth.clearTokens();
+    window.location.href = 'index.html';
 };
-
-// Check authentication on page load
-function checkAuthentication() {
-    const idToken = sessionStorage.getItem('idToken');
-    const accessToken = sessionStorage.getItem('accessToken');
-    
-    if (!idToken || !accessToken) {
-        console.warn('No authentication tokens found, redirecting to login');
-        window.location.href = 'index.html';
-        return false;
-    }
-    
-    // Validate token expiration
-    if (idToken) {
-        try {
-            const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-            const currentTime = Math.floor(Date.now() / 1000);
-            
-            if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-                console.warn('Authentication token has expired. Redirecting to login.');
-                sessionStorage.clear();
-                window.location.href = 'index.html';
-                return false;
-            }
-        } catch (error) {
-            console.error('Invalid token format. Redirecting to login.');
-            sessionStorage.clear();
-            window.location.href = 'index.html';
-            return false;
-        }
-    }
-    
-    console.log('Authentication tokens found, proceeding with authenticated access');
-    return true;
-}
 
 // AWS and table config
 let dynamoDB = null;
-const ORDERS_TABLE = 'order-receiver-orders-dev';
+const ORDERS_TABLE = window.WIZZCENTRAL_CONFIG.TABLES.ORDERS;
 const AWS_REGION = 'us-east-1';
+
+// Normalize status keys (convert hyphens to underscores)
+function normalizeStatus(status) {
+    if (typeof status !== 'string') return 'unknown';
+    return status.replace(/-/g, '_');
+}
 
 // Status mapping
 const ORDER_STATUSES = {
@@ -76,10 +40,7 @@ let filteredOrders = [];
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Orders page DOM loaded');
-    if (typeof initializeDashboard === 'function') {
-        initializeDashboard();
-    }
-    if (!checkAuthentication()) return;
+    if (typeof initializeDashboard === 'function') initializeDashboard();
     showLoader(true, 'Loading orders...');
     try {
         await initializeAWS();
@@ -89,6 +50,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage(`Error loading orders: ${err.message}`, 'error');
     } finally {
         showLoader(false);
+        // Attach refresh button handler
+        const refreshBtn = document.getElementById('refreshOrdersBtn');
+        if (refreshBtn) refreshBtn.addEventListener('click', () => {
+            showLoader(true, 'Refreshing orders...');
+            refreshOrdersData();
+        });
     }
 });
 
@@ -122,8 +89,8 @@ async function initializeOrdersManagement() {
         hideMessage();
     } catch (error) {
         console.error('Error loading orders:', error);
-        showMessage(`Error: ${error.message}. Showing sample data.`, 'error');
-        ordersData = getSampleOrdersData();
+        showMessage(`Error loading orders: ${error.message}`, 'error');
+        ordersData = [];
     } finally {
         filteredOrders = [...ordersData];
         initializeUI();
@@ -150,15 +117,6 @@ async function loadOrdersFromDynamoDB() {
     console.log(`Loaded ${ordersData.length} orders`);
 }
 
-// Sample fallback
-function getSampleOrdersData() {
-    return [
-        {orderId:'ORD1001',customerId:'CUST001',merchantId:'MER001',driverId:'DRV001',status:'pending',total:'$45.99',date:'7/24/2025'},
-        {orderId:'ORD1002',customerId:'CUST002',merchantId:'MER002',driverId:'DRV002',status:'out_for_delivery',total:'$120.00',date:'7/25/2025'},
-        {orderId:'ORD1003',customerId:'CUST003',merchantId:'MER001',driverId:'DRV003',status:'delivered',total:'$89.50',date:'7/23/2025'}
-    ];
-}
-
 // UI and events
 function initializeUI() { renderOrdersTable(); }
 function setupEventListeners() {
@@ -173,26 +131,47 @@ function renderOrdersTable() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:#666;"><i class="fas fa-shopping-bag" style="font-size:3rem; color:#ccc;"></i><div>No orders found</div></td></tr>`;
         return;
     }
-    tbody.innerHTML = filteredOrders.map(o => `
+    tbody.innerHTML = filteredOrders.map(o => {
+        const key = normalizeStatus(o.status);
+        const info = ORDER_STATUSES[key] || ORDER_STATUSES['unknown'];
+        return `
         <tr>
             <td>${o.orderId}</td>
             <td>${o.customerId}</td>
             <td>${o.merchantId}</td>
             <td>${o.driverId}</td>
-            <td><span class="status-badge ${ORDER_STATUSES[o.status]?.class||'unknown'}">${ORDER_STATUSES[o.status]?.label||'Unknown'}</span></td>
+            <td><span class="status-badge ${info.class}">${info.label}</span></td>
             <td>${o.total}</td>
             <td>${o.date}</td>
             <td>
                 <button class="btn-action" onclick="viewOrder('${o.orderId}')"><i class="fas fa-eye"></i></button>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
-// View details
+// Open order details modal
 function viewOrder(id) {
-    const o = ordersData.find(x=>x.orderId===id);
+    const o = ordersData.find(x => x.orderId === id);
     if (!o) return;
-    alert(`Order ${o.orderId}\nStatus: ${ORDER_STATUSES[o.status]?.label}\nTotal: ${o.total}`);
+    const body = document.getElementById('orderDetailsBody');
+    if (body) {
+        const key = normalizeStatus(o.status);
+        const info = ORDER_STATUSES[key] || ORDER_STATUSES['unknown'];
+        body.innerHTML = `
+            <p><strong>Order ID:</strong> ${o.orderId}</p>
+            <p><strong>Status:</strong> ${info.label}</p>
+            <p><strong>Total:</strong> ${o.total}</p>
+            <p><strong>Date:</strong> ${o.date}</p>
+        `;
+        document.getElementById('orderDetailsModal').style.display = 'flex';
+    }
+}
+
+// Close the order details modal
+function closeOrderModal() {
+    const modal = document.getElementById('orderDetailsModal');
+    if (modal) modal.style.display = 'none';
 }
 
 // Refresh data
@@ -203,11 +182,22 @@ async function refreshOrdersData() {
     finally{ showLoader(false); }
 }
 
+// Show/hide loader using shared loader elements
+function showLoader(show, message = 'Loading...') {
+    const loader = document.getElementById('loader');
+    const loaderMessage = document.getElementById('loader-message');
+    if (loader) {
+        loader.style.display = show ? 'flex' : 'none';
+        if (show && loaderMessage) {
+            loaderMessage.textContent = message;
+        }
+    }
+}
+
 // Helpers
 function showMessage(msg,type='info'){
     const el=document.getElementById('orders-table-status');
     if(el){ el.textContent=msg; el.className=`table-status-info table-status-${type}`; el.style.display='block'; }
 }
 function hideMessage(){ const el=document.getElementById('orders-table-status'); if(el) el.style.display='none'; }
-function showLoader(show,msg='Loading...'){ let loader=document.getElementById('loader-overlay'); /* reuse from merchants.js */ }
 function formatDate(iso){ return iso?new Date(iso).toLocaleDateString():'N/A'; }

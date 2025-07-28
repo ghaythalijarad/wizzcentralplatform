@@ -31,6 +31,13 @@ window.WIZZCENTRAL_CONFIG = {
         SUCCESS_COLOR: '#28a745',
         WARNING_COLOR: '#ffc107',
         DANGER_COLOR: '#dc3545'
+    },
+    // DynamoDB table names
+    TABLES: {
+        MERCHANTS: 'order-receiver-businesses-dev',
+        ORDERS: 'order-receiver-orders-dev',
+        DRIVERS: 'order-receiver-drivers-dev',
+        CUSTOMERS: 'order-receiver-customers-dev'
     }
 };
 
