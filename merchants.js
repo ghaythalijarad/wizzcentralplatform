@@ -779,42 +779,54 @@ function editMerchant(merchantId) {
 }
 
 function populateEditForm(merchant) {
-    // Basic information
-    document.getElementById('editBusinessName').value = merchant.name || '';
-    document.getElementById('editOwnerName').value = merchant.owner || '';
+    // Basic information - map to correct DynamoDB field names
+    document.getElementById('editBusinessName').value = merchant.businessName || merchant.name || '';
+    document.getElementById('editOwnerName').value = merchant.ownerName || merchant.owner || '';
     document.getElementById('editEmail').value = merchant.email || '';
-    document.getElementById('editPhone').value = merchant.phone || '';
+    document.getElementById('editPhoneNumber').value = merchant.phoneNumber || merchant.phone || '';
     
-    // Category, commission, and status
-    document.getElementById('editCategory').value = merchant.category?.toLowerCase() || 'other';
-    document.getElementById('editCommission').value = merchant.commission || '';
+    // Business type and status - use exact DynamoDB values
+    document.getElementById('editBusinessType').value = merchant.businessType?.toLowerCase() || 'restaurant';
     document.getElementById('editStatus').value = merchant.status || 'pending';
     
     // Store original status for comparison
     document.getElementById('editMerchantForm').setAttribute('data-original-status', merchant.status || 'pending');
     
-    // Address - handle both string and object formats
-    let address = {};
-    if (typeof merchant.address === 'string') {
+    // Address fields - handle both the nested address object and individual fields
+    let street = '', city = '', district = '', country = 'Iraq';
+    
+    // First try individual fields
+    if (merchant.street) street = merchant.street;
+    if (merchant.city) city = merchant.city;
+    if (merchant.district) district = merchant.district;
+    if (merchant.country) country = merchant.country;
+    
+    // If no individual fields, try parsing the address object
+    if (!street && !city && merchant.address) {
         try {
-            address = JSON.parse(merchant.address);
+            if (typeof merchant.address === 'string') {
+                const addressObj = JSON.parse(merchant.address);
+                if (addressObj.street && addressObj.street.S) street = addressObj.street.S;
+                if (addressObj.city && addressObj.city.S) city = addressObj.city.S;
+                if (addressObj.district && addressObj.district.S) district = addressObj.district.S;
+                if (addressObj.country && addressObj.country.S) country = addressObj.country.S;
+            } else if (typeof merchant.address === 'object') {
+                street = merchant.address.street || '';
+                city = merchant.address.city || '';
+                district = merchant.address.district || merchant.address.state || '';
+                country = merchant.address.country || 'Iraq';
+            }
         } catch (e) {
-            // If it's not JSON, treat as a simple string
-            address = { street: merchant.address };
+            console.warn('Failed to parse address:', e);
+            // If parsing fails, treat address as a simple string for the street field
+            street = merchant.address;
         }
-    } else if (typeof merchant.address === 'object' && merchant.address !== null) {
-        address = merchant.address;
     }
     
-    document.getElementById('editStreet').value = address.street || '';
-    document.getElementById('editCity').value = address.city || '';
-    document.getElementById('editState').value = address.state || '';
-    document.getElementById('editZipCode').value = address.zipCode || '';
-    document.getElementById('editCountry').value = address.country || 'US';
-    
-    // Additional fields
-    document.getElementById('editDescription').value = merchant.description || '';
-    document.getElementById('editWebsite').value = merchant.website || '';
+    document.getElementById('editStreet').value = street;
+    document.getElementById('editCity').value = city;
+    document.getElementById('editDistrict').value = district;
+    document.getElementById('editCountry').value = country;
     
     // Set up status change monitoring
     setupStatusChangeHandler();
@@ -933,8 +945,8 @@ function collectEditFormData(form) {
     const formData = new FormData(form);
     const data = {};
     
-    // Map form fields to DynamoDB field names
-    const businessName = formData.get('name')?.trim();
+    // Map form fields to exact DynamoDB field names
+    const businessName = formData.get('businessName')?.trim();
     if (businessName) data.businessName = businessName;
     
     const ownerName = formData.get('ownerName')?.trim();
@@ -943,28 +955,11 @@ function collectEditFormData(form) {
     const email = formData.get('email')?.trim();
     if (email) data.email = email;
     
-    const phoneNumber = formData.get('phone')?.trim();
+    const phoneNumber = formData.get('phoneNumber')?.trim();
     if (phoneNumber) data.phoneNumber = phoneNumber;
     
-    const businessType = formData.get('category');
-    if (businessType && businessType !== 'other') {
-        // Map display categories back to database values
-        const typeMap = {
-            'restaurant': 'restaurant',
-            'grocery store': 'store',
-            'cafe': 'cafe',
-            'cloud kitchen': 'cloudkitchen',
-            'pharmacy': 'pharmacy',
-            'retail': 'retail'
-        };
-        data.businessType = typeMap[businessType.toLowerCase()] || businessType;
-    }
-    
-    const description = formData.get('description')?.trim();
-    if (description) data.description = description;
-    
-    const website = formData.get('website')?.trim();
-    if (website) data.website = website;
+    const businessType = formData.get('businessType');
+    if (businessType) data.businessType = businessType;
     
     // Status and reason
     const newStatus = formData.get('status');
@@ -979,24 +974,28 @@ function collectEditFormData(form) {
         };
     }
     
-    // Commission (convert to number)
-    const commission = formData.get('commission');
-    if (commission && commission.trim()) {
-        data.commission = parseFloat(commission);
-    }
-    
-    // Address fields - map to individual DynamoDB fields instead of nested object
-    const street = formData.get('address.street')?.trim();
-    const city = formData.get('address.city')?.trim();
-    const state = formData.get('address.state')?.trim();
-    const zipCode = formData.get('address.zipCode')?.trim();
-    const country = formData.get('address.country')?.trim();
-    const district = state; // Use state field as district since that's what DynamoDB expects
+    // Address fields - store as individual fields (matching DynamoDB schema)
+    const street = formData.get('street')?.trim();
+    const city = formData.get('city')?.trim();
+    const district = formData.get('district')?.trim();
+    const country = formData.get('country')?.trim();
     
     if (street) data.street = street;
     if (city) data.city = city;
     if (district) data.district = district;
     if (country) data.country = country;
+    
+    // Also create the nested address object for compatibility (some APIs might expect this)
+    const addressParts = { street, city, district, country };
+    const hasAddressData = Object.values(addressParts).some(value => value);
+    if (hasAddressData) {
+        data.address = JSON.stringify({
+            street: { S: street || '' },
+            city: { S: city || '' },
+            district: { S: district || '' },
+            country: { S: country || 'Iraq' }
+        });
+    }
     
     // Add updatedAt timestamp
     data.updatedAt = new Date().toISOString();
@@ -1028,11 +1027,10 @@ function validateEditFormData(data) {
     if (!data.phoneNumber) {
         errors.push('Phone number is required');
     }
-    // Remove strict phone validation as per earlier requirement
     
     // Status change validation
     if (data.statusUpdate) {
-        const validStatuses = ['pending', 'verified', 'under-review', 'rejected', 'suspended', 'approved'];
+        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];
         if (!validStatuses.includes(data.statusUpdate.newStatus)) {
             errors.push('Invalid status selected');
         }
@@ -1046,17 +1044,12 @@ function validateEditFormData(data) {
         }
     }
     
-    // Optional field validations
-    if (data.website && !/^https?:\/\/.+/.test(data.website)) {
-        errors.push('Website must be a valid URL starting with http:// or https://');
-    }
-    
-    if (data.commission !== undefined && (data.commission < 1 || data.commission > 30)) {
-        errors.push('Commission must be between 1% and 30%');
-    }
-    
-    if (data.description && data.description.length > 500) {
-        errors.push('Description must be less than 500 characters');
+    // Business type validation
+    if (data.businessType) {
+        const validTypes = ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'];
+        if (!validTypes.includes(data.businessType)) {
+            errors.push('Invalid business type selected');
+        }
     }
     
     return {
@@ -1377,9 +1370,8 @@ function handleFormFieldValidation() {
     const fields = {
         editBusinessName: (value) => value && value.length >= 2,
         editEmail: (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-        editPhone: (value) => value && /^[\+]?[1-9][\d]{0,15}$/.test(value.replace(/[\s\-\(\)]/g, '')),
-        editWebsite: (value) => !value || /^https?:\/\/.+/.test(value),
-        editCommission: (value) => !value || (parseFloat(value) >= 1 && parseFloat(value) <= 30)
+        editPhoneNumber: (value) => value && value.length >= 5, // Basic phone validation
+        editBusinessType: (value) => value && ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'].includes(value)
     };
     
     Object.keys(fields).forEach(fieldId => {
