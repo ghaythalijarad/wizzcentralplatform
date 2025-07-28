@@ -265,6 +265,7 @@ async function refreshMerchantsData() {
 
 // Export for global access
 window.refreshMerchantsData = refreshMerchantsData;
+window.onDomReady = onDomReady;
 
 // Initialize AWS SDK credentials and DynamoDB client for merchants
 async function initializeAWS() {
@@ -275,6 +276,9 @@ async function initializeAWS() {
         }
 
         console.log('Fetching amplify_outputs.json from root...');
+        const resp = await fetch('/amplify_outputs.json');
+        if (!resp.ok) {
+            throw new Error(`Failed to fetch amplify_outputs.json: ${resp.status}`);
         }
         const outputs = await resp.json();
         console.log('Successfully loaded amplify_outputs.json');
@@ -1222,3 +1226,50 @@ function getActionFromStatus(status) {
     };
     return statusActionMap[status] || 'review'; // Default to review if status isn't recognized
 }
+
+// Modal utility functions
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = 'auto'; // Restore scroll
+    }
+}
+
+function showEditFormMessage(message, type = 'info') {
+    const messageContainer = document.getElementById('editFormMessages');
+    if (messageContainer) {
+        messageContainer.innerHTML = `
+            <div class="alert alert-${type}" style="
+                padding: 0.75rem 1rem;
+                border-radius: 6px;
+                margin-bottom: 1rem;
+                border: 1px solid;
+                ${type === 'error' ? 'background-color: #fef2f2; border-color: #fecaca; color: #dc2626;' : ''}
+                ${type === 'success' ? 'background-color: #f0fdf4; border-color: #bbf7d0; color: #16a34a;' : ''}
+                ${type === 'info' ? 'background-color: #eff6ff; border-color: #bfdbfe; color: #2563eb;' : ''}
+            ">
+                ${message}
+            </div>
+        `;
+        messageContainer.style.display = 'block';
+        
+        // Auto-hide success messages after 3 seconds
+        if (type === 'success') {
+            setTimeout(() => hideEditFormMessage(), 3000);
+        }
+    }
+}
+
+function hideEditFormMessage() {
+    const messageContainer = document.getElementById('editFormMessages');
+    if (messageContainer) {
+        messageContainer.style.display = 'none';
+        messageContainer.innerHTML = '';
+    }
+}
+
+// Export modal functions for global access
+window.closeModal = closeModal;
+window.showEditFormMessage = showEditFormMessage;
+window.hideEditFormMessage = hideEditFormMessage;
