@@ -1020,229 +1020,205 @@ async function submitMerchantUpdate(merchantId, updateData) {
             if (updateData.statusUpdate) {
                 console.log('Submitting status update:', updateData.statusUpdate);
                 
-                // Map status to action for the backend API
-                const statusActionMap = {
-                    'verified': 'approve',
-                    'approved': 'approve',
-                    'rejected': 'reject',
-                    'suspended': 'suspend', 
-                    'under-review': 'review',
-                    'under_review': 'review', // handle underscore variant
-                    'pending': 'reactivate' 
-                };
-                
-                const action = statusActionMap[updateData.statusUpdate.newStatus];
+                // Get proper action from status
+                const action = getActionFromStatus(updateData.statusUpdate.newStatus);
                 if (!action) {
                     throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
                 }
+                
+                // Prepare the request body for status update
                 const requestBody = {
                     action: action,
                     reason: updateData.statusUpdate.reason,
                     sendEmail: true
                 };
+                
+                // Log request details for debugging
                 console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
-                console.log('Status update request body:', requestBody);
-                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
-                const statusUpdateUrl = `${API_BASE_URL}/merchants/${merchantId}/status`;
-                const statusUpdatePayload = requestBody;
-                response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
-                try {
-                    // Make the API call to update status
-                    const statusUpdateResult = await apiCall(statusUpdateUrl, 'PATCH', statusUpdatePayload, accessToken);
-                    console.log('Status update API call successful:', statusUpdateResult);  'Authorization': `Bearer ${accessToken}`,
-
-                    // The backend returns { success: true, merchant: updatedMerchant } },
-                    // We need to handle this structure.    body: JSON.stringify(requestBody)
-                    if (statusUpdateResult && statusUpdateResult.success && statusUpdateResult.merchant) {
-                        updateData.statusUpdate = statusUpdateResult.merchant; // Use the returned merchant data
-                    } else if (statusUpdateResult && statusUpdateResult.success) {
-                        // If merchant object is not returned, we can try to refetch or use existing datarrorMessage = 'Status update failed';
-                        console.warn('Status update successful, but no merchant data returned. UI might not reflect latest changes immediately.');
-                        // As a fallback, we can merge the submitted changes into the local data
-                        const updatedMerchantLocally = { ...merchant, ...statusUpdatePayload };const responseText = await statusResponse.text();
-                        updateData.statusUpdate = updatedMerchantLocally;r response text:', responseText);
-                    } else {
-                        // This case might happen if the response is not what we expect, even on success.
-                        console.log('Status update response was not in the expected format, but assuming success based on HTTP status.');
-                        updateData.statusUpdate = { ...merchant, ...statusUpdatePayload };
+                console.log('Status update request body:', JSON.stringify(requestBody, null, 2));
+                console.log('Request method:', 'PATCH');
+                
+                // Make status update request - MUST use PATCH method and the /status endpoint
+                const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                // Handle response for status update
+                if (!statusResponse.ok) {
+                    let errorMessage = 'Status update failed';
+                    try {
+                        const errorDetails = await statusResponse.json();
+                        if (errorDetails.error && typeof errorDetails.error === 'object') {
+                            errorMessage = errorDetails.error.message || errorDetails.error.error || `Server error: ${statusResponse.status}`;
+                        } else {
+                            errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                        }
+                        console.error('Status update error details:', errorDetails);
+                    } catch (e) {
+                        console.error('Failed to parse error response:', e);
+                        try {
+                            const responseText = await statusResponse.text();
+                            console.error('Error response text:', responseText);
+                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
+                        } catch (textError) {
+                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                        }
                     }
-                } catch (error) {rDetails.error && typeof errorDetails.error === 'object') {
-                    console.error('Status update API call failed:', error);nse.status}`;
-                    throw new Error(`Failed to update status: ${error.message}`); else {
-                }    errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                    
+                    if (typeof errorMessage !== 'string') {
+                        errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
+                    }
+                    
+                    console.log('About to throw error with message:', errorMessage);
+                    throw new Error(errorMessage);
+                }
+                
+                console.log('Status update successful');
+                
+                // Try to parse the response for status update
+                let statusUpdateResult;
+                try {
+                    statusUpdateResult = await statusResponse.json();
+                    console.log('Status update response:', statusUpdateResult);
+                } catch (e) {
+                    console.warn('Could not parse status update response as JSON:', e);
+                }
             }
             
-            // Remove statusUpdate from regular update data
-            const { statusUpdate, ...regularUpdateData } = updateData;f (typeof errorMessage !== 'string') {
-            errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
+            // Remove statusUpdate and the base status field from regular update data
+            const { statusUpdate, status, ...regularUpdateData } = updateData;
+            
             // If there are other fields to update, make a separate call
-            if (Object.keys(regularUpdateData).length > 0) { else {
-                console.log('Submitting regular merchant update:', regularUpdateData);xt} - ${responseText.substring(0, 200)}`;
+            if (Object.keys(regularUpdateData).length > 0) {
+                console.log('Submitting regular merchant update:', regularUpdateData);
+                console.log('Regular update request URL:', `${API_BASE_URL}/merchants/${merchantId}`);
+                console.log('Request method:', 'PUT');
                 
-                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {etails || responseText);
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
                     method: 'PUT',
-                    headers: {   console.error('Failed to parse error response:', e);
-                        'Content-Type': 'application/json',    errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                    headers: {
+                        'Content-Type': 'application/json',
                         'Authorization': `Bearer ${accessToken}`,
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify(regularUpdateData)
-                });   console.error('Error message is not a string:', typeof errorMessage, errorMessage);
-                    errorMessage = 'Failed to update merchant status - server error';
+                });
+                
                 if (!response.ok) {
                     let errorMessage = 'Update failed';
-                    try {   console.log('About to throw error with message:', errorMessage);
-                        const errorData = await response.json();    throw new Error(errorMessage);
+                    try {
+                        const errorData = await response.json();
                         // Handle nested error structure from API response
-                        if (errorData.error && typeof errorData.error === 'object') {   
-                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;    console.log('Status update successful');
+                        if (errorData.error && typeof errorData.error === 'object') {
+                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;
                         } else {
                             errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
-                        }// Remove statusUpdate from regular update data
+                        }
                         console.error('Merchant update error details:', errorData);
                     } catch (e) {
                         console.error('Failed to parse error response:', e);
-                        // Try to get response text if JSON parsing failsObject.keys(regularUpdateData).length > 0) {
+                        // Try to get response text if JSON parsing fails
                         try {
                             const errorText = await response.text();
-                            console.error('Error response text:', errorText); = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
+                            console.error('Error response text:', errorText);
                             errorMessage = `HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 200)}`;
                         } catch (textError) {
-                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;/json',
-                        }  'Authorization': `Bearer ${accessToken}`,
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+                        }
                     }
-                    throw new Error(errorMessage); },
-                }    body: JSON.stringify(regularUpdateData)
+                    throw new Error(errorMessage);
+                }
                 
                 const result = await response.json();
-                onse.ok) {
+                console.log('Regular update response:', result);
+                
                 // Update local data with the response from server
                 if (result.merchant) {
                     const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
                     if (merchantIndex !== -1) {
-                        Object.assign(filteredMerchants[merchantIndex], result.merchant);rData.error && typeof errorData.error === 'object') {
-                        erver error: ${response.status}`;
-                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId); else {
-                        if (mainIndex !== -1) {`Server error: ${response.status}`;
+                        Object.assign(filteredMerchants[merchantIndex], result.merchant);
+                        
+                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
+                        if (mainIndex !== -1) {
                             Object.assign(merchantsData[mainIndex], result.merchant);
-                        }rData);
+                        }
                     }
-                }le.error('Failed to parse error response:', e);
-                fails
+                }
+                
                 return { success: true, data: result };
             }
-            ror response text:', errorText);
-            return { success: true }; ${errorText.substring(0, 200)}`;
-        } catch (textError) {
-               errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            
+            return { success: true };
+        }
     } catch (error) {
-        console.error('API call failed:', error);   }
-        console.error('Error type:', typeof error);    throw new Error(errorMessage);
+        console.error('API call failed:', error);
+        console.error('Error type:', typeof error);
         console.error('Error message:', error?.message);
         console.error('Error stack:', error?.stack);
         
         // Extract meaningful error message
         let errorMessage = 'Unknown error occurred';
         
-        if (error instanceof Error) {antId);
-            errorMessage = error.message || 'Unknown error occurred';merchantIndex !== -1) {
+        if (error instanceof Error) {
+            errorMessage = error.message || 'Unknown error occurred';
         } else if (typeof error === 'string') {
             errorMessage = error;
-        } else if (error && typeof error === 'object') {antId);
-            // Try to extract error information from response objectf (mainIndex !== -1) {
-            if (error.message) {       Object.assign(merchantsData[mainIndex], result.merchant);
-                errorMessage = error.message || 'Unknown error occurred';       }
-            } else if (error.error && typeof error.error === 'object' && error.error.message) {    }
+        } else if (error && typeof error === 'object') {
+            // Try to extract error information from response object
+            if (error.message) {
+                errorMessage = error.message || 'Unknown error occurred';
+            } else if (error.error && typeof error.error === 'object' && error.error.message) {
                 errorMessage = error.error.message;
-            } else if (error.status) {   
-                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;    return { success: true, data: result };
+            } else if (error.status) {
+                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
             } else {
-                try {   
-                    errorMessage = JSON.stringify(error);    return { success: true };
+                try {
+                    errorMessage = JSON.stringify(error);
                 } catch (e) {
                     errorMessage = 'Failed to parse error object';
                 }
             }
         }
-        console.error('Error message:', error?.message);
-        // Final safety check - ensure errorMessage is a string?.stack);
+        
+        // Final safety check - ensure errorMessage is a string
         if (typeof errorMessage !== 'string') {
-            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);// Extract meaningful error message
-            errorMessage = 'An error occurred while updating the merchant';rror occurred';
+            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
+            errorMessage = 'An error occurred while updating the merchant';
         }
         
-        // Provide more specific error messages based on contentmessage || 'Unknown error occurred';
+        // Provide more specific error messages based on content
         if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
             return { success: false, error: 'Network error. Please check your connection and try again.' };
-        } else if (errorMessage.includes('401')) {of error === 'object') {
-            return { success: false, error: 'Authentication failed. Please login again.' };on from response object
+        } else if (errorMessage.includes('401')) {
+            return { success: false, error: 'Authentication failed. Please login again.' };
         } else if (errorMessage.includes('403')) {
             return { success: false, error: 'You do not have permission to edit this merchant.' };
-        } else if (errorMessage.includes('404')) {typeof error.error === 'object' && error.error.message) {
+        } else if (errorMessage.includes('404')) {
             return { success: false, error: 'Merchant not found.' };
-        } else if (errorMessage.includes('500')) {f (error.status) {
-            return { success: false, error: 'Server error occurred. Please try again or contact support.' };Message = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
+        } else if (errorMessage.includes('500')) {
+            return { success: false, error: 'Server error occurred. Please try again or contact support.' };
         } else {
             return { success: false, error: errorMessage };
         }
-    } catch (e) {
-}       errorMessage = 'Failed to parse error object';
-       }
-function showEditFormMessage(message, type = 'info') {    }
-    const messageContainer = document.getElementById('editFormMessages');
-    const typeStyles = {
-        success: 'background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;',
-        error: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;',
-        warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',   console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
-        info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'    errorMessage = 'An error occurred while updating the merchant';
+    }
+}
+
+// Helper function to map status to backend action values
+function getActionFromStatus(status) {
+    const statusActionMap = {
+        'verified': 'approve',
+        'approved': 'approve',
+        'rejected': 'reject',
+        'suspended': 'suspend',
+        'under-review': 'review',
+        'under_review': 'review', // handle underscore variant
+        'pending': 'reactivate'
     };
-    
-    messageContainer.innerHTML = `
-        <div style="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">sage.includes('fetch')) {
-            ${message}d try again.' };
-        </div>
-    `;
-    messageContainer.style.display = 'block';
-}ion to edit this merchant.' };
-
-function hideEditFormMessage() {
-    const messageContainer = document.getElementById('editFormMessages');f (errorMessage.includes('500')) {
-    if (messageContainer) {ccurred. Please try again or contact support.' };
-        messageContainer.style.display = 'none'; else {
-        messageContainer.innerHTML = '';       return { success: false, error: errorMessage };
-    }       }
-}    }
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);sage(message, type = 'info') {
-    if (modal) {
-        modal.style.display = 'none';
-        
-        // Special handling for edit modal',
-        if (modalId === 'editMerchantModal') {  warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',
-            resetEditForm();    info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
-            
-            // Clear auto-saved data if user manually closes modal
-            const form = document.getElementById('editMerchantForm');nnerHTML = `
-            const merchantId = form?.getAttribute('data-merchant-id');tyle="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">
-            if (merchantId) {      ${message}
-                const saveKey = `editForm_${merchantId}`;
-                localStorage.removeItem(saveKey);   `;
-            }    messageContainer.style.display = 'block';
-        }
-        
-        // Remove focus from any active elementse() {
-        if (document.activeElement) {ById('editFormMessages');
-            document.activeElement.blur();
-        }   messageContainer.style.display = 'none';
-    }       messageContainer.innerHTML = '';
-}    }
-
-// Enhanced form handling functions
-dal(modalId) {
-function resetEditForm() {ById('editMerchantForm');
-    const form = document.getElementById('editMerchantForm');modal) {
-    if (form) {
-        form.reset();
-        hideEditFormMessage();for edit modal
-        modalId === 'editMerchantModal'
+    return statusActionMap[status] || 'review'; // Default to review if status isn't recognized
+}
