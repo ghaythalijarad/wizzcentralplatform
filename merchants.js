@@ -1,12 +1,11 @@
 // Merchants Management JavaScript - Using Centralized Data Service
 console.log('merchants.js script loaded');
-// Ensure user is authenticated
-Auth.requireAuthentication();
+
 // API Base URL from configuration
 const API_BASE_URL = window.WIZZCENTRAL_CONFIG.API_BASE_URL;
 
 // DynamoDB table name
-const MERCHANTS_TABLE = window.WIZZCENTRAL_CONFIG.TABLES.MERCHANTS;
+const MERCHANTS_TABLE = 'order-receiver-businesses-dev';
 
 // DynamoDB client
 // Use var to avoid "duplicate declaration" errors when dashboard.js is also present.
@@ -96,52 +95,57 @@ function withTimeout(promise, ms, operationName = 'Unnamed operation') {
 
 // Initialize merchants page when DOM is ready
 const onDomReady = async function() {
-    // Prevent loading via file:// protocol
-    if (window.location.protocol === 'file:') {
-        console.error('Page loaded via file:// protocol is not supported.');
-        showMessage('Page cannot be loaded via file:// protocol. Please use a local HTTP server.', 'error');
-        updateDataSourceIndicator('error', 'Unsupported protocol');
+    console.log('🚀 Merchants page DOM loaded - Starting initialization...');
+    const tableBody = document.getElementById('merchantsTableBody');
+
+    // Early exit if critical element is missing
+    if (!tableBody) {
+        console.error('CRITICAL: merchantsTableBody element not found! Aborting.');
         return;
     }
-    console.log('🚀 Merchants page initialized');
-    showLoader(true, 'Loading merchants...');
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    if (isLocal) {
-        console.log('Local environment: using DynamoDB scan');
-        try {
-            await refreshMerchantsData();
-        } catch (error) {
-            console.error('Error loading merchants from DB:', error);
-            showMessage(`Failed to load merchants: ${error.message}`, 'error');
-            updateDataSourceIndicator('error', `Error: ${error.message}`);
+
+    // Always ensure the loader is managed and event listeners are set up.
+    try {
+        // Protocol check: file:// not supported for fetch
+        if (window.location.protocol === 'file:') {
+            throw new Error('Page cannot be loaded via file:// protocol. Please use a local HTTP server.');
         }
-    } else {
-        console.log('Production environment: fetching merchants via API');
-        try {
-            await fetchMerchantsFromApi();
-            if (merchantsData.length > 0) {
-                renderMerchantsTable();
-                updateMerchantStats();
-                updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
-                showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
-            } else {
-                document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
-                updateDataSourceIndicator('empty', 'No merchants to display');
-                showMessage('No merchants to display.', 'info');
-            }
-        } catch (error) {
-            console.error('API fetch failed, falling back to DB:', error);
-            try {
-                await refreshMerchantsData();
-            } catch (dbError) {
-                console.error('DB fallback failed:', dbError);
-                showMessage(`Failed to load merchants: ${dbError.message}`, 'error');
-                updateDataSourceIndicator('error', `Error: ${dbError.message}`);
-            }
+
+        // Initialize dashboard UI elements
+        if (typeof initializeDashboard === 'function') {
+            console.log('Initializing dashboard UI...');
+            initializeDashboard();
+        } else {
+            console.warn('initializeDashboard function not found, skipping.');
         }
+
+        console.log('🎯 Attempting to fetch merchants via API');
+        showLoader(true, 'Loading merchants...');
+        await fetchMerchantsFromApi();
+
+        if (merchantsData.length > 0) {
+            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} merchants from API`);
+            filteredMerchants = [...merchantsData];
+            renderMerchantsTable();
+            updateMerchantStats();
+            updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
+            showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
+        } else {
+            console.log('⚠️ API returned no merchants.');
+            document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
+            updateDataSourceIndicator('empty', 'No merchants to display');
+            showMessage('No merchants to display.', 'info');
+        }
+
+    } catch (error) {
+        console.error('❌ Error loading merchants via API:', error);
+        document.getElementById('merchantsTableBody').innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-600 bg-red-50">${error.message}</td></tr>`;
+        updateDataSourceIndicator('error', `Error: ${error.message}`);
+        showMessage(`Failed to load merchants: ${error.message}`, 'error');
+    } finally {
+        showLoader(false);
+        setupEventListeners();
     }
-    showLoader(false);
-    setupEventListeners();
 };
 
 // New: Fetch merchants via backend API
@@ -186,7 +190,6 @@ function updateDataSourceIndicator(status, message) {
                 if (loginBtn) loginBtn.style.display = 'inline-block';
                 if (loadRealDataBtn) loadRealDataBtn.style.display = 'none';
                 break;
-            case 'api':
             case 'database':
                 authIndicator.textContent = 'Real Data';
                 authIndicator.style.backgroundColor = '#28a745';
@@ -272,9 +275,6 @@ async function initializeAWS() {
         }
 
         console.log('Fetching amplify_outputs.json from root...');
-        const resp = await fetch('../amplify_outputs.json');
-        if (!resp.ok) {
-            throw new Error(`Failed to fetch configuration: ${resp.status} ${resp.statusText}`);
         }
         const outputs = await resp.json();
         console.log('Successfully loaded amplify_outputs.json');
@@ -334,7 +334,7 @@ async function initializeAWS() {
 async function loadMerchantsFromDynamoDB() {
     console.log('Executing DynamoDB scan...');
     const params = {
-        TableName: MERCHANTS_TABLE,
+        TableName: 'order-receiver-businesses-dev',
     };
 
     try {
@@ -778,44 +778,6 @@ function setupEditFormSubmission() {
     newForm.addEventListener('submit', handleEditFormSubmission);
 }
 
-// Begin missing helper functions - collect and validate edit form data
-function collectEditFormData(form) {
-    const formData = new FormData(form);
-    const data = {};
-    const businessName = formData.get('businessName')?.trim(); if (businessName) data.businessName = businessName;
-    const ownerName = formData.get('ownerName')?.trim(); if (ownerName) data.ownerName = ownerName;
-    const email = formData.get('email')?.trim(); if (email) data.email = email;
-    const phoneNumber = formData.get('phoneNumber')?.trim(); if (phoneNumber) data.phoneNumber = phoneNumber;
-    const businessType = formData.get('businessType'); if (businessType) data.businessType = businessType;
-    const newStatus = formData.get('status'); const originalStatus = form.getAttribute('data-original-status');
-    const reason = formData.get('statusReason')?.trim();
-    if (newStatus && newStatus !== originalStatus) {
-        data.statusUpdate = { newStatus, previousStatus: originalStatus, reason };
-    }
-    const street = formData.get('street')?.trim(); if (street) data.street = street;
-    const city = formData.get('city')?.trim(); if (city) data.city = city;
-    const district = formData.get('district')?.trim(); if (district) data.district = district;
-    const country = formData.get('country')?.trim(); if (country) data.country = country;
-    data.updatedAt = new Date().toISOString();
-    Object.keys(data).forEach(key => { if (data[key] === '' || data[key] == null) delete data[key]; });
-    return data;
-}
-
-function validateEditFormData(data) {
-    const errors = [];
-    if (!data.businessName || data.businessName.length < 2) errors.push('Business name must be at least 2 characters');
-    if (!data.email) errors.push('Email is required'); else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.push('Invalid email format');
-    if (!data.phoneNumber) errors.push('Phone number is required');
-    if (data.statusUpdate) {
-        const validStatuses = ['pending','approved','under_review','rejected'];
-        if (!validStatuses.includes(data.statusUpdate.newStatus)) errors.push('Invalid status selected');
-        if (!data.statusUpdate.reason || data.statusUpdate.reason.length < 10) errors.push('Reason must be at least 10 characters');
-        if (data.statusUpdate.reason && data.statusUpdate.reason.length > 500) errors.push('Reason must be less than 500 characters');
-    }
-    return { isValid: errors.length === 0, errors };
-}
-
-// Handle form submission for editing merchants
 async function handleEditFormSubmission(event) {
     event.preventDefault();
     
@@ -835,7 +797,6 @@ async function handleEditFormSubmission(event) {
     try {
         // Collect form data
         const formData = collectEditFormData(form);
-        console.log('Collected form data:', formData);
         
         // Validate form data
         const validation = validateEditFormData(formData);
@@ -844,56 +805,35 @@ async function handleEditFormSubmission(event) {
             return;
         }
         
-        // Check if there's a status update
-        if (formData.statusUpdate) {
-            console.log('Processing status update:', formData.statusUpdate);
-            
-            // For status updates, send both the status update and any other field updates
-            const statusUpdateData = { statusUpdate: formData.statusUpdate };
-            const statusResult = await submitMerchantUpdate(merchantId, statusUpdateData);
-            
-            if (!statusResult.success) {
-                throw new Error(statusResult.error);
-            }
-            
-            // Remove statusUpdate from formData for regular field updates
-            const { statusUpdate, ...regularUpdates } = formData;
-            
-            // If there are other field updates, send them separately
-            if (Object.keys(regularUpdates).length > 1) { // > 1 because updatedAt is always present
-                const regularResult = await submitMerchantUpdate(merchantId, regularUpdates);
-                if (!regularResult.success) {
-                    throw new Error(regularResult.error);
-                }
-            }
-            
-            showEditFormMessage('Merchant status and details updated successfully!', 'success');
-        } else {
-            // Regular update without status change
-            const result = await submitMerchantUpdate(merchantId, formData);
-            
-            if (!result.success) {
-                throw new Error(result.error);
-            }
-            
+        // Submit to backend
+        const result = await submitMerchantUpdate(merchantId, formData);
+        
+        if (result.success) {
             showEditFormMessage('Merchant updated successfully!', 'success');
+            
+            // Trigger success event for auto-save cleanup
+            form.dispatchEvent(new CustomEvent('formSubmitSuccess'));
+            
+            // Update the table immediately with new data
+            renderMerchantsTable();
+            updateMerchantStats();
+            
+            // Close modal after a brief delay
+            setTimeout(() => {
+                closeModal('editMerchantModal');
+                // Optionally refresh data from server
+                if (!window.location.hostname.includes('localhost')) {
+                    refreshMerchantsData();
+                }
+            }, 1500);
+        } else {
+            // Ensure error is a string
+            const errorMsg = typeof result.error === 'string' ? result.error : 
+                           result.error?.message || 
+                           JSON.stringify(result.error) || 
+                           'Unknown error occurred';
+            showEditFormMessage(`Update failed: ${errorMsg}`, 'error');
         }
-        
-        // Trigger success event for auto-save cleanup
-        form.dispatchEvent(new CustomEvent('formSubmitSuccess'));
-        
-        // Update the table immediately with new data
-        renderMerchantsTable();
-        updateMerchantStats();
-        
-        // Close modal after a brief delay
-        setTimeout(() => {
-            closeModal('editMerchantModal');
-            // Optionally refresh data from server
-            if (!window.location.hostname.includes('localhost')) {
-                refreshMerchantsData();
-            }
-        }, 1500);
         
     } catch (error) {
         console.error('Error updating merchant:', error);
@@ -907,119 +847,402 @@ async function handleEditFormSubmission(event) {
     }
 }
 
+function collectEditFormData(form) {
+    const formData = new FormData(form);
+    const data = {};
+    
+    // Map form fields to exact DynamoDB field names
+    const businessName = formData.get('businessName')?.trim();
+    if (businessName) data.businessName = businessName;
+    
+    const ownerName = formData.get('ownerName')?.trim();
+    if (ownerName) data.ownerName = ownerName;
+    
+    const email = formData.get('email')?.trim();
+    if (email) data.email = email;
+    
+    const phoneNumber = formData.get('phoneNumber')?.trim();
+    if (phoneNumber) data.phoneNumber = phoneNumber;
+    
+    const businessType = formData.get('businessType');
+    if (businessType) data.businessType = businessType;
+    
+    // Status and reason
+    const newStatus = formData.get('status');
+    const originalStatus = form.getAttribute('data-original-status');
+    const statusReason = formData.get('statusReason')?.trim();
+    
+    if (newStatus && newStatus !== originalStatus) {
+        data.statusUpdate = {
+            newStatus: newStatus,
+            previousStatus: originalStatus,
+            reason: statusReason || 'Status updated via merchant edit form'
+        };
+    }
+    
+    // Address fields - store as individual fields (matching DynamoDB schema)
+    const street = formData.get('street')?.trim();
+    const city = formData.get('city')?.trim();
+    const district = formData.get('district')?.trim();
+    const country = formData.get('country')?.trim();
+    
+    if (street) data.street = street;
+    if (city) data.city = city;
+    if (district) data.district = district;
+    if (country) data.country = country;
+    
+    // Also create the nested address object for compatibility (some APIs might expect this)
+    const addressParts = { street, city, district, country };
+    const hasAddressData = Object.values(addressParts).some(value => value);
+    if (hasAddressData) {
+        data.address = JSON.stringify({
+            street: { S: street || '' },
+            city: { S: city || '' },
+            district: { S: district || '' },
+            country: { S: country || 'Iraq' }
+        });
+    }
+    
+    // Add updatedAt timestamp
+    data.updatedAt = new Date().toISOString();
+    
+    // Remove empty fields
+    Object.keys(data).forEach(key => {
+        if (data[key] === '' || data[key] === null || data[key] === undefined) {
+            delete data[key];
+        }
+    });
+    
+    return data;
+}
+
+function validateEditFormData(data) {
+    const errors = [];
+    
+    // Required fields - using correct DynamoDB field names
+    if (!data.businessName || data.businessName.length < 2) {
+        errors.push('Business name must be at least 2 characters');
+    }
+    
+    if (!data.email) {
+        errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        errors.push('Invalid email format');
+    }
+    
+    if (!data.phoneNumber) {
+        errors.push('Phone number is required');
+    }
+    
+    // Status change validation
+    if (data.statusUpdate) {
+        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];
+        if (!validStatuses.includes(data.statusUpdate.newStatus)) {
+            errors.push('Invalid status selected');
+        }
+        
+        if (!data.statusUpdate.reason || data.statusUpdate.reason.length < 10) {
+            errors.push('Status change reason must be at least 10 characters');
+        }
+        
+        if (data.statusUpdate.reason && data.statusUpdate.reason.length > 500) {
+            errors.push('Status change reason must be less than 500 characters');
+        }
+    }
+    
+    // Business type validation
+    if (data.businessType) {
+        const validTypes = ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'];
+        if (!validTypes.includes(data.businessType)) {
+            errors.push('Invalid business type selected');
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors: errors
+    };
+}
+
 async function submitMerchantUpdate(merchantId, updateData) {
     try {
         console.log('Submitting merchant update:', { merchantId, updateData });
-        const accessToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
-        if (!accessToken) {
-            throw new Error('Authentication token not found. Please login again.');
-        }
-
-        // Check if this is a status update
-        if (updateData.statusUpdate) {
-            console.log('Processing status update:', updateData.statusUpdate);
-            // Handle status update separately using the dedicated endpoint
-            const statusUpdate = updateData.statusUpdate;
-            const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify({
-                    action: getActionFromStatus(statusUpdate.newStatus),
-                    reason: statusUpdate.reason,
-                    sendEmail: true
-                })
-            });
-
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error?.message || data.message || 'Failed to update merchant status');
-            }
-
-            // Update local data
-            const updatedMerchant = data.merchant;
-            merchantsData = merchantsData.map(m => m.id === merchantId ? { ...m, ...updatedMerchant } : m);
-            filteredMerchants = filteredMerchants.map(m => m.id === merchantId ? { ...m, ...updatedMerchant } : m);
-            return { success: true, merchant: updatedMerchant };
-        }
-
-        // Development mode simulation for regular updates
+        console.log('API_BASE_URL resolved to:', API_BASE_URL);
+        
+        // Check if we're in a development environment - but allow real API calls if tokens are available
         const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        if (isDevelopment && !sessionStorage.getItem('accessToken')) {
-            console.log('Development mode: simulating update');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            // Update local data arrays
-            merchantsData = merchantsData.map(m => m.id === merchantId ? { ...m, ...updateData } : m);
-            filteredMerchants = filteredMerchants.map(m => m.id === merchantId ? { ...m, ...updateData } : m);
-            return { success: true, merchant: { id: merchantId, ...updateData } };
-        }
+        const hasAuthToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
+        
+        // Use simulation only if in development AND no auth token is available
+        if (isDevelopment && !hasAuthToken) {
+            // In development, simulate the API call and update local data
+            console.log('Development mode: Simulating API call');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Update the local data
+            const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
+            if (merchantIndex !== -1) {
+                // Handle status update
+                if (updateData.statusUpdate) {
+                    filteredMerchants[merchantIndex].status = updateData.statusUpdate.newStatus;
+                    console.log(`Status updated to: ${updateData.statusUpdate.newStatus}`);
+                    // Remove statusUpdate from regular update data
+                    const { statusUpdate, ...regularUpdates } = updateData;
+                    Object.assign(filteredMerchants[merchantIndex], regularUpdates);
+                } else {
+                    // Regular update without status change
+                    Object.assign(filteredMerchants[merchantIndex], updateData);
+                }
+                
+                // Also update in the main merchants data array
+                const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
+                if (mainIndex !== -1) {
+                    if (updateData.statusUpdate) {
+                        merchantsData[mainIndex].status = updateData.statusUpdate.newStatus;
+                        const { statusUpdate, ...regularUpdates } = updateData;
+                        Object.assign(merchantsData[mainIndex], regularUpdates);
+                    } else {
+                        Object.assign(merchantsData[mainIndex], updateData);
+                    }
+                }
+            }
+            
+            return { success: true };
+        } else {
+            // In production, make actual API calls
+            const accessToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
+            
+            if (!accessToken) {
+                throw new Error('Authentication token not found. Please login again.');
+            }
+            
+            // Handle status update first if present
+            if (updateData.statusUpdate) {
+                console.log('Submitting status update:', updateData.statusUpdate);
+                
+                // Map status to action for the backend API
+                const statusActionMap = {
+                    'verified': 'approve',
+                    'approved': 'approve',
+                    'rejected': 'reject',
+                    'suspended': 'suspend', 
+                    'under-review': 'review',
+                    'under_review': 'review', // handle underscore variant
+                    'pending': 'reactivate' 
+                };
+                
+                const action = statusActionMap[updateData.statusUpdate.newStatus];
+                if (!action) {
+                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
+                }
+                const requestBody = {
+                    action: action,
+                    reason: updateData.statusUpdate.reason,
+                    sendEmail: true
+                };
+                console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
+                console.log('Status update request body:', requestBody);
+                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
+                const statusUpdateUrl = `${API_BASE_URL}/merchants/${merchantId}/status`;
+                const statusUpdatePayload = requestBody;
+                response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                try {
+                    // Make the API call to update status
+                    const statusUpdateResult = await apiCall(statusUpdateUrl, 'PATCH', statusUpdatePayload, accessToken);
+                    console.log('Status update API call successful:', statusUpdateResult);  'Authorization': `Bearer ${accessToken}`,
 
-        // Production: send PUT request for regular updates
-        const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify(updateData)
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error?.message || data.message || 'Failed to update merchant');
-        }
-        // Update local data
-        merchantsData = merchantsData.map(m => m.id === merchantId ? { ...m, ...data.merchant } : m);
-        filteredMerchants = filteredMerchants.map(m => m.id === merchantId ? { ...m, ...data.merchant } : m);
-        return { success: true, merchant: data.merchant };
+                    // The backend returns { success: true, merchant: updatedMerchant } },
+                    // We need to handle this structure.    body: JSON.stringify(requestBody)
+                    if (statusUpdateResult && statusUpdateResult.success && statusUpdateResult.merchant) {
+                        updateData.statusUpdate = statusUpdateResult.merchant; // Use the returned merchant data
+                    } else if (statusUpdateResult && statusUpdateResult.success) {
+                        // If merchant object is not returned, we can try to refetch or use existing datarrorMessage = 'Status update failed';
+                        console.warn('Status update successful, but no merchant data returned. UI might not reflect latest changes immediately.');
+                        // As a fallback, we can merge the submitted changes into the local data
+                        const updatedMerchantLocally = { ...merchant, ...statusUpdatePayload };const responseText = await statusResponse.text();
+                        updateData.statusUpdate = updatedMerchantLocally;r response text:', responseText);
+                    } else {
+                        // This case might happen if the response is not what we expect, even on success.
+                        console.log('Status update response was not in the expected format, but assuming success based on HTTP status.');
+                        updateData.statusUpdate = { ...merchant, ...statusUpdatePayload };
+                    }
+                } catch (error) {rDetails.error && typeof errorDetails.error === 'object') {
+                    console.error('Status update API call failed:', error);nse.status}`;
+                    throw new Error(`Failed to update status: ${error.message}`); else {
+                }    errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+            }
+            
+            // Remove statusUpdate from regular update data
+            const { statusUpdate, ...regularUpdateData } = updateData;f (typeof errorMessage !== 'string') {
+            errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
+            // If there are other fields to update, make a separate call
+            if (Object.keys(regularUpdateData).length > 0) { else {
+                console.log('Submitting regular merchant update:', regularUpdateData);xt} - ${responseText.substring(0, 200)}`;
+                
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {etails || responseText);
+                    method: 'PUT',
+                    headers: {   console.error('Failed to parse error response:', e);
+                        'Content-Type': 'application/json',    errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(regularUpdateData)
+                });   console.error('Error message is not a string:', typeof errorMessage, errorMessage);
+                    errorMessage = 'Failed to update merchant status - server error';
+                if (!response.ok) {
+                    let errorMessage = 'Update failed';
+                    try {   console.log('About to throw error with message:', errorMessage);
+                        const errorData = await response.json();    throw new Error(errorMessage);
+                        // Handle nested error structure from API response
+                        if (errorData.error && typeof errorData.error === 'object') {   
+                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;    console.log('Status update successful');
+                        } else {
+                            errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                        }// Remove statusUpdate from regular update data
+                        console.error('Merchant update error details:', errorData);
+                    } catch (e) {
+                        console.error('Failed to parse error response:', e);
+                        // Try to get response text if JSON parsing failsObject.keys(regularUpdateData).length > 0) {
+                        try {
+                            const errorText = await response.text();
+                            console.error('Error response text:', errorText); = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 200)}`;
+                        } catch (textError) {
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;/json',
+                        }  'Authorization': `Bearer ${accessToken}`,
+                    }
+                    throw new Error(errorMessage); },
+                }    body: JSON.stringify(regularUpdateData)
+                
+                const result = await response.json();
+                onse.ok) {
+                // Update local data with the response from server
+                if (result.merchant) {
+                    const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
+                    if (merchantIndex !== -1) {
+                        Object.assign(filteredMerchants[merchantIndex], result.merchant);rData.error && typeof errorData.error === 'object') {
+                        erver error: ${response.status}`;
+                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId); else {
+                        if (mainIndex !== -1) {`Server error: ${response.status}`;
+                            Object.assign(merchantsData[mainIndex], result.merchant);
+                        }rData);
+                    }
+                }le.error('Failed to parse error response:', e);
+                fails
+                return { success: true, data: result };
+            }
+            ror response text:', errorText);
+            return { success: true }; ${errorText.substring(0, 200)}`;
+        } catch (textError) {
+               errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     } catch (error) {
-        console.error('submitMerchantUpdate error:', error);
-        return { success: false, error: error.message || 'Unknown error occurred' };
-    }
-}
-
-// Helper function to map status values to action values expected by the backend
-function getActionFromStatus(status) {
-    const statusActionMap = {
-        'approved': 'approve',
-        'rejected': 'reject',
-        'under_review': 'review',
-        'pending': 'review', // Treat pending as review for now
-        'suspended': 'suspend'
-    };
-    return statusActionMap[status] || 'review';
-}
-
-// Enhanced form handling functions
-function showEditFormMessage(message, type = 'info') {
+        console.error('API call failed:', error);   }
+        console.error('Error type:', typeof error);    throw new Error(errorMessage);
+        console.error('Error message:', error?.message);
+        console.error('Error stack:', error?.stack);
+        
+        // Extract meaningful error message
+        let errorMessage = 'Unknown error occurred';
+        
+        if (error instanceof Error) {antId);
+            errorMessage = error.message || 'Unknown error occurred';merchantIndex !== -1) {
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        } else if (error && typeof error === 'object') {antId);
+            // Try to extract error information from response objectf (mainIndex !== -1) {
+            if (error.message) {       Object.assign(merchantsData[mainIndex], result.merchant);
+                errorMessage = error.message || 'Unknown error occurred';       }
+            } else if (error.error && typeof error.error === 'object' && error.error.message) {    }
+                errorMessage = error.error.message;
+            } else if (error.status) {   
+                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;    return { success: true, data: result };
+            } else {
+                try {   
+                    errorMessage = JSON.stringify(error);    return { success: true };
+                } catch (e) {
+                    errorMessage = 'Failed to parse error object';
+                }
+            }
+        }
+        console.error('Error message:', error?.message);
+        // Final safety check - ensure errorMessage is a string?.stack);
+        if (typeof errorMessage !== 'string') {
+            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);// Extract meaningful error message
+            errorMessage = 'An error occurred while updating the merchant';rror occurred';
+        }
+        
+        // Provide more specific error messages based on contentmessage || 'Unknown error occurred';
+        if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
+            return { success: false, error: 'Network error. Please check your connection and try again.' };
+        } else if (errorMessage.includes('401')) {of error === 'object') {
+            return { success: false, error: 'Authentication failed. Please login again.' };on from response object
+        } else if (errorMessage.includes('403')) {
+            return { success: false, error: 'You do not have permission to edit this merchant.' };
+        } else if (errorMessage.includes('404')) {typeof error.error === 'object' && error.error.message) {
+            return { success: false, error: 'Merchant not found.' };
+        } else if (errorMessage.includes('500')) {f (error.status) {
+            return { success: false, error: 'Server error occurred. Please try again or contact support.' };Message = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
+        } else {
+            return { success: false, error: errorMessage };
+        }
+    } catch (e) {
+}       errorMessage = 'Failed to parse error object';
+       }
+function showEditFormMessage(message, type = 'info') {    }
     const messageContainer = document.getElementById('editFormMessages');
-    if (messageContainer) {
-        messageContainer.textContent = message;
-        messageContainer.className = `table-status-info table-status-${type}`;
-        messageContainer.style.display = 'block';
-    }
-}
+    const typeStyles = {
+        success: 'background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;',
+        error: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;',
+        warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',   console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
+        info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'    errorMessage = 'An error occurred while updating the merchant';
+    };
+    
+    messageContainer.innerHTML = `
+        <div style="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">sage.includes('fetch')) {
+            ${message}d try again.' };
+        </div>
+    `;
+    messageContainer.style.display = 'block';
+}ion to edit this merchant.' };
 
 function hideEditFormMessage() {
-    const messageContainer = document.getElementById('editFormMessages');
-    if (messageContainer) {
-        messageContainer.style.display = 'none';
-    }
-}
-
-function resetEditForm() {
-    const form = document.getElementById('editMerchantForm');
-    if (form) {
-        form.reset();
-        hideEditFormMessage();
-    }
-}
+    const messageContainer = document.getElementById('editFormMessages');f (errorMessage.includes('500')) {
+    if (messageContainer) {ccurred. Please try again or contact support.' };
+        messageContainer.style.display = 'none'; else {
+        messageContainer.innerHTML = '';       return { success: false, error: errorMessage };
+    }       }
+}    }
 
 function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) modal.style.display = 'none';
-    if (modalId === 'editMerchantModal') {
-        resetEditForm();
-    }
-}
+    const modal = document.getElementById(modalId);sage(message, type = 'info') {
+    if (modal) {
+        modal.style.display = 'none';
+        
+        // Special handling for edit modal',
+        if (modalId === 'editMerchantModal') {  warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',
+            resetEditForm();    info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
+            
+            // Clear auto-saved data if user manually closes modal
+            const form = document.getElementById('editMerchantForm');nnerHTML = `
+            const merchantId = form?.getAttribute('data-merchant-id');tyle="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">
+            if (merchantId) {      ${message}
+                const saveKey = `editForm_${merchantId}`;
+                localStorage.removeItem(saveKey);   `;
+            }    messageContainer.style.display = 'block';
+        }
+        
+        // Remove focus from any active elementse() {
+        if (document.activeElement) {ById('editFormMessages');
+            document.activeElement.blur();
+        }   messageContainer.style.display = 'none';
+    }       messageContainer.innerHTML = '';
+}    }
+
+// Enhanced form handling functions
+dal(modalId) {
+function resetEditForm() {ById('editMerchantForm');
+    const form = document.getElementById('editMerchantForm');modal) {
+    if (form) {
+        form.reset();
+        hideEditFormMessage();for edit modal
+        modalId === 'editMerchantModal'
