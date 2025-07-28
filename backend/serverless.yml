@@ -11,16 +11,16 @@ provider:
   environment:
     STAGE: ${self:provider.stage}
     REGION: ${self:provider.region}
-    USERS_TABLE: WizzUser_users_dev
-    MERCHANTS_TABLE: order-receiver-businesses-dev
-    DRIVERS_TABLE: ${self:service}-drivers-${self:provider.stage}
-    CUSTOMERS_TABLE: ${self:service}-customers-${self:provider.stage}
-    ORDERS_TABLE: order-receiver-orders-dev
-    PROMOTIONS_TABLE: order-receiver-discounts-dev
-    PROMOTION_USAGE_TABLE: ${self:service}-promotion-usage-${self:provider.stage}
-    SUPPORT_TICKETS_TABLE: ${self:service}-support-tickets-${self:provider.stage}
-    FAQS_TABLE: ${self:service}-faqs-${self:provider.stage}
-    KNOWLEDGE_BASE_TABLE: ${self:service}-knowledge-base-${self:provider.stage}
+    USERS_TABLE: "WizzUser_users_${self:provider.stage}"
+    MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
+    DRIVERS_TABLE: "${self:service}-drivers-${self:provider.stage}"
+    CUSTOMERS_TABLE: "${self:service}-customers-${self:provider.stage}"
+    ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
+    PROMOTIONS_TABLE: "order-receiver-discounts-${self:provider.stage}"
+    PROMOTION_USAGE_TABLE: "${self:service}-promotion-usage-${self:provider.stage}"
+    SUPPORT_TICKETS_TABLE: "${self:service}-support-tickets-${self:provider.stage}"
+    FAQS_TABLE: "${self:service}-faqs-${self:provider.stage}"
+    KNOWLEDGE_BASE_TABLE: "${self:service}-knowledge-base-${self:provider.stage}"
     COGNITO_USER_POOL_ID: us-east-1_aX8X9oQTV
     COGNITO_USER_POOL_ARN: arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV
     COGNITO_JWKS_URL: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_aX8X9oQTV/.well-known/jwks.json
