@@ -1162,9 +1162,9 @@ async function submitMerchantUpdate(merchantId, updateData) {
         }
     } catch (error) {
         console.error('API call failed:', error);
-        console.error('Error type:', typeof error);
-        console.error('Error message:', error?.message);
-        console.error('Error stack:', error?.stack);
+        console.error('Error type: ' + typeof error);
+        console.error('Error message: ' + (error && error.message ? error.message : 'No message'));
+        console.error('Error stack: ' + (error && error.stack ? error.stack : 'No stack'));
         
         // Extract meaningful error message
         let errorMessage = 'Unknown error occurred';
@@ -1180,7 +1180,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
             } else if (error.error && typeof error.error === 'object' && error.error.message) {
                 errorMessage = error.error.message;
             } else if (error.status) {
-                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
+                errorMessage = 'HTTP ' + error.status + ': ' + (error.statusText || 'Server Error');
             } else {
                 try {
                     errorMessage = JSON.stringify(error);
@@ -1192,7 +1192,8 @@ async function submitMerchantUpdate(merchantId, updateData) {
         
         // Final safety check - ensure errorMessage is a string
         if (typeof errorMessage !== 'string') {
-            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
+            console.error('Error message is still not a string: ' + typeof errorMessage);
+            console.error('Raw error message:', errorMessage);
             errorMessage = 'An error occurred while updating the merchant';
         }
         
