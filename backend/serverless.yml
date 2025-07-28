@@ -11,12 +11,12 @@ provider:
   environment:
     STAGE: ${self:provider.stage}
     REGION: ${self:provider.region}
-    USERS_TABLE: ${self:service}-users-${self:provider.stage}
-    MERCHANTS_TABLE: ${self:service}-merchants-${self:provider.stage}
+    USERS_TABLE: WizzUser_users_dev
+    MERCHANTS_TABLE: order-receiver-businesses-dev
     DRIVERS_TABLE: ${self:service}-drivers-${self:provider.stage}
     CUSTOMERS_TABLE: ${self:service}-customers-${self:provider.stage}
-    ORDERS_TABLE: ${self:service}-orders-${self:provider.stage}
-    PROMOTIONS_TABLE: ${self:service}-promotions-${self:provider.stage}
+    ORDERS_TABLE: order-receiver-orders-dev
+    PROMOTIONS_TABLE: order-receiver-discounts-dev
     PROMOTION_USAGE_TABLE: ${self:service}-promotion-usage-${self:provider.stage}
     SUPPORT_TICKETS_TABLE: ${self:service}-support-tickets-${self:provider.stage}
     FAQS_TABLE: ${self:service}-faqs-${self:provider.stage}
