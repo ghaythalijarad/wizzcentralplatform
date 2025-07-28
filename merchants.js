@@ -1273,3 +1273,38 @@ function hideEditFormMessage() {
 window.closeModal = closeModal;
 window.showEditFormMessage = showEditFormMessage;
 window.hideEditFormMessage = hideEditFormMessage;
+
+// Force load real data function for development testing
+window.forceLoadRealData = async function() {
+    console.log('Forcing load of real data...');
+    showLoader(true, 'Loading real data from database...');
+    
+    try {
+        await initializeAWS();
+        await loadMerchantsFromDynamoDB();
+        
+        if (merchantsData.length > 0) {
+            filteredMerchants = [...merchantsData];
+            renderMerchantsTable();
+            updateMerchantStats();
+            updateDataSourceIndicator('database', `Loaded ${merchantsData.length} real merchants from database`);
+            showMessage(`Loaded ${merchantsData.length} merchants from database`, 'success');
+        } else {
+            showMessage('No merchants found in database', 'info');
+        }
+    } catch (error) {
+        console.error('Failed to force load real data:', error);
+        showMessage(`Failed to load real data: ${error.message}`, 'error');
+    } finally {
+        showLoader(false);
+    }
+};
+
+// Update merchant status function (for status modal)
+window.updateMerchantStatus = function() {
+    console.log('updateMerchantStatus function called - this would handle status modal updates');
+    // This function would be implemented to handle the status modal
+    // For now, just close the modal
+    closeModal('statusModal');
+    showMessage('Status modal function not fully implemented yet', 'info');
+};
