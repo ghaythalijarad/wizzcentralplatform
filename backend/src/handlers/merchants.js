@@ -205,15 +205,31 @@ exports.createMerchant = async (event) => {
 // Update merchant
 exports.updateMerchant = async (event) => {
   try {
+    console.log('=== UPDATE MERCHANT START ===');
+    console.log('Event:', JSON.stringify(event, null, 2));
+
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
+      console.log('CORS preflight request, returning cors response');
       return responseHelper.cors();
     }
 
     const merchantId = event.pathParameters.merchantId;
-    const body = JSON.parse(event.body);
+    console.log('Merchant ID:', merchantId);
+
+    let body;
+    try {
+      body = JSON.parse(event.body || '{}');
+      console.log('Parsed request body:', body);
+    } catch (jsonError) {
+      console.error('Failed to parse request body as JSON:', jsonError);
+      return responseHelper.validation([
+        { field: 'body', message: 'Invalid JSON in request body' }
+      ]);
+    }
 
     if (!merchantId) {
+      console.error('Missing merchant ID');
       return responseHelper.validation([
         { field: 'merchantId', message: 'Merchant ID is required' }
       ]);
@@ -222,25 +238,34 @@ exports.updateMerchant = async (event) => {
     // Validate input
     const validator = validate(merchantSchemas.update);
     const validation = validator(body);
+    console.log('Validation result:', validation);
 
     if (!validation.isValid) {
+      console.error('Validation failed:', validation.errors);
       return responseHelper.validation(validation.errors);
     }
 
     const updates = validation.data;
+    console.log('Validated updates:', updates);
 
     // Check if merchant exists
+    console.log(`Checking for merchant with ID: ${merchantId} in table: ${MERCHANTS_TABLE}`);
     const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
     if (!existingMerchant) {
+      console.error(`Merchant not found with ID: ${merchantId}`);
       return responseHelper.notFound('Merchant not found');
     }
+    console.log('Existing merchant found:', existingMerchant);
 
     // If email is being updated, check if new email already exists
     if (updates.email && updates.email !== existingMerchant.email) {
+      console.log(`Checking for existing email: ${updates.email}`);
       const emailExists = await database.findByEmail(MERCHANTS_TABLE, updates.email);
       if (emailExists) {
+        console.error(`Email already exists: ${updates.email}`);
         return responseHelper.conflict('Email already in use by another merchant');
       }
+      console.log('Email is available.');
     }
 
     // Update merchant with correct key
@@ -268,13 +293,18 @@ exports.updateMerchant = async (event) => {
       ReturnValues: 'ALL_NEW'
     };
 
+    console.log('DynamoDB update parameters:', JSON.stringify(updateParams, null, 2));
+
     const result = await database.client.send(new UpdateCommand(updateParams));
     const updatedMerchant = result.Attributes;
+    console.log('DynamoDB update successful. Updated merchant:', updatedMerchant);
 
     return responseHelper.success({ merchant: updatedMerchant, message: 'Merchant updated successfully' });
 
   } catch (error) {
+    console.error('=== UPDATE MERCHANT ERROR ===');
     console.error('Update merchant error:', error);
+    console.error('Error stack:', error.stack);
     return responseHelper.serverError('Failed to update merchant');
   }
 };
