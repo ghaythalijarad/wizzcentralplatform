@@ -96,9 +96,50 @@ function withTimeout(promise, ms, operationName = 'Unnamed operation') {
 
 // Initialize merchants page when DOM is ready
 const onDomReady = async function() {
-    console.log('🚀 Merchants page DOM loaded - Loading merchants...');
+    // Prevent loading via file:// protocol
+    if (window.location.protocol === 'file:') {
+        console.error('Page loaded via file:// protocol is not supported.');
+        showMessage('Page cannot be loaded via file:// protocol. Please use a local HTTP server.', 'error');
+        updateDataSourceIndicator('error', 'Unsupported protocol');
+        return;
+    }
+    console.log('🚀 Merchants page initialized');
     showLoader(true, 'Loading merchants...');
-    await refreshMerchantsData();
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+        console.log('Local environment: using DynamoDB scan');
+        try {
+            await refreshMerchantsData();
+        } catch (error) {
+            console.error('Error loading merchants from DB:', error);
+            showMessage(`Failed to load merchants: ${error.message}`, 'error');
+            updateDataSourceIndicator('error', `Error: ${error.message}`);
+        }
+    } else {
+        console.log('Production environment: fetching merchants via API');
+        try {
+            await fetchMerchantsFromApi();
+            if (merchantsData.length > 0) {
+                renderMerchantsTable();
+                updateMerchantStats();
+                updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
+                showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
+            } else {
+                document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
+                updateDataSourceIndicator('empty', 'No merchants to display');
+                showMessage('No merchants to display.', 'info');
+            }
+        } catch (error) {
+            console.error('API fetch failed, falling back to DB:', error);
+            try {
+                await refreshMerchantsData();
+            } catch (dbError) {
+                console.error('DB fallback failed:', dbError);
+                showMessage(`Failed to load merchants: ${dbError.message}`, 'error');
+                updateDataSourceIndicator('error', `Error: ${dbError.message}`);
+            }
+        }
+    }
     showLoader(false);
     setupEventListeners();
 };
@@ -737,6 +778,44 @@ function setupEditFormSubmission() {
     newForm.addEventListener('submit', handleEditFormSubmission);
 }
 
+// Begin missing helper functions - collect and validate edit form data
+function collectEditFormData(form) {
+    const formData = new FormData(form);
+    const data = {};
+    const businessName = formData.get('businessName')?.trim(); if (businessName) data.businessName = businessName;
+    const ownerName = formData.get('ownerName')?.trim(); if (ownerName) data.ownerName = ownerName;
+    const email = formData.get('email')?.trim(); if (email) data.email = email;
+    const phoneNumber = formData.get('phoneNumber')?.trim(); if (phoneNumber) data.phoneNumber = phoneNumber;
+    const businessType = formData.get('businessType'); if (businessType) data.businessType = businessType;
+    const newStatus = formData.get('status'); const originalStatus = form.getAttribute('data-original-status');
+    const reason = formData.get('statusReason')?.trim();
+    if (newStatus && newStatus !== originalStatus) {
+        data.statusUpdate = { newStatus, previousStatus: originalStatus, reason };
+    }
+    const street = formData.get('street')?.trim(); if (street) data.street = street;
+    const city = formData.get('city')?.trim(); if (city) data.city = city;
+    const district = formData.get('district')?.trim(); if (district) data.district = district;
+    const country = formData.get('country')?.trim(); if (country) data.country = country;
+    data.updatedAt = new Date().toISOString();
+    Object.keys(data).forEach(key => { if (data[key] === '' || data[key] == null) delete data[key]; });
+    return data;
+}
+
+function validateEditFormData(data) {
+    const errors = [];
+    if (!data.businessName || data.businessName.length < 2) errors.push('Business name must be at least 2 characters');
+    if (!data.email) errors.push('Email is required'); else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.push('Invalid email format');
+    if (!data.phoneNumber) errors.push('Phone number is required');
+    if (data.statusUpdate) {
+        const validStatuses = ['pending','approved','under_review','rejected'];
+        if (!validStatuses.includes(data.statusUpdate.newStatus)) errors.push('Invalid status selected');
+        if (!data.statusUpdate.reason || data.statusUpdate.reason.length < 10) errors.push('Reason must be at least 10 characters');
+        if (data.statusUpdate.reason && data.statusUpdate.reason.length > 500) errors.push('Reason must be less than 500 characters');
+    }
+    return { isValid: errors.length === 0, errors };
+}
+
+// Handle form submission for editing merchants
 async function handleEditFormSubmission(event) {
     event.preventDefault();
     
