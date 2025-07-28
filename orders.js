@@ -82,7 +82,17 @@ async function fetchOrdersFromApi() {
 // UI and events
 function initializeUI() { renderOrdersTable(); }
 function setupEventListeners() {
-    document.getElementById('ordersTableBody');
+    // Close Order Details Modal buttons
+    document.querySelectorAll('.close-order-modal').forEach(btn => {
+        btn.addEventListener('click', closeOrderModal);
+    });
+    // Optionally, add overlay click listener to close modal when clicking outside content
+    const modal = document.getElementById('orderDetailsModal');
+    if (modal) {
+        modal.addEventListener('click', event => {
+            if (event.target === modal) closeOrderModal();
+        });
+    }
 }
 
 // Render table
