@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Status Update Authorization</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .log { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        input { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Status Update Authorization</h1>
+        <p>This tool debugs the 500 error in merchant status updates.</p>
+
+        <div class="test-section info">
+            <h3>Current Token Information</h3>
+            <div id="tokenInfo"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Authentication Token</h3>
+            <button onclick="analyzeToken()">Analyze JWT Token</button>
+            <div id="tokenAnalysis" class="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Status Update Request</h3>
+            <input type="text" id="merchantId" placeholder="Enter merchant ID (businessId)" value="723a276a-ad62-482c-898c-076d1f8d5c0e">
+            <button onclick="testStatusUpdate()">Test Status Update API</button>
+            <div id="statusResult" class="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Debug Log</h3>
+            <div id="debugLog" class="log"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+
+    <script>
+        function log(message, type = 'info') {
+            const debugLog = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.textContent += `[${timestamp}] ${message}\n`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[DEBUG] ${message}`);
+        }
+
+        function displayTokenInfo() {
+            const idToken = sessionStorage.getItem('idToken');
+            const accessToken = sessionStorage.getItem('accessToken');
+            
+            const tokenInfo = document.getElementById('tokenInfo');
+            tokenInfo.innerHTML = `
+                <strong>ID Token:</strong> ${idToken ? 'Present (' + idToken.length + ' chars)' : 'Missing'}<br>
+                <strong>Access Token:</strong> ${accessToken ? 'Present (' + accessToken.length + ' chars)' : 'Missing'}<br>
+                <strong>API Base URL:</strong> ${window.WIZZCENTRAL_CONFIG?.API_BASE_URL || 'Not configured'}
+            `;
+        }
+
+        function analyzeToken() {
+            log('Analyzing JWT token...');
+            const tokenAnalysis = document.getElementById('tokenAnalysis');
+            
+            try {
+                const idToken = sessionStorage.getItem('idToken');
+                if (!idToken) {
+                    tokenAnalysis.textContent = 'No ID token found';
+                    return;
+                }
+
+                // Decode JWT token (just the payload, don't verify signature)
+                const parts = idToken.split('.');
+                if (parts.length !== 3) {
+                    tokenAnalysis.textContent = 'Invalid JWT format';
+                    return;
+                }
+
+                const payload = JSON.parse(atob(parts[1]));
+                
+                const analysis = `JWT Token Analysis:
+
+Header: ${parts[0].substring(0, 50)}...
+Payload: ${JSON.stringify(payload, null, 2)}
+Signature: ${parts[2].substring(0, 50)}...
+
+Key Information:
+- User ID: ${payload.sub || 'Not found'}
+- Username: ${payload['cognito:username'] || payload.username || 'Not found'}
+- Email: ${payload.email || 'Not found'}
+- Groups: ${JSON.stringify(payload['cognito:groups'] || [])}
+- Roles: ${JSON.stringify(payload['custom:role'] || payload.role || 'Not found')}
+- Token Issuer: ${payload.iss || 'Not found'}
+- Audience: ${payload.aud || 'Not found'}
+- Expiry: ${payload.exp ? new Date(payload.exp * 1000).toISOString() : 'Not found'}
+- Issued At: ${payload.iat ? new Date(payload.iat * 1000).toISOString() : 'Not found'}`;
+
+                tokenAnalysis.textContent = analysis;
+                log('Token analysis completed');
+                
+            } catch (error) {
+                tokenAnalysis.textContent = `Token analysis failed: ${error.message}`;
+                log(`Token analysis error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStatusUpdate() {
+            const merchantId = document.getElementById('merchantId').value.trim();
+            if (!merchantId) {
+                log('Please enter a merchant ID', 'error');
+                return;
+            }
+
+            log(`Testing status update for merchant: ${merchantId}`);
+            const statusResult = document.getElementById('statusResult');
+            statusResult.textContent = 'Testing status update...\n';
+            
+            try {
+                const accessToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
+                
+                if (!accessToken) {
+                    throw new Error('No authentication token available');
+                }
+
+                const requestBody = {
+                    action: 'approve',
+                    reason: 'Testing status update from debug tool',
+                    sendEmail: false
+                };
+
+                const url = `${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${merchantId}/status`;
+                
+                log(`Making request to: ${url}`);
+                log(`Request body: ${JSON.stringify(requestBody, null, 2)}`);
+                
+                statusResult.textContent += `Request URL: ${url}\n`;
+                statusResult.textContent += `Request Body: ${JSON.stringify(requestBody, null, 2)}\n`;
+                statusResult.textContent += `Authorization: Bearer ${accessToken.substring(0, 20)}...\n\n`;
+                
+                const response = await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const responseText = await response.text();
+                
+                statusResult.textContent += `Response Status: ${response.status} ${response.statusText}\n`;
+                statusResult.textContent += `Response Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}\n`;
+                statusResult.textContent += `Response Body: ${responseText}\n`;
+                
+                if (response.ok) {
+                    log('Status update test successful');
+                } else {
+                    log(`Status update test failed: ${response.status} ${responseText}`, 'error');
+                    
+                    // Try to parse error details
+                    try {
+                        const errorData = JSON.parse(responseText);
+                        statusResult.textContent += `\nParsed Error:\n${JSON.stringify(errorData, null, 2)}\n`;
+                        
+                        if (errorData.error) {
+                            statusResult.textContent += `\nError Message: ${errorData.error.message || 'Unknown'}\n`;
+                            statusResult.textContent += `Error Details: ${JSON.stringify(errorData.error.details || {}, null, 2)}\n`;
+                        }
+                    } catch (parseError) {
+                        statusResult.textContent += `\nFailed to parse error response: ${parseError.message}\n`;
+                    }
+                }
+
+            } catch (error) {
+                const errorMsg = `Status update test failed: ${error.message}`;
+                statusResult.textContent += `\nTest Error: ${errorMsg}\n`;
+                log(errorMsg, 'error');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            displayTokenInfo();
+            log('Debug tool initialized');
+        });
+    </script>
+</body>
+</html>

@@ -1144,6 +1144,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 
                 console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
                 console.log('Status update request body:', requestBody);
+                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
                 console.log('Access token (first 20 chars):', accessToken ? accessToken.substring(0, 20) + '...' : 'None');
                 
                 const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
@@ -1166,7 +1167,17 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         // Try to parse as JSON
                         if (responseText.trim().startsWith('{')) {
                             errorDetails = JSON.parse(responseText);
-                            errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                            // Handle nested error structure from API response
+                            if (errorDetails.error && typeof errorDetails.error === 'object') {
+                                errorMessage = errorDetails.error.message || errorDetails.error.error || errorDetails.message || `Server error: ${statusResponse.status}`;
+                            } else {
+                                errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                            }
+                            
+                            // Ensure errorMessage is a string
+                            if (typeof errorMessage !== 'string') {
+                                errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
+                            }
                         } else {
                             errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
                         }
@@ -1175,6 +1186,14 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         console.error('Failed to parse error response:', e);
                         errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
                     }
+                    
+                    // Ensure errorMessage is a string before throwing
+                    if (typeof errorMessage !== 'string') {
+                        console.error('Error message is not a string:', typeof errorMessage, errorMessage);
+                        errorMessage = 'Failed to update merchant status - server error';
+                    }
+                    
+                    console.log('About to throw error with message:', errorMessage);
                     throw new Error(errorMessage);
                 }
                 
@@ -1202,7 +1221,12 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     let errorMessage = 'Update failed';
                     try {
                         const errorData = await response.json();
-                        errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                        // Handle nested error structure from API response
+                        if (errorData.error && typeof errorData.error === 'object') {
+                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;
+                        } else {
+                            errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
+                        }
                         console.error('Merchant update error details:', errorData);
                     } catch (e) {
                         console.error('Failed to parse error response:', e);
@@ -1256,6 +1280,8 @@ async function submitMerchantUpdate(merchantId, updateData) {
             // Try to extract error information from response object
             if (error.message) {
                 errorMessage = error.message;
+            } else if (error.error && typeof error.error === 'object' && error.error.message) {
+                errorMessage = error.error.message;
             } else if (error.status) {
                 errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
             } else {
@@ -1265,6 +1291,12 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     errorMessage = 'Failed to parse error object';
                 }
             }
+        }
+        
+        // Final safety check - ensure errorMessage is a string
+        if (typeof errorMessage !== 'string') {
+            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
+            errorMessage = 'An error occurred while updating the merchant';
         }
         
         // Provide more specific error messages based on content
