@@ -1037,7 +1037,7 @@ function validateEditFormData(data) {
     
     // Status change validation
     if (data.statusUpdate) {
-        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];
+        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];w', 'rejected'];
         if (!validStatuses.includes(data.statusUpdate.newStatus)) {
             errors.push('Invalid status selected');
         }
@@ -1124,428 +1124,405 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 // Map status to action for the backend API
                 const statusActionMap = {
                     'verified': 'approve',
-                    'approved': 'approve', // Handle both verified and approved status
+                    'approved': 'approve',
                     'rejected': 'reject',
                     'suspended': 'suspend', 
                     'under-review': 'review',
+                    'under_review': 'review', // handle underscore variant
                     'pending': 'reactivate' 
                 };
                 
                 const action = statusActionMap[updateData.statusUpdate.newStatus];
-                if (!action) {
-                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
-                }
-
+                if (!action) {dStatus = updateData.statusUpdate.newStatus;
+                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);replace(/_/g, '-')];
+                }f (!action) {
+                    throw new Error(`Invalid status change: ${requestedStatus}`);
                 const requestBody = {
                     action: action,
                     reason: updateData.statusUpdate.reason,
                     sendEmail: true
-                };
-                
+                };  reason: updateData.statusUpdate.reason,
+                    sendEmail: true
                 console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
                 console.log('Status update request body:', requestBody);
-                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
+                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));tus`);
                 console.log('Access token (first 20 chars):', accessToken ? accessToken.substring(0, 20) + '...' : 'None');
-                
-                const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                if (!statusResponse.ok) {
-                    let errorMessage = 'Status update failed';
-                    let errorDetails = null;
-                    try {
-                        const responseText = await statusResponse.text();
-                        console.error('Raw error response text:', responseText);
-                        
-                        // Try to parse as JSON
-                        if (responseText.trim().startsWith('{')) {
-                            errorDetails = JSON.parse(responseText);
-                            // Handle nested error structure from API response
-                            if (errorDetails.error && typeof errorDetails.error === 'object') {
-                                errorMessage = errorDetails.error.message || errorDetails.error.error || errorDetails.message || `Server error: ${statusResponse.status}`;
-                            } else {
-                                errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
-                            }
-                            
-                            // Ensure errorMessage is a string
-                            if (typeof errorMessage !== 'string') {
-                                errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
-                            }
-                        } else {
-                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
-                        }
-                        console.error('Status update error details:', errorDetails || responseText);
-                    } catch (e) {
-                        console.error('Failed to parse error response:', e);
-                        errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
+                console.log('Status update request body JSON:', JSON.stringify(requestBody, null, 2));
+                const statusUpdateUrl = `${API_BASE_URL}/merchants/${merchantId}/status`;0) + '...' : 'None');
+                const statusUpdatePayload = requestBody;
+                sponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                try {
+                    // Make the API call to update status
+                    const statusUpdateResult = await apiCall(statusUpdateUrl, 'PATCH', statusUpdatePayload, accessToken);/json',
+                    console.log('Status update API call successful:', statusUpdateResult);  'Authorization': `Bearer ${accessToken}`,
+
+                    // The backend returns { success: true, merchant: updatedMerchant } },
+                    // We need to handle this structure.    body: JSON.stringify(requestBody)
+                    if (statusUpdateResult && statusUpdateResult.success && statusUpdateResult.merchant) {
+                        updateData.statusUpdate = statusUpdateResult.merchant; // Use the returned merchant data
+                    } else if (statusUpdateResult && statusUpdateResult.success) {
+                        // If merchant object is not returned, we can try to refetch or use existing datarrorMessage = 'Status update failed';
+                        console.warn('Status update successful, but no merchant data returned. UI might not reflect latest changes immediately.');
+                        // As a fallback, we can merge the submitted changes into the local data
+                        const updatedMerchantLocally = { ...merchant, ...statusUpdatePayload };const responseText = await statusResponse.text();
+                        updateData.statusUpdate = updatedMerchantLocally;r response text:', responseText);
+                    } else {
+                        // This case might happen if the response is not what we expect, even on success.
+                        console.log('Status update response was not in the expected format, but assuming success based on HTTP status.');
+                        updateData.statusUpdate = { ...merchant, ...statusUpdatePayload };
                     }
-                    
-                    // Ensure errorMessage is a string before throwing
-                    if (typeof errorMessage !== 'string') {
-                        console.error('Error message is not a string:', typeof errorMessage, errorMessage);
-                        errorMessage = 'Failed to update merchant status - server error';
-                    }
-                    
-                    console.log('About to throw error with message:', errorMessage);
-                    throw new Error(errorMessage);
-                }
-                
-                console.log('Status update successful');
+                } catch (error) {rDetails.error && typeof errorDetails.error === 'object') {
+                    console.error('Status update API call failed:', error);nse.status}`;
+                    throw new Error(`Failed to update status: ${error.message}`); else {
+                }    errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
             }
             
             // Remove statusUpdate from regular update data
-            const { statusUpdate, ...regularUpdateData } = updateData;
-            
+            const { statusUpdate, ...regularUpdateData } = updateData;f (typeof errorMessage !== 'string') {
+            errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
             // If there are other fields to update, make a separate call
-            if (Object.keys(regularUpdateData).length > 0) {
-                console.log('Submitting regular merchant update:', regularUpdateData);
+            if (Object.keys(regularUpdateData).length > 0) { else {
+                console.log('Submitting regular merchant update:', regularUpdateData);xt} - ${responseText.substring(0, 200)}`;
                 
-                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {etails || responseText);
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
+                    headers: {   console.error('Failed to parse error response:', e);
+                        'Content-Type': 'application/json',    errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
                         'Authorization': `Bearer ${accessToken}`,
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify(regularUpdateData)
-                });
-                
+                });   console.error('Error message is not a string:', typeof errorMessage, errorMessage);
+                    errorMessage = 'Failed to update merchant status - server error';
                 if (!response.ok) {
                     let errorMessage = 'Update failed';
-                    try {
-                        const errorData = await response.json();
+                    try {   console.log('About to throw error with message:', errorMessage);
+                        const errorData = await response.json();    throw new Error(errorMessage);
                         // Handle nested error structure from API response
-                        if (errorData.error && typeof errorData.error === 'object') {
-                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;
+                        if (errorData.error && typeof errorData.error === 'object') {   
+                            errorMessage = errorData.error.message || errorData.error.error || errorData.message || `Server error: ${response.status}`;    console.log('Status update successful');
                         } else {
                             errorMessage = errorData.message || errorData.error || `Server error: ${response.status}`;
-                        }
+                        }// Remove statusUpdate from regular update data
                         console.error('Merchant update error details:', errorData);
                     } catch (e) {
                         console.error('Failed to parse error response:', e);
-                        // Try to get response text if JSON parsing fails
+                        // Try to get response text if JSON parsing failsObject.keys(regularUpdateData).length > 0) {
                         try {
                             const errorText = await response.text();
-                            console.error('Error response text:', errorText);
+                            console.error('Error response text:', errorText); = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
                             errorMessage = `HTTP ${response.status}: ${response.statusText} - ${errorText.substring(0, 200)}`;
                         } catch (textError) {
-                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-                        }
+                            errorMessage = `HTTP ${response.status}: ${response.statusText}`;/json',
+                        }  'Authorization': `Bearer ${accessToken}`,
                     }
-                    throw new Error(errorMessage);
-                }
+                    throw new Error(errorMessage); },
+                }    body: JSON.stringify(regularUpdateData)
                 
                 const result = await response.json();
-                
+                onse.ok) {
                 // Update local data with the response from server
                 if (result.merchant) {
                     const merchantIndex = filteredMerchants.findIndex(m => m.id === merchantId);
                     if (merchantIndex !== -1) {
-                        Object.assign(filteredMerchants[merchantIndex], result.merchant);
-                        
-                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId);
-                        if (mainIndex !== -1) {
+                        Object.assign(filteredMerchants[merchantIndex], result.merchant);rData.error && typeof errorData.error === 'object') {
+                        erver error: ${response.status}`;
+                        const mainIndex = merchantsData.findIndex(m => m.id === merchantId); else {
+                        if (mainIndex !== -1) {`Server error: ${response.status}`;
                             Object.assign(merchantsData[mainIndex], result.merchant);
-                        }
+                        }rData);
                     }
-                }
-                
+                }le.error('Failed to parse error response:', e);
+                fails
                 return { success: true, data: result };
             }
-            
-            return { success: true };
-        }
-        
+            ror response text:', errorText);
+            return { success: true }; ${errorText.substring(0, 200)}`;
+        } catch (textError) {
+               errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     } catch (error) {
-        console.error('API call failed:', error);
-        console.error('Error type:', typeof error);
+        console.error('API call failed:', error);   }
+        console.error('Error type:', typeof error);    throw new Error(errorMessage);
         console.error('Error message:', error?.message);
         console.error('Error stack:', error?.stack);
         
         // Extract meaningful error message
         let errorMessage = 'Unknown error occurred';
         
-        if (error instanceof Error) {
-            errorMessage = error.message || 'Unknown error occurred';
+        if (error instanceof Error) {antId);
+            errorMessage = error.message || 'Unknown error occurred';merchantIndex !== -1) {
         } else if (typeof error === 'string') {
             errorMessage = error;
-        } else if (error && typeof error === 'object') {
-            // Try to extract error information from response object
-            if (error.message) {
-                errorMessage = error.message;
-            } else if (error.error && typeof error.error === 'object' && error.error.message) {
+        } else if (error && typeof error === 'object') {antId);
+            // Try to extract error information from response objectf (mainIndex !== -1) {
+            if (error.message) {       Object.assign(merchantsData[mainIndex], result.merchant);
+                errorMessage = error.message;       }
+            } else if (error.error && typeof error.error === 'object' && error.error.message) {    }
                 errorMessage = error.error.message;
-            } else if (error.status) {
-                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
+            } else if (error.status) {   
+                errorMessage = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;    return { success: true, data: result };
             } else {
-                try {
-                    errorMessage = JSON.stringify(error);
+                try {   
+                    errorMessage = JSON.stringify(error);    return { success: true };
                 } catch (e) {
                     errorMessage = 'Failed to parse error object';
                 }
             }
         }
-        
-        // Final safety check - ensure errorMessage is a string
+        console.error('Error message:', error?.message);
+        // Final safety check - ensure errorMessage is a string?.stack);
         if (typeof errorMessage !== 'string') {
-            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
-            errorMessage = 'An error occurred while updating the merchant';
+            console.error('Error message is still not a string:', typeof errorMessage, errorMessage);// Extract meaningful error message
+            errorMessage = 'An error occurred while updating the merchant';rror occurred';
         }
         
-        // Provide more specific error messages based on content
+        // Provide more specific error messages based on contentmessage || 'Unknown error occurred';
         if (error.name === 'TypeError' && errorMessage.includes('fetch')) {
             return { success: false, error: 'Network error. Please check your connection and try again.' };
-        } else if (errorMessage.includes('401')) {
-            return { success: false, error: 'Authentication failed. Please login again.' };
+        } else if (errorMessage.includes('401')) {of error === 'object') {
+            return { success: false, error: 'Authentication failed. Please login again.' };on from response object
         } else if (errorMessage.includes('403')) {
             return { success: false, error: 'You do not have permission to edit this merchant.' };
-        } else if (errorMessage.includes('404')) {
+        } else if (errorMessage.includes('404')) {typeof error.error === 'object' && error.error.message) {
             return { success: false, error: 'Merchant not found.' };
-        } else if (errorMessage.includes('500')) {
-            return { success: false, error: 'Server error occurred. Please try again or contact support.' };
+        } else if (errorMessage.includes('500')) {f (error.status) {
+            return { success: false, error: 'Server error occurred. Please try again or contact support.' };Message = `HTTP ${error.status}: ${error.statusText || 'Server Error'}`;
         } else {
             return { success: false, error: errorMessage };
         }
-    }
-}
-
-function showEditFormMessage(message, type = 'info') {
+    } catch (e) {
+}       errorMessage = 'Failed to parse error object';
+       }
+function showEditFormMessage(message, type = 'info') {    }
     const messageContainer = document.getElementById('editFormMessages');
     const typeStyles = {
         success: 'background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0;',
         error: 'background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5;',
-        warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',
-        info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
+        warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',   console.error('Error message is still not a string:', typeof errorMessage, errorMessage);
+        info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'    errorMessage = 'An error occurred while updating the merchant';
     };
     
     messageContainer.innerHTML = `
-        <div style="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">
-            ${message}
+        <div style="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">sage.includes('fetch')) {
+            ${message}d try again.' };
         </div>
     `;
     messageContainer.style.display = 'block';
-}
+}ion to edit this merchant.' };
 
 function hideEditFormMessage() {
-    const messageContainer = document.getElementById('editFormMessages');
-    if (messageContainer) {
-        messageContainer.style.display = 'none';
-        messageContainer.innerHTML = '';
-    }
-}
+    const messageContainer = document.getElementById('editFormMessages');f (errorMessage.includes('500')) {
+    if (messageContainer) {ccurred. Please try again or contact support.' };
+        messageContainer.style.display = 'none'; else {
+        messageContainer.innerHTML = '';       return { success: false, error: errorMessage };
+    }       }
+}    }
 
 function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
+    const modal = document.getElementById(modalId);sage(message, type = 'info') {
     if (modal) {
         modal.style.display = 'none';
         
-        // Special handling for edit modal
-        if (modalId === 'editMerchantModal') {
-            resetEditForm();
+        // Special handling for edit modal',
+        if (modalId === 'editMerchantModal') {  warning: 'background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;',
+            resetEditForm();    info: 'background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd;'
             
             // Clear auto-saved data if user manually closes modal
-            const form = document.getElementById('editMerchantForm');
-            const merchantId = form?.getAttribute('data-merchant-id');
-            if (merchantId) {
+            const form = document.getElementById('editMerchantForm');nnerHTML = `
+            const merchantId = form?.getAttribute('data-merchant-id');tyle="padding: 0.75rem; border-radius: 6px; margin: 0.5rem 0; ${typeStyles[type] || typeStyles.info}">
+            if (merchantId) {      ${message}
                 const saveKey = `editForm_${merchantId}`;
-                localStorage.removeItem(saveKey);
-            }
+                localStorage.removeItem(saveKey);   `;
+            }    messageContainer.style.display = 'block';
         }
         
-        // Remove focus from any active elements
-        if (document.activeElement) {
+        // Remove focus from any active elementse() {
+        if (document.activeElement) {ById('editFormMessages');
             document.activeElement.blur();
-        }
-    }
-}
+        }   messageContainer.style.display = 'none';
+    }       messageContainer.innerHTML = '';
+}    }
 
 // Enhanced form handling functions
-
-function resetEditForm() {
-    const form = document.getElementById('editMerchantForm');
+dal(modalId) {
+function resetEditForm() {ById(modalId);
+    const form = document.getElementById('editMerchantForm');modal) {
     if (form) {
         form.reset();
-        hideEditFormMessage();
-        
+        hideEditFormMessage();for edit modal
+        modalId === 'editMerchantModal') {
         // Hide status reason section
         const statusReasonSection = document.getElementById('statusReasonSection');
         if (statusReasonSection) {
-            statusReasonSection.style.display = 'none';
-        }
+            statusReasonSection.style.display = 'none';ment.getElementById('editMerchantForm');
+        }erchant-id');
         
-        // Reset status reason field
-        const statusReasonField = document.getElementById('editStatusReason');
-        if (statusReasonField) {
+        // Reset status reason field   const saveKey = `editForm_${merchantId}`;
+        const statusReasonField = document.getElementById('editStatusReason');       localStorage.removeItem(saveKey);
+        if (statusReasonField) {    }
             statusReasonField.required = false;
             statusReasonField.value = '';
-        }
-        
-        // Reset status field styling
-        const statusField = document.getElementById('editStatus');
-        if (statusField) {
+        }ements
+        f (document.activeElement) {
+        // Reset status field styling       document.activeElement.blur();
+        const statusField = document.getElementById('editStatus');       }
+        if (statusField) {    }
             statusField.style.borderColor = '#d1d5db';
             statusField.style.backgroundColor = 'white';
-        }
+        }functions
         
-        // Reset any custom styling
-        const inputs = form.querySelectorAll('input, select, textarea');
+        // Reset any custom stylingditForm() {
+        const inputs = form.querySelectorAll('input, select, textarea');ment.getElementById('editMerchantForm');
         inputs.forEach(input => {
-            input.classList.remove('error', 'success');
+            input.classList.remove('error', 'success');form.reset();
             input.style.borderColor = '';
         });
-    }
-}
-
-function handleFormFieldValidation() {
+    }ion
+}ById('statusReasonSection');
+f (statusReasonSection) {
+function handleFormFieldValidation() {    statusReasonSection.style.display = 'none';
     // Add real-time validation to form fields
     const form = document.getElementById('editMerchantForm');
-    if (!form) return;
-    
+    if (!form) return;ield
+    lementById('editStatusReason');
     const fields = {
-        editBusinessName: (value) => value && value.length >= 2,
-        editEmail: (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        editBusinessName: (value) => value && value.length >= 2,   statusReasonField.required = false;
+        editEmail: (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),    statusReasonField.value = '';
         editPhoneNumber: (value) => value && value.length >= 5, // Basic phone validation
         editBusinessType: (value) => value && ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'].includes(value)
-    };
-    
+    };eld styling
+    ditStatus');
     Object.keys(fields).forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) {
+        const field = document.getElementById(fieldId);   statusField.style.borderColor = '#d1d5db';
+        if (field) {    statusField.style.backgroundColor = 'white';
             field.addEventListener('blur', function() {
                 const isValid = fields[fieldId](this.value.trim());
-                if (isValid) {
-                    this.style.borderColor = '#10b981';
+                if (isValid) {ng
+                    this.style.borderColor = '#10b981';lect, textarea');
                     this.classList.remove('error');
-                    this.classList.add('success');
-                } else if (this.value.trim()) {
-                    this.style.borderColor = '#ef4444';
-                    this.classList.remove('success');
+                    this.classList.add('success'); input.classList.remove('error', 'success');
+                } else if (this.value.trim()) {       input.style.borderColor = '';
+                    this.style.borderColor = '#ef4444';       });
+                    this.classList.remove('success');    }
                     this.classList.add('error');
-                } else {
                     this.style.borderColor = '';
                     this.classList.remove('error', 'success');
-                }
-            });
-            
+                }alidation to form fields
+            });const form = document.getElementById('editMerchantForm');
+            n;
             field.addEventListener('focus', function() {
                 this.style.borderColor = '#3b82f6';
                 this.classList.remove('error', 'success');
             });
-        }
-    });
+        }  editPhoneNumber: (value) => value && value.length >= 5, // Basic phone validation
+    });    editBusinessType: (value) => value && ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'].includes(value)
 }
 
-function addFormAutoSave() {
+function addFormAutoSave() {ds).forEach(fieldId => {
     // Add auto-save functionality for form data
     const form = document.getElementById('editMerchantForm');
-    if (!form) return;
-    
+    if (!form) return;ener('blur', function() {
+    lue.trim());
     const merchantId = form.getAttribute('data-merchant-id');
-    if (!merchantId) return;
-    
+    if (!merchantId) return;981';
+    r');
     const saveKey = `editForm_${merchantId}`;
     
-    // Load saved data
-    const savedData = localStorage.getItem(saveKey);
+    // Load saved dataf4444';
+    const savedData = localStorage.getItem(saveKey);ss');
     if (savedData) {
-        try {
-            const data = JSON.parse(savedData);
-            Object.keys(data).forEach(key => {
+        try {   this.style.borderColor = '';
+            const data = JSON.parse(savedData);     this.classList.remove('error', 'success');
+            Object.keys(data).forEach(key => {    }
                 const field = document.getElementById(key);
                 if (field && data[key]) {
                     field.value = data[key];
-                }
-            });
-        } catch (e) {
-            console.warn('Failed to load auto-saved form data:', e);
-        }
+                } this.style.borderColor = '#3b82f6';
+            });       this.classList.remove('error', 'success');
+        } catch (e) {     });
+            console.warn('Failed to load auto-saved form data:', e);       }
+        }    });
     }
     
     // Save data on input
-    const inputs = form.querySelectorAll('input, select, textarea');
-    inputs.forEach(input => {
+    const inputs = form.querySelectorAll('input, select, textarea');unctionality for form data
+    inputs.forEach(input => {const form = document.getElementById('editMerchantForm');
         input.addEventListener('input', function() {
             const formData = {};
-            inputs.forEach(inp => {
+            inputs.forEach(inp => {const merchantId = form.getAttribute('data-merchant-id');
                 if (inp.value.trim()) {
                     formData[inp.id] = inp.value.trim();
-                }
+                }ditForm_${merchantId}`;
             });
-            localStorage.setItem(saveKey, JSON.stringify(formData));
-        });
+            localStorage.setItem(saveKey, JSON.stringify(formData));ta
+        });edData = localStorage.getItem(saveKey);
     });
     
     // Clear saved data when form is submitted successfully
-    form.addEventListener('formSubmitSuccess', function() {
-        localStorage.removeItem(saveKey);
-    });
-}
+    form.addEventListener('formSubmitSuccess', function() { => {
+        localStorage.removeItem(saveKey);ementById(key);
+    });f (field && data[key]) {
+}     field.value = data[key];
 
 function enhanceEditModal() {
-    // Add keyboard shortcuts and accessibility improvements
-    const modal = document.getElementById('editMerchantModal');
-    if (!modal) return;
+    // Add keyboard shortcuts and accessibility improvements catch (e) {
+    const modal = document.getElementById('editMerchantModal');       console.warn('Failed to load auto-saved form data:', e);
+    if (!modal) return;    }
     
     // Close modal with Escape key
     document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape' && modal.style.display === 'flex') {
+        if (event.key === 'Escape' && modal.style.display === 'flex') {ect, textarea');
             closeModal('editMerchantModal');
-        }
+        }ut', function() {
     });
     
-    // Close modal when clicking outside
-    modal.addEventListener('click', function(event) {
+    // Close modal when clicking outsidef (inp.value.trim()) {
+    modal.addEventListener('click', function(event) {     formData[inp.id] = inp.value.trim();
         if (event.target === modal) {
-            closeModal('editMerchantModal');
-        }
-    });
+            closeModal('editMerchantModal'); });
+        }     localStorage.setItem(saveKey, JSON.stringify(formData));
+    });    });
     
     // Focus management
-    const firstInput = modal.querySelector('input:not([disabled])');
-    if (firstInput) {
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
+    const firstInput = modal.querySelector('input:not([disabled])');itted successfully
+    if (firstInput) {m.addEventListener('formSubmitSuccess', function() {
+        const observer = new MutationObserver(function(mutations) {       localStorage.removeItem(saveKey);
+            mutations.forEach(function(mutation) {    });
                 if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
                     if (modal.style.display === 'flex') {
                         setTimeout(() => firstInput.focus(), 100);
-                    }
-                }
+                    }rtcuts and accessibility improvements
+                }const modal = document.getElementById('editMerchantModal');
             });
         });
         observer.observe(modal, { attributes: true });
-    }
-}
-
-// Initialize enhanced features when DOM is ready
+    }ction(event) {
+}f (event.key === 'Escape' && modal.style.display === 'flex') {
+     closeModal('editMerchantModal');
+// Initialize enhanced features when DOM is ready    }
 function initializeEditEnhancements() {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(() => {
-                handleFormFieldValidation();
-                enhanceEditModal();
-            }, 500);
+        document.addEventListener('DOMContentLoaded', function() {ide
+            setTimeout(() => {(event) {
+                handleFormFieldValidation();f (event.target === modal) {
+                enhanceEditModal();     closeModal('editMerchantModal');
+            }, 500);    }
         });
     } else {
-        setTimeout(() => {
-            handleFormFieldValidation();
+        setTimeout(() => {nt
+            handleFormFieldValidation();;
             enhanceEditModal();
         }, 500);
     }
-}
-
-// Call initialization
-initializeEditEnhancements();
-
+}ributeName === 'style') {
+f (modal.style.display === 'flex') {
+// Call initialization       setTimeout(() => firstInput.focus(), 100);
+initializeEditEnhancements();     }
+     }
 // Make sure the DOM is ready before executing the main logic
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onDomReady);
-} else {
+if (document.readyState === 'loading') {   });
+    document.addEventListener('DOMContentLoaded', onDomReady);       observer.observe(modal, { attributes: true });
+} else {    }
     onDomReady();
+}
 }

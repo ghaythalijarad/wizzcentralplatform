@@ -66,6 +66,41 @@ class Database {
     return this.get(tableName, 'userId', userId);
   }
 
+  // Update item with flexible key
+  async updateByKey(tableName, keyName, keyValue, updates) {
+    const updateExpression = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+
+    Object.keys(updates).forEach(key => {
+      updateExpression.push(`#${key} = :${key}`);
+      expressionAttributeNames[`#${key}`] = key;
+      expressionAttributeValues[`:${key}`] = updates[key];
+    });
+
+    // Always update the updatedAt timestamp
+    updateExpression.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    const params = {
+      TableName: tableName,
+      Key: { [keyName]: keyValue },
+      UpdateExpression: `SET ${updateExpression.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: 'ALL_NEW'
+    };
+
+    try {
+      const result = await this.client.send(new UpdateCommand(params));
+      return result.Attributes;
+    } catch (error) {
+      console.error('Database Update Error:', error);
+      throw new Error(`Failed to update item in ${tableName}`);
+    }
+  }
+
   // Update item
   async update(tableName, id, updates) {
     const updateExpression = [];
