@@ -96,57 +96,11 @@ function withTimeout(promise, ms, operationName = 'Unnamed operation') {
 
 // Initialize merchants page when DOM is ready
 const onDomReady = async function() {
-    console.log('🚀 Merchants page DOM loaded - Starting initialization...');
-    const tableBody = document.getElementById('merchantsTableBody');
-
-    // Early exit if critical element is missing
-    if (!tableBody) {
-        console.error('CRITICAL: merchantsTableBody element not found! Aborting.');
-        return;
-    }
-
-    // Always ensure the loader is managed and event listeners are set up.
-    try {
-        // Protocol check: file:// not supported for fetch
-        if (window.location.protocol === 'file:') {
-            throw new Error('Page cannot be loaded via file:// protocol. Please use a local HTTP server.');
-        }
-
-        // Initialize dashboard UI elements
-        if (typeof initializeDashboard === 'function') {
-            console.log('Initializing dashboard UI...');
-            initializeDashboard();
-        } else {
-            console.warn('initializeDashboard function not found, skipping.');
-        }
-
-        console.log('🎯 Attempting to fetch merchants via API');
-        showLoader(true, 'Loading merchants...');
-        await fetchMerchantsFromApi();
-
-        if (merchantsData.length > 0) {
-            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} merchants from API`);
-            filteredMerchants = [...merchantsData];
-            renderMerchantsTable();
-            updateMerchantStats();
-            updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
-            showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
-        } else {
-            console.log('⚠️ API returned no merchants.');
-            document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
-            updateDataSourceIndicator('empty', 'No merchants to display');
-            showMessage('No merchants to display.', 'info');
-        }
-
-    } catch (error) {
-        console.error('❌ Error loading merchants via API:', error);
-        document.getElementById('merchantsTableBody').innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-600 bg-red-50">${error.message}</td></tr>`;
-        updateDataSourceIndicator('error', `Error: ${error.message}`);
-        showMessage(`Failed to load merchants: ${error.message}`, 'error');
-    } finally {
-        showLoader(false);
-        setupEventListeners();
-    }
+    console.log('🚀 Merchants page DOM loaded - Loading merchants...');
+    showLoader(true, 'Loading merchants...');
+    await refreshMerchantsData();
+    showLoader(false);
+    setupEventListeners();
 };
 
 // New: Fetch merchants via backend API
