@@ -34,10 +34,7 @@ window.WIZZCENTRAL_CONFIG = {
     }
 };
 
-// Local development override for serverless-offline or file protocol
-if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    window.WIZZCENTRAL_CONFIG.API_BASE_URL = `http://${window.location.hostname || 'localhost'}:3000/${window.WIZZCENTRAL_CONFIG.STAGE}`;
-}
+// Remove local development override, enforce API_BASE_URL from environment
 
 // Note: For local development use, use the built-in override or set window.__API_BASE_URL__ before loading scripts
 

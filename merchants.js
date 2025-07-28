@@ -119,49 +119,56 @@ const onDomReady = async function() {
             console.warn('initializeDashboard function not found, skipping.');
         }
 
-        console.log('🎯 Attempting to load real merchants data from DynamoDB...');
-        showLoader(true, 'Loading merchants from database...');
-        updateDataSourceIndicator('loading', 'Connecting to database...');
-
-        // Initialize AWS first
-        console.log('⚙️ Initializing AWS connection...');
-        await initializeAWS();
-        console.log('✅ AWS connection initialized successfully');
-
-        // Try to load real data from DynamoDB
-        console.log('📊 Loading merchants from DynamoDB...');
-        updateDataSourceIndicator('loading', 'Fetching merchant data...');
-        await loadMerchantsFromDynamoDB();
+        console.log('🎯 Attempting to fetch merchants via API');
+        showLoader(true, 'Loading merchants...');
+        await fetchMerchantsFromApi();
 
         if (merchantsData.length > 0) {
-            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} real merchants from DynamoDB`);
+            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} merchants from API`);
             filteredMerchants = [...merchantsData];
             renderMerchantsTable();
             updateMerchantStats();
-            updateDataSourceIndicator('database', `Loaded ${merchantsData.length} real merchants`);
-            showMessage(`Loaded ${merchantsData.length} real merchants from the database.`, 'success');
+            updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
+            showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
         } else {
-            console.log('⚠️ Database returned no merchants.');
-            tableBody.innerHTML = '<tr><td colspan="8" class="text-center p-8">The database is empty. No merchants found.</td></tr>';
-            updateDataSourceIndicator('empty', 'Database is empty');
-            showMessage('The database is empty. No merchants to display.', 'info');
+            console.log('⚠️ API returned no merchants.');
+            document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
+            updateDataSourceIndicator('empty', 'No merchants found');
+            showMessage('No merchants found via API.', 'info');
         }
 
     } catch (error) {
-        console.error('❌ A critical error occurred during initialization:', error);
-        const errorMessage = `Failed to load data: ${error.message}. This could be an issue with AWS credentials, network, or permissions. Please check the browser console for details.`;
-        if (tableBody) {
-            tableBody.innerHTML = `<tr><td colspan="8" class="text-center p-8 text-red-600 bg-red-50 border border-red-200">${errorMessage}</td></tr>`;
-        }
+        console.error('❌ Error loading merchants via API:', error);
+        document.getElementById('merchantsTableBody').innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-600 bg-red-50">${error.message}</td></tr>`;
         updateDataSourceIndicator('error', `Error: ${error.message}`);
-        showMessage(errorMessage, 'error');
+        showMessage(`Failed to load merchants: ${error.message}`, 'error');
     } finally {
-        console.log('🏁 Initialization sequence finished. Cleaning up.');
         showLoader(false);
-        // Setup event listeners regardless of outcome
         setupEventListeners();
     }
 };
+
+// New: Fetch merchants via backend API
+async function fetchMerchantsFromApi() {
+    console.log('🔍 Fetching merchants from API endpoint');
+    const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
+    if (!token) throw new Error('No authentication token available');
+    updateDataSourceIndicator('loading', 'Fetching merchants from API...');
+
+    const response = await fetch(`${API_BASE_URL}/merchants`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch merchants from API');
+    }
+    merchantsData = data.merchants || data;
+    filteredMerchants = [...merchantsData];
+}
 
 // Helper function to show sample data with a clear message
 function showSampleDataWithMessage(reason) {
@@ -299,13 +306,6 @@ async function initializeAWS() {
         }
 
         console.log('Fetching amplify_outputs.json from root...');
-        const resp = await withTimeout(
-            fetch('/amplify_outputs.json'), 
-            5000, 
-            'Fetch amplify_outputs.json'
-        );
-        if (!resp.ok) {
-            throw new Error(`Failed to fetch /amplify_outputs.json. Status: ${resp.status} ${resp.statusText}. Ensure the file is in the root of your deployment.`);
         }
         const outputs = await resp.json();
         console.log('Successfully loaded amplify_outputs.json');
@@ -1256,7 +1256,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
         } else if (error && typeof error === 'object') {antId);
             // Try to extract error information from response objectf (mainIndex !== -1) {
             if (error.message) {       Object.assign(merchantsData[mainIndex], result.merchant);
-                errorMessage = error.message;       }
+                errorMessage = error.message || 'Unknown error occurred';       }
             } else if (error.error && typeof error.error === 'object' && error.error.message) {    }
                 errorMessage = error.error.message;
             } else if (error.status) {   
@@ -1345,184 +1345,9 @@ function closeModal(modalId) {
 
 // Enhanced form handling functions
 dal(modalId) {
-function resetEditForm() {ById(modalId);
+function resetEditForm() {ById('editMerchantForm');
     const form = document.getElementById('editMerchantForm');modal) {
     if (form) {
         form.reset();
         hideEditFormMessage();for edit modal
-        modalId === 'editMerchantModal') {
-        // Hide status reason section
-        const statusReasonSection = document.getElementById('statusReasonSection');
-        if (statusReasonSection) {
-            statusReasonSection.style.display = 'none';ment.getElementById('editMerchantForm');
-        }erchant-id');
-        
-        // Reset status reason field   const saveKey = `editForm_${merchantId}`;
-        const statusReasonField = document.getElementById('editStatusReason');       localStorage.removeItem(saveKey);
-        if (statusReasonField) {    }
-            statusReasonField.required = false;
-            statusReasonField.value = '';
-        }ements
-        f (document.activeElement) {
-        // Reset status field styling       document.activeElement.blur();
-        const statusField = document.getElementById('editStatus');       }
-        if (statusField) {    }
-            statusField.style.borderColor = '#d1d5db';
-            statusField.style.backgroundColor = 'white';
-        }functions
-        
-        // Reset any custom stylingditForm() {
-        const inputs = form.querySelectorAll('input, select, textarea');ment.getElementById('editMerchantForm');
-        inputs.forEach(input => {
-            input.classList.remove('error', 'success');form.reset();
-            input.style.borderColor = '';
-        });
-    }ion
-}ById('statusReasonSection');
-f (statusReasonSection) {
-function handleFormFieldValidation() {    statusReasonSection.style.display = 'none';
-    // Add real-time validation to form fields
-    const form = document.getElementById('editMerchantForm');
-    if (!form) return;ield
-    lementById('editStatusReason');
-    const fields = {
-        editBusinessName: (value) => value && value.length >= 2,   statusReasonField.required = false;
-        editEmail: (value) => value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),    statusReasonField.value = '';
-        editPhoneNumber: (value) => value && value.length >= 5, // Basic phone validation
-        editBusinessType: (value) => value && ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'].includes(value)
-    };eld styling
-    ditStatus');
-    Object.keys(fields).forEach(fieldId => {
-        const field = document.getElementById(fieldId);   statusField.style.borderColor = '#d1d5db';
-        if (field) {    statusField.style.backgroundColor = 'white';
-            field.addEventListener('blur', function() {
-                const isValid = fields[fieldId](this.value.trim());
-                if (isValid) {ng
-                    this.style.borderColor = '#10b981';lect, textarea');
-                    this.classList.remove('error');
-                    this.classList.add('success'); input.classList.remove('error', 'success');
-                } else if (this.value.trim()) {       input.style.borderColor = '';
-                    this.style.borderColor = '#ef4444';       });
-                    this.classList.remove('success');    }
-                    this.classList.add('error');
-                    this.style.borderColor = '';
-                    this.classList.remove('error', 'success');
-                }alidation to form fields
-            });const form = document.getElementById('editMerchantForm');
-            n;
-            field.addEventListener('focus', function() {
-                this.style.borderColor = '#3b82f6';
-                this.classList.remove('error', 'success');
-            });
-        }  editPhoneNumber: (value) => value && value.length >= 5, // Basic phone validation
-    });    editBusinessType: (value) => value && ['restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'].includes(value)
-}
-
-function addFormAutoSave() {ds).forEach(fieldId => {
-    // Add auto-save functionality for form data
-    const form = document.getElementById('editMerchantForm');
-    if (!form) return;ener('blur', function() {
-    lue.trim());
-    const merchantId = form.getAttribute('data-merchant-id');
-    if (!merchantId) return;981';
-    r');
-    const saveKey = `editForm_${merchantId}`;
-    
-    // Load saved dataf4444';
-    const savedData = localStorage.getItem(saveKey);ss');
-    if (savedData) {
-        try {   this.style.borderColor = '';
-            const data = JSON.parse(savedData);     this.classList.remove('error', 'success');
-            Object.keys(data).forEach(key => {    }
-                const field = document.getElementById(key);
-                if (field && data[key]) {
-                    field.value = data[key];
-                } this.style.borderColor = '#3b82f6';
-            });       this.classList.remove('error', 'success');
-        } catch (e) {     });
-            console.warn('Failed to load auto-saved form data:', e);       }
-        }    });
-    }
-    
-    // Save data on input
-    const inputs = form.querySelectorAll('input, select, textarea');unctionality for form data
-    inputs.forEach(input => {const form = document.getElementById('editMerchantForm');
-        input.addEventListener('input', function() {
-            const formData = {};
-            inputs.forEach(inp => {const merchantId = form.getAttribute('data-merchant-id');
-                if (inp.value.trim()) {
-                    formData[inp.id] = inp.value.trim();
-                }ditForm_${merchantId}`;
-            });
-            localStorage.setItem(saveKey, JSON.stringify(formData));ta
-        });edData = localStorage.getItem(saveKey);
-    });
-    
-    // Clear saved data when form is submitted successfully
-    form.addEventListener('formSubmitSuccess', function() { => {
-        localStorage.removeItem(saveKey);ementById(key);
-    });f (field && data[key]) {
-}     field.value = data[key];
-
-function enhanceEditModal() {
-    // Add keyboard shortcuts and accessibility improvements catch (e) {
-    const modal = document.getElementById('editMerchantModal');       console.warn('Failed to load auto-saved form data:', e);
-    if (!modal) return;    }
-    
-    // Close modal with Escape key
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape' && modal.style.display === 'flex') {ect, textarea');
-            closeModal('editMerchantModal');
-        }ut', function() {
-    });
-    
-    // Close modal when clicking outsidef (inp.value.trim()) {
-    modal.addEventListener('click', function(event) {     formData[inp.id] = inp.value.trim();
-        if (event.target === modal) {
-            closeModal('editMerchantModal'); });
-        }     localStorage.setItem(saveKey, JSON.stringify(formData));
-    });    });
-    
-    // Focus management
-    const firstInput = modal.querySelector('input:not([disabled])');itted successfully
-    if (firstInput) {m.addEventListener('formSubmitSuccess', function() {
-        const observer = new MutationObserver(function(mutations) {       localStorage.removeItem(saveKey);
-            mutations.forEach(function(mutation) {    });
-                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-                    if (modal.style.display === 'flex') {
-                        setTimeout(() => firstInput.focus(), 100);
-                    }rtcuts and accessibility improvements
-                }const modal = document.getElementById('editMerchantModal');
-            });
-        });
-        observer.observe(modal, { attributes: true });
-    }ction(event) {
-}f (event.key === 'Escape' && modal.style.display === 'flex') {
-     closeModal('editMerchantModal');
-// Initialize enhanced features when DOM is ready    }
-function initializeEditEnhancements() {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {ide
-            setTimeout(() => {(event) {
-                handleFormFieldValidation();f (event.target === modal) {
-                enhanceEditModal();     closeModal('editMerchantModal');
-            }, 500);    }
-        });
-    } else {
-        setTimeout(() => {nt
-            handleFormFieldValidation();;
-            enhanceEditModal();
-        }, 500);
-    }
-}ributeName === 'style') {
-f (modal.style.display === 'flex') {
-// Call initialization       setTimeout(() => firstInput.focus(), 100);
-initializeEditEnhancements();     }
-     }
-// Make sure the DOM is ready before executing the main logic
-if (document.readyState === 'loading') {   });
-    document.addEventListener('DOMContentLoaded', onDomReady);       observer.observe(modal, { attributes: true });
-} else {    }
-    onDomReady();
-}
-}
+        modalId === 'editMerchantModal'

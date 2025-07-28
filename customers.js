@@ -36,18 +36,9 @@ function checkAuthentication() {
 }
 
 // Global logout function
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html';
-    }
+window.logout = function() {
+    Auth.clearTokens();
+    window.location.href = 'index.html';
 };
 
 // Customer management variables
@@ -497,6 +488,7 @@ window.exportCustomers = exportCustomers;
 
 // Initialize page when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    Auth.requireAuthentication();
     console.log('DOM loaded, checking authentication...');
     
     if (checkAuthentication()) {

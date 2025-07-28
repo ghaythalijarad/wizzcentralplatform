@@ -15,21 +15,6 @@ window.logout = async () => {
     }
 };
 
-// Check authentication on dashboard load
-function checkAuthentication() {
-    const idToken = sessionStorage.getItem('idToken');
-    const accessToken = sessionStorage.getItem('accessToken');
-    
-    if (!idToken || !accessToken) {
-        console.warn('No authentication tokens found, redirecting to login');
-        window.location.href = 'index.html';
-        return false;
-    }
-    
-    console.log('Authentication tokens found, proceeding with dashboard');
-    return true;
-}
-
 // DOM Elements (will be populated after DOM is ready)
 let sidebar, mainContent, menuToggle, sidebarToggle;
 
@@ -114,11 +99,9 @@ async function loadRecentBusinesses() {
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication first
-    if (!checkAuthentication()) {
-        return; // Exit if authentication fails
-    }
-    
+    // Enforce authentication
+    Auth.requireAuthentication();
+
     // Get DOM elements
     sidebar = document.getElementById('sidebar');
     mainContent = document.getElementById('mainContent');

@@ -1,61 +1,10 @@
 // Drivers Management JavaScript
 
 // Check authentication on page load
-function checkAuthentication() {
-  const idToken = sessionStorage.getItem('idToken');
-  const accessToken = sessionStorage.getItem('accessToken');
-  
-  if (!idToken || !accessToken) {
-    console.warn('No authentication tokens found, redirecting to login');
-    window.location.href = 'index.html';
-    return false;
-  }
-  
-  // Validate token expiration
-  if (idToken) {
-    try {
-      const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-        console.warn('Authentication token has expired. Redirecting to login.');
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-        return false;
-      }
-    } catch (error) {
-      console.error('Invalid token format. Redirecting to login.');
-      sessionStorage.clear();
-      window.location.href = 'index.html';
-      return false;
-    }
-  }
-  
-  console.log('Authentication check passed');
-  return true;
-}
+document.addEventListener('DOMContentLoaded', async function() {
+    Auth.requireAuthentication();
 
-// AWS SDK and authentication setup
-let dynamodbClient = null;
-const DRIVERS_TABLE = 'WizzUser_users_dev'; // Assuming drivers are also in the users table
-
-// Global logout function
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html'; // Stay in pages directory
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html'; // Stay in pages directory
-    }
-};
-
-// Initialize AWS credentials and DynamoDB client
-async function initializeAWS() {
+    // Initialize AWS with Auth headers
     try {
         const idToken = sessionStorage.getItem('idToken');
         const accessToken = sessionStorage.getItem('accessToken');
@@ -99,7 +48,17 @@ async function initializeAWS() {
         window.location.href = 'index.html';
         throw error;
     }
-}
+});
+
+// AWS SDK and authentication setup
+let dynamodbClient = null;
+const DRIVERS_TABLE = 'WizzUser_users_dev'; // Assuming drivers are also in the users table
+
+// Global logout function
+window.logout = function() {
+    Auth.clearTokens();
+    window.location.href = 'index.html';
+};
 
 // Load drivers data from DynamoDB - TEMPORARILY USING MOCK DATA FOR DEBUGGING
 async function loadDriversData() {

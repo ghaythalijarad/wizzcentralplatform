@@ -209,12 +209,12 @@ async function handleLogin(email, password, remember) {
             console.log('Login successful');
             showMessage('Login successful! Redirecting...', 'success');
             
-            // Store authentication tokens
-            sessionStorage.setItem('accessToken', authResult.accessToken);
-            sessionStorage.setItem('idToken', authResult.idToken);
-            sessionStorage.setItem('refreshToken', authResult.refreshToken);
-            sessionStorage.setItem('userEmail', email);
-            
+            // Store authentication tokens via Auth utility
+            Auth.setToken('accessToken', authResult.accessToken);
+            Auth.setToken('idToken', authResult.idToken);
+            Auth.setToken('refreshToken', authResult.refreshToken);
+            Auth.setToken('userEmail', email);
+                
             // Store remember preference
             if (remember) {
                 localStorage.setItem('rememberLogin', 'true');
