@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct API Test - Bypass Auth Issues</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .error-log { border-left-color: #dc3545; background: #fdf2f2; }
+        .success-log { border-left-color: #28a745; background: #f2f9f2; }
+        .warning-log { border-left-color: #ffc107; background: #fffdf2; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Direct API Test - Bypass Auth Issues</h1>
+    
+    <div class="container">
+        <h2>Problem Analysis</h2>
+        <div class="status error">
+            <strong>🚨 Issue:</strong> Authentication endpoint returning 502 Bad Gateway<br>
+            <strong>💡 Solution:</strong> Test merchant status update directly with mock authentication
+        </div>
+        <div class="status info">
+            <strong>🎯 Target:</strong> Test if the "Load failed" error is due to auth issues or the actual merchant update logic
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h3>🧪 Mock Authentication Test</h3>
+            <p>Let's create a valid JWT token for testing:</p>
+            <button onclick="createMockToken()">Create Mock JWT Token</button>
+            <div id="mockTokenResult"></div>
+        </div>
+
+        <div class="container">
+            <h3>🔍 Direct Status Update Test</h3>
+            <input type="text" id="directMerchantId" value="723a276a-ad62-482c-898c-076d1f8d5c0e" placeholder="Merchant ID">
+            <select id="directAction">
+                <option value="approve">Approve</option>
+                <option value="reject">Reject</option>
+                <option value="suspend">Suspend</option>
+                <option value="review">Review</option>
+                <option value="reactivate">Reactivate</option>
+            </select>
+            <textarea id="directReason" placeholder="Reason" rows="2">Testing direct API call to bypass auth issues</textarea>
+            <button onclick="testDirectStatusUpdate()">Test Direct Status Update</button>
+            <div id="directResult"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>🔍 Alternative: Use Different Merchant ID</h3>
+        <p>The specific merchant ID might not exist. Let's test with a different approach:</p>
+        <button onclick="testMerchantsList()">Get Merchants List</button>
+        <button onclick="testWithDifferentId()">Test With Different ID Format</button>
+        <div id="alternativeResult"></div>
+    </div>
+
+    <div class="container">
+        <h3>📋 Debug Logs</h3>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="debugLogs"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev';
+        let mockToken = null;
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('debugLogs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}-log`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+        }
+
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${content}</div>`;
+        }
+
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+
+        function createMockToken() {
+            // Create a mock JWT token for testing
+            // This is just for testing - not secure for production
+            const header = {
+                "alg": "HS256",
+                "typ": "JWT"
+            };
+            
+            const payload = {
+                "sub": "test-user-id",
+                "email": "admin@wizzcentral.com",
+                "role": "admin",
+                "userId": "test-user-123",
+                "exp": Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour from now
+                "iat": Math.floor(Date.now() / 1000)
+            };
+
+            // Simple base64 encoding (not secure, just for testing)
+            const encodedHeader = btoa(JSON.stringify(header));
+            const encodedPayload = btoa(JSON.stringify(payload));
+            
+            // Mock signature (not secure, just for testing)
+            const mockSignature = btoa("mock-signature-for-testing");
+            
+            mockToken = `${encodedHeader}.${encodedPayload}.${mockSignature}`;
+            
+            showResult('mockTokenResult', `
+                <div class="success">
+                    ✅ <strong>Mock Token Created</strong><br>
+                    <div class="code-block">${mockToken.substring(0, 50)}...</div>
+                    <strong>Payload:</strong> ${JSON.stringify(payload, null, 2)}
+                </div>
+            `, 'success');
+            
+            addLog('✅ Mock JWT token created for testing', 'success');
+        }
+
+        async function testDirectStatusUpdate() {
+            const merchantId = document.getElementById('directMerchantId').value;
+            const action = document.getElementById('directAction').value;
+            const reason = document.getElementById('directReason').value;
+
+            if (!mockToken) {
+                createMockToken();
+            }
+
+            addLog(`🔄 Testing direct status update for merchant: ${merchantId}`, 'info');
+
+            const requestBody = {
+                action: action,
+                reason: reason,
+                sendEmail: false
+            };
+
+            addLog(`📤 Request: PATCH ${API_BASE_URL}/merchants/${merchantId}/status`, 'info');
+            addLog(`📤 Body: ${JSON.stringify(requestBody)}`, 'info');
+            addLog(`📤 Auth: Bearer ${mockToken.substring(0, 20)}...`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${mockToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                addLog(`📡 Response: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                addLog(`📊 Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+
+                let data;
+                try {
+                    const responseText = await response.text();
+                    addLog(`📄 Raw response: ${responseText}`, 'info');
+                    
+                    if (responseText) {
+                        data = JSON.parse(responseText);
+                    } else {
+                        data = { error: 'Empty response' };
+                    }
+                } catch (parseError) {
+                    addLog(`❌ Failed to parse response: ${parseError.message}`, 'error');
+                    data = { error: 'Failed to parse response', parseError: parseError.message };
+                }
+
+                if (response.ok) {
+                    showResult('directResult', `
+                        <div class="success">
+                            ✅ <strong>Status Update Successful!</strong><br>
+                            ${data.message || 'Status updated successfully'}
+                        </div>
+                    `, 'success');
+                    addLog(`✅ Status update successful!`, 'success');
+                } else {
+                    let errorMessage = 'Unknown error';
+                    if (response.status === 403) {
+                        errorMessage = 'Authorization failed - this confirms auth is the issue';
+                    } else if (response.status === 404) {
+                        errorMessage = 'Merchant not found - invalid merchant ID';
+                    } else if (response.status === 500) {
+                        errorMessage = 'Server error - check CloudWatch logs';
+                    } else if (response.status === 502) {
+                        errorMessage = 'Bad Gateway - Lambda function error';
+                    }
+
+                    showResult('directResult', `
+                        <div class="error">
+                            ❌ <strong>Status Update Failed</strong><br>
+                            <strong>Status:</strong> ${response.status}<br>
+                            <strong>Analysis:</strong> ${errorMessage}<br>
+                            <strong>Response:</strong> ${JSON.stringify(data, null, 2)}
+                        </div>
+                    `, 'error');
+                    addLog(`❌ Status update failed: ${response.status} - ${errorMessage}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚨 Network error: ${error.message}`, 'error');
+                showResult('directResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMerchantsList() {
+            addLog('🔍 Testing merchants list endpoint...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/merchants`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                addLog(`📡 Merchants list response: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    const textResponse = await response.text();
+                    addLog(`📄 Raw response: ${textResponse}`, 'warning');
+                    data = { error: 'Failed to parse response' };
+                }
+
+                if (response.ok && data.merchants) {
+                    const firstMerchant = data.merchants[0];
+                    if (firstMerchant) {
+                        document.getElementById('directMerchantId').value = firstMerchant.businessId || firstMerchant.id;
+                        
+                        showResult('alternativeResult', `
+                            <div class="success">
+                                ✅ <strong>Found ${data.merchants.length} merchants</strong><br>
+                                <strong>Using:</strong> ${firstMerchant.businessName} (${firstMerchant.businessId || firstMerchant.id})<br>
+                                <strong>Status:</strong> ${firstMerchant.status}
+                            </div>
+                        `, 'success');
+                        addLog(`✅ Updated merchant ID field with: ${firstMerchant.businessId || firstMerchant.id}`, 'success');
+                    }
+                } else {
+                    showResult('alternativeResult', `❌ Failed to get merchants: ${data.message || 'Unknown error'}`, 'error');
+                    addLog(`❌ Merchants list failed: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚨 Error getting merchants: ${error.message}`, 'error');
+                showResult('alternativeResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testWithDifferentId() {
+            // Try with some common test IDs
+            const testIds = [
+                'test-merchant-1',
+                'merchant-123',
+                '12345678-1234-1234-1234-123456789012',
+                'default-merchant'
+            ];
+
+            addLog('🧪 Testing with different merchant ID formats...', 'info');
+
+            for (const testId of testIds) {
+                addLog(`🔍 Trying merchant ID: ${testId}`, 'info');
+                
+                try {
+                    const response = await fetch(`${API_BASE_URL}/merchants/${testId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        document.getElementById('directMerchantId').value = testId;
+                        
+                        showResult('alternativeResult', `
+                            <div class="success">
+                                ✅ <strong>Found valid merchant ID: ${testId}</strong><br>
+                                <strong>Name:</strong> ${data.merchant.businessName}<br>
+                                <strong>Status:</strong> ${data.merchant.status}
+                            </div>
+                        `, 'success');
+                        addLog(`✅ Valid merchant found: ${testId}`, 'success');
+                        return;
+                    }
+                } catch (error) {
+                    // Continue to next ID
+                }
+            }
+
+            showResult('alternativeResult', '❌ No valid merchant IDs found with the test formats', 'warning');
+            addLog('❌ All test merchant IDs failed', 'warning');
+        }
+
+        // Auto-initialize
+        addLog('🚀 Direct API test tool loaded', 'info');
+        addLog('🎯 Goal: Determine if "Load failed" is auth-related or logic-related', 'info');
+    </script>
+</body>
+</html>

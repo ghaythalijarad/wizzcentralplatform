@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug: Load Failed Error</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        input, select, textarea, button {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .log-entry {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .error-log { border-left-color: #dc3545; background: #fdf2f2; }
+        .success-log { border-left-color: #28a745; background: #f2f9f2; }
+        .warning-log { border-left-color: #ffc107; background: #fffdf2; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚨 Debug: "Load Failed" Error</h1>
+    
+    <div class="container">
+        <h2>Error Details</h2>
+        <div class="status error">
+            <strong>🚨 Error:</strong> Load failed<br>
+            <strong>🌐 URL:</strong> https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev/merchants/723a276a-ad62-482c-898c-076d1f8d5c0e/status<br>
+            <strong>🆔 Merchant ID:</strong> 723a276a-ad62-482c-898c-076d1f8d5c0e
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="container">
+            <h3>🔐 Authentication</h3>
+            <input type="email" id="email" placeholder="Email" value="admin@wizzcentral.com">
+            <input type="password" id="password" placeholder="Password" value="Admin123!">
+            <button onclick="authenticate()">Login</button>
+            <div id="authResult"></div>
+        </div>
+
+        <div class="container">
+            <h3>🔍 Test Specific Merchant</h3>
+            <input type="text" id="merchantId" value="723a276a-ad62-482c-898c-076d1f8d5c0e" readonly>
+            <button onclick="testMerchantLookup()">Test Merchant Lookup</button>
+            <button onclick="testStatusUpdate()">Test Status Update</button>
+            <div id="merchantResult"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>🧪 Comprehensive Diagnostics</h3>
+        <button onclick="runFullDiagnostics()">Run Full Diagnostics</button>
+        <div id="diagnosticsResult"></div>
+    </div>
+
+    <div class="container">
+        <h3>📋 Debug Logs</h3>
+        <button onclick="clearLogs()">Clear Logs</button>
+        <div id="debugLogs"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev';
+        const MERCHANT_ID = '723a276a-ad62-482c-898c-076d1f8d5c0e';
+        let authToken = localStorage.getItem('authToken');
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('debugLogs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}-log`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+        }
+
+        function showResult(elementId, content, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${type}">${content}</div>`;
+        }
+
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+
+        async function authenticate() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            addLog('🔐 Attempting authentication...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                addLog(`📡 Auth response status: ${response.status} ${response.statusText}`, 'info');
+                
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    addLog(`❌ Failed to parse auth response: ${parseError.message}`, 'error');
+                    const textResponse = await response.text();
+                    addLog(`📄 Raw response: ${textResponse}`, 'warning');
+                    return;
+                }
+
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('authToken', authToken);
+                    showResult('authResult', '✅ Authentication successful!', 'success');
+                    addLog('✅ Authentication successful, token stored', 'success');
+                } else {
+                    showResult('authResult', `❌ Authentication failed: ${data.message || 'Unknown error'}`, 'error');
+                    addLog(`❌ Authentication failed: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚨 Network error during authentication: ${error.message}`, 'error');
+                showResult('authResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testMerchantLookup() {
+            if (!authToken) {
+                addLog('❌ No auth token available', 'error');
+                showResult('merchantResult', '❌ Please authenticate first', 'error');
+                return;
+            }
+
+            addLog(`🔍 Looking up merchant: ${MERCHANT_ID}`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/merchants/${MERCHANT_ID}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                addLog(`📡 Merchant lookup response: ${response.status} ${response.statusText}`, 'info');
+                addLog(`📊 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    addLog(`❌ Failed to parse merchant response: ${parseError.message}`, 'error');
+                    const textResponse = await response.text();
+                    addLog(`📄 Raw response: ${textResponse}`, 'warning');
+                    showResult('merchantResult', `❌ Invalid response format`, 'error');
+                    return;
+                }
+
+                if (response.ok && data.merchant) {
+                    const merchant = data.merchant;
+                    showResult('merchantResult', `
+                        <div class="success">
+                            ✅ <strong>Merchant Found:</strong><br>
+                            <strong>Name:</strong> ${merchant.businessName || 'N/A'}<br>
+                            <strong>ID:</strong> ${merchant.businessId}<br>
+                            <strong>Status:</strong> ${merchant.status}<br>
+                            <strong>Email:</strong> ${merchant.email || 'N/A'}
+                        </div>
+                    `, 'success');
+                    addLog(`✅ Merchant found: ${merchant.businessName} (Status: ${merchant.status})`, 'success');
+                } else {
+                    showResult('merchantResult', `❌ Merchant not found: ${data.message || 'Unknown error'}`, 'error');
+                    addLog(`❌ Merchant lookup failed: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚨 Network error during merchant lookup: ${error.message}`, 'error');
+                showResult('merchantResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStatusUpdate() {
+            if (!authToken) {
+                addLog('❌ No auth token available', 'error');
+                return;
+            }
+
+            addLog(`🔄 Testing status update for merchant: ${MERCHANT_ID}`, 'info');
+
+            const requestBody = {
+                action: 'approve',
+                reason: 'Testing load failed error fix',
+                sendEmail: false
+            };
+
+            addLog(`📤 Request body: ${JSON.stringify(requestBody)}`, 'info');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/merchants/${MERCHANT_ID}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                addLog(`📡 Status update response: ${response.status} ${response.statusText}`, 'info');
+                addLog(`📊 Response headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    addLog(`❌ Failed to parse status update response: ${parseError.message}`, 'error');
+                    const textResponse = await response.text();
+                    addLog(`📄 Raw response: ${textResponse}`, 'warning');
+                    return;
+                }
+
+                if (response.ok) {
+                    addLog(`✅ Status update successful: ${data.message}`, 'success');
+                    addLog(`📧 Email sent: ${data.emailSent}`, 'info');
+                } else {
+                    addLog(`❌ Status update failed: ${response.status} - ${data.message}`, 'error');
+                    addLog(`🔍 Error details: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLog(`🚨 Network error during status update: ${error.message}`, 'error');
+                addLog(`🔍 Error type: ${error.name}`, 'error');
+                addLog(`🔍 Error stack: ${error.stack}`, 'error');
+            }
+        }
+
+        async function runFullDiagnostics() {
+            addLog('🧪 Starting full diagnostics...', 'info');
+            
+            const diagnostics = [];
+
+            // Test 1: API Base URL
+            diagnostics.push(`🌐 API Base URL: ${API_BASE_URL}`);
+            
+            // Test 2: CORS Preflight
+            try {
+                addLog('🔍 Testing CORS preflight...', 'info');
+                const corsResponse = await fetch(`${API_BASE_URL}/merchants/${MERCHANT_ID}/status`, {
+                    method: 'OPTIONS'
+                });
+                diagnostics.push(`✅ CORS Preflight: ${corsResponse.status} ${corsResponse.statusText}`);
+            } catch (corsError) {
+                diagnostics.push(`❌ CORS Preflight: ${corsError.message}`);
+                addLog(`❌ CORS preflight failed: ${corsError.message}`, 'error');
+            }
+
+            // Test 3: Network connectivity
+            try {
+                addLog('🔍 Testing basic connectivity...', 'info');
+                const pingResponse = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET'
+                });
+                diagnostics.push(`✅ Health Check: ${pingResponse.status} ${pingResponse.statusText}`);
+            } catch (healthError) {
+                diagnostics.push(`❌ Health Check: ${healthError.message}`);
+                addLog(`❌ Health check failed: ${healthError.message}`, 'error');
+            }
+
+            // Test 4: Auth token status
+            if (authToken) {
+                diagnostics.push(`✅ Auth Token: Available (${authToken.substring(0, 20)}...)`);
+                
+                // Try to decode JWT (basic)
+                try {
+                    const tokenParts = authToken.split('.');
+                    if (tokenParts.length === 3) {
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        diagnostics.push(`✅ Token Payload: Valid (exp: ${new Date(payload.exp * 1000).toLocaleString()})`);
+                    }
+                } catch (tokenError) {
+                    diagnostics.push(`⚠️ Token Payload: Could not decode`);
+                }
+            } else {
+                diagnostics.push(`❌ Auth Token: Not available`);
+            }
+
+            // Test 5: Merchant ID format
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidRegex.test(MERCHANT_ID)) {
+                diagnostics.push(`✅ Merchant ID Format: Valid UUID`);
+            } else {
+                diagnostics.push(`❌ Merchant ID Format: Invalid UUID format`);
+            }
+
+            // Display results
+            showResult('diagnosticsResult', `
+                <div class="code-block">
+${diagnostics.join('\n')}
+                </div>
+            `);
+
+            addLog('🧪 Full diagnostics completed', 'success');
+        }
+
+        // Auto-authenticate if token exists
+        if (authToken) {
+            addLog('🔐 Found existing auth token', 'info');
+        }
+
+        // Run initial diagnostics
+        addLog('🚀 Debug tool loaded for specific merchant', 'info');
+        addLog(`🆔 Target merchant: ${MERCHANT_ID}`, 'info');
+        addLog(`🌐 API endpoint: ${API_BASE_URL}`, 'info');
+    </script>
+</body>
+</html>

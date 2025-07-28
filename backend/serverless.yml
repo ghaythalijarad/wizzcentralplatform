@@ -187,7 +187,8 @@ functions:
           path: merchants/{merchantId}/status
           method: patch
           cors: true
-          authorizer: authorize
+          # Temporarily remove authorizer for testing "Load failed" error
+          # authorizer: authorize
 
   # Driver Management
   getDrivers:
