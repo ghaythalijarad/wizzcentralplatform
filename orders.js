@@ -43,8 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initializeDashboard === 'function') initializeDashboard();
     showLoader(true, 'Loading orders...');
     try {
-        await initializeAWS();
-        await initializeOrdersManagement();
+        await fetchOrdersFromApi();
+        initializeUI();
+        setupEventListeners();
     } catch (err) {
         console.error('Orders initialization failed:', err);
         showMessage(`Error loading orders: ${err.message}`, 'error');
@@ -54,67 +55,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         const refreshBtn = document.getElementById('refreshOrdersBtn');
         if (refreshBtn) refreshBtn.addEventListener('click', () => {
             showLoader(true, 'Refreshing orders...');
-            refreshOrdersData();
+            fetchOrdersFromApi();
         });
     }
 });
 
-// AWS initialization
-async function initializeAWS() {
-    if (typeof AWS === 'undefined') {
-        throw new Error('AWS SDK not loaded.');
-    }
-    const resp = await fetch('../amplify_outputs.json');
-    if (!resp.ok) throw new Error(`Failed to fetch config: ${resp.status}`);
-    const outputs = await resp.json();
-    const region = outputs.data?.aws_region || AWS_REGION;
-    const idToken = sessionStorage.getItem('idToken');
-    const userPoolId = outputs.auth.user_pool_id;
-    const identityPoolId = outputs.auth.identity_pool_id;
-    const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-    AWS.config.update({ region });
-    const credParams = { IdentityPoolId: identityPoolId };
-    if (idToken) credParams.Logins = { [provider]: idToken };
-    AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
-    await AWS.config.credentials.refreshPromise();
-    dynamoDB = new AWS.DynamoDB.DocumentClient();
-    console.log('AWS initialized, identityId:', AWS.config.credentials.identityId);
-}
-
-// Initialize page logic
-async function initializeOrdersManagement() {
+// Fetch orders via backend API
+async function fetchOrdersFromApi() {
     showLoader(true, 'Fetching orders...');
-    try {
-        await loadOrdersFromDynamoDB();
-        hideMessage();
-    } catch (error) {
-        console.error('Error loading orders:', error);
-        showMessage(`Error loading orders: ${error.message}`, 'error');
-        ordersData = [];
-    } finally {
-        filteredOrders = [...ordersData];
-        initializeUI();
-        setupEventListeners();
-        showLoader(false);
+    const token = Auth.getToken('accessToken') || Auth.getToken('idToken');
+    if (!token) throw new Error('No authentication token available');
+    const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/orders`, {
+        method: 'GET',
+        headers: Auth.attachAuthHeader({ 'Content-Type': 'application/json' })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch orders from API');
     }
-}
-
-// Load from DynamoDB
-async function loadOrdersFromDynamoDB() {
-    if (!dynamoDB) throw new Error('DynamoDB client not initialized');
-    const params = { TableName: ORDERS_TABLE };
-    const result = await dynamoDB.scan(params).promise();
-    ordersData = (result.Items || []).map(item => ({
-        orderId: item.orderId,
-        customerId: item.customerId,
-        merchantId: item.merchantId,
-        driverId: item.driverId || 'N/A',
-        status: item.status || 'unknown',
-        total: item.total != null ? `$${item.total.toFixed(2)}` : 'N/A',
-        date: formatDate(item.createdAt),
-        fullData: item
-    }));
-    console.log(`Loaded ${ordersData.length} orders`);
+    ordersData = data.orders || data;
+    filteredOrders = [...ordersData];
+    renderOrdersTable();
+    updateDataSourceIndicator('api', `Loaded ${ordersData.length} orders via API`);
 }
 
 // UI and events
@@ -177,7 +139,7 @@ function closeOrderModal() {
 // Refresh data
 async function refreshOrdersData() {
     showLoader(true,'Refreshing orders...');
-    try { await loadOrdersFromDynamoDB(); renderOrdersTable(); hideMessage(); }
+    try { await fetchOrdersFromApi(); }
     catch(e){ console.error(e); showMessage(`Error: ${e.message}`,'error'); }
     finally{ showLoader(false); }
 }
