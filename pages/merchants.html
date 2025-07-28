@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Merchants Management</title>
+    <link rel="stylesheet" href="/dashboard.css">
+    <link rel="stylesheet" href="/merchants-table.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>WizzCentral</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item active">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="orders.html" class="nav-link">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>Orders Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <div class="top-bar">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="page-title">Merchants Management</h1>
+            <div class="auth-status" id="authStatus" style="display: flex; align-items: center; gap: 10px;">
+                <span id="authIndicator" style="padding: 5px 10px; border-radius: 4px; font-size: 0.8rem;">Checking...</span>
+                <button id="loginBtn" onclick="window.location.href='../index.html'" style="display: none; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
+                <button id="loadRealDataBtn" onclick="forceLoadRealData()" style="display: none; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Load Real Data</button>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Auth and Data Status -->
+            <div id="dataStatus" style="margin-bottom: 1rem; padding: 10px; border-radius: 4px; background: #f8f9fa; border-left: 4px solid #007bff; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>Data Source:</strong> <span id="dataSourceIndicator">Loading...</span>
+                </div>
+                <button id="refreshDataBtn" onclick="refreshMerchantsData()" style="padding: 8px 15px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                    <i class="fas fa-sync-alt"></i> Refresh Data
+                </button>
+            </div>
+            
+             <!-- Merchants Table -->
+            <div class="table-container">
+                <div id="merchants-table-status"></div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Business</th>
+                            <th>Owner</th>
+                            <th>Status</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="merchantsTableBody">
+                        <!-- Merchants will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+        </div> <!-- end page-content -->
+
+        <!-- Status Update Modal -->
+        <div id="statusModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+            <div class="modal-content" style="background:white; padding:1rem; border-radius:8px; max-width:400px; width:90%; position:relative;">
+                <button onclick="closeModal('statusModal')" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Update Merchant Status</h3>
+                <div id="statusModalBody"></div>
+                <div style="margin-top:1rem; text-align:right;">
+                    <button class="btn-secondary" onclick="closeModal('statusModal')" style="margin-right: 0.5rem;">Cancel</button>
+                    <button class="btn-primary" onclick="updateMerchantStatus()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Merchant Details Modal -->
+        <div id="viewMerchantModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+            <div class="modal-content" style="background:white; padding:1rem; border-radius:8px; max-width:600px; width:90%; position:relative;">
+                <button onclick="closeModal('viewMerchantModal')" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Merchant Details</h3>
+                <div id="merchantDetailsBody"></div>
+                <div style="margin-top:1rem; text-align:right;">
+                    <button class="btn-primary" onclick="closeModal('viewMerchantModal')">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Merchant Modal -->
+        <div id="editMerchantModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index: 1000;">
+            <div class="modal-content" style="background:white; padding:1.5rem; border-radius:8px; max-width:700px; width:95%; max-height:90vh; overflow-y:auto; position:relative;">
+                <button onclick="closeModal('editMerchantModal')" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280; padding:4px;">&times;</button>
+                
+                <h3 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.5rem;">Edit Merchant</h3>
+                
+                <form id="editMerchantForm" style="display: grid; gap: 1rem;">
+                    <!-- Basic Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editBusinessName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business Name</label>
+                            <input type="text" id="editBusinessName" name="businessName" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editOwnerName" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Owner Name</label>
+                            <input type="text" id="editOwnerName" name="ownerName" 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editEmail" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Email</label>
+                            <input type="email" id="editEmail" name="email" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editPhoneNumber" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Phone Number</label>
+                            <input type="tel" id="editPhoneNumber" name="phoneNumber" required 
+                                   style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Business Type and Status -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editBusinessType" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business Type</label>
+                            <select id="editBusinessType" name="businessType" 
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <option value="restaurant">Restaurant</option>
+                                <option value="store">Store</option>
+                                <option value="cafe">Cafe</option>
+                                <option value="cloudkitchen">Cloud Kitchen</option>
+                                <option value="pharmacy">Pharmacy</option>
+                                <option value="retail">Retail</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="editStatus" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Status</label>
+                            <select id="editStatus" name="status" 
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="under_review">Under Review</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Status Change Reason (shows only when status is changed) -->
+                    <div id="statusReasonSection" style="display: none;">
+                        <label for="editStatusReason" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                            Reason for Status Change <span style="color: #ef4444;">*</span>
+                        </label>
+                        <textarea id="editStatusReason" name="statusReason" rows="2" minlength="10" maxlength="500" 
+                                  placeholder="Please provide a reason for the status change..."
+                                  style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; resize: vertical;"></textarea>
+                        <small style="color: #6b7280; font-size: 0.75rem;">This will be included in the email notification sent to the merchant.</small>
+                    </div>
+
+                    <!-- Address - Match DynamoDB structure -->
+                    <div>
+                        <label style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #374151;">Address</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <input type="text" id="editStreet" name="street" placeholder="Street Address" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCity" name="city" placeholder="City" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <input type="text" id="editDistrict" name="district" placeholder="District" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCountry" name="country" placeholder="Country" value="Iraq" 
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Remove Description and Website sections as they're not in DynamoDB -->
+
+                    <!-- Form Messages -->
+                    <div id="editFormMessages" style="display: none;"></div>
+
+                    <!-- Submit Buttons -->
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeModal('editMerchantModal')" 
+                                style="padding: 0.75rem 1.5rem; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Cancel
+                        </button>
+                        <button type="submit" id="saveEditBtn" 
+                                style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    <!-- AWS SDK and Core Scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <script>
+        console.log('AWS SDK loaded:', typeof AWS !== 'undefined');
+        
+        // Prevent dashboard.js from overriding our functions
+        window.MERCHANTS_PAGE = true;
+        
+        // Override logout function early
+        window.logout = () => {
+            console.log('Logout clicked from merchants page');
+            sessionStorage.clear();
+            localStorage.clear();
+            window.location.href = '../index.html';
+        };
+    </script>
+    <script src="/config.js"></script>
+    <script>
+        console.log('Config loaded:', typeof window.WIZZCENTRAL_CONFIG !== 'undefined');
+    </script>
+    <script src="/dashboard.js"></script>
+    <script>
+        console.log('Dashboard script loaded. Allowing its authentication logic to run.');
+    </script>
+    <!-- Load simple merchants fix for table rendering -->
+    <script src="/merchants-simple-fix.js"></script>
+    <script>console.log('Simple merchants fix script loaded');</script>
+
+    <p style="padding:1rem; background:#fff3cd; color:#856404; text-align:center;">
+        If you are not redirected automatically, <a href="../index.html">click here</a> to log in.
+    </p>
+</body>
+</html>
