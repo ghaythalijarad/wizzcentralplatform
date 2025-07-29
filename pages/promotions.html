@@ -165,8 +165,60 @@
                 </div>
             </div>
 
-            <!-- Filters and Search -->
-            <div class="table-controls">
+            <!-- Merchant Discounts Section -->
+            <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007cba;">
+                    <h2 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-store" style="margin-right: 0.5rem; color: #007cba;"></i>
+                        Merchant Discounts
+                    </h2>
+                    <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
+                        <span class="stat-item" style="padding: 0.25rem 0.75rem; background: #e3f2fd; border-radius: 20px; font-size: 0.9rem;">
+                            Total: <strong id="totalMerchantDiscounts" style="color: #1976d2;">0</strong>
+                        </span>
+                        <span class="stat-item" style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
+                            Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Discount</th>
+                                <th>Merchant</th>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Status</th>
+                                <th>Usage</th>
+                                <th>Valid Until</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="merchantDiscountsTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                                    <div>Loading merchant discounts...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- WizzCentral Promotions Section -->
+            <div class="page-section" style="margin-top: 2rem;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f0f8ff; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-tags" style="margin-right: 0.5rem; color: #28a745;"></i>
+                        WizzCentral Promotions
+                    </h2>
+                </div>
+
+                <!-- Filters and Search -->
+                <div class="table-controls">
                 <div class="search-container">
                     <i class="fas fa-search"></i>
                     <input type="text" placeholder="Search promotions..." id="searchInput">
@@ -336,6 +388,7 @@
                     </tbody>
                 </table>
             </div>
+            </div> <!-- Close WizzCentral Promotions Section -->
         </div>
     </div>
 
@@ -409,42 +462,6 @@
                     <button type="submit" class="btn-primary">Create Promotion</button>
                 </div>
             </form>
-        </div>
-    </div>
-
-    <!-- Merchant Discounts Section -->
-    <div class="page-section" style="margin-top: 2rem;">
-        <div class="section-header">
-            <h2>Merchant Discounts</h2>
-            <div class="merchant-discount-stats">
-                <span class="stat-item">Total: <strong id="totalMerchantDiscounts">0</strong></span>
-                <span class="stat-item">Active: <strong id="activeMerchantDiscounts">0</strong></span>
-            </div>
-        </div>
-        
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Discount</th>
-                        <th>Merchant</th>
-                        <th>Type</th>
-                        <th>Value</th>
-                        <th>Status</th>
-                        <th>Usage</th>
-                        <th>Valid Until</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="merchantDiscountsTableBody">
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
-                            <div>Loading merchant discounts...</div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
         </div>
     </div>
 
