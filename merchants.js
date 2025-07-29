@@ -807,24 +807,18 @@ function populateEditForm(merchant) {
     const currentStatus = merchant.status || 'pending';
     statusSelect.innerHTML = ''; // Clear existing options
 
-    // Add a disabled, selected "Select one" option
-    const placeholderOption = document.createElement('option');
-    placeholderOption.value = "";
-    placeholderOption.textContent = "Select one...";
-    placeholderOption.disabled = true;
-    statusSelect.appendChild(placeholderOption);
-
     // Add all possible statuses
     for (const statusKey in MERCHANT_STATUSES) {
         if (MERCHANT_STATUSES.hasOwnProperty(statusKey) && statusKey !== 'unknown') {
             const option = document.createElement('option');
             option.value = statusKey;
             option.textContent = MERCHANT_STATUSES[statusKey].label;
+            option.selected = (statusKey === currentStatus); // Set current status as selected
             statusSelect.appendChild(option);
         }
     }
 
-    // Set the current status as selected
+    // Ensure the current status is selected
     statusSelect.value = currentStatus;
     
     // Store original status for comparison
@@ -846,7 +840,7 @@ function setupStatusChangeHandler() {
     
     statusSelect.addEventListener('change', function() {
         const newStatus = this.value;
-        const statusChanged = newStatus !== originalStatus;
+        const statusChanged = newStatus !== originalStatus && newStatus !== '';
         
         if (statusChanged) {
             reasonSection.style.display = 'block';
@@ -975,7 +969,7 @@ function collectEditFormData(form) {
     const originalStatus = form.getAttribute('data-original-status');
     const statusReason = formData.get('statusReason')?.trim();
     
-    if (newStatus && newStatus !== originalStatus) {
+    if (newStatus && newStatus !== '' && newStatus !== originalStatus) {
         data.statusUpdate = {
             newStatus: newStatus,
             previousStatus: originalStatus,
