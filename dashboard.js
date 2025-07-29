@@ -1,15 +1,7 @@
-// Dashboard JavaScript functionality
+// dashboard.js - Dashboard JavaScript functionality
 
 // DOM Elements (will be populated after DOM is ready)
 let sidebar, mainContent, menuToggle, sidebarToggle;
-    await AWS.config.credentials.refreshPromise();
-    dynamoDB = new AWS.DynamoDB.DocumentClient();
-}
-
-async function fetchTableCount(tableName) {
-    const res = await dynamoDB.scan({ TableName: tableName, Select: 'COUNT' }).promise();
-    return res.Count || 0;
-}
 
 async function loadDashboardStats() {
     console.log('🔢 Loading dashboard stats from all tables...');
