@@ -1,5 +1,5 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, ScanCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, ScanCommand, QueryCommand, GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 const responseHelper = require('../utils/response');
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
@@ -233,5 +233,121 @@ exports.getProductsByMerchant = async (event) => {
   } catch (error) {
     console.error('Get products by merchant error:', error);
     return responseHelper.serverError('Failed to load products');
+  }
+};
+
+exports.updateProduct = async (event) => {
+  try {
+    console.log('=== UPDATE PRODUCT START ===');
+
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const { merchantId, productId } = event.pathParameters;
+    if (!merchantId || !productId) {
+      return responseHelper.error(400, 'Merchant ID and Product ID are required');
+    }
+
+    const data = JSON.parse(event.body);
+    console.log('Received data for update:', data);
+
+    // Basic validation
+    if (!data.name || !data.price || !data.categoryId) {
+      return responseHelper.error(400, 'Product name, price, and category are required');
+    }
+
+    const {
+      name,
+      name_ar,
+      description,
+      description_ar,
+      price,
+      categoryId,
+      preparation_time,
+      is_available,
+      image_url,
+      allergens,
+      ingredients
+    } = data;
+
+    const updateExpression = `
+      SET #name = :name, 
+          #name_ar = :name_ar, 
+          #description = :description, 
+          #description_ar = :description_ar, 
+          #price = :price, 
+          #categoryId = :categoryId, 
+          #preparation_time = :preparation_time, 
+          #is_available = :is_available, 
+          #image_url = :image_url, 
+          #allergens = :allergens, 
+          #ingredients = :ingredients,
+          #updated_at = :updated_at
+    `;
+
+    const expressionAttributeNames = {
+      '#name': 'name',
+      '#name_ar': 'name_ar',
+      '#description': 'description',
+      '#description_ar': 'description_ar',
+      '#price': 'price',
+      '#categoryId': 'categoryId',
+      '#preparation_time': 'preparation_time',
+      '#is_available': 'is_available',
+      '#image_url': 'image_url',
+      '#allergens': 'allergens',
+      '#ingredients': 'ingredients',
+      '#updated_at': 'updated_at'
+    };
+
+    const expressionAttributeValues = {
+      ':name': name,
+      ':name_ar': name_ar || null,
+      ':description': description || null,
+      ':description_ar': description_ar || null,
+      ':price': price,
+      ':categoryId': categoryId,
+      ':preparation_time': preparation_time || 0,
+      ':is_available': is_available,
+      ':image_url': image_url || null,
+      ':allergens': allergens || [],
+      ':ingredients': ingredients || [],
+      ':updated_at': new Date().toISOString()
+    };
+
+    const params = {
+      TableName: PRODUCTS_TABLE,
+      Key: {
+        productId: productId
+      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ConditionExpression: 'attribute_exists(productId) AND businessId = :merchantId',
+      ReturnValues: 'ALL_NEW'
+    };
+    
+    // Add merchantId to expression attribute values for the condition check
+    expressionAttributeValues[':merchantId'] = merchantId;
+
+
+    console.log('Updating product with params:', JSON.stringify(params, null, 2));
+
+    const result = await dynamodb.send(new UpdateCommand(params));
+
+    console.log('Product updated successfully:', result.Attributes);
+
+    return responseHelper.success(200, {
+      message: 'Product updated successfully',
+      product: result.Attributes
+    });
+
+  } catch (error) {
+    console.error('Update product error:', error);
+    if (error.name === 'ConditionalCheckFailedException') {
+      return responseHelper.error(403, 'Update failed: Product does not exist or does not belong to this merchant.');
+    }
+    return responseHelper.serverError('Failed to update product');
   }
 };

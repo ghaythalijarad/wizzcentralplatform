@@ -190,6 +190,25 @@ functions:
           # Temporarily remove authorizer for testing "Load failed" error
           # authorizer: authorize
 
+  # Product Management
+  getProductsByMerchant:
+    handler: src/handlers/products.getProductsByMerchant
+    events:
+      - http:
+          path: merchants/{merchantId}/products
+          method: get
+          cors: true
+          # authorizer: authorize # Add auth later
+
+  updateProduct:
+    handler: src/handlers/products.updateProduct
+    events:
+      - http:
+          path: merchants/{merchantId}/products/{productId}
+          method: put
+          cors: true
+          # authorizer: authorize # Add auth later
+
   # Driver Management
   getDrivers:
     handler: src/handlers/drivers.getDrivers
@@ -550,15 +569,6 @@ functions:
     events:
       - http:
           path: products/{productId}
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  getProductsByMerchant:
-    handler: src/handlers/products.getProductsByBusiness
-    events:
-      - http:
-          path: merchants/{merchantId}/products
           method: get
           cors: true
           # authorizer: authorize  # Temporarily disabled for testing
