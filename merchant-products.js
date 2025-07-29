@@ -14,24 +14,48 @@ function getBusinessId() {
     return new URLSearchParams(window.location.search).get('businessId');
 }
 
-// Load categories and map by id
-async function loadCategories(dynamoDB) {
-    const result = await dynamoDB.scan({ TableName: 'order-receiver-categories-dev' }).promise();
-    const items = result.Items || [];
-    const map = {};
-    items.forEach(c => { map[c.categoryId] = c.name || c.name_ar || 'Unknown'; });
-    return map;
+// Load categories from API
+async function loadCategories() {
+    const idToken = sessionStorage.getItem('idToken');
+    const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/categories`, {
+        headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to load categories: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to load categories');
+    }
+    
+    return result.data.categories || {};
 }
 
-// Load products for businessId
-async function loadProducts(businessId, dynamoDB) {
-    const params = {
-        TableName: 'order-receiver-products-dev',
-        FilterExpression: 'businessId = :bid',
-        ExpressionAttributeValues: { ':bid': businessId }
-    };
-    const result = await dynamoDB.scan(params).promise();
-    return result.Items || [];
+// Load products for businessId from API
+async function loadProducts(businessId) {
+    const idToken = sessionStorage.getItem('idToken');
+    const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${businessId}/products`, {
+        headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to load products: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to load products');
+    }
+    
+    return result.data.products || [];
 }
 
 // Render grouped by category
@@ -79,11 +103,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     showStatus('Loading products...');
     try {
-        // Initialize AWS using centralized utility
-        await AWSUtils.initialize();
-        const dynamoDB = await AWSUtils.getDynamoDBClient();
-        
-        const [categories, products] = await Promise.all([loadCategories(dynamoDB), loadProducts(businessId, dynamoDB)]);
+        // Use API endpoints instead of direct DynamoDB access
+        const [categories, products] = await Promise.all([loadCategories(), loadProducts(businessId)]);
         clearStatus();
         renderCategoriesAndProducts(categories, products);
     } catch (err) {

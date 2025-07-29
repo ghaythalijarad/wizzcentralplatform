@@ -627,36 +627,49 @@ async function loadMerchantProducts(merchantId) {
     }
 
     try {
-        // Ensure AWS is initialized
-        if (!dynamoDB) {
-            dynamoDB = await AWSUtils.getDynamoDBClient();
-        }
-
-        // Load categories first
-        const categoriesResult = await dynamoDB.scan({ 
-            TableName: 'order-receiver-categories-dev' 
-        }).promise();
+        // Use API endpoints instead of direct DynamoDB access
+        const idToken = sessionStorage.getItem('idToken');
         
-        categoryMap = {};
-        if (categoriesResult.Items) {
-            categoriesResult.Items.forEach(cat => {
-                categoryMap[cat.categoryId] = cat.name || cat.name_ar || 'Unknown Category';
-            });
+        // Load categories first
+        const categoriesResponse = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/categories`, {
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!categoriesResponse.ok) {
+            throw new Error(`Failed to load categories: ${categoriesResponse.status}`);
         }
+        
+        const categoriesResult = await categoriesResponse.json();
+        if (!categoriesResult.success) {
+            throw new Error(categoriesResult.error?.message || 'Failed to load categories');
+        }
+        
+        categoryMap = categoriesResult.data.categories || {};
 
-        // Load products for this merchant
-        // Note: Products table uses businessId field which should match the merchant's ID
+        // Load products for this merchant using API
         const businessId = merchantId; // Use the merchant ID directly
         console.log(`Loading products for businessId: ${businessId}`);
         
-        const productsParams = {
-            TableName: 'order-receiver-products-dev',
-            FilterExpression: 'businessId = :bid',
-            ExpressionAttributeValues: { ':bid': businessId }
-        };
+        const productsResponse = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${businessId}/products`, {
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
         
-        const productsResult = await dynamoDB.scan(productsParams).promise();
-        merchantProducts = productsResult.Items || [];
+        if (!productsResponse.ok) {
+            throw new Error(`Failed to load products: ${productsResponse.status}`);
+        }
+        
+        const productsResult = await productsResponse.json();
+        if (!productsResult.success) {
+            throw new Error(productsResult.error?.message || 'Failed to load products');
+        }
+        
+        merchantProducts = productsResult.data.products || [];
 
         console.log(`Loaded ${merchantProducts.length} products for merchant ${merchantId}`);
         
@@ -789,19 +802,33 @@ function populateEditForm(merchant) {
     document.getElementById('editBusinessType').value = merchant.businessType?.toLowerCase() || 'restaurant';
     document.getElementById('editStatus').value = merchant.status || 'pending';
     
+    // Dynamically populate status dropdown
+    const statusSelect = document.getElementById('editStatus');
+    const currentStatus = merchant.status || 'pending';
+    statusSelect.innerHTML = ''; // Clear existing options
+
+    // Add a disabled, selected "Select one" option
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = "";
+    placeholderOption.textContent = "Select one...";
+    placeholderOption.disabled = true;
+    statusSelect.appendChild(placeholderOption);
+
+    // Add all possible statuses
+    for (const statusKey in MERCHANT_STATUSES) {
+        if (MERCHANT_STATUSES.hasOwnProperty(statusKey) && statusKey !== 'unknown') {
+            const option = document.createElement('option');
+            option.value = statusKey;
+            option.textContent = MERCHANT_STATUSES[statusKey].label;
+            statusSelect.appendChild(option);
+        }
+    }
+
+    // Set the current status as selected
+    statusSelect.value = currentStatus;
+    
     // Store original status for comparison
-    document.getElementById('editMerchantForm').setAttribute('data-original-status', merchant.status || 'pending');
-    
-    // Address fields - only use individual fields (no more parsing from address field)
-    let street = merchant.street || '';
-    let city = merchant.city || '';
-    let district = merchant.district || '';
-    let country = merchant.country || 'Iraq';
-    
-    document.getElementById('editStreet').value = street;
-    document.getElementById('editCity').value = city;
-    document.getElementById('editDistrict').value = district;
-    document.getElementById('editCountry').value = country;
+    document.getElementById('editMerchantForm').setAttribute('data-original-status', currentStatus);
     
     // Set up status change monitoring
     setupStatusChangeHandler();
@@ -1012,7 +1039,7 @@ function validateEditFormData(data) {
     
     // Status change validation
     if (data.statusUpdate) {
-        const validStatuses = ['pending', 'approved', 'under_review', 'rejected'];
+        const validStatuses = Object.keys(MERCHANT_STATUSES);
         if (!validStatuses.includes(data.statusUpdate.newStatus)) {
             errors.push('Invalid status selected');
         }
@@ -1105,7 +1132,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 // Get proper action from status
                 const action = getActionFromStatus(updateData.statusUpdate.newStatus);
                 if (!action) {
-                    throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
+                    throw new Error(`Invalid or unsupported status transition to: ${updateData.statusUpdate.newStatus}`);
                 }
                 
                 console.log(`Status transition: ${currentMerchant?.status} -> ${updateData.statusUpdate.newStatus} (action: ${action})`);
@@ -1133,11 +1160,13 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     body: JSON.stringify(requestBody)
                 });
                 
+                const responseText = await statusResponse.text();
+                
                 // Handle response for status update
                 if (!statusResponse.ok) {
                     let errorMessage = 'Status update failed';
                     try {
-                        const errorDetails = await statusResponse.json();
+                        const errorDetails = JSON.parse(responseText);
                         console.error('Full error response:', errorDetails);
                         
                         // Handle validation errors (422) specifically
@@ -1152,13 +1181,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         console.error('Status update error details:', errorDetails);
                     } catch (e) {
                         console.error('Failed to parse error response:', e);
-                        try {
-                            const responseText = await statusResponse.text();
-                            console.error('Error response text:', responseText);
-                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
-                        } catch (textError) {
-                            errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText}`;
-                        }
+                        errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
                     }
                     
                     if (typeof errorMessage !== 'string') {
@@ -1174,7 +1197,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                 // Try to parse the response for status update
                 let statusUpdateResult;
                 try {
-                    statusUpdateResult = await statusResponse.json();
+                    statusUpdateResult = JSON.parse(responseText);
                     console.log('Status update response:', statusUpdateResult);
                 } catch (e) {
                     console.warn('Could not parse status update response as JSON:', e);
@@ -1314,11 +1337,12 @@ function getActionFromStatus(status) {
         'approved': 'approve',
         'rejected': 'reject',
         'suspended': 'suspend',
-        'under-review': 'review',
+        'under_review': 'review',
         'under_review': 'review', // handle underscore variant
-        'pending': 'reactivate'
+        'pending': 'reset_to_pending', // Correct action for setting back to pending
+        'pending_verification': 'review'
     };
-    return statusActionMap[status] || 'review'; // Default to review if status isn't recognized
+    return statusActionMap[status] || null; // Return null for unrecognized status
 }
 
 // Modal utility functions
@@ -1397,6 +1421,3 @@ window.forceLoadRealData = async function() {
         showLoader(false);
     }
 }
-
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', onDomReady);
