@@ -425,6 +425,18 @@ function showLoader(show, message = 'Loading...') {
 // In a real app, this would handle search, filters, etc.
 function setupEventListeners() {
     console.log('Setting up event listeners (search, filters, etc.)...');
+    
+    // Product view navigation buttons
+    const backToMerchantsBtn = document.getElementById('backToMerchantsBtn');
+    if (backToMerchantsBtn) {
+        backToMerchantsBtn.addEventListener('click', backToMerchantsList);
+    }
+    
+    const refreshProductsBtn = document.getElementById('refreshProductsBtn');
+    if (refreshProductsBtn) {
+        refreshProductsBtn.addEventListener('click', refreshMerchantProducts);
+    }
+    
     // This is a placeholder. A full implementation would add listeners for
     // search input, filter dropdowns, and other interactive elements.
 }
@@ -481,9 +493,12 @@ function renderMerchantsTable() {
                     <div class="address-info">${displayAddress}</div>
                 </td>
                 <td>
-                    <div class="actions">
+                    <div class="action-buttons">
                         <button class="btn-action" onclick="viewMerchantDetails('${merchant.id}')" title="View Details">
                             <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn-view-products" onclick="viewMerchantProducts('${merchant.id}')" title="View Products">
+                            <i class="fas fa-box"></i>
                         </button>
                         <button class="btn-action" onclick="editMerchant('${merchant.id}')" title="Edit">
                             <i class="fas fa-edit"></i>
@@ -587,6 +602,201 @@ function editMerchant(merchantId) {
     
     // Set up form submission handler
     setupEditFormSubmission();
+}
+
+// Product view functions
+let currentMerchantId = null;
+let merchantProducts = [];
+let categoryMap = {};
+
+function viewMerchantProducts(merchantId) {
+    const merchant = filteredMerchants.find(m => m.id === merchantId);
+    if (!merchant) {
+        console.error('Merchant not found:', merchantId);
+        return;
+    }
+
+    currentMerchantId = merchantId;
+    
+    // Hide merchants list view
+    document.getElementById('merchantsListView').style.display = 'none';
+    
+    // Show products view
+    document.getElementById('merchantProductsView').style.display = 'block';
+    
+    // Update page title
+    const pageTitle = document.querySelector('.page-title');
+    if (pageTitle) {
+        pageTitle.textContent = 'Merchant Products';
+    }
+    
+    // Update merchant info in header
+    document.getElementById('selectedMerchantName').textContent = merchant.name || merchant.businessName || 'Unknown Business';
+    document.getElementById('selectedMerchantDetails').textContent = `${merchant.email || ''} • ${merchant.phone || ''}`;
+    
+    // Load products
+    loadMerchantProducts(merchantId);
+}
+
+function backToMerchantsList() {
+    // Hide products view
+    document.getElementById('merchantProductsView').style.display = 'none';
+    
+    // Show merchants list view
+    document.getElementById('merchantsListView').style.display = 'block';
+    
+    // Update page title
+    const pageTitle = document.querySelector('.page-title');
+    if (pageTitle) {
+        pageTitle.textContent = 'Merchants Management';
+    }
+    
+    // Clear current merchant
+    currentMerchantId = null;
+    merchantProducts = [];
+}
+
+async function loadMerchantProducts(merchantId) {
+    const statusElement = document.getElementById('productsStatus');
+    const statusText = document.getElementById('productsStatusText');
+    const container = document.getElementById('merchantProductsContainer');
+    
+    // Show loading status
+    if (statusElement && statusText) {
+        statusText.textContent = 'Loading products...';
+        statusElement.style.display = 'block';
+        statusElement.style.borderLeftColor = '#007bff';
+    }
+    
+    if (container) {
+        container.innerHTML = '<div class="loading-message" style="text-align: center; padding: 2rem; color: #6b7280;"><i class="fas fa-spinner fa-spin"></i> Loading products...</div>';
+    }
+
+    try {
+        // Ensure AWS is initialized
+        if (!dynamoDB) {
+            dynamoDB = await AWSUtils.getDynamoDBClient();
+        }
+
+        // Load categories first
+        const categoriesResult = await dynamoDB.scan({ 
+            TableName: 'order-receiver-categories-dev' 
+        }).promise();
+        
+        categoryMap = {};
+        if (categoriesResult.Items) {
+            categoriesResult.Items.forEach(cat => {
+                categoryMap[cat.categoryId] = cat.name || cat.name_ar || 'Unknown Category';
+            });
+        }
+
+        // Load products for this merchant
+        const productsParams = {
+            TableName: 'order-receiver-products-dev',
+            FilterExpression: 'businessId = :bid',
+            ExpressionAttributeValues: { ':bid': merchantId }
+        };
+        
+        const productsResult = await dynamoDB.scan(productsParams).promise();
+        merchantProducts = productsResult.Items || [];
+
+        console.log(`Loaded ${merchantProducts.length} products for merchant ${merchantId}`);
+
+        // Update status
+        if (statusElement && statusText) {
+            if (merchantProducts.length > 0) {
+                statusText.textContent = `Found ${merchantProducts.length} products`;
+                statusElement.style.borderLeftColor = '#28a745';
+            } else {
+                statusText.textContent = 'No products found for this merchant';
+                statusElement.style.borderLeftColor = '#ffc107';
+            }
+        }
+
+        // Render products
+        renderMerchantProducts();
+
+    } catch (error) {
+        console.error('Error loading merchant products:', error);
+        
+        if (statusElement && statusText) {
+            statusText.textContent = `Error loading products: ${error.message}`;
+            statusElement.style.borderLeftColor = '#dc3545';
+        }
+        
+        if (container) {
+            container.innerHTML = `
+                <div class="no-products-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error Loading Products</h3>
+                    <p>${error.message}</p>
+                    <button onclick="loadMerchantProducts('${merchantId}')" class="btn-primary">
+                        <i class="fas fa-retry"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+    }
+}
+
+function renderMerchantProducts() {
+    const container = document.getElementById('merchantProductsContainer');
+    if (!container) return;
+
+    if (merchantProducts.length === 0) {
+        container.innerHTML = `
+            <div class="no-products-message">
+                <i class="fas fa-box-open"></i>
+                <h3>No Products Found</h3>
+                <p>This merchant hasn't added any products yet.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Group products by category
+    const groupedProducts = merchantProducts.reduce((acc, product) => {
+        const categoryId = product.categoryId || product.category_id || 'uncategorized';
+        if (!acc[categoryId]) {
+            acc[categoryId] = [];
+        }
+        acc[categoryId].push(product);
+        return acc;
+    }, {});
+
+    // Render each category section
+    let html = '';
+    for (const categoryId in groupedProducts) {
+        const categoryName = categoryMap[categoryId] || 'Uncategorized';
+        const products = groupedProducts[categoryId];
+        
+        html += `
+            <div class="category-section">
+                <h2>${categoryName}</h2>
+                <div class="products-grid">
+                    ${products.map(product => `
+                        <div class="product-card">
+                            <img src="${product.image_url || 'https://via.placeholder.com/280x160?text=No+Image'}" 
+                                 alt="${product.name || product.name_ar || 'Product'}" 
+                                 onerror="this.src='https://via.placeholder.com/280x160?text=No+Image'" />
+                            <h3>${product.name || product.name_ar || 'Unnamed Product'}</h3>
+                            <p>${product.description || product.description_ar || 'No description available'}</p>
+                            <div class="price">${product.price != null ? '$' + parseFloat(product.price).toFixed(2) : 'Price not set'}</div>
+                            ${product.available === false ? '<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Currently unavailable</div>' : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
+function refreshMerchantProducts() {
+    if (currentMerchantId) {
+        loadMerchantProducts(currentMerchantId);
+    }
 }
 
 function populateEditForm(merchant) {
@@ -1182,6 +1392,9 @@ function hideEditFormMessage() {
 window.closeModal = closeModal;
 window.showEditFormMessage = showEditFormMessage;
 window.hideEditFormMessage = hideEditFormMessage;
+window.viewMerchantProducts = viewMerchantProducts;
+window.backToMerchantsList = backToMerchantsList;
+window.refreshMerchantProducts = refreshMerchantProducts;
 
 // Force load real data function for development testing
 window.forceLoadRealData = async function() {

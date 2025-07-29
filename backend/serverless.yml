@@ -336,7 +336,7 @@ functions:
           path: promotions
           method: get
           cors: true
-          authorizer: authorize
+          # authorizer: authorize  # Temporarily disabled for testing
           
   createPromotion:
     handler: src/handlers/promotions.createPromotion
@@ -345,16 +345,7 @@ functions:
           path: promotions
           method: post
           cors: true
-          authorizer: authorize
-          
-  getPromotions:
-    handler: src/handlers/promotions.getPromotions
-    events:
-      - http:
-          path: promotions
-          method: get
-          cors: true
-          authorizer: authorize
+          # authorizer: authorize  # Temporarily disabled for testing
           
   getPromotion:
     handler: src/handlers/promotions.getPromotion

@@ -60,6 +60,11 @@ const validatePromotionCodeSchema = Joi.object({
 
 // Create new promotion
 exports.createPromotion = async (event) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return responseHelper.cors();
+  }
+
   try {
     const body = JSON.parse(event.body);
     const validation = validateInput(body, createPromotionSchema);
@@ -218,6 +223,11 @@ exports.deletePromotion = async (event) => {
 
 // List promotions with filters
 exports.listPromotions = async (event) => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return responseHelper.cors();
+  }
+
   try {
     const {
       isActive,
