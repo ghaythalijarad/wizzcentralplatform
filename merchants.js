@@ -537,6 +537,10 @@ function editMerchant(merchantId) {
         return;
     }
 
+    console.log('Editing merchant:', merchant.name || merchant.businessName);
+    console.log('Merchant data:', merchant);
+    console.log('Merchant status:', merchant.status);
+
     // Clear any previous messages
     hideEditFormMessage();
 
@@ -798,13 +802,16 @@ function populateEditForm(merchant) {
     document.getElementById('editEmail').value = merchant.email || '';
     document.getElementById('editPhoneNumber').value = merchant.phoneNumber || merchant.phone || '';
     
-    // Business type and status - use exact DynamoDB values
+    // Business type - use exact DynamoDB values
     document.getElementById('editBusinessType').value = merchant.businessType?.toLowerCase() || 'restaurant';
-    document.getElementById('editStatus').value = merchant.status || 'pending';
     
-    // Dynamically populate status dropdown
+    // Dynamically populate status dropdown first
     const statusSelect = document.getElementById('editStatus');
     const currentStatus = merchant.status || 'pending';
+    
+    console.log('Setting up status dropdown for merchant:', merchant.name || merchant.businessName);
+    console.log('Current merchant status from DynamoDB:', currentStatus);
+    
     statusSelect.innerHTML = ''; // Clear existing options
 
     // Add all possible statuses
@@ -813,13 +820,16 @@ function populateEditForm(merchant) {
             const option = document.createElement('option');
             option.value = statusKey;
             option.textContent = MERCHANT_STATUSES[statusKey].label;
-            option.selected = (statusKey === currentStatus); // Set current status as selected
             statusSelect.appendChild(option);
+            
+            console.log('Added status option:', statusKey, '->', MERCHANT_STATUSES[statusKey].label);
         }
     }
 
-    // Ensure the current status is selected
+    // Set the current status as selected
     statusSelect.value = currentStatus;
+    console.log('Status dropdown value set to:', statusSelect.value);
+    console.log('Selected option text:', statusSelect.options[statusSelect.selectedIndex]?.text);
     
     // Store original status for comparison
     document.getElementById('editMerchantForm').setAttribute('data-original-status', currentStatus);
