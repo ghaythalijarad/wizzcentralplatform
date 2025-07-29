@@ -763,22 +763,27 @@ function renderMerchantProducts() {
     // Render each category section
     let html = '';
     for (const categoryId of sortedCategories) {
-        const categoryName = categoryMap[categoryId] || 'Uncategorized';
+        const categoryName = categoryMap[categoryId] || categoryId;
         const products = groupedProducts[categoryId];
-        
         html += `
-            <div class="category-section">
-                <h2>${categoryName} <span style="font-size: 0.8rem; color: #6b7280; font-weight: normal;">(${products.length} ${products.length === 1 ? 'item' : 'items'})</span></h2>
+            <div class="product-category-section">
+                <h3 class="product-category-title">${categoryName} (${products.length} items)</h3>
                 <div class="products-grid">
                     ${products.map(product => `
                         <div class="product-card">
-                            <img src="${product.image_url || 'https://via.placeholder.com/280x160?text=No+Image'}" 
-                                 alt="${product.name || product.name_ar || 'Product'}" 
-                                 onerror="this.src='https://via.placeholder.com/280x160?text=No+Image'" />
-                            <h3>${product.name || product.name_ar || 'Unnamed Product'}</h3>
-                            <p>${product.description || product.description_ar || 'No description available'}</p>
-                            <div class="price">${product.price != null ? '$' + parseFloat(product.price).toFixed(2) : 'Price not set'}</div>
-                            ${product.available === false ? '<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;"><i class="fas fa-exclamation-circle"></i> Currently unavailable</div>' : ''}
+                            <img src="${product.image_url || 'https://via.placeholder.com/150'}" alt="${product.name}" class="product-image">
+                            <div class="product-info">
+                                <h4 class="product-name">${product.name}</h4>
+                                <p class="product-description">${product.description || ''}</p>
+                                <div class="product-price-and-actions">
+                                    <span class="product-price">$${product.price}</span>
+                                    <div class="product-actions">
+                                        <button class="btn-action btn-edit-product" onclick="editProduct('${product.productId}')" title="Edit Product">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
@@ -792,6 +797,117 @@ function renderMerchantProducts() {
 function refreshMerchantProducts() {
     if (currentMerchantId) {
         loadMerchantProducts(currentMerchantId);
+    }
+}
+
+function editProduct(productId) {
+    const product = merchantProducts.find(p => p.productId === productId);
+    if (!product) {
+        console.error('Product not found:', productId);
+        alert('Product not found. Please refresh and try again.');
+        return;
+    }
+
+    console.log('Editing Product:', product);
+
+    // Populate the form
+    document.getElementById('editProductId').value = product.productId;
+    document.getElementById('editProductName').value = product.name || '';
+    document.getElementById('editProductNameAr').value = product.name_ar || '';
+    document.getElementById('editProductDescription').value = product.description || '';
+    document.getElementById('editProductDescriptionAr').value = product.description_ar || '';
+    document.getElementById('editProductAllergens').value = (product.allergens || []).join(', ');
+    document.getElementById('editProductIngredients').value = (product.ingredients || []).join(', ');
+    document.getElementById('editProductPrice').value = product.price;
+    document.getElementById('editProductPreparationTime').value = product.preparation_time || 0;
+    document.getElementById('editProductIsAvailable').checked = product.is_available;
+    document.getElementById('editProductImageUrl').value = product.image_url || '';
+
+    // Populate category dropdown
+    const categorySelect = document.getElementById('editProductCategory');
+    categorySelect.innerHTML = ''; // Clear existing options
+    for (const categoryId in categoryMap) {
+        const option = document.createElement('option');
+        option.value = categoryId;
+        option.textContent = categoryMap[categoryId];
+        if (categoryId === product.categoryId || categoryId === product.category_id) {
+            option.selected = true;
+        }
+        categorySelect.appendChild(option);
+    }
+
+    // Show the modal
+    document.getElementById('editProductModal').style.display = 'flex';
+
+    // Add form submission listener
+    const editForm = document.getElementById('editProductForm');
+    // To prevent multiple listeners, we clone and replace the element
+    const newForm = editForm.cloneNode(true);
+    editForm.parentNode.replaceChild(newForm, editForm);
+    newForm.addEventListener('submit', handleEditProductFormSubmit);
+}
+
+async function handleEditProductFormSubmit(event) {
+    event.preventDefault();
+    const form = event.target;
+    const productId = form.querySelector('#editProductId').value;
+    const submitButton = form.querySelector('button[type="submit"]');
+    const messageElement = document.getElementById('editProductFormMessage');
+
+    const updatedProductData = {
+        name: form.querySelector('#editProductName').value,
+        name_ar: form.querySelector('#editProductNameAr').value,
+        description: form.querySelector('#editProductDescription').value,
+        description_ar: form.querySelector('#editProductDescriptionAr').value,
+        price: parseFloat(form.querySelector('#editProductPrice').value),
+        categoryId: form.querySelector('#editProductCategory').value,
+        preparation_time: parseInt(form.querySelector('#editProductPreparationTime').value, 10),
+        is_available: form.querySelector('#editProductIsAvailable').checked,
+        image_url: form.querySelector('#editProductImageUrl').value,
+        allergens: form.querySelector('#editProductAllergens').value.split(',').map(s => s.trim()).filter(Boolean),
+        ingredients: form.querySelector('#editProductIngredients').value.split(',').map(s => s.trim()).filter(Boolean),
+    };
+
+    console.log('Submitting updated product data:', updatedProductData);
+    submitButton.disabled = true;
+    submitButton.textContent = 'Saving...';
+    messageElement.style.display = 'none';
+
+    try {
+        const idToken = sessionStorage.getItem('idToken');
+        const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${currentMerchantId}/products/${productId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updatedProductData)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Failed to update product.');
+        }
+
+        messageElement.textContent = 'Product updated successfully!';
+        messageElement.className = 'form-message success';
+        messageElement.style.display = 'block';
+
+        // Hide modal and refresh products list after a short delay
+        setTimeout(() => {
+            document.getElementById('editProductModal').style.display = 'none';
+            refreshMerchantProducts();
+        }, 1500);
+
+    } catch (error) {
+        console.error('Error updating product:', error);
+        messageElement.textContent = `Error: ${error.message}`;
+        messageElement.className = 'form-message error';
+        messageElement.style.display = 'block';
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Save Changes';
     }
 }
 

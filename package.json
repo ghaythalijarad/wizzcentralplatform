@@ -4,13 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "ampx sandbox",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",
     "@aws-amplify/backend-cli": "^1.0.0",
-    "typescript": "^5.0.0",
     "vite": "^5.0.0"
   },
   "dependencies": {

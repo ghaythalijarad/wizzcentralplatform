@@ -117,6 +117,109 @@
             gap: 0.5rem;
             flex-wrap: wrap;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .btn-secondary {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .form-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .form-message.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .form-message.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
     </style>
 </head>
 <body data-page="merchants">
@@ -264,11 +367,78 @@
                     <span id="productsStatusText"></span>
                 </div>
 
-                <!-- Products Container -->
-                <div id="merchantProductsContainer">
-                    <!-- Products will be loaded here -->
+                <!-- Container for products -->
+                <div id="merchantProductsContainer" class="products-grid">
+                    <!-- Products will be rendered here by JavaScript -->
                 </div>
             </div>
+
+            <!-- Edit Product Modal -->
+            <div id="editProductModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Edit Product</h2>
+                        <span class="close-button" onclick="document.getElementById('editProductModal').style.display='none'">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editProductForm">
+                            <input type="hidden" id="editProductId">
+                            <div class="form-group">
+                                <label for="editProductName">Product Name (English)</label>
+                                <input type="text" id="editProductName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductNameAr">Product Name (Arabic)</label>
+                                <input type="text" id="editProductNameAr">
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductDescription">Description (English)</label>
+                                <textarea id="editProductDescription" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductDescriptionAr">Description (Arabic)</label>
+                                <textarea id="editProductDescriptionAr" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductAllergens">Allergens (comma-separated)</label>
+                                <textarea id="editProductAllergens" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductIngredients">Ingredients (comma-separated)</label>
+                                <textarea id="editProductIngredients" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductPrice">Price</label>
+                                <input type="number" id="editProductPrice" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductCategory">Category</label>
+                                <select id="editProductCategory" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductPreparationTime">Preparation Time (minutes)</label>
+                                <input type="number" id="editProductPreparationTime" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductIsAvailable">
+                                    <input type="checkbox" id="editProductIsAvailable">
+                                    Is Available
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductImageUrl">Image URL</label>
+                                <input type="text" id="editProductImageUrl">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Changes</button>
+                                <button type="button" class="btn-secondary" onclick="document.getElementById('editProductModal').style.display='none'">Cancel</button>
+                            </div>
+                        </form>
+                        <div id="editProductFormMessage" class="form-message" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
         </div> <!-- end page-content -->
 
         <!-- Status Update Modal -->
