@@ -500,6 +500,7 @@ exports.updateMerchantStatus = async (event) => {
     const validTransitions = {
       pending: ['approved', 'rejected', 'under-review'],
       'under-review': ['approved', 'rejected', 'suspended'],
+      'under_review': ['approved', 'rejected', 'suspended'], // Handle underscore variation
       approved: ['suspended', 'under-review', 'rejected'], // Allow approved -> rejected
       verified: ['suspended', 'under-review', 'rejected'], // Keep for backwards compatibility
       suspended: ['approved', 'under-review', 'rejected'],
