@@ -14,7 +14,7 @@ provider:
     USERS_TABLE: "WizzUser_users_${self:provider.stage}"
     MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
     DRIVERS_TABLE: "${self:service}-drivers-${self:provider.stage}"
-    CUSTOMERS_TABLE: "${self:service}-customers-${self:provider.stage}"
+    CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
     ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
     PROMOTIONS_TABLE: "order-receiver-discounts-${self:provider.stage}"
     PROMOTION_USAGE_TABLE: "${self:service}-promotion-usage-${self:provider.stage}"

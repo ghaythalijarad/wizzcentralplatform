@@ -17,7 +17,7 @@ async function loadDashboardStats() {
         const dynamoDB = await AWSUtils.getDynamoDBClient();
         
         const tables = {
-            customersCount: 'wizzcentral-backend-customers-dev',
+            customersCount: 'WizzUser_users_dev',
             merchantsCount: 'order-receiver-businesses-dev',
             driversCount: 'wizzcentral-backend-drivers-dev',
             ordersCount: 'order-receiver-orders-dev',
