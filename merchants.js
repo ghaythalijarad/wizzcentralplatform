@@ -267,7 +267,7 @@ async function loadMerchantsFromDynamoDB() {
                 // Improved status detection - prioritize actual status field
                 status: item.status || (item.isActive === false ? 'pending' : 'approved'),
                 isActive: item.isActive !== undefined ? item.isActive : true,
-                address: extractAddress(item.address, item.city, item.country),
+                address: buildAddressFromIndividualFields(item.street, item.city, item.district, item.country),
                 owner: item.ownerName || item.owner || item.contactName || 'N/A',
                 joinDate: item.createdAt ? formatDate(item.createdAt) : (item.dateCreated ? formatDate(item.dateCreated) : 'N/A'),
                 avatar: item.businessPhotoUrl || item.avatar || item.logo || generateAvatarUrl(item.businessName || item.name),
@@ -313,51 +313,19 @@ function mapBusinessType(businessType) {
     return typeMap[businessType] || 'Other';
 }
 
-// Enhanced helper function to extract address from DynamoDB address structure
-function extractAddress(addressObj, city, country) {
-    console.log('Extracting address from:', { addressObj, city, country });
-    
-    // Handle complex address object from DynamoDB
-    if (addressObj && typeof addressObj === 'object') {
-        const parts = [];
-        
-        // Check if it's a DynamoDB attribute value object (unconverted format)
-        if (addressObj.country && addressObj.country.S) {
-            console.log('Processing DynamoDB AttributeValue format');
-            // DynamoDB AttributeValue format
-            if (addressObj.street && addressObj.street.S) parts.push(addressObj.street.S);
-            if (addressObj.district && addressObj.district.S) parts.push(addressObj.district.S);
-            if (addressObj.city && addressObj.city.S) parts.push(addressObj.city.S);
-            if (addressObj.country && addressObj.country.S) parts.push(addressObj.country.S);
-        } else {
-            console.log('Processing converted object format');
-            // Regular object format (DocumentClient converted)
-            if (addressObj.street) parts.push(addressObj.street);
-            if (addressObj.district) parts.push(addressObj.district);
-            if (addressObj.city) parts.push(addressObj.city);
-            if (addressObj.country) parts.push(addressObj.country);
-        }
-        
-        if (parts.length > 0) {
-            const address = parts.join(', ');
-            console.log('Extracted address:', address);
-            return address;
-        }
-    }
-    
-    // Fallback to individual city and country fields
-    if (typeof addressObj === 'string') {
-        console.log('Using string address:', addressObj);
-        return addressObj;
-    }
+// Build address display string from individual fields (not from nested address object)
+function buildAddressFromIndividualFields(street, city, district, country) {
+    console.log('Building address from individual fields:', { street, city, district, country });
     
     const parts = [];
+    if (street) parts.push(street);
+    if (district) parts.push(district);
     if (city) parts.push(city);
     if (country) parts.push(country);
     
-    const fallbackAddress = parts.length > 0 ? parts.join(', ') : 'Address not available';
-    console.log('Fallback address:', fallbackAddress);
-    return fallbackAddress;
+    const address = parts.length > 0 ? parts.join(', ') : 'Address not available';
+    console.log('Built address:', address);
+    return address;
 }
 
 // Helper function to format dates
@@ -458,18 +426,8 @@ function renderMerchantsTable() {
     const rows = filteredMerchants.map(merchant => {
         const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
         
+        // Use the address that was already built from individual fields
         let displayAddress = merchant.address || 'N/A';
-        try {
-            // The address might be a JSON string, so we parse it.
-            const parsedAddress = JSON.parse(merchant.address);
-            displayAddress = [
-                parsedAddress.street,
-                parsedAddress.city,
-                parsedAddress.country
-            ].filter(Boolean).join(', ');
-        } catch (e) {
-            // If it's not a JSON string, use it as is.
-        }
 
         return `
             <tr>
@@ -541,18 +499,8 @@ function viewMerchantDetails(merchantId) {
         return;
     }
 
-    // Format address display
+    // Use the address that was already built from individual fields
     let displayAddress = merchant.address || 'Not provided';
-    try {
-        const parsedAddress = JSON.parse(merchant.address);
-        displayAddress = [
-            parsedAddress.street,
-            parsedAddress.city,
-            parsedAddress.country
-        ].filter(Boolean).join(', ');
-    } catch (e) {
-        // Use address as is if not JSON
-    }
 
     const modalBody = document.getElementById('merchantDetailsBody');
     if (modalBody) {
@@ -844,36 +792,11 @@ function populateEditForm(merchant) {
     // Store original status for comparison
     document.getElementById('editMerchantForm').setAttribute('data-original-status', merchant.status || 'pending');
     
-    // Address fields - handle both the nested address object and individual fields
-    let street = '', city = '', district = '', country = 'Iraq';
-    
-    // First try individual fields
-    if (merchant.street) street = merchant.street;
-    if (merchant.city) city = merchant.city;
-    if (merchant.district) district = merchant.district;
-    if (merchant.country) country = merchant.country;
-    
-    // If no individual fields, try parsing the address object
-    if (!street && !city && merchant.address) {
-        try {
-            if (typeof merchant.address === 'string') {
-                const addressObj = JSON.parse(merchant.address);
-                if (addressObj.street && addressObj.street.S) street = addressObj.street.S;
-                if (addressObj.city && addressObj.city.S) city = addressObj.city.S;
-                if (addressObj.district && addressObj.district.S) district = addressObj.district.S;
-                if (addressObj.country && addressObj.country.S) country = addressObj.country.S;
-            } else if (typeof merchant.address === 'object') {
-                street = merchant.address.street || '';
-                city = merchant.address.city || '';
-                district = merchant.address.district || merchant.address.state || '';
-                country = merchant.address.country || 'Iraq';
-            }
-        } catch (e) {
-            console.warn('Failed to parse address:', e);
-            // If parsing fails, treat address as a simple string for the street field
-            street = merchant.address;
-        }
-    }
+    // Address fields - only use individual fields (no more parsing from address field)
+    let street = merchant.street || '';
+    let city = merchant.city || '';
+    let district = merchant.district || '';
+    let country = merchant.country || 'Iraq';
     
     document.getElementById('editStreet').value = street;
     document.getElementById('editCity').value = city;
