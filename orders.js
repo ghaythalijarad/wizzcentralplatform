@@ -51,7 +51,7 @@ async function initializeOrdersManagement() {
     showLoader(true, 'Fetching orders...');
     try {
         // Use centralized AWS utilities
-        const dynamoDB = AWSUtils.getDynamoDBClient();
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
         await loadOrdersFromDynamoDB(dynamoDB);
         hideMessage();
     } catch (error) {

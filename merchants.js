@@ -230,7 +230,7 @@ async function loadMerchantsFromDynamoDB() {
     console.log('Executing DynamoDB scan...');
     
     // Use centralized AWS utilities
-    const dynamoDB = AWSUtils.getDynamoDBClient();
+    const dynamoDB = await AWSUtils.getDynamoDBClient();
     
     const params = {
         TableName: 'order-receiver-businesses-dev',
@@ -1190,18 +1190,9 @@ window.forceLoadRealData = async function() {
             showMessage('No merchants found in database', 'info');
         }
     } catch (error) {
-        console.error('Failed to force load real data:', error);
-        showMessage(`Failed to load real data: ${error.message}`, 'error');
+        console.error('Error forcing load of real data:', error);
+        showMessage(`Error: ${error.message}`, 'error');
     } finally {
         showLoader(false);
     }
-};
-
-// Update merchant status function (for status modal)
-window.updateMerchantStatus = function() {
-    console.log('updateMerchantStatus function called - this would handle status modal updates');
-    // This function would be implemented to handle the status modal
-    // For now, just close the modal
-    closeModal('statusModal');
-    showMessage('Status modal function not fully implemented yet', 'info');
-};
+}

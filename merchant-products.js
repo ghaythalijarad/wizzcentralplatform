@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         // Initialize AWS using centralized utility
         await AWSUtils.initialize();
-        const dynamoDB = AWSUtils.getDynamoDBClient();
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
         
         const [categories, products] = await Promise.all([loadCategories(dynamoDB), loadProducts(businessId, dynamoDB)]);
         clearStatus();

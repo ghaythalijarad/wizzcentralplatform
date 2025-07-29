@@ -41,7 +41,7 @@ async function loadCustomersData() {
         console.log('Loading customers data from DynamoDB...');
         
         // Use centralized AWS utilities
-        const dynamoDB = AWSUtils.getDynamoDBClient();
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
         
         console.log('Scanning WizzUser_users_dev table with proper permissions...');
         
