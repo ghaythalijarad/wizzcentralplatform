@@ -1125,21 +1125,14 @@ async function submitMerchantUpdate(merchantId, updateData) {
             
             // Handle status update first if present
             if (updateData.statusUpdate) {
-                console.log('Submitting status update:', updateData.statusUpdate);
-                
                 // Find the current merchant to show current status
                 const currentMerchant = filteredMerchants.find(m => m.id === merchantId);
-                if (currentMerchant) {
-                    console.log(`Current merchant status: ${currentMerchant.status}, attempting to change to: ${updateData.statusUpdate.newStatus}`);
-                }
                 
                 // Get proper action from status
                 const action = getActionFromStatus(updateData.statusUpdate.newStatus);
                 if (!action) {
                     throw new Error(`Invalid or unsupported status transition to: ${updateData.statusUpdate.newStatus}`);
                 }
-                
-                console.log(`Status transition: ${currentMerchant?.status} -> ${updateData.statusUpdate.newStatus} (action: ${action})`);
                 
                 // Prepare the request body for status update
                 const requestBody = {
@@ -1148,12 +1141,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     sendEmail: true
                 };
                 
-                // Log request details for debugging
-                console.log('Status update request URL:', `${API_BASE_URL}/merchants/${merchantId}/status`);
-                console.log('Status update request body:', JSON.stringify(requestBody, null, 2));
-                console.log('Request method:', 'PATCH');
-                
-                // Make status update request - MUST use PATCH method and the /status endpoint
+                // Make status update request
                 const statusResponse = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
                     method: 'PATCH',
                     headers: {
@@ -1182,9 +1170,7 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         } else {
                             errorMessage = errorDetails.message || errorDetails.error || `Server error: ${statusResponse.status}`;
                         }
-                        console.error('Status update error details:', errorDetails);
                     } catch (e) {
-                        console.error('Failed to parse error response:', e);
                         errorMessage = `HTTP ${statusResponse.status}: ${statusResponse.statusText} - ${responseText.substring(0, 200)}`;
                     }
                     
@@ -1192,19 +1178,15 @@ async function submitMerchantUpdate(merchantId, updateData) {
                         errorMessage = JSON.stringify(errorMessage) || `Server error: ${statusResponse.status}`;
                     }
                     
-                    console.log('About to throw error with message:', errorMessage);
                     throw new Error(errorMessage);
                 }
-                
-                console.log('Status update successful');
                 
                 // Try to parse the response for status update
                 let statusUpdateResult;
                 try {
                     statusUpdateResult = JSON.parse(responseText);
-                    console.log('Status update response:', statusUpdateResult);
                 } catch (e) {
-                    console.warn('Could not parse status update response as JSON:', e);
+                    // Response parsing failed, but status update was successful
                 }
             }
             

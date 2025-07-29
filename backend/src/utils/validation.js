@@ -89,7 +89,7 @@ const merchantSchemas = {
   }).min(1),
 
   updateStatus: Joi.object({
-    action: Joi.string().valid('approve', 'reject', 'suspend', 'review', 'reactivate').required(),
+    action: Joi.string().valid('approve', 'reject', 'suspend', 'review', 'reactivate', 'reset_to_pending').required(),
     reason: Joi.string().min(10).max(500).required(),
     sendEmail: Joi.boolean().default(true)
   })
