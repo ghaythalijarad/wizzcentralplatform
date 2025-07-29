@@ -79,8 +79,17 @@ const onDomReady = async function() {
         console.log('🎯 Loading merchants directly from DynamoDB');
         showLoader(true, 'Loading merchants...');
         
+        // Check if AWSUtils is available
+        if (!window.AWSUtils) {
+            throw new Error('AWSUtils is not available. Please ensure aws-utils.js is loaded.');
+        }
+        
+        console.log('🔐 Initializing AWS...');
         // Initialize AWS using centralized utility
         await AWSUtils.initialize();
+        console.log('✅ AWS initialized successfully');
+        
+        console.log('📊 Loading merchants from DynamoDB...');
         await loadMerchantsFromDynamoDB();
 
         if (merchantsData.length > 0) {
@@ -99,7 +108,7 @@ const onDomReady = async function() {
         }
 
     } catch (error) {
-        console.error('❌ Error loading merchants via API:', error);
+        console.error('❌ Error loading merchants from database:', error);
         document.getElementById('merchantsTableBody').innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-600 bg-red-50">${error.message}</td></tr>`;
         updateDataSourceIndicator('error', `Error: ${error.message}`);
         showMessage(`Failed to load merchants: ${error.message}`, 'error');
@@ -1200,3 +1209,6 @@ window.forceLoadRealData = async function() {
         showLoader(false);
     }
 }
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', onDomReady);
