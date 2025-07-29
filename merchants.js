@@ -613,9 +613,11 @@ function viewMerchantProducts(merchantId) {
     const merchant = filteredMerchants.find(m => m.id === merchantId);
     if (!merchant) {
         console.error('Merchant not found:', merchantId);
+        alert('Merchant not found. Please refresh the page and try again.');
         return;
     }
 
+    console.log('Viewing products for merchant:', merchant.name || merchant.businessName);
     currentMerchantId = merchantId;
     
     // Hide merchants list view
@@ -631,8 +633,11 @@ function viewMerchantProducts(merchantId) {
     }
     
     // Update merchant info in header
-    document.getElementById('selectedMerchantName').textContent = merchant.name || merchant.businessName || 'Unknown Business';
-    document.getElementById('selectedMerchantDetails').textContent = `${merchant.email || ''} • ${merchant.phone || ''}`;
+    const merchantName = merchant.name || merchant.businessName || 'Unknown Business';
+    const merchantDetails = [merchant.email, merchant.phone].filter(Boolean).join(' • ') || 'No contact details';
+    
+    document.getElementById('selectedMerchantName').textContent = merchantName;
+    document.getElementById('selectedMerchantDetails').textContent = merchantDetails;
     
     // Load products
     loadMerchantProducts(merchantId);
@@ -691,16 +696,25 @@ async function loadMerchantProducts(merchantId) {
         }
 
         // Load products for this merchant
+        // Note: Products table uses businessId field which should match the merchant's ID
+        const businessId = merchantId; // Use the merchant ID directly
+        console.log(`Loading products for businessId: ${businessId}`);
+        
         const productsParams = {
             TableName: 'order-receiver-products-dev',
             FilterExpression: 'businessId = :bid',
-            ExpressionAttributeValues: { ':bid': merchantId }
+            ExpressionAttributeValues: { ':bid': businessId }
         };
         
         const productsResult = await dynamoDB.scan(productsParams).promise();
         merchantProducts = productsResult.Items || [];
 
         console.log(`Loaded ${merchantProducts.length} products for merchant ${merchantId}`);
+        
+        // Log sample product for debugging
+        if (merchantProducts.length > 0) {
+            console.log('Sample product:', merchantProducts[0]);
+        }
 
         // Update status
         if (statusElement && statusText) {
@@ -730,8 +744,11 @@ async function loadMerchantProducts(merchantId) {
                     <i class="fas fa-exclamation-triangle"></i>
                     <h3>Error Loading Products</h3>
                     <p>${error.message}</p>
-                    <button onclick="loadMerchantProducts('${merchantId}')" class="btn-primary">
-                        <i class="fas fa-retry"></i> Retry
+                    <button onclick="loadMerchantProducts('${merchantId}')" class="btn-primary" style="margin-top: 1rem;">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                    <button onclick="backToMerchantsList()" class="btn-secondary" style="margin-top: 1rem; margin-left: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i> Back to Merchants
                     </button>
                 </div>
             `;
@@ -744,11 +761,17 @@ function renderMerchantProducts() {
     if (!container) return;
 
     if (merchantProducts.length === 0) {
+        const merchant = filteredMerchants.find(m => m.id === currentMerchantId);
+        const merchantName = merchant ? (merchant.name || merchant.businessName || 'this merchant') : 'this merchant';
+        
         container.innerHTML = `
             <div class="no-products-message">
                 <i class="fas fa-box-open"></i>
                 <h3>No Products Found</h3>
-                <p>This merchant hasn't added any products yet.</p>
+                <p>${merchantName} hasn't added any products yet.</p>
+                <p style="font-size: 0.9rem; color: #6b7280; margin-top: 1rem;">
+                    Products will appear here once the merchant adds them to their inventory.
+                </p>
             </div>
         `;
         return;
@@ -764,15 +787,22 @@ function renderMerchantProducts() {
         return acc;
     }, {});
 
+    // Sort categories - put 'uncategorized' last
+    const sortedCategories = Object.keys(groupedProducts).sort((a, b) => {
+        if (a === 'uncategorized') return 1;
+        if (b === 'uncategorized') return -1;
+        return (categoryMap[a] || 'Unknown').localeCompare(categoryMap[b] || 'Unknown');
+    });
+
     // Render each category section
     let html = '';
-    for (const categoryId in groupedProducts) {
+    for (const categoryId of sortedCategories) {
         const categoryName = categoryMap[categoryId] || 'Uncategorized';
         const products = groupedProducts[categoryId];
         
         html += `
             <div class="category-section">
-                <h2>${categoryName}</h2>
+                <h2>${categoryName} <span style="font-size: 0.8rem; color: #6b7280; font-weight: normal;">(${products.length} ${products.length === 1 ? 'item' : 'items'})</span></h2>
                 <div class="products-grid">
                     ${products.map(product => `
                         <div class="product-card">
@@ -782,7 +812,7 @@ function renderMerchantProducts() {
                             <h3>${product.name || product.name_ar || 'Unnamed Product'}</h3>
                             <p>${product.description || product.description_ar || 'No description available'}</p>
                             <div class="price">${product.price != null ? '$' + parseFloat(product.price).toFixed(2) : 'Price not set'}</div>
-                            ${product.available === false ? '<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;">Currently unavailable</div>' : ''}
+                            ${product.available === false ? '<div style="color: #ef4444; font-size: 0.8rem; margin-top: 0.5rem;"><i class="fas fa-exclamation-circle"></i> Currently unavailable</div>' : ''}
                         </div>
                     `).join('')}
                 </div>

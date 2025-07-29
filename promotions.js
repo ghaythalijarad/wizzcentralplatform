@@ -78,19 +78,58 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.error('Failed to initialize promotions page:', error);
     }
     
-    // Load merchant discounts
-    if (window.dataService) {
-        loadMerchantDiscounts();
-    } else {
-        console.warn('Data service not available, merchant discounts will not be loaded');
-        // Try again after a delay in case the service is still loading
-        setTimeout(() => {
-            if (window.dataService) {
-                loadMerchantDiscounts();
-            }
-        }, 1000);
-    }
+    // Load merchant discounts with better error handling and retry logic
+    await loadMerchantDiscountsWithRetry();
 });
+
+// Improved merchant discounts loading with retry logic
+async function loadMerchantDiscountsWithRetry(maxRetries = 3, retryDelay = 1000) {
+    console.log('🔄 Starting merchant discounts loading with retry logic...');
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`📋 Attempt ${attempt}/${maxRetries} to load merchant discounts`);
+            
+            // Wait for data service to be available
+            if (!window.dataService) {
+                console.log('⏳ Waiting for data service to be available...');
+                
+                // Wait up to 5 seconds for data service to load
+                let waitTime = 0;
+                const maxWaitTime = 5000;
+                const checkInterval = 100;
+                
+                while (!window.dataService && waitTime < maxWaitTime) {
+                    await new Promise(resolve => setTimeout(resolve, checkInterval));
+                    waitTime += checkInterval;
+                }
+                
+                if (!window.dataService) {
+                    throw new Error('Data service not available after waiting');
+                }
+            }
+            
+            console.log('✅ Data service is available, attempting to load merchant discounts...');
+            await loadMerchantDiscounts();
+            
+            console.log('🎉 Merchant discounts loaded successfully!');
+            return; // Success, exit retry loop
+            
+        } catch (error) {
+            console.error(`❌ Attempt ${attempt} failed:`, error);
+            
+            if (attempt === maxRetries) {
+                console.error('💥 All retry attempts failed');
+                showMerchantDiscountError(error);
+                return;
+            }
+            
+            console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay *= 1.5; // Exponential backoff
+        }
+    }
+}
 
 function initializePromotionsPage() {
     renderPromotionsTable();
@@ -492,8 +531,7 @@ async function loadMerchantDiscounts() {
         
         if (!window.dataService) {
             console.warn('❌ Data service not available for merchant discounts');
-            showMerchantDiscountError();
-            return;
+            throw new Error('Data service is not available. Please check if data-service.js is loaded properly.');
         }
         
         console.log('✅ Data service available, initializing...');
@@ -520,7 +558,14 @@ async function loadMerchantDiscounts() {
                 code: discountError.code,
                 stack: discountError.stack
             });
-            // Continue with empty discounts array
+            
+            // Check if it's a credentials or AWS error
+            if (discountError.message.includes('credentials') || discountError.message.includes('AWS')) {
+                throw new Error(`AWS credentials error: ${discountError.message}. Please ensure you are properly authenticated.`);
+            }
+            
+            // Continue with empty discounts array for other errors
+            discounts = [];
         }
         
         try {
@@ -534,7 +579,14 @@ async function loadMerchantDiscounts() {
                 code: businessError.code,
                 stack: businessError.stack
             });
-            // Continue with empty businesses array
+            
+            // Check if it's a credentials or AWS error
+            if (businessError.message.includes('credentials') || businessError.message.includes('AWS')) {
+                throw new Error(`AWS credentials error: ${businessError.message}. Please ensure you are properly authenticated.`);
+            }
+            
+            // Continue with empty businesses array for other errors
+            businesses = [];
         }
         
         merchantDiscounts = discounts;
@@ -552,11 +604,6 @@ async function loadMerchantDiscounts() {
         console.log(`- Merchant discounts: ${merchantDiscounts.length}`);
         console.log(`- Businesses data: ${Object.keys(businessesData).length}`);
         console.log('- Sample businessesData keys:', Object.keys(businessesData).slice(0, 5));
-        console.log('📊 Final processing results:');
-        console.log(`- Merchant discounts: ${merchantDiscounts.length}`);
-        console.log(`- Businesses data: ${Object.keys(businessesData).length}`);
-        console.log('- Sample businessesData keys:', Object.keys(businessesData).slice(0, 5));
-        console.log('Final businesses data:', businessesData);
         
         // Update stats
         updateMerchantDiscountStats();
@@ -575,7 +622,9 @@ async function loadMerchantDiscounts() {
             discountsLength: merchantDiscounts.length,
             businessesDataKeys: Object.keys(businessesData)
         });
-        showMerchantDiscountError();
+        
+        // Re-throw the error so it can be caught by the retry logic
+        throw error;
     }
 }
 
@@ -606,8 +655,8 @@ async function refreshMerchantDiscounts() {
     if (totalEl) totalEl.textContent = '0';
     if (activeEl) activeEl.textContent = '0';
     
-    // Load fresh data
-    await loadMerchantDiscounts();
+    // Load fresh data with retry logic
+    await loadMerchantDiscountsWithRetry();
 }
 
 // Update merchant discount statistics
@@ -724,19 +773,47 @@ function formatDiscountValue(discount) {
 }
 
 // Show error when merchant discounts fail to load
-function showMerchantDiscountError() {
+function showMerchantDiscountError(error = null) {
     const tbody = document.getElementById('merchantDiscountsTableBody');
     if (!tbody) return;
+    
+    // Determine error type and provide helpful message
+    let errorMessage = 'Failed to load merchant discounts';
+    let helpText = 'Please check the console for detailed error information';
+    let iconClass = 'fas fa-exclamation-triangle';
+    
+    if (error) {
+        if (error.message.includes('credentials') || error.message.includes('AWS')) {
+            errorMessage = 'Authentication Error';
+            helpText = 'Please refresh the page and ensure you are properly logged in';
+            iconClass = 'fas fa-user-lock';
+        } else if (error.message.includes('Data service not available')) {
+            errorMessage = 'Data Service Unavailable';
+            helpText = 'The data service is still loading. Please wait a moment and try again';
+            iconClass = 'fas fa-server';
+        } else if (error.message.includes('timeout') || error.message.includes('network')) {
+            errorMessage = 'Connection Error';
+            helpText = 'Network connection issue. Please check your internet connection and try again';
+            iconClass = 'fas fa-wifi';
+        } else if (error.message) {
+            helpText = `Error: ${error.message}`;
+        }
+        }
     
     tbody.innerHTML = `
         <tr>
             <td colspan="8" style="text-align: center; padding: 2rem; color: #e74c3c;">
-                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">Failed to load merchant discounts</div>
-                <div style="font-size: 0.9rem; margin-bottom: 1rem;">Please check the console for detailed error information</div>
-                <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                    <i class="fas fa-sync-alt"></i> Try Again
-                </button>
+                <i class="${iconClass}" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                <div style="font-size: 1.2rem; margin-bottom: 0.5rem;">${errorMessage}</div>
+                <div style="font-size: 0.9rem; margin-bottom: 1rem; color: #666;">${helpText}</div>
+                <div style="margin-top: 1rem;">
+                    <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
+                        <i class="fas fa-sync-alt"></i> Try Again
+                    </button>
+                    <button onclick="window.debugMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="fas fa-bug"></i> Debug
+                    </button>
+                </div>
             </td>
         </tr>
     `;
