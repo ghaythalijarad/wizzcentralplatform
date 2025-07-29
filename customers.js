@@ -1,46 +1,5 @@
 // Customers Management JavaScript
 
-// Check authentication on page load
-function checkAuthentication() {
-    const idToken = sessionStorage.getItem('idToken');
-    const accessToken = sessionStorage.getItem('accessToken');
-    
-    if (!idToken || !accessToken) {
-        console.warn('No authentication tokens found, redirecting to login');
-        window.location.href = 'index.html';
-        return false;
-    }
-    
-    // Validate token expiration
-    if (idToken) {
-        try {
-            const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-            const currentTime = Math.floor(Date.now() / 1000);
-            
-            if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-                console.warn('Authentication token has expired. Redirecting to login.');
-                sessionStorage.clear();
-                window.location.href = 'index.html';
-                return false;
-            }
-        } catch (error) {
-            console.error('Invalid token format. Redirecting to login.');
-            sessionStorage.clear();
-            window.location.href = 'index.html';
-            return false;
-        }
-    }
-    
-    console.log('Authentication check passed');
-    return true;
-}
-
-// Global logout function
-window.logout = function() {
-    Auth.clearTokens();
-    window.location.href = 'index.html';
-};
-
 // Customer management variables
 let customers = [];
 let filteredCustomers = [];
@@ -81,24 +40,8 @@ async function loadCustomersData() {
     try {
         console.log('Loading customers data from DynamoDB...');
         
-        // Configure AWS with proper credentials
-        console.log('Configuring AWS with updated permissions...');
-        const { COGNITO_REGION, COGNITO_IDENTITY_POOL_ID } = window.WIZZCENTRAL_CONFIG;
-        
-        AWS.config.update({ 
-            region: COGNITO_REGION,
-            maxRetries: 3
-        });
-
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: COGNITO_IDENTITY_POOL_ID,
-        });
-
-        console.log('Refreshing credentials with DynamoDB permissions...');
-        await AWS.config.credentials.refreshPromise();
-        
-        console.log('Creating DynamoDB client...');
-        const dynamoDB = new AWS.DynamoDB.DocumentClient();
+        // Use centralized AWS utilities
+        const dynamoDB = AWSUtils.getDynamoDBClient();
         
         console.log('Scanning WizzUser_users_dev table with proper permissions...');
         
@@ -487,16 +430,24 @@ function exportCustomers() {
 window.exportCustomers = exportCustomers;
 
 // Initialize page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    Auth.requireAuthentication();
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('DOM loaded, checking authentication...');
     
-    if (checkAuthentication()) {
-        console.log('Authentication valid, initializing customers page...');
-        // Initialize directly without waiting for data service
-        setTimeout(() => {
-            initializeCustomersPage();
-        }, 1000); // Give time for AWS SDK to load
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) {
+        return;
+    }
+    
+    console.log('Authentication valid, initializing customers page...');
+    
+    try {
+        // Initialize AWS utilities
+        await AWSUtils.initialize();
+        
+        // Initialize customers page
+        await initializeCustomersPage();
+    } catch (error) {
+        console.error('Failed to initialize customers page:', error);
     }
 });
 

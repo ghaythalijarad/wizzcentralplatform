@@ -1,22 +1,5 @@
 console.log('merchant-products.js loaded');
 
-// Global logout
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html';
-    }
-};
-
-let dynamoDB;
-
 // Status messages
 function showStatus(msg, type='info') {
     const el = document.getElementById('status-message');
@@ -31,26 +14,8 @@ function getBusinessId() {
     return new URLSearchParams(window.location.search).get('businessId');
 }
 
-// AWS init
-async function initializeAWS() {
-    const resp = await fetch('../amplify_outputs.json');
-    if (!resp.ok) throw new Error(`Failed loading config: ${resp.status}`);
-    const outputs = await resp.json();
-    const region = outputs.data.aws_region || 'us-east-1';
-    const userPoolId = outputs.auth.user_pool_id;
-    const identityPoolId = outputs.auth.identity_pool_id;
-    const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-    AWS.config.update({ region });
-    const idToken = sessionStorage.getItem('idToken');
-    const credParams = { IdentityPoolId: identityPoolId };
-    if (idToken) credParams.Logins = { [provider]: idToken };
-    AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
-    await AWS.config.credentials.refreshPromise();
-    dynamoDB = new AWS.DynamoDB.DocumentClient();
-}
-
 // Load categories and map by id
-async function loadCategories() {
+async function loadCategories(dynamoDB) {
     const result = await dynamoDB.scan({ TableName: 'order-receiver-categories-dev' }).promise();
     const items = result.Items || [];
     const map = {};
@@ -59,7 +24,7 @@ async function loadCategories() {
 }
 
 // Load products for businessId
-async function loadProducts(businessId) {
+async function loadProducts(businessId, dynamoDB) {
     const params = {
         TableName: 'order-receiver-products-dev',
         FilterExpression: 'businessId = :bid',
@@ -104,14 +69,21 @@ function refreshPage() { window.location.reload(); }
 // On load
 document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initializeDashboard === 'function') initializeDashboard();
+    
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) return;
+    
     const businessId = getBusinessId();
     if (!businessId) {
         showStatus('No business selected', 'error'); return;
     }
     showStatus('Loading products...');
     try {
-        await initializeAWS();
-        const [categories, products] = await Promise.all([loadCategories(), loadProducts(businessId)]);
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
+        const dynamoDB = AWSUtils.getDynamoDBClient();
+        
+        const [categories, products] = await Promise.all([loadCategories(dynamoDB), loadProducts(businessId, dynamoDB)]);
         clearStatus();
         renderCategoriesAndProducts(categories, products);
     } catch (err) {

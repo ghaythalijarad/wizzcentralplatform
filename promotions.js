@@ -1,105 +1,7 @@
 // Promotions Management JavaScript
 
-// Check authentication on page load
-function checkAuthentication() {
-  const idToken = sessionStorage.getItem('idToken');
-  const accessToken = sessionStorage.getItem('accessToken');
-  
-  if (!idToken || !accessToken) {
-    console.warn('No authentication tokens found, redirecting to login');
-    window.location.href = 'index.html';
-    return false;
-  }
-  
-  // Validate token expiration
-  if (idToken) {
-    try {
-      const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-        console.warn('Authentication token has expired. Redirecting to login.');
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-        return false;
-      }
-    } catch (error) {
-      console.error('Invalid token format. Redirecting to login.');
-      sessionStorage.clear();
-      window.location.href = 'index.html';
-      return false;
-    }
-  }
-  
-  console.log('Authentication check passed');
-  return true;
-}
-
-// AWS SDK and authentication setup
-let dynamodbClient = null;
+// Use centralized AWS utilities
 const PROMOTIONS_TABLE = 'WizzPromo_promos_dev'; // Assumed table name
-
-// Global logout function for navigation consistency
-window.logout = async () => {
-  try {
-    if (AWS && AWS.config && AWS.config.credentials) {
-      AWS.config.credentials.clearCachedId();
-    }
-    sessionStorage.clear();
-    localStorage.clear(); // Clear both just to be safe
-    window.location.href = 'index.html'; // Will work since we're in pages/
-  } catch (error) {
-    console.error('Logout error:', error);
-    window.location.href = 'index.html'; // Will work since we're in pages/
-  }
-};
-
-// Initialize AWS credentials and DynamoDB client
-async function initializeAWS() {
-    try {
-        const idToken = sessionStorage.getItem('idToken');
-        const accessToken = sessionStorage.getItem('accessToken');
-        
-        if (!idToken || !accessToken) {
-            console.log('No authentication tokens found. Redirecting to login.');
-            window.location.href = 'index.html';
-            return;
-        }
-
-        if (typeof AWS === 'undefined') {
-            throw new Error('AWS SDK not loaded.');
-        }
-
-        const response = await fetch('../amplify_outputs.json');
-        if (!response.ok) {
-            throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
-        }
-        const outputs = await response.json();
-        
-        const region = outputs.data?.aws_region || 'us-east-1';
-        const userPoolId = outputs.auth.user_pool_id;
-        const identityPoolId = outputs.auth.identity_pool_id;
-        const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-
-        AWS.config.region = region;
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: identityPoolId,
-            Logins: {
-                [cognitoProvider]: idToken
-            }
-        });
-
-        await AWS.config.credentials.refreshPromise();
-        console.log("Successfully fetched AWS credentials for promotions.");
-
-        dynamodbClient = new AWS.DynamoDB.DocumentClient();
-        console.log('AWS initialized successfully for promotions.');
-    } catch (error) {
-        console.error('Failed to initialize AWS for promotions:', error);
-        window.location.href = 'index.html';
-        throw error;
-    }
-}
 
 // Load promotions data from DynamoDB - TEMPORARILY DISABLED FOR DEBUGGING
 async function loadPromotionsData() {
@@ -157,8 +59,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading promotions...</td></tr>`;
     }
     
-    // Check authentication first
-    if (!checkAuthentication()) {
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) {
         return;
     }
     
@@ -168,7 +70,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     
     try {
-        await initializeAWS();
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
         await loadPromotionsData();
         setupEventListeners();
     } catch (error) {

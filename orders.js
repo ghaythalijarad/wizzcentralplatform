@@ -1,24 +1,10 @@
 // Orders Management JavaScript
 console.log('orders.js script loaded');
-// Ensure user is authenticated
-Auth.requireAuthentication();
-
-// Global logout using Auth utility
-window.logout = () => {
-    Auth.clearTokens();
-    window.location.href = 'index.html';
-};
 
 // AWS and table config
 let dynamoDB = null;
-const ORDERS_TABLE = window.WIZZCENTRAL_CONFIG.TABLES.ORDERS;
+const ORDERS_TABLE = 'order-receiver-orders-dev';
 const AWS_REGION = 'us-east-1';
-
-// Normalize status keys (convert hyphens to underscores)
-function normalizeStatus(status) {
-    if (typeof status !== 'string') return 'unknown';
-    return status.replace(/-/g, '_');
-}
 
 // Status mapping
 const ORDER_STATUSES = {
@@ -40,59 +26,77 @@ let filteredOrders = [];
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('Orders page DOM loaded');
-    if (typeof initializeDashboard === 'function') initializeDashboard();
+    if (typeof initializeDashboard === 'function') {
+        initializeDashboard();
+    }
+    
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) return;
+    
     showLoader(true, 'Loading orders...');
     try {
-        await fetchOrdersFromApi();
-        initializeUI();
-        setupEventListeners();
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
+        await initializeOrdersManagement();
     } catch (err) {
         console.error('Orders initialization failed:', err);
         showMessage(`Error loading orders: ${err.message}`, 'error');
     } finally {
         showLoader(false);
-        // Attach refresh button handler
-        const refreshBtn = document.getElementById('refreshOrdersBtn');
-        if (refreshBtn) refreshBtn.addEventListener('click', () => {
-            showLoader(true, 'Refreshing orders...');
-            fetchOrdersFromApi();
-        });
     }
 });
 
-// Fetch orders via backend API
-async function fetchOrdersFromApi() {
+// Initialize page logic
+async function initializeOrdersManagement() {
     showLoader(true, 'Fetching orders...');
-    const token = Auth.getToken('accessToken') || Auth.getToken('idToken');
-    if (!token) throw new Error('No authentication token available');
-    const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/orders`, {
-        method: 'GET',
-        headers: Auth.attachAuthHeader({ 'Content-Type': 'application/json' })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch orders from API');
+    try {
+        // Use centralized AWS utilities
+        const dynamoDB = AWSUtils.getDynamoDBClient();
+        await loadOrdersFromDynamoDB(dynamoDB);
+        hideMessage();
+    } catch (error) {
+        console.error('Error loading orders:', error);
+        showMessage(`Error: ${error.message}. Showing sample data.`, 'error');
+        ordersData = getSampleOrdersData();
+    } finally {
+        filteredOrders = [...ordersData];
+        initializeUI();
+        setupEventListeners();
+        showLoader(false);
     }
-    ordersData = data.orders || data;
-    filteredOrders = [...ordersData];
-    renderOrdersTable();
-    updateDataSourceIndicator('api', `Loaded ${ordersData.length} orders via API`);
+}
+
+// Load from DynamoDB
+async function loadOrdersFromDynamoDB(dynamoDB) {
+    if (!dynamoDB) throw new Error('DynamoDB client not initialized');
+    const params = { TableName: ORDERS_TABLE };
+    const result = await dynamoDB.scan(params).promise();
+    ordersData = (result.Items || []).map(item => ({
+        orderId: item.orderId,
+        customerId: item.customerId,
+        merchantId: item.merchantId,
+        driverId: item.driverId || 'N/A',
+        status: item.status || 'unknown',
+        total: item.total != null ? `$${item.total.toFixed(2)}` : 'N/A',
+        date: formatDate(item.createdAt),
+        fullData: item
+    }));
+    console.log(`Loaded ${ordersData.length} orders`);
+}
+
+// Sample fallback
+function getSampleOrdersData() {
+    return [
+        {orderId:'ORD1001',customerId:'CUST001',merchantId:'MER001',driverId:'DRV001',status:'pending',total:'$45.99',date:'7/24/2025'},
+        {orderId:'ORD1002',customerId:'CUST002',merchantId:'MER002',driverId:'DRV002',status:'out_for_delivery',total:'$120.00',date:'7/25/2025'},
+        {orderId:'ORD1003',customerId:'CUST003',merchantId:'MER001',driverId:'DRV003',status:'delivered',total:'$89.50',date:'7/23/2025'}
+    ];
 }
 
 // UI and events
 function initializeUI() { renderOrdersTable(); }
 function setupEventListeners() {
-    // Close Order Details Modal buttons
-    document.querySelectorAll('.close-order-modal').forEach(btn => {
-        btn.addEventListener('click', closeOrderModal);
-    });
-    // Optionally, add overlay click listener to close modal when clicking outside content
-    const modal = document.getElementById('orderDetailsModal');
-    if (modal) {
-        modal.addEventListener('click', event => {
-            if (event.target === modal) closeOrderModal();
-        });
-    }
+    document.getElementById('ordersTableBody');
 }
 
 // Render table
@@ -103,67 +107,34 @@ function renderOrdersTable() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:#666;"><i class="fas fa-shopping-bag" style="font-size:3rem; color:#ccc;"></i><div>No orders found</div></td></tr>`;
         return;
     }
-    tbody.innerHTML = filteredOrders.map(o => {
-        const key = normalizeStatus(o.status);
-        const info = ORDER_STATUSES[key] || ORDER_STATUSES['unknown'];
-        return `
+    tbody.innerHTML = filteredOrders.map(o => `
         <tr>
             <td>${o.orderId}</td>
             <td>${o.customerId}</td>
             <td>${o.merchantId}</td>
             <td>${o.driverId}</td>
-            <td><span class="status-badge ${info.class}">${info.label}</span></td>
+            <td><span class="status-badge ${ORDER_STATUSES[o.status]?.class||'unknown'}">${ORDER_STATUSES[o.status]?.label||'Unknown'}</span></td>
             <td>${o.total}</td>
             <td>${o.date}</td>
             <td>
                 <button class="btn-action" onclick="viewOrder('${o.orderId}')"><i class="fas fa-eye"></i></button>
             </td>
-        </tr>`;
-    }).join('');
+        </tr>`).join('');
 }
 
-// Open order details modal
+// View details
 function viewOrder(id) {
-    const o = ordersData.find(x => x.orderId === id);
+    const o = ordersData.find(x=>x.orderId===id);
     if (!o) return;
-    const body = document.getElementById('orderDetailsBody');
-    if (body) {
-        const key = normalizeStatus(o.status);
-        const info = ORDER_STATUSES[key] || ORDER_STATUSES['unknown'];
-        body.innerHTML = `
-            <p><strong>Order ID:</strong> ${o.orderId}</p>
-            <p><strong>Status:</strong> ${info.label}</p>
-            <p><strong>Total:</strong> ${o.total}</p>
-            <p><strong>Date:</strong> ${o.date}</p>
-        `;
-        document.getElementById('orderDetailsModal').style.display = 'flex';
-    }
-}
-
-// Close the order details modal
-function closeOrderModal() {
-    const modal = document.getElementById('orderDetailsModal');
-    if (modal) modal.style.display = 'none';
+    alert(`Order ${o.orderId}\nStatus: ${ORDER_STATUSES[o.status]?.label}\nTotal: ${o.total}`);
 }
 
 // Refresh data
 async function refreshOrdersData() {
     showLoader(true,'Refreshing orders...');
-    try { await fetchOrdersFromApi(); }
+    try { await loadOrdersFromDynamoDB(); renderOrdersTable(); hideMessage(); }
     catch(e){ console.error(e); showMessage(`Error: ${e.message}`,'error'); }
     finally{ showLoader(false); }
-}
-
-// Show/hide loader using shared loader elements
-function showLoader(show, message = 'Loading...') {
-    const loader = document.getElementById('loader');
-    const loaderMessage = document.getElementById('loader-message');
-    if (loader) {
-        loader.style.display = show ? 'flex' : 'none';
-        if (show && loaderMessage) {
-            loaderMessage.textContent = message;
-        }
-    }
 }
 
 // Helpers
@@ -172,4 +143,5 @@ function showMessage(msg,type='info'){
     if(el){ el.textContent=msg; el.className=`table-status-info table-status-${type}`; el.style.display='block'; }
 }
 function hideMessage(){ const el=document.getElementById('orders-table-status'); if(el) el.style.display='none'; }
+function showLoader(show,msg='Loading...'){ let loader=document.getElementById('loader-overlay'); /* reuse from merchants.js */ }
 function formatDate(iso){ return iso?new Date(iso).toLocaleDateString():'N/A'; }

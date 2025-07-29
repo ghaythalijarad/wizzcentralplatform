@@ -1,64 +1,7 @@
 // Drivers Management JavaScript
 
-// Check authentication on page load
-document.addEventListener('DOMContentLoaded', async function() {
-    Auth.requireAuthentication();
-
-    // Initialize AWS with Auth headers
-    try {
-        const idToken = sessionStorage.getItem('idToken');
-        const accessToken = sessionStorage.getItem('accessToken');
-        
-        if (!idToken || !accessToken) {
-            console.log('No authentication tokens found. Redirecting to login.');
-            window.location.href = 'index.html';
-            return;
-        }
-
-        if (typeof AWS === 'undefined') {
-            throw new Error('AWS SDK not loaded.');
-        }
-
-        const response = await fetch('../amplify_outputs.json');
-        if (!response.ok) {
-            throw new Error(`Failed to fetch amplify_outputs.json: ${response.status}`);
-        }
-        const outputs = await response.json();
-        
-        const region = outputs.data?.aws_region || 'us-east-1';
-        const userPoolId = outputs.auth.user_pool_id;
-        const identityPoolId = outputs.auth.identity_pool_id;
-        const cognitoProvider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-
-        AWS.config.region = region;
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-            IdentityPoolId: identityPoolId,
-            Logins: {
-                [cognitoProvider]: idToken
-            }
-        });
-
-        await AWS.config.credentials.refreshPromise();
-        console.log("Successfully fetched AWS credentials for drivers.");
-
-        dynamodbClient = new AWS.DynamoDB.DocumentClient();
-        console.log('AWS initialized successfully for drivers.');
-    } catch (error) {
-        console.error('Failed to initialize AWS for drivers:', error);
-        window.location.href = 'index.html';
-        throw error;
-    }
-});
-
-// AWS SDK and authentication setup
-let dynamodbClient = null;
+// Use centralized AWS utilities
 const DRIVERS_TABLE = 'WizzUser_users_dev'; // Assuming drivers are also in the users table
-
-// Global logout function
-window.logout = function() {
-    Auth.clearTokens();
-    window.location.href = 'index.html';
-};
 
 // Load drivers data from DynamoDB - TEMPORARILY USING MOCK DATA FOR DEBUGGING
 async function loadDriversData() {
@@ -123,38 +66,35 @@ async function loadDriversData() {
 // Driver management functions
 let drivers = []; // Will be populated from DynamoDB
 
-// Initialize drivers page
+// Initialize drivers page when DOM is ready
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('Drivers page DOM loaded');
+    
     const tbody = document.getElementById('driversTableBody');
     if (tbody) {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading drivers...</td></tr>`;
     }
     
-    try {
-        // await initializeAWS(); // DISABLED FOR DEBUGGING
-        await loadDriversData(); // Using mock data
-        setupEventListeners();
-    } catch (error) {
-        console.error('Failed to initialize drivers page:', error);
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) {
+        return;
     }
-});
-
-// Initialize drivers page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Drivers page DOM loaded');
-    
-    // Check authentication first - TEMPORARILY DISABLED FOR DEBUGGING
-    // if (!checkAuthentication()) {
-    //     return;
-    // }
     
     // Initialize dashboard functionality (sidebar, etc.)
     if (typeof initializeDashboard === 'function') {
         initializeDashboard();
     }
     
-    // Load drivers data
-    loadDriversData();
+    try {
+        // Initialize AWS utilities
+        await AWSUtils.initialize();
+        
+        // Load drivers data
+        await loadDriversData();
+        setupEventListeners();
+    } catch (error) {
+        console.error('Failed to initialize drivers page:', error);
+    }
 });
 
 function initializeDriversPage() {

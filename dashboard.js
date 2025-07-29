@@ -1,39 +1,7 @@
 // Dashboard JavaScript functionality
 
-// Authentication check and logout function
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html';
-    }
-};
-
 // DOM Elements (will be populated after DOM is ready)
 let sidebar, mainContent, menuToggle, sidebarToggle;
-
-// AWS DynamoDB initialization for stats
-var dynamoDB;
-async function initializeAWSForDashboard() {
-    if (typeof AWS === 'undefined') throw new Error('AWS SDK not loaded');
-    const resp = await fetch('../amplify_outputs.json');
-    if (!resp.ok) throw new Error(`Failed loading config: ${resp.status}`);
-    const cfg = await resp.json();
-    const region = cfg.data.aws_region || 'us-east-1';
-    const userPoolId = cfg.auth.user_pool_id;
-    const identityPoolId = cfg.auth.identity_pool_id;
-    const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-    AWS.config.update({ region });
-    const idToken = sessionStorage.getItem('idToken');
-    const credParams = { IdentityPoolId: identityPoolId };
-    if (idToken) credParams.Logins = { [provider]: idToken };
-    AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
     await AWS.config.credentials.refreshPromise();
     dynamoDB = new AWS.DynamoDB.DocumentClient();
 }
@@ -99,9 +67,11 @@ async function loadRecentBusinesses() {
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Enforce authentication
-    Auth.requireAuthentication();
-
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) {
+        return; // Exit if authentication fails
+    }
+    
     // Get DOM elements
     sidebar = document.getElementById('sidebar');
     mainContent = document.getElementById('mainContent');

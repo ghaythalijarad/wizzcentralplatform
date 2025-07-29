@@ -13,8 +13,6 @@ Amplify.configure({
 });
 // Redirect to login if not authenticated
 Auth.currentAuthenticatedUser().catch(() => window.location.href = 'index.html');
-// Expose logout
-window.logout = async () => { await Auth.signOut(); window.location.href = 'index.html'; };
 
 // Sample support data
 let tickets = [

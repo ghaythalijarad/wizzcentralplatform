@@ -31,17 +31,13 @@ window.WIZZCENTRAL_CONFIG = {
         SUCCESS_COLOR: '#28a745',
         WARNING_COLOR: '#ffc107',
         DANGER_COLOR: '#dc3545'
-    },
-    // DynamoDB table names
-    TABLES: {
-        MERCHANTS: 'order-receiver-businesses-dev',
-        ORDERS: 'order-receiver-orders-dev',
-        DRIVERS: 'order-receiver-drivers-dev',
-        CUSTOMERS: 'order-receiver-customers-dev'
     }
 };
 
-// Remove local development override, enforce API_BASE_URL from environment
+// Local development override for serverless-offline or file protocol
+if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    window.WIZZCENTRAL_CONFIG.API_BASE_URL = `http://${window.location.hostname || 'localhost'}:3000/${window.WIZZCENTRAL_CONFIG.STAGE}`;
+}
 
 // Note: For local development use, use the built-in override or set window.__API_BASE_URL__ before loading scripts
 

@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body>
+<body data-page="orders">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -22,43 +22,43 @@
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li class="nav-item">
+                <li class="nav-item" data-page="dashboard">
                     <a href="dashboard.html" class="nav-link">
                         <i class="fas fa-tachometer-alt"></i>
                         <span>Dashboard</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="drivers">
                     <a href="drivers.html" class="nav-link">
                         <i class="fas fa-motorcycle"></i>
                         <span>Drivers Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="customers">
                     <a href="customers.html" class="nav-link">
                         <i class="fas fa-users"></i>
                         <span>Customers Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="merchants">
                     <a href="merchants.html" class="nav-link">
                         <i class="fas fa-store"></i>
                         <span>Merchants Management</span>
                     </a>
                 </li>
-                <li class="nav-item active">
+                <li class="nav-item active" data-page="orders">
                     <a href="orders.html" class="nav-link">
                         <i class="fas fa-shopping-bag"></i>
                         <span>Orders Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="promotions">
                     <a href="promotions.html" class="nav-link">
                         <i class="fas fa-tags"></i>
                         <span>Promotions Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="support">
                     <a href="support.html" class="nav-link">
                         <i class="fas fa-headset"></i>
                         <span>Support</span>
@@ -90,7 +90,7 @@
                 <i class="fas fa-bars"></i>
             </button>
             <h1 class="page-title">Orders Management</h1>
-            <button class="btn-primary" id="refreshOrdersBtn" style="margin-left:auto;">
+            <button class="btn-primary" onclick="refreshOrdersData()" style="margin-left:auto;">
                 <i class="fas fa-sync"></i>
                 Refresh
             </button>
@@ -126,37 +126,16 @@
         </div>
     </div>
 
-    <!-- Order Details Modal -->
-    <div id="orderDetailsModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-        <div class="modal-content" style="background:white; padding:1rem; border-radius:8px; max-width:400px; width:90%; position:relative;">
-            <button class="close-order-modal" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
-            <h3 style="margin-bottom: 1rem;">Order Details</h3>
-            <div id="orderDetailsBody"></div>
-        </div>
-    </div>
-
-    <!-- Loader Overlay -->
-    <div id="loader" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); align-items:center; justify-content:center; z-index:9999;">
-        <div id="loader-message" style="background:white; padding:1rem; border-radius:4px; font-size:1rem;">Loading...</div>
-    </div>
-
-    <!-- Core Scripts -->
-    <script src="/config.js"></script>
-    <script src="/auth.js"></script>
-    <script src="/dashboard.js"></script>
-    <script src="/orders.js"></script>
-    <script>document.addEventListener('DOMContentLoaded', () => {
-        // Initialize orders page
-        if (typeof initializeDashboard === 'function') initializeDashboard();
-        showLoader(true, 'Loading orders...');
-        fetchOrdersFromApi().catch(err => showMessage(`Error: ${err.message}`, 'error')).finally(() => showLoader(false));
-        // Attach refresh handler
-        const refreshBtn = document.getElementById('refreshOrdersBtn');
-        if (refreshBtn) refreshBtn.addEventListener('click', () => {
-            showLoader(true, 'Refreshing orders...');
-            fetchOrdersFromApi().finally(() => showLoader(false));
-        });
-    });</script>
-
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <!-- Configuration -->
+    <script src="../config.js"></script>
+    <!-- Centralized utilities -->
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    <!-- Sidebar -->
+    <script src="../assets/js/sidebar.js"></script>
+    <!-- Page-specific scripts -->
+    <script src="../orders.js"></script>
 </body>
 </html>

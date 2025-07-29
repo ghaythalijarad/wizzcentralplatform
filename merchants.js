@@ -27,55 +27,6 @@ let allMerchants = [];
 let merchantsData = [];
 let filteredMerchants = [];
 
-// Enhanced authentication check with proper token validation
-function checkMerchantsAuthentication() {
-    const token = sessionStorage.getItem('accessToken');
-    const idToken = sessionStorage.getItem('idToken');
-    
-    if (!token && !idToken) {
-        console.warn('No authentication tokens found. Redirecting to login.');
-        window.location.href = '../index.html';
-        return false;
-    }
-    
-    // Validate token expiration
-    if (idToken) {
-        try {
-            const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-            const currentTime = Math.floor(Date.now() / 1000);
-            
-            if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-                console.warn('Authentication token has expired. Redirecting to login.');
-                sessionStorage.clear();
-                window.location.href = '../index.html';
-                return false;
-            }
-        } catch (error) {
-            console.error('Invalid token format. Redirecting to login.');
-            sessionStorage.clear();
-            window.location.href = '../index.html';
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-// Global logout function
-window.logout = async () => {
-    try {
-        if (AWS && AWS.config && AWS.config.credentials) {
-            AWS.config.credentials.clearCachedId();
-        }
-        sessionStorage.clear();
-        localStorage.clear(); // Clear both just to be safe
-        window.location.href = 'index.html';
-    } catch (error) {
-        console.error('Logout error:', error);
-        window.location.href = 'index.html';
-    }
-};
-
 // Utility to add a timeout to a promise
 function withTimeout(promise, ms, operationName = 'Unnamed operation') {
     let timeoutId;
@@ -96,6 +47,12 @@ function withTimeout(promise, ms, operationName = 'Unnamed operation') {
 // Initialize merchants page when DOM is ready
 const onDomReady = async function() {
     console.log('🚀 Merchants page DOM loaded - Starting initialization...');
+    
+    // Check authentication using centralized utility
+    if (!Auth.requireAuthentication()) {
+        return;
+    }
+    
     const tableBody = document.getElementById('merchantsTableBody');
 
     // Early exit if critical element is missing
@@ -228,7 +185,8 @@ async function refreshMerchantsData() {
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
     try {
-        await initializeAWS();
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
         await loadMerchantsFromDynamoDB();
         
         if (merchantsData.length > 0) {
@@ -267,76 +225,13 @@ async function refreshMerchantsData() {
 window.refreshMerchantsData = refreshMerchantsData;
 window.onDomReady = onDomReady;
 
-// Initialize AWS SDK credentials and DynamoDB client for merchants
-async function initializeAWS() {
-    console.log('Starting AWS Initialization...');
-    try {
-        if (typeof AWS === 'undefined') {
-            throw new Error('AWS SDK is not loaded. Please ensure the AWS SDK script is included in the HTML.');
-        }
-
-        console.log('Fetching amplify_outputs.json from root...');
-        const resp = await fetch('/amplify_outputs.json');
-        if (!resp.ok) {
-            throw new Error(`Failed to fetch amplify_outputs.json: ${resp.status}`);
-        }
-        const outputs = await resp.json();
-        console.log('Successfully loaded amplify_outputs.json');
-
-        const region = outputs.data?.aws_region || 'us-east-1';
-        const userPoolId = outputs.auth?.user_pool_id;
-        const identityPoolId = outputs.auth?.identity_pool_id;
-
-        if (!userPoolId || !identityPoolId) {
-            throw new Error('user_pool_id or identity_pool_id is missing from amplify_outputs.json.');
-        }
-
-        const provider = `cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-        AWS.config.update({ region });
-        console.log(`AWS region configured to: ${region}`);
-
-        const idToken = sessionStorage.getItem('idToken');
-        const credParams = { IdentityPoolId: identityPoolId };
-        const hasValidToken = idToken && idToken.length > 50;
-
-        if (hasValidToken) {
-            console.log('Valid Cognito ID token found. Using for authenticated access.');
-            credParams.Logins = { [provider]: idToken };
-        } else {
-            console.warn('No valid authentication token found. Attempting unauthenticated access.');
-            console.info('ℹ️ For this to work, your Cognito Identity Pool must allow unauthenticated access, and the unauthenticated IAM role must have DynamoDB permissions.');
-        }
-
-        AWS.config.credentials = new AWS.CognitoIdentityCredentials(credParams);
-
-        console.log('Refreshing AWS credentials...');
-        await withTimeout(
-            AWS.config.credentials.refreshPromise(),
-            10000,
-            'AWS credentials refresh'
-        );
-        console.log('✅ AWS credentials refreshed successfully.', {
-            identityId: AWS.config.credentials.identityId,
-            isAuthenticated: AWS.config.credentials.authenticated
-        });
-
-        dynamoDB = new AWS.DynamoDB.DocumentClient({
-            convertEmptyValues: true,
-            removeUndefinedValues: true,
-            region: region
-        });
-        console.log('✅ DynamoDB DocumentClient initialized successfully.');
-
-    } catch (err) {
-        console.error('❌ Error during AWS initialization:', err);
-        // Re-throw the error with a more descriptive message to be caught by the main handler
-        throw new Error(`AWS Initialization Failed: ${err.message}`);
-    }
-}
-
 // Load merchants data from DynamoDB using AWS SDK
 async function loadMerchantsFromDynamoDB() {
     console.log('Executing DynamoDB scan...');
+    
+    // Use centralized AWS utilities
+    const dynamoDB = AWSUtils.getDynamoDBClient();
+    
     const params = {
         TableName: 'order-receiver-businesses-dev',
     };
@@ -1281,7 +1176,8 @@ window.forceLoadRealData = async function() {
     showLoader(true, 'Loading real data from database...');
     
     try {
-        await initializeAWS();
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
         await loadMerchantsFromDynamoDB();
         
         if (merchantsData.length > 0) {

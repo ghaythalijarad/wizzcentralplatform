@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body>
+<body data-page="promotions">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -22,43 +22,43 @@
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li class="nav-item">
+                <li class="nav-item" data-page="dashboard">
                     <a href="dashboard.html" class="nav-link">
                         <i class="fas fa-tachometer-alt"></i>
                         <span>Dashboard</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="drivers">
                     <a href="drivers.html" class="nav-link">
                         <i class="fas fa-motorcycle"></i>
                         <span>Drivers Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="customers">
                     <a href="customers.html" class="nav-link">
                         <i class="fas fa-users"></i>
                         <span>Customers Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="merchants">
                     <a href="merchants.html" class="nav-link">
                         <i class="fas fa-store"></i>
                         <span>Merchants Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="orders">
                     <a href="orders.html" class="nav-link">
                         <i class="fas fa-shopping-bag"></i>
                         <span>Orders Management</span>
                     </a>
                 </li>
-                <li class="nav-item active">
+                <li class="nav-item active" data-page="promotions">
                     <a href="promotions.html" class="nav-link">
                         <i class="fas fa-tags"></i>
                         <span>Promotions Management</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <li class="nav-item" data-page="support">
                     <a href="support.html" class="nav-link">
                         <i class="fas fa-headset"></i>
                         <span>Support</span>
@@ -336,160 +336,21 @@
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination -->
-            <div class="pagination">
-                <button class="pagination-btn" disabled>
-                    <i class="fas fa-chevron-left"></i>
-                    Previous
-                </button>
-                <div class="pagination-info">
-                    Showing 1-10 of 47 promotions
-                </div>
-                <button class="pagination-btn">
-                    Next
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Merchant Discounts Section -->
-        <div class="page-content">
-            <div class="content-header">
-                <h2>Merchant Created Discounts</h2>
-                <p>Discounts and offers created by individual merchants</p>
-            </div>
-
-            <!-- Merchant Discounts Stats -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon discounts">
-                        <i class="fas fa-tags"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="totalMerchantDiscounts">0</h3>
-                        <p>Total Merchant Discounts</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon active-discounts">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="activeMerchantDiscounts">0</h3>
-                        <p>Active Discounts</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Merchant Discounts Table -->
-            <div class="table-container">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Discount</th>
-                            <th>Merchant</th>
-                            <th>Type</th>
-                            <th>Value</th>
-                            <th>Status</th>
-                            <th>Usage</th>
-                            <th>Valid Until</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="merchantDiscountsTableBody">
-                        <!-- Merchant discounts will be populated here -->
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                                <i class="fas fa-tags" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
-                                <div>Loading merchant discounts...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
         </div>
     </div>
 
-    <!-- Add Promotion Modal -->
-    <div class="modal" id="addPromotionModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Create New Promotion</h2>
-                <button class="modal-close" onclick="closeAddPromotionModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="addPromotionForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="promotionTitle">Promotion Title</label>
-                            <input type="text" id="promotionTitle" name="title" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="promotionCode">Promo Code</label>
-                            <input type="text" id="promotionCode" name="code" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="promotionType">Discount Type</label>
-                            <select id="promotionType" name="type" required>
-                                <option value="">Select type</option>
-                                <option value="percentage">Percentage</option>
-                                <option value="fixed_amount">Fixed Amount</option>
-                                <option value="free_delivery">Free Delivery</option>
-                                <option value="bogo">Buy One Get One</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="discountValue">Discount Value</label>
-                            <input type="number" id="discountValue" name="value" min="1" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="startDate">Start Date</label>
-                            <input type="datetime-local" id="startDate" name="startDate" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="endDate">End Date</label>
-                            <input type="datetime-local" id="endDate" name="endDate" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="usageLimit">Usage Limit</label>
-                            <input type="number" id="usageLimit" name="limit" min="1" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="minOrderValue">Min Order Value ($)</label>
-                            <input type="number" id="minOrderValue" name="minOrder" min="0" step="0.01">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="promotionDescription">Description</label>
-                        <textarea id="promotionDescription" name="description" rows="3" placeholder="Enter promotion description..."></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeAddPromotionModal()">Cancel</button>
-                <button type="submit" form="addPromotionForm" class="btn-primary">Create Promotion</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- AWS SDK and Configuration Scripts -->
-    <script>
-      // Amplify Console will substitute ${API_BASE_URL} with your environment variable
-      window.__API_BASE_URL__ = window.__API_BASE_URL__ || '${API_BASE_URL}';
-    </script>
-    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    
+    <!-- Configuration -->
     <script src="../config.js"></script>
-    <script src="../data-service.js"></script>
-    <script src="../dashboard.js"></script>
+    
+    <!-- Centralized utilities -->
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    
+    <!-- Page-specific scripts -->
+    <script src="../assets/js/sidebar.js"></script>
     <script src="../promotions.js"></script>
 </body>
 </html>

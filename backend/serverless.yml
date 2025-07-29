@@ -73,16 +73,7 @@ functions:
       - http:
           path: auth/login
           method: post
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
 
   getUser:
     handler: src/handlers/auth.getUser
@@ -90,16 +81,7 @@ functions:
       - http:
           path: auth/user
           method: get
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           
   register:
     handler: src/handlers/auth.register
@@ -107,16 +89,7 @@ functions:
       - http:
           path: auth/register
           method: post
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           
   refreshToken:
     handler: src/handlers/auth.refreshToken
@@ -177,16 +150,7 @@ functions:
       - http:
           path: merchants
           method: get
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           # authorizer: authorize  # Temporarily disabled for testing
           
   createMerchant:
@@ -195,16 +159,7 @@ functions:
       - http:
           path: merchants
           method: post
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           # authorizer: authorize  # Temporarily disabled for testing
           
   getMerchant:
@@ -213,16 +168,7 @@ functions:
       - http:
           path: merchants/{merchantId}
           method: get
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           # authorizer: authorize  # Temporarily disabled for testing
           
   updateMerchant:
@@ -231,16 +177,7 @@ functions:
       - http:
           path: merchants/{merchantId}
           method: put
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           # authorizer: authorize  # Temporarily disabled for testing
           
   updateMerchantStatus:
@@ -249,16 +186,7 @@ functions:
       - http:
           path: merchants/{merchantId}/status
           method: patch
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           # Temporarily remove authorizer for testing "Load failed" error
           # authorizer: authorize
 
@@ -325,16 +253,7 @@ functions:
       - http:
           path: orders
           method: get
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           authorizer: authorize
           
   createOrder:
@@ -343,16 +262,7 @@ functions:
       - http:
           path: orders
           method: post
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           authorizer: authorize
           
   getOrder:
@@ -361,16 +271,7 @@ functions:
       - http:
           path: orders/{orderId}
           method: get
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           authorizer: authorize
           
   updateOrder:
@@ -379,16 +280,7 @@ functions:
       - http:
           path: orders/{orderId}
           method: put
-          cors:
-            origin: 'https://main.d1wakhuqiysatv.amplifyapp.com'
-            headers:
-              - Content-Type
-              - X-Amz-Date
-              - Authorization
-              - X-Api-Key
-              - X-Amz-Security-Token
-              - X-Amz-User-Agent
-            allowCredentials: true
+          cors: true
           authorizer: authorize
           
   cancelOrder:

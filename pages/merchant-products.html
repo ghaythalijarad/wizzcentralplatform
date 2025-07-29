@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
-<body>
+<body data-page="merchant-products">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -22,21 +22,67 @@
         </div>
         <nav class="sidebar-nav">
             <ul>
-                <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-                <li class="nav-item"><a href="drivers.html" class="nav-link"><i class="fas fa-motorcycle"></i><span>Drivers Management</span></a></li>
-                <li class="nav-item"><a href="customers.html" class="nav-link"><i class="fas fa-users"></i><span>Customers Management</span></a></li>
-                <li class="nav-item"><a href="merchants.html" class="nav-link"><i class="fas fa-store"></i><span>Merchants Management</span></a></li>
-                <li class="nav-item active"><a href="merchant-products.html" class="nav-link"><i class="fas fa-boxes"></i><span>Products</span></a></li>
-                <li class="nav-item"><a href="orders.html" class="nav-link"><i class="fas fa-shopping-bag"></i><span>Orders Management</span></a></li>
-                <li class="nav-item"><a href="promotions.html" class="nav-link"><i class="fas fa-tags"></i><span>Promotions Management</span></a></li>
-                <li class="nav-item"><a href="support.html" class="nav-link"><i class="fas fa-headset"></i><span>Support</span></a></li>
+                <li class="nav-item" data-page="dashboard">
+                    <a href="dashboard.html" class="nav-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="drivers">
+                    <a href="drivers.html" class="nav-link">
+                        <i class="fas fa-motorcycle"></i>
+                        <span>Drivers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="customers">
+                    <a href="customers.html" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Customers Management</span>
+                    </a>
+                </li>
+                <li class="nav-item active" data-page="merchants">
+                    <a href="merchants.html" class="nav-link">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants Management</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="orders">
+                    <a href="orders.html" class="nav-link">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>Orders Management</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="promotions">
+                    <a href="promotions.html" class="nav-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Promotions Management</span>
+                    </a>
+                </li>
+                <li class="nav-item" data-page="support">
+                    <a href="support.html" class="nav-link">
+                        <i class="fas fa-headset"></i>
+                        <span>Support</span>
+                    </a>
+                </li>
             </ul>
         </nav>
         <div class="sidebar-footer">
-            <div class="user-profile"><div class="user-avatar"><i class="fas fa-user"></i></div><div class="user-info"><span class="user-name">Admin User</span><span class="user-role">Administrator</span></div></div>
-            <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>Logout</span></button>
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-info">
+                    <span class="user-name">Admin User</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
         </div>
     </div>
+
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
         <div class="top-bar">
@@ -49,10 +95,17 @@
             <div id="categories-container"></div>
         </div>
     </div>
-    <!-- AWS SDK and Core Scripts -->
-    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <!-- Configuration -->
     <script src="../config.js"></script>
-    <script src="../dashboard.js"></script>
+    <!-- Centralized utilities -->
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    <!-- Sidebar -->
+    <script src="../assets/js/sidebar.js"></script>
+    <!-- Page-specific scripts -->
     <script src="../merchant-products.js"></script>
 </body>
 </html>
