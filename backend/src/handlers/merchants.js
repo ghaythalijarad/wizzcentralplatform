@@ -482,7 +482,8 @@ exports.updateMerchantStatus = async (event) => {
       reject: 'rejected',
       suspend: 'suspended',
       review: 'under-review',
-      reactivate: 'approved' // Reactivate to approved status
+      reactivate: 'approved', // Reactivate to approved status
+      reset_to_pending: 'pending' // New action to reset status to pending
     };
     console.log('Available status actions:', Object.keys(statusMap));
     console.log('Requested action:', action);
@@ -499,12 +500,12 @@ exports.updateMerchantStatus = async (event) => {
     // Validate status transition with enhanced logging
     const validTransitions = {
       pending: ['approved', 'rejected', 'under-review'],
-      'under-review': ['approved', 'rejected', 'suspended'],
-      'under_review': ['approved', 'rejected', 'suspended'], // Handle underscore variation
-      approved: ['suspended', 'under-review', 'rejected'], // Allow approved -> rejected
+      'under-review': ['approved', 'rejected', 'suspended', 'pending'],
+      'under_review': ['approved', 'rejected', 'suspended', 'pending'], // Handle underscore variation
+      approved: ['suspended', 'under-review', 'rejected'],
       verified: ['suspended', 'under-review', 'rejected'], // Keep for backwards compatibility
-      suspended: ['approved', 'under-review', 'rejected'],
-      rejected: ['under-review', 'approved'] // Allow rejected merchants to be reviewed/approved again
+      suspended: ['approved', 'under-review', 'rejected', 'pending'],
+      rejected: ['under-review', 'approved', 'pending'] // Allow rejected merchants to be reviewed/approved again or reset
     };
     
     console.log('Current merchant status:', merchant.status);
@@ -616,7 +617,8 @@ exports.updateMerchantStatus = async (event) => {
       reject: 'Merchant application has been rejected',
       suspend: 'Merchant has been suspended',
       review: 'Merchant has been marked for review',
-      reactivate: 'Merchant has been reactivated'
+      reactivate: 'Merchant has been reactivated',
+      reset_to_pending: 'Merchant status has been reset to pending'
     };
 
     const response = {
