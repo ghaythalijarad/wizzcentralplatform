@@ -76,19 +76,23 @@ const onDomReady = async function() {
             console.warn('initializeDashboard function not found, skipping.');
         }
 
-        console.log('🎯 Attempting to fetch merchants via API');
+        console.log('🎯 Loading merchants directly from DynamoDB');
         showLoader(true, 'Loading merchants...');
-        await fetchMerchantsFromApi();
+        
+        // Initialize AWS using centralized utility
+        await AWSUtils.initialize();
+        await loadMerchantsFromDynamoDB();
 
         if (merchantsData.length > 0) {
-            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} merchants from API`);
+            console.log(`🎉 SUCCESS! Loaded ${merchantsData.length} merchants from DynamoDB`);
             filteredMerchants = [...merchantsData];
             renderMerchantsTable();
             updateMerchantStats();
-            updateDataSourceIndicator('api', `Loaded ${merchantsData.length} merchants via API`);
-            showMessage(`Loaded ${merchantsData.length} merchants from API`, 'success');
+            updateDataSourceIndicator('database', `Loaded ${merchantsData.length} merchants from database`);
+            showMessage(`Loaded ${merchantsData.length} merchants from database`, 'success');
+            setTimeout(() => hideMessage(), 2000); // Hide after 2 seconds
         } else {
-            console.log('⚠️ API returned no merchants.');
+            console.log('⚠️ No merchants found in database.');
             document.getElementById('merchantsTableBody').innerHTML = '<tr><td colspan="7" class="text-center p-8">No merchants found.</td></tr>';
             updateDataSourceIndicator('empty', 'No merchants to display');
             showMessage('No merchants to display.', 'info');
