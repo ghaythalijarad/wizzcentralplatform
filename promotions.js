@@ -181,6 +181,7 @@ function getPromotionIcon(type) {
     const icons = {
         percentage: '<i class="fas fa-percentage"></i>',
         fixed: '<i class="fas fa-dollar-sign"></i>',
+        fixed_amount: '<i class="fas fa-dollar-sign"></i>', // Handle both formats
         free_delivery: '<i class="fas fa-truck"></i>',
         bogo: '<i class="fas fa-gift"></i>'
     };
@@ -192,6 +193,7 @@ function getDiscountDisplay(promotion) {
         case 'percentage':
             return `${promotion.value}% OFF`;
         case 'fixed':
+        case 'fixed_amount': // Handle both formats
             return `$${promotion.value} OFF`;
         case 'free_delivery':
             return 'Free Shipping';

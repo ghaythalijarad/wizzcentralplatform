@@ -500,10 +500,10 @@ exports.updateMerchantStatus = async (event) => {
     const validTransitions = {
       pending: ['approved', 'rejected', 'under-review'],
       'under-review': ['approved', 'rejected', 'suspended'],
-      approved: ['suspended', 'under-review'],
-      verified: ['suspended', 'under-review'], // Keep for backwards compatibility
-      suspended: ['approved', 'under-review'],
-      rejected: ['under-review'] // Allow rejected merchants to be reviewed again
+      approved: ['suspended', 'under-review', 'rejected'], // Allow approved -> rejected
+      verified: ['suspended', 'under-review', 'rejected'], // Keep for backwards compatibility
+      suspended: ['approved', 'under-review', 'rejected'],
+      rejected: ['under-review', 'approved'] // Allow rejected merchants to be reviewed/approved again
     };
     
     console.log('Current merchant status:', merchant.status);

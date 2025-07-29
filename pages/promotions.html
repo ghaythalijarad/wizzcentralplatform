@@ -339,11 +339,123 @@
         </div>
     </div>
 
+    <!-- Add Promotion Modal -->
+    <div id="addPromotionModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Promotion</h2>
+                <button class="close-btn" onclick="closeAddPromotionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="addPromotionForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="title">Promotion Title *</label>
+                        <input type="text" id="title" name="title" required placeholder="e.g., Summer Sale 2025">
+                    </div>
+                    <div class="form-group">
+                        <label for="code">Promotion Code *</label>
+                        <input type="text" id="code" name="code" required placeholder="e.g., SUMMER25" style="text-transform: uppercase;">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="type">Discount Type *</label>
+                        <select id="type" name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="percentage">Percentage Off</option>
+                            <option value="fixed">Fixed Amount Off</option>
+                            <option value="free_delivery">Free Delivery</option>
+                            <option value="bogo">Buy One Get One</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="value">Discount Value *</label>
+                        <input type="number" id="value" name="value" required min="0" step="0.01" placeholder="e.g., 25 or 10.50">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="description">Description *</label>
+                    <textarea id="description" name="description" required placeholder="Brief description of the promotion"></textarea>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="startDate">Start Date *</label>
+                        <input type="datetime-local" id="startDate" name="startDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">End Date *</label>
+                        <input type="datetime-local" id="endDate" name="endDate" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="limit">Usage Limit (optional)</label>
+                        <input type="number" id="limit" name="limit" min="1" placeholder="e.g., 100">
+                    </div>
+                    <div class="form-group">
+                        <label for="minOrder">Min Order Value (optional)</label>
+                        <input type="number" id="minOrder" name="minOrder" min="0" step="0.01" placeholder="e.g., 50.00">
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddPromotionModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Promotion</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Merchant Discounts Section -->
+    <div class="page-section" style="margin-top: 2rem;">
+        <div class="section-header">
+            <h2>Merchant Discounts</h2>
+            <div class="merchant-discount-stats">
+                <span class="stat-item">Total: <strong id="totalMerchantDiscounts">0</strong></span>
+                <span class="stat-item">Active: <strong id="activeMerchantDiscounts">0</strong></span>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Discount</th>
+                        <th>Merchant</th>
+                        <th>Type</th>
+                        <th>Value</th>
+                        <th>Status</th>
+                        <th>Usage</th>
+                        <th>Valid Until</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="merchantDiscountsTableBody">
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                            <div>Loading merchant discounts...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- AWS SDK -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
     
     <!-- Configuration -->
     <script src="../config.js"></script>
+    
+    <!-- Data service -->
+    <script src="../data-service.js"></script>
     
     <!-- Centralized utilities -->
     <script src="../assets/js/auth-utils.js"></script>
