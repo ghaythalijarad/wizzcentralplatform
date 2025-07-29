@@ -264,7 +264,8 @@ async function loadMerchantsFromDynamoDB() {
                 email: item.email || item.businessEmail || 'N/A',
                 phone: item.phoneNumber || item.phone || item.businessPhone || 'N/A',
                 category: mapBusinessType(item.businessType || item.category) || 'Other',
-                status: item.status || (item.isActive !== false ? 'approved' : 'pending'),
+                // Improved status detection - prioritize actual status field
+                status: item.status || (item.isActive === false ? 'pending' : 'approved'),
                 isActive: item.isActive !== undefined ? item.isActive : true,
                 address: extractAddress(item.address, item.city, item.country),
                 owner: item.ownerName || item.owner || item.contactName || 'N/A',
@@ -278,7 +279,7 @@ async function loadMerchantsFromDynamoDB() {
             console.log(`✅ Successfully loaded and mapped ${merchantsData.length} merchants from DynamoDB!`);
             console.log('📊 Summary of loaded merchants:');
             merchantsData.forEach((merchant, index) => {
-                console.log(`   ${index + 1}. ${merchant.name} (${merchant.id}) - ${merchant.address}`);
+                console.log(`   ${index + 1}. ${merchant.name} (${merchant.id}) - Status: ${merchant.status}, Address: ${merchant.address}`);
             });
             
             console.log('Final merchants data for rendering:', merchantsData);
@@ -1172,11 +1173,19 @@ async function submitMerchantUpdate(merchantId, updateData) {
             if (updateData.statusUpdate) {
                 console.log('Submitting status update:', updateData.statusUpdate);
                 
+                // Find the current merchant to show current status
+                const currentMerchant = filteredMerchants.find(m => m.id === merchantId);
+                if (currentMerchant) {
+                    console.log(`Current merchant status: ${currentMerchant.status}, attempting to change to: ${updateData.statusUpdate.newStatus}`);
+                }
+                
                 // Get proper action from status
                 const action = getActionFromStatus(updateData.statusUpdate.newStatus);
                 if (!action) {
                     throw new Error(`Invalid status change: ${updateData.statusUpdate.newStatus}`);
                 }
+                
+                console.log(`Status transition: ${currentMerchant?.status} -> ${updateData.statusUpdate.newStatus} (action: ${action})`);
                 
                 // Prepare the request body for status update
                 const requestBody = {
@@ -1206,10 +1215,16 @@ async function submitMerchantUpdate(merchantId, updateData) {
                     let errorMessage = 'Status update failed';
                     try {
                         const errorDetails = await statusResponse.json();
-                        if (errorDetails.error && typeof errorDetails.error === 'object') {
-                            errorMessage = errorDetails.error.message || errorDetails.error.error || `Server error: ${statusResponse.status}`;
+                        console.error('Full error response:', errorDetails);
+                        
+                        // Handle validation errors (422) specifically
+                        if (statusResponse.status === 422 && errorDetails.errors && Array.isArray(errorDetails.errors)) {
+                            const validationErrors = errorDetails.errors.map(err => `${err.field}: ${err.message}`).join(', ');
+                            errorMessage = `Validation failed: ${validationErrors}`;
+                        } else if (errorDetails.error && typeof errorDetails.error === 'object') {
+                            errorMessage = errorDetails.error.message || errorDetails.error.error || errorDetails.message || `Server error: ${statusResponse.status}`;
                         } else {
-                            errorMessage = errorDetails.message || errorDetails.error || errorDetails.detail || `Server error: ${statusResponse.status}`;
+                            errorMessage = errorDetails.message || errorDetails.error || `Server error: ${statusResponse.status}`;
                         }
                         console.error('Status update error details:', errorDetails);
                     } catch (e) {
@@ -1354,6 +1369,13 @@ async function submitMerchantUpdate(merchantId, updateData) {
             return { success: false, error: 'You do not have permission to edit this merchant.' };
         } else if (errorMessage.includes('404')) {
             return { success: false, error: 'Merchant not found.' };
+        } else if (errorMessage.includes('422') || errorMessage.includes('Validation failed')) {
+            // Enhanced validation error handling
+            if (errorMessage.includes('Cannot reject merchant') || errorMessage.includes('status transition')) {
+                return { success: false, error: 'Invalid status change. This merchant\'s current status does not allow this transition. Please refresh the page and try again.' };
+            } else {
+                return { success: false, error: `Validation error: ${errorMessage}` };
+            }
         } else if (errorMessage.includes('500')) {
             return { success: false, error: 'Server error occurred. Please try again or contact support.' };
         } else {
