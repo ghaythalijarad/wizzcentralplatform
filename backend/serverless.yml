@@ -535,6 +535,43 @@ functions:
           cors: true
           authorizer: authorize
 
+  # Product Management
+  getCategories:
+    handler: src/handlers/products.getCategories
+    events:
+      - http:
+          path: categories
+          method: get
+          cors: true
+          # authorizer: authorize  # Temporarily disabled for testing
+          
+  getProducts:
+    handler: src/handlers/products.getProducts
+    events:
+      - http:
+          path: products
+          method: get
+          cors: true
+          # authorizer: authorize  # Temporarily disabled for testing
+          
+  getProduct:
+    handler: src/handlers/products.getProduct
+    events:
+      - http:
+          path: products/{productId}
+          method: get
+          cors: true
+          # authorizer: authorize  # Temporarily disabled for testing
+          
+  getProductsByMerchant:
+    handler: src/handlers/products.getProductsByBusiness
+    events:
+      - http:
+          path: merchants/{merchantId}/products
+          method: get
+          cors: true
+          # authorizer: authorize  # Temporarily disabled for testing
+
   # Analytics & Dashboard
   getDashboardStats:
     handler: src/handlers/analytics.getDashboardStats

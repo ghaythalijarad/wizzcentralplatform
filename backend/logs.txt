@@ -1,0 +1,2 @@
+Error:
+Serverless command "logs" requires "--function" option. Run "serverless logs --help" for more info
