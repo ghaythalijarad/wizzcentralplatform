@@ -12,29 +12,62 @@ async function fetchTableCount(tableName) {
 }
 
 async function loadDashboardStats() {
+    console.log('🔢 Loading dashboard stats from all tables...');
+    
     try {
-        const stats = await window.dataService.getAllStats();
-        
-        const customersCountEl = document.getElementById('customersCount');
-        const merchantsCountEl = document.getElementById('merchantsCount');
-        
-        const usersCount = stats.users || 0;
-        const businessesCount = stats.businesses || 0;
-        
-        if (customersCountEl) {
-            customersCountEl.textContent = usersCount;
-        }
-        if (merchantsCountEl) {
-            merchantsCountEl.textContent = businessesCount;
+        // Check if AWSUtils is available
+        if (!window.AWSUtils) {
+            throw new Error('AWSUtils is not available');
         }
         
-    } catch (e) {
-        console.error('Error loading dashboard stats:', e);
+        // Initialize AWS
+        await AWSUtils.initialize();
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
+        
+        const tables = {
+            customersCount: 'wizzcentral-backend-customers-dev',
+            merchantsCount: 'order-receiver-businesses-dev',
+            driversCount: 'wizzcentral-backend-drivers-dev',
+            ordersCount: 'order-receiver-orders-dev',
+            promotionsCount: 'order-receiver-discounts-dev',
+            ticketsCount: 'wizzcentral-backend-support-tickets-dev'
+        };
+        
+        // Update each stat card
+        for (const [elementId, tableName] of Object.entries(tables)) {
+            try {
+                const params = {
+                    TableName: tableName,
+                    Select: 'COUNT'
+                };
+                
+                const result = await dynamoDB.scan(params).promise();
+                const count = result.Count || 0;
+                
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = count.toLocaleString();
+                    console.log(`✅ ${elementId}: ${count}`);
+                }
+            } catch (error) {
+                console.error(`❌ Error counting ${elementId}:`, error.message);
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = 'Error';
+                }
+            }
+        }
+        
+        console.log('✅ Dashboard stats loaded successfully');
+        
+    } catch (error) {
+        console.error('❌ Error loading dashboard stats:', error);
         // Set fallback values in case of error
-        const customersCountEl = document.getElementById('customersCount');
-        const merchantsCountEl = document.getElementById('merchantsCount');
-        if (customersCountEl) customersCountEl.textContent = '0';
-        if (merchantsCountEl) merchantsCountEl.textContent = '0';
+        const statElements = ['customersCount', 'merchantsCount', 'driversCount', 'ordersCount', 'promotionsCount', 'ticketsCount'];
+        statElements.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.textContent = '0';
+        });
     }
 }
 
