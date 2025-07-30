@@ -991,11 +991,22 @@ function setupStatusChangeHandler() {
 function setupEditFormSubmission() {
     const form = document.getElementById('editMerchantForm');
     
-    // Remove any existing event listeners
+    // To prevent multiple listeners, we clone and replace the form.
+    // However, we must manually transfer the current values from the old form
+    // to the new form, because cloneNode does not preserve user input.
     const newForm = form.cloneNode(true);
+
+    // Transfer values from the old form to the new form
+    const oldElements = form.querySelectorAll('input, select, textarea');
+    const newElements = newForm.querySelectorAll('input, select, textarea');
+
+    for (let i = 0; i < oldElements.length; i++) {
+        newElements[i].value = oldElements[i].value;
+    }
+
     form.parentNode.replaceChild(newForm, form);
     
-    // Add new event listener
+    // Add new event listener to the new form
     newForm.addEventListener('submit', handleEditFormSubmission);
 }
 
