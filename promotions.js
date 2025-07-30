@@ -163,6 +163,15 @@ function setupEventListeners() {
 
     // Set default dates for new promotion
     setDefaultDates();
+
+    // Modal open/close handlers for Create Promotion
+    document.getElementById('openAddPromotionModalBtn').addEventListener('click', () => {
+        document.getElementById('addPromotionModal').style.display = 'flex';
+    });
+    document.getElementById('closeAddPromotionModalBtn').addEventListener('click', () => {
+        document.getElementById('addPromotionModal').style.display = 'none';
+        closeAddPromotionModal();
+    });
 }
 
 function setDefaultDates() {
@@ -430,11 +439,11 @@ async function handleAddPromotion(e) {
             throw new Error(details);
         }
 
+        // On success, close modal
+        document.getElementById('addPromotionModal').style.display = 'none';
+        
         // Refresh promotions from backend
         await loadPromotionsData();
-        closeAddPromotionModal();
-        window.dashboardFunctions?.showNotification('Promotion created successfully!', 'success');
-
     } catch (error) {
         console.error('Error creating promotion:', error);
         window.dashboardFunctions?.showNotification(`Error: ${error.message}`, 'error');
