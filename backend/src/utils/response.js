@@ -1,12 +1,15 @@
 // HTTP response utilities for Lambda functions
 
 class ResponseHelper {
-  static success(statusCode = 200, data = null, message = null) {
+  static success(statusCode, data, message) {
     const response = {
       success: true,
-      data,
       timestamp: new Date().toISOString()
     };
+
+    if (data) {
+      response.data = data;
+    }
     
     if (message) {
       response.message = message;

@@ -80,7 +80,7 @@ exports.getMerchants = async (event) => {
       rejected: merchants.filter(m => m.status === 'rejected').length
     };
 
-    return responseHelper.success({
+    return responseHelper.success(200, {
       merchants: paginatedMerchants,
       stats,
       hasMore: merchants.length > (limit ? parseInt(limit) : 50)
@@ -116,7 +116,7 @@ exports.getMerchant = async (event) => {
       return responseHelper.notFound('Merchant not found');
     }
 
-    return responseHelper.success({ merchant });
+    return responseHelper.success(200, { merchant });
 
   } catch (error) {
     console.error('Get merchant error:', error);
@@ -191,10 +191,9 @@ exports.createMerchant = async (event) => {
 
     const createdMerchant = await database.create(MERCHANTS_TABLE, merchant);
 
-    return responseHelper.success({
-      merchant: createdMerchant,
-      message: 'Merchant application submitted successfully'
-    }, 201);
+    return responseHelper.success(201, {
+      merchant: createdMerchant
+    }, 'Merchant application submitted successfully');
 
   } catch (error) {
     console.error('Create merchant error:', error);
@@ -303,7 +302,7 @@ exports.updateMerchant = async (event) => {
     const result = await database.client.send(new UpdateCommand(updateParams));
     const updatedMerchant = result.Attributes;
 
-    return responseHelper.success({ merchant: updatedMerchant, message: 'Merchant updated successfully' });
+    return responseHelper.success(200, { merchant: updatedMerchant }, 'Merchant updated successfully');
 
   } catch (error) {
     console.error('Update merchant error:', error);
@@ -340,7 +339,7 @@ exports.deleteMerchant = async (event) => {
       deletedBy: JSON.parse(event.requestContext.authorizer.stringKey).userId
     });
 
-    return responseHelper.success({ message: 'Merchant deleted successfully' });
+    return responseHelper.success(200, null, 'Merchant deleted successfully');
 
   } catch (error) {
     console.error('Delete merchant error:', error);
@@ -393,7 +392,7 @@ exports.getMerchantAnalytics = async (event) => {
       ]
     };
 
-    return responseHelper.success({
+    return responseHelper.success(200, {
       analytics
     });
 
@@ -683,5 +682,517 @@ exports.updateMerchantStatus = async (event) => {
     } else {
       return responseHelper.serverError(`Failed to update merchant status: ${error.message}`);
     }
+  }
+};
+
+// Update merchant documents (business license, tax ID, etc.)
+exports.updateMerchantDocuments = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const body = JSON.parse(event.body);
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Validate input
+    const validator = validate(merchantSchemas.updateDocuments);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const updates = validation.data;
+
+    // Check if merchant exists
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!existingMerchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Update documents
+    const updatedMerchant = await database.updateByKey(MERCHANTS_TABLE, 'businessId', merchantId, updates);
+
+    return responseHelper.success(200, {
+      merchant: updatedMerchant
+    }, 'Merchant documents updated successfully');
+
+  } catch (error) {
+    console.error('Update merchant documents error:', error);
+    return responseHelper.serverError('Failed to update merchant documents');
+  }
+};
+
+// Update merchant settings (notification preferences, etc.)
+exports.updateMerchantSettings = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const body = JSON.parse(event.body);
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Validate input
+    const validator = validate(merchantSchemas.updateSettings);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const updates = validation.data;
+
+    // Check if merchant exists
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!existingMerchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Update settings
+    const updatedMerchant = await database.updateByKey(MERCHANTS_TABLE, 'businessId', merchantId, updates);
+
+    return responseHelper.success(200, {
+      merchant: updatedMerchant
+    }, 'Merchant settings updated successfully');
+
+  } catch (error) {
+    console.error('Update merchant settings error:', error);
+    return responseHelper.serverError('Failed to update merchant settings');
+  }
+};
+
+// Get merchant transactions (orders, payments, etc.)
+exports.getMerchantTransactions = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // For now, return mock data
+    const transactions = []; // Replace with actual data fetch
+    return responseHelper.success(200, { transactions });
+  } catch (error) {
+    console.error('Get merchant transactions error:', error);
+    return responseHelper.serverError('Failed to get merchant transactions');
+  }
+};
+
+// Get merchant payouts
+exports.getMerchantPayouts = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // For now, return mock data
+    const payouts = []; // Replace with actual data fetch
+    return responseHelper.success(200, { payouts });
+  } catch (error) {
+    console.error('Get merchant payouts error:', error);
+    return responseHelper.serverError('Failed to get merchant payouts');
+  }
+};
+
+// Get merchant reviews
+exports.getMerchantReviews = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // For now, return mock data
+    const reviews = []; // Replace with actual data fetch
+    return responseHelper.success(200, { reviews });
+  } catch (error) {
+    console.error('Get merchant reviews error:', error);
+    return responseHelper.serverError('Failed to get merchant reviews');
+  }
+};
+
+// Generate presigned URL for S3 upload
+exports.generateUploadUrl = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const fileName = event.queryStringParameters.fileName;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    if (!fileName) {
+      return responseHelper.validation([
+        { field: 'fileName', message: 'File name is required' }
+      ]);
+    }
+
+    // Generate presigned URL
+    const key = `uploads/${merchantId}/${Date.now()}_${fileName}`;
+    const presignedUrl = await getPresignedUrl(s3Client, bucketName, key, 'putObject');
+
+    return responseHelper.success(200, {
+      uploadUrl: presignedUrl,
+      key: key
+    }, 'Upload URL generated successfully');
+  } catch (error) {
+    console.error('Error generating upload URL:', error);
+    return responseHelper.serverError('Failed to generate upload URL');
+  }
+};
+
+// Get merchant products
+exports.getMerchantProducts = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const merchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!merchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    const products = await database.getProductsForMerchant(merchantId);
+    return responseHelper.success(200, { products });
+  } catch (error) {
+    console.error('Error getting merchant products:', error);
+    return responseHelper.serverError('Failed to get merchant products');
+  }
+};
+
+// Update merchant product
+exports.updateMerchantProduct = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const productId = event.pathParameters.productId;
+    const body = JSON.parse(event.body);
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    if (!productId) {
+      return responseHelper.validation([
+        { field: 'productId', message: 'Product ID is required' }
+      ]);
+    }
+
+    // Validate input
+    const validator = validate(merchantSchemas.updateProduct);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const updates = validation.data;
+
+    // Check if merchant exists
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!existingMerchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Check if product exists
+    const existingProduct = await database.getProduct(merchantId, productId);
+    if (!existingProduct) {
+      return responseHelper.notFound('Product not found');
+    }
+
+    // Update product
+    const updatedProduct = await database.updateProduct(merchantId, productId, updates);
+    return responseHelper.success(200, { product: updatedProduct }, 'Product updated successfully');
+  } catch (error) {
+    console.error('Error updating product:', error);
+    return responseHelper.serverError('Failed to update product');
+  }
+};
+
+// Delete merchant product
+exports.deleteMerchantProduct = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const productId = event.pathParameters.productId;
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    if (!productId) {
+      return responseHelper.validation([
+        { field: 'productId', message: 'Product ID is required' }
+      ]);
+    }
+
+    // Check if merchant exists
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!existingMerchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Check if product exists
+    const existingProduct = await database.getProduct(merchantId, productId);
+    if (!existingProduct) {
+      return responseHelper.notFound('Product not found');
+    }
+
+    // Delete product
+    await database.deleteProduct(merchantId, productId);
+    return responseHelper.success(200, null, 'Product deleted successfully');
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    return responseHelper.serverError('Failed to delete product');
+  }
+};
+
+// Create merchant product
+exports.createMerchantProduct = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const merchantId = event.pathParameters.merchantId;
+    const body = JSON.parse(event.body);
+
+    if (!merchantId) {
+      return responseHelper.validation([
+        { field: 'merchantId', message: 'Merchant ID is required' }
+      ]);
+    }
+
+    // Validate input
+    const validator = validate(merchantSchemas.createProduct);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const productData = validation.data;
+
+    // Check if merchant exists
+    const existingMerchant = await database.get(MERCHANTS_TABLE, 'businessId', merchantId);
+    if (!existingMerchant) {
+      return responseHelper.notFound('Merchant not found');
+    }
+
+    // Create product
+    const newProduct = await database.createProduct(merchantId, productData);
+    return responseHelper.success(201, { product: newProduct }, 'Product created successfully');
+  } catch (error) {
+    console.error('Error creating product:', error);
+    return responseHelper.serverError('Failed to create product');
+  }
+};
+
+// Get all categories
+exports.getCategories = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    // Get categories from database
+    const categories = await database.getCategories();
+    return responseHelper.success(200, { categories });
+  } catch (error) {
+    console.error('Error getting categories:', error);
+    return responseHelper.serverError('Failed to get categories');
+  }
+};
+
+// Create new category
+exports.createCategory = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const body = JSON.parse(event.body);
+
+    // Validate input
+    const validator = validate(merchantSchemas.createCategory);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const categoryData = validation.data;
+
+    // Create category
+    const newCategory = await database.createCategory(categoryData);
+    return responseHelper.success(201, { category: newCategory }, 'Category created successfully');
+  } catch (error) {
+    console.error('Error creating category:', error);
+    return responseHelper.serverError('Failed to create category');
+  }
+};
+
+// Update category
+exports.updateCategory = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const categoryId = event.pathParameters.categoryId;
+    const body = JSON.parse(event.body);
+
+    if (!categoryId) {
+      return responseHelper.validation([
+        { field: 'categoryId', message: 'Category ID is required' }
+      ]);
+    }
+
+    // Validate input
+    const validator = validate(merchantSchemas.updateCategory);
+    const validation = validator(body);
+
+    if (!validation.isValid) {
+      return responseHelper.validation(validation.errors);
+    }
+
+    const updates = validation.data;
+
+    // Check if category exists
+    const existingCategory = await database.getCategory(categoryId);
+    if (!existingCategory) {
+      return responseHelper.notFound('Category not found');
+    }
+
+    // Update category
+    const updatedCategory = await database.updateCategory(categoryId, updates);
+    return responseHelper.success(200, { category: updatedCategory }, 'Category updated successfully');
+  } catch (error) {
+    console.error('Error updating category:', error);
+    return responseHelper.serverError('Failed to update category');
+  }
+};
+
+// Delete category
+exports.deleteCategory = async (event) => {
+  try {
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return responseHelper.cors();
+    }
+
+    const categoryId = event.pathParameters.categoryId;
+
+    if (!categoryId) {
+      return responseHelper.validation([
+        { field: 'categoryId', message: 'Category ID is required' }
+      ]);
+    }
+
+    // Check if category exists
+    const existingCategory = await database.getCategory(categoryId);
+    if (!existingCategory) {
+      return responseHelper.notFound('Category not found');
+    }
+
+    // Delete category
+    await database.deleteCategory(categoryId);
+    return responseHelper.success(200, null, 'Category deleted successfully');
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    return responseHelper.serverError('Failed to delete category');
   }
 };
