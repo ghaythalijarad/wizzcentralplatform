@@ -72,14 +72,12 @@ exports.createPromotion = async (event) => {
       return responseHelper.error(400, 'Validation failed', validation.errors);
     }
 
-    // Check if promotion code already exists
-    const existingPromotion = await dynamodb.send(new QueryCommand({
+    // Check if promotion code already exists (using scan as no GSI available)
+    const existingPromotion = await dynamodb.send(new ScanCommand({
       TableName: process.env.PROMOTIONS_TABLE,
-      IndexName: 'Code-Index',
-      KeyConditionExpression: 'code = :code',
-      ExpressionAttributeValues: {
-        ':code': body.code.toUpperCase()
-      }
+      FilterExpression: '#code = :code',
+      ExpressionAttributeNames: { '#code': 'code' },
+      ExpressionAttributeValues: { ':code': body.code.toUpperCase() }
     }));
 
     if (existingPromotion.Items && existingPromotion.Items.length > 0) {
