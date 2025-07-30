@@ -16,7 +16,7 @@ provider:
     DRIVERS_TABLE: "${self:service}-drivers-${self:provider.stage}"
     CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
     ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
-    PROMOTIONS_TABLE: "order-receiver-discounts-${self:provider.stage}"
+    PROMOTIONS_TABLE: "WizzCentral_promotions-${self:provider.stage}"
     PROMOTION_USAGE_TABLE: "${self:service}-promotion-usage-${self:provider.stage}"
     SUPPORT_TICKETS_TABLE: "${self:service}-support-tickets-${self:provider.stage}"
     FAQS_TABLE: "${self:service}-faqs-${self:provider.stage}"
@@ -573,4 +573,16 @@ functions:
           method: get
           cors: true
 
-resources: {}
+resources:
+  Resources:
+    CentralPromotionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.PROMOTIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: promotionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: promotionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
