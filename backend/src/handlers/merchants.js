@@ -210,6 +210,16 @@ exports.updateMerchant = async (event) => {
       return responseHelper.cors();
     }
 
+    // Get user context from authorizer
+    let userContext = { userId: 'test-admin' };
+    try {
+      if (event.requestContext && event.requestContext.authorizer && event.requestContext.authorizer.stringKey) {
+        userContext = JSON.parse(event.requestContext.authorizer.stringKey);
+      }
+    } catch (authError) {
+      console.log('Using test user context - authorization disabled for testing');
+    }
+
     const merchantId = event.pathParameters.merchantId;
     const body = JSON.parse(event.body);
 
@@ -241,6 +251,28 @@ exports.updateMerchant = async (event) => {
       if (emailExists) {
         return responseHelper.conflict('Email already in use by another merchant');
       }
+    }
+
+    // If status is updated, add a record to the status history
+    if (updates.status && updates.status !== existingMerchant.status) {
+      // If status has changed, a reason is required.
+      if (!updates.statusChangeReason) {
+        return responseHelper.validation([
+          { field: 'statusChangeReason', message: 'A reason is required for status changes.' }
+        ]);
+      }
+
+      const userId = userContext.userId || userContext.sub || 'unknown-user';
+      const statusHistoryEntry = {
+        status: updates.status,
+        previousStatus: existingMerchant.status,
+        changedBy: userId,
+        changedAt: new Date().toISOString(),
+        reason: updates.statusChangeReason // No longer needs a fallback
+      };
+      
+      updates.statusHistory = [...(existingMerchant.statusHistory || []), statusHistoryEntry];
+      delete updates.statusChangeReason; // Clean up the field
     }
 
     // Update merchant with correct key

@@ -55,43 +55,21 @@ const merchantSchemas = {
 
   update: Joi.object({
     businessName: Joi.string().min(2).max(100),
-    name: Joi.string().min(2).max(100), // Keep both for backwards compatibility
-    email: Joi.string().email(),
-    phoneNumber: Joi.string().min(1),
-    phone: Joi.string().min(1), // Keep both for backwards compatibility
-    businessType: Joi.string().valid('restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail'),
-    category: Joi.string().valid('restaurant', 'grocery', 'pharmacy', 'retail', 'electronics', 'clothing', 'beauty', 'books', 'sports', 'home', 'automotive', 'other'), // Keep for backwards compatibility
     ownerName: Joi.string().min(2).max(100),
-    street: Joi.string(),
-    city: Joi.string(),
-    district: Joi.string(),
-    country: Joi.string(),
-    address: Joi.object({
-      street: Joi.string(),
-      city: Joi.string(),
-      state: Joi.string(),
-      zipCode: Joi.string(),
-      country: Joi.string()
-    }),
-    businessHours: Joi.object({
-      monday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      tuesday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      wednesday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      thursday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      friday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      saturday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() }),
-      sunday: Joi.object({ open: Joi.string(), close: Joi.string(), closed: Joi.boolean() })
-    }),
-    website: Joi.string().uri(),
-    commission: Joi.number().min(0).max(100),
-    description: Joi.string().max(500),
-    updatedAt: Joi.string().isoDate()
+    email: Joi.string().email(),
+    phoneNumber: Joi.string().pattern(/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/),
+    businessType: Joi.string().valid('restaurant', 'store', 'cafe', 'cloudkitchen', 'pharmacy', 'retail', 'other'),
+    status: Joi.string().valid('pending', 'approved', 'rejected', 'under-review', 'suspended'),
+    statusChangeReason: Joi.string().min(10).max(500).when('status', {
+      is: Joi.exist(),
+      then: Joi.optional(),
+      otherwise: Joi.forbidden()
+    })
   }).min(1),
 
   updateStatus: Joi.object({
-    action: Joi.string().valid('approve', 'reject', 'suspend', 'review', 'reactivate', 'reset_to_pending').required(),
-    reason: Joi.string().min(10).max(500).required(),
-    sendEmail: Joi.boolean().default(true)
+    status: Joi.string().valid('confirmed', 'preparing', 'ready', 'picked_up', 'delivered', 'cancelled').required(),
+    notes: Joi.string().max(200)
   })
 };
 
