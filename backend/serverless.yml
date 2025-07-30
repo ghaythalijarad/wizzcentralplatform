@@ -339,15 +339,6 @@ functions:
           authorizer: authorize
 
   # Promotion Management
-  listPromotions:
-    handler: src/handlers/promotions.listPromotions
-    events:
-      - http:
-          path: promotions
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
   createPromotion:
     handler: src/handlers/promotions.createPromotion
     events:
@@ -355,8 +346,7 @@ functions:
           path: promotions
           method: post
           cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
+          # authorizer: authorize
   getPromotion:
     handler: src/handlers/promotions.getPromotion
     events:
@@ -364,8 +354,7 @@ functions:
           path: promotions/{promotionId}
           method: get
           cors: true
-          authorizer: authorize
-          
+          # authorizer: authorize
   updatePromotion:
     handler: src/handlers/promotions.updatePromotion
     events:
@@ -373,8 +362,7 @@ functions:
           path: promotions/{promotionId}
           method: put
           cors: true
-          authorizer: authorize
-          
+          # authorizer: authorize
   deletePromotion:
     handler: src/handlers/promotions.deletePromotion
     events:
@@ -382,8 +370,15 @@ functions:
           path: promotions/{promotionId}
           method: delete
           cors: true
-          authorizer: authorize
-          
+          # authorizer: authorize
+  listPromotions:
+    handler: src/handlers/promotions.listPromotions
+    events:
+      - http:
+          path: promotions
+          method: get
+          cors: true
+          # authorizer: authorize
   validatePromotionCode:
     handler: src/handlers/promotions.validatePromotionCode
     events:
@@ -391,25 +386,7 @@ functions:
           path: promotions/validate
           method: post
           cors: true
-          authorizer: authorize
-          
-  applyPromotion:
-    handler: src/handlers/promotions.applyPromotion
-    events:
-      - http:
-          path: promotions/{promotionId}/apply
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getPromotionAnalytics:
-    handler: src/handlers/promotions.getPromotionAnalytics
-    events:
-      - http:
-          path: promotions/{promotionId}/analytics
-          method: get
-          cors: true
-          authorizer: authorize
+          # authorizer: authorize
 
   # Support Management - Tickets
   listTickets:
