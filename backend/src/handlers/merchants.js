@@ -271,6 +271,20 @@ exports.updateMerchant = async (event) => {
       };
       
       updates.statusHistory = [...(existingMerchant.statusHistory || []), statusHistoryEntry];
+      
+      // Send email notification about the status change
+      try {
+        await emailService.sendStatusChangeEmail(
+          existingMerchant.email,
+          existingMerchant.businessName,
+          updates.status,
+          updates.statusChangeReason
+        );
+      } catch (emailError) {
+        console.error('Failed to send status change email:', emailError);
+        // Do not block the main operation if email fails, just log the error.
+      }
+
       delete updates.statusChangeReason; // Clean up the field
     }
 

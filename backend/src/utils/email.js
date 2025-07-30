@@ -207,6 +207,43 @@ class EmailService {
     }
   }
 
+  // Generic status change email
+  async sendStatusChangeEmail(toEmail, businessName, newStatus, reason) {
+    const subject = `Your WizzCentral Account Status has been Updated to: ${newStatus}`;
+    const template = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #4a5568; padding: 20px; text-align: center;">
+          <h1 style="color: white; margin: 0;">Account Status Update</h1>
+        </div>
+        <div style="padding: 30px; background: #f8fafc;">
+          <h2 style="color: #333;">Hello ${businessName},</h2>
+          <p style="font-size: 16px; line-height: 1.6; color: #555;">
+            This is to inform you that your WizzCentral account status has been updated.
+          </p>
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>New Status:</strong> <span style="font-weight: bold; color: #2d3748;">${newStatus}</span></p>
+            <p><strong>Reason for change:</strong></p>
+            <p style="font-style: italic; color: #666;">${reason}</p>
+          </div>
+          <p style="font-size: 16px; line-height: 1.6; color: #555;">
+            If you have any questions, please contact our support team.
+          </p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="mailto:support@wizzcentral.com" style="background: #64748b; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Contact Support
+            </a>
+          </div>
+          <p style="color: #666; font-size: 14px;">
+            Best regards,<br>
+            The WizzCentral Team
+          </p>
+        </div>
+      </div>
+    `;
+
+    return this.sendEmail(toEmail, subject, template);
+  }
+
   // Send welcome email for new users
   async sendWelcomeEmail(user) {
     const template = `

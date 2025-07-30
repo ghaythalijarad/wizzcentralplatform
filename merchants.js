@@ -949,6 +949,12 @@ function populateEditForm(merchant) {
     document.getElementById('editEmail').value = merchant.email || '';
     document.getElementById('editPhoneNumber').value = merchant.phoneNumber || merchant.phone || '';
     
+    // Address details - populate from individual fields
+    document.getElementById('editStreet').value = merchant.street || '';
+    document.getElementById('editCity').value = merchant.city || '';
+    document.getElementById('editDistrict').value = merchant.district || '';
+    document.getElementById('editCountry').value = merchant.country || 'Iraq'; // Default to Iraq
+    
     // Business type - use exact DynamoDB values
     document.getElementById('editBusinessType').value = merchant.businessType?.toLowerCase() || 'restaurant';
     
