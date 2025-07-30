@@ -16,7 +16,7 @@ const MERCHANT_STATUSES = {
     'pending': { label: 'Pending', class: 'pending', color: '#f59e0b', icon: 'hourglass_empty' },
     'approved': { label: 'Approved', class: 'verified', color: '#10b981', icon: 'check_circle' },
     'rejected': { label: 'Rejected', class: 'rejected', color: '#ef4444', icon: 'cancel' },
-    'under_review': { label: 'Under Review', class: 'under-review', color: '#3b82f6', icon: 'assignment' },
+    'under-review': { label: 'Under Review', class: 'under-review', color: '#3b82f6', icon: 'assignment' },
     'unknown': { label: 'Unknown', class: 'unknown', color: '#6b7280', icon: 'help_outline' }
 };
 
