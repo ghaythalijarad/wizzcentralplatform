@@ -330,12 +330,10 @@ function openAddPromotionModal() {
 }
 
 function closeAddPromotionModal() {
-    const modal = document.getElementById('addPromotionModal');
-    if (modal) {
-        modal.style.display = 'none';
-        document.body.style.overflow = 'auto';
-        // Reset form
-        document.getElementById('addPromotionForm').reset();
+    // Inline form reset for Create New Promotion section
+    const form = document.getElementById('addPromotionForm');
+    if (form) {
+        form.reset();
     }
 }
 

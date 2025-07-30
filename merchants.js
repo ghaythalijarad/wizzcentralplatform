@@ -918,7 +918,9 @@ async function handleEditProductFormSubmit(event) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-            throw new Error(result.message || 'Failed to update product.');
+            // Use detailed error message if provided by API
+            const errMsg = result.error?.message || result.message || 'Failed to update merchant on the server.';
+            throw new Error(errMsg);
         }
 
         messageElement.textContent = 'Product updated successfully!';
@@ -949,11 +951,12 @@ function populateEditForm(merchant) {
     document.getElementById('editEmail').value = merchant.email || '';
     document.getElementById('editPhoneNumber').value = merchant.phoneNumber || merchant.phone || '';
     
-    // Address details - populate from individual fields
-    document.getElementById('editStreet').value = merchant.street || '';
-    document.getElementById('editCity').value = merchant.city || '';
-    document.getElementById('editDistrict').value = merchant.district || '';
-    document.getElementById('editCountry').value = merchant.country || 'Iraq'; // Default to Iraq
+    // Address details - populate from merchant.fullData with fallback to nested address
+    const raw = merchant.fullData || {};
+    document.getElementById('editStreet').value = raw.street || raw.address?.street || '';
+    document.getElementById('editCity').value = raw.city || raw.address?.city || '';
+    document.getElementById('editDistrict').value = raw.district || raw.address?.district || '';
+    document.getElementById('editCountry').value = raw.country || raw.address?.country || 'Iraq'; // Default to Iraq
     
     // Business type - use exact DynamoDB values
     document.getElementById('editBusinessType').value = merchant.businessType?.toLowerCase() || 'restaurant';
@@ -1070,7 +1073,9 @@ async function handleEditFormSubmission(event) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-            throw new Error(result.message || 'Failed to update merchant on the server.');
+            // Use detailed error message if provided by API
+            const errMsg = result.error?.message || result.message || 'Failed to update merchant on the server.';
+            throw new Error(errMsg);
         }
 
         showEditFormMessage('Merchant updated successfully!', 'success');
@@ -1134,13 +1139,9 @@ window.forceLoadRealData = async function() {
             showMessage('No merchants found in database', 'info');
         }
     } catch (error) {
-        console.error('Error forcing data load:', error);
-        showMessage(`Failed to load real data: ${error.message}`, 'error');
-        updateDataSourceIndicator('error', `Error: ${error.message}`);
+        console.error('Error forcing real data load:', error);
+        showMessage(`Error: ${error.message}`, 'error');
     } finally {
         showLoader(false);
     }
-};
-
-// Make sure DOM is ready before running the script
-document.addEventListener('DOMContentLoaded', onDomReady);
+}
