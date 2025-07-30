@@ -398,14 +398,50 @@ function setupEventListeners() {
     if (backToMerchantsBtn) {
         backToMerchantsBtn.addEventListener('click', backToMerchantsList);
     }
-    
     const refreshProductsBtn = document.getElementById('refreshProductsBtn');
     if (refreshProductsBtn) {
         refreshProductsBtn.addEventListener('click', refreshMerchantProducts);
     }
     
-    // This is a placeholder. A full implementation would add listeners for
-    // search input, filter dropdowns, and other interactive elements.
+    // Centralized Edit Merchant Form listeners
+    const editForm = document.getElementById('editMerchantForm');
+    if (editForm) {
+        // Handle form submission
+        editForm.addEventListener('submit', handleEditFormSubmission);
+
+        // Handle status changes to show/hide the reason field
+        const statusSelect = editForm.querySelector('#editStatus');
+        const reasonSection = editForm.querySelector('#statusReasonSection');
+        const reasonTextarea = editForm.querySelector('#editStatusReason');
+
+        if (statusSelect && reasonSection && reasonTextarea) {
+            statusSelect.addEventListener('change', function() {
+                const originalStatus = editForm.getAttribute('data-original-status');
+                const newStatus = this.value;
+                const statusChanged = newStatus !== originalStatus && newStatus !== '';
+
+                if (statusChanged) {
+                    reasonSection.style.display = 'block';
+                    reasonTextarea.required = true;
+                    
+                    // Add visual indicator that status changed
+                    statusSelect.style.borderColor = '#f59e0b';
+                    statusSelect.style.backgroundColor = '#fef3c7';
+                    
+                    // Auto-focus the reason field
+                    setTimeout(() => reasonTextarea.focus(), 100);
+                } else {
+                    reasonSection.style.display = 'none';
+                    reasonTextarea.required = false;
+                    reasonTextarea.value = '';
+                    
+                    // Reset status field styling
+                    statusSelect.style.borderColor = '#d1d5db';
+                    statusSelect.style.backgroundColor = 'white';
+                }
+            });
+        }
+    }
 }
 
 // Render the merchants table with the provided data
@@ -550,9 +586,6 @@ function editMerchant(merchantId) {
     
     // Show the modal
     document.getElementById('editMerchantModal').style.display = 'flex';
-    
-    // Set up form submission handler
-    setupEditFormSubmission();
 }
 
 // Product view functions
@@ -948,73 +981,29 @@ function populateEditForm(merchant) {
     // Store original status for comparison
     document.getElementById('editMerchantForm').setAttribute('data-original-status', currentStatus);
     
-    // Set up status change monitoring
-    setupStatusChangeHandler();
-}
-
-function setupStatusChangeHandler() {
-    const statusSelect = document.getElementById('editStatus');
+    // Reset status change UI elements each time the form is populated
     const reasonSection = document.getElementById('statusReasonSection');
-    const reasonTextarea = document.getElementById('editStatusReason');
-    const form = document.getElementById('editMerchantForm');
-    
-    if (!statusSelect || !reasonSection || !reasonTextarea || !form) return;
-    
-    const originalStatus = form.getAttribute('data-original-status');
-    
-    statusSelect.addEventListener('change', function() {
-        const newStatus = this.value;
-        const statusChanged = newStatus !== originalStatus && newStatus !== '';
-        
-        if (statusChanged) {
-            reasonSection.style.display = 'block';
-            reasonTextarea.required = true;
-            
-            // Add visual indicator that status changed
-            statusSelect.style.borderColor = '#f59e0b';
-            statusSelect.style.backgroundColor = '#fef3c7';
-            
-            // Auto-focus the reason field
-            setTimeout(() => reasonTextarea.focus(), 100);
-        } else {
-            reasonSection.style.display = 'none';
-            reasonTextarea.required = false;
-            reasonTextarea.value = '';
-            
-            // Reset status field styling
-            statusSelect.style.borderColor = '#d1d5db';
-            statusSelect.style.backgroundColor = 'white';
-        }
-    });
-}
-
-function setupEditFormSubmission() {
-    const form = document.getElementById('editMerchantForm');
-    
-    // To prevent multiple listeners, we clone and replace the form.
-    // However, we must manually transfer the current values from the old form
-    // to the new form, because cloneNode does not preserve user input.
-    const newForm = form.cloneNode(true);
-
-    // Transfer values from the old form to the new form
-    const oldElements = form.querySelectorAll('input, select, textarea');
-    const newElements = newForm.querySelectorAll('input, select, textarea');
-
-    for (let i = 0; i < oldElements.length; i++) {
-        newElements[i].value = oldElements[i].value;
+    const statusSelectField = document.getElementById('editStatus');
+    if (reasonSection) {
+        reasonSection.style.display = 'none';
     }
-
-    form.parentNode.replaceChild(newForm, form);
-    
-    // Add new event listener to the new form
-    newForm.addEventListener('submit', handleEditFormSubmission);
+    if (statusSelectField) {
+        statusSelectField.style.borderColor = '#d1d5db';
+        statusSelectField.style.backgroundColor = 'white';
+    }
+    document.getElementById('editStatusReason').value = '';
 }
+
+// This function is no longer needed.
+/* function setupStatusChangeHandler() { ... } */
+
+// This function is no longer needed.
+/* function setupEditFormSubmission() { ... } */
 
 async function handleEditFormSubmission(event) {
     event.preventDefault();
-    // Always get the form directly from the DOM to ensure we have the latest values,
-    // especially since we are using cloneNode which can cause stale references.
-    const form = document.getElementById('editMerchantForm');
+    // The form is the direct target of the submit event.
+    const form = event.target;
     const merchantId = form.getAttribute('data-merchant-id');
     const submitButton = form.querySelector('button[type="submit"]');
     
@@ -1148,8 +1137,4 @@ window.forceLoadRealData = async function() {
 };
 
 // Make sure DOM is ready before running the script
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onDomReady);
-} else {
-    onDomReady();
-}
+document.addEventListener('DOMContentLoaded', onDomReady);
