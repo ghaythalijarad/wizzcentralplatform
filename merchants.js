@@ -1001,7 +1001,9 @@ function setupEditFormSubmission() {
 
 async function handleEditFormSubmission(event) {
     event.preventDefault();
-    const form = event.target;
+    // Always get the form directly from the DOM to ensure we have the latest values,
+    // especially since we are using cloneNode which can cause stale references.
+    const form = document.getElementById('editMerchantForm');
     const merchantId = form.getAttribute('data-merchant-id');
     const submitButton = form.querySelector('button[type="submit"]');
     
@@ -1019,7 +1021,8 @@ async function handleEditFormSubmission(event) {
 
     const originalStatus = form.getAttribute('data-original-status');
     const newStatus = document.getElementById('editStatus').value;
-    const statusReason = document.getElementById('editStatusReason').value;
+    // Trim the value to remove any leading/trailing whitespace.
+    const statusReason = document.getElementById('editStatusReason').value.trim();
 
     const statusChanged = originalStatus !== newStatus;
 
@@ -1125,9 +1128,17 @@ window.forceLoadRealData = async function() {
             showMessage('No merchants found in database', 'info');
         }
     } catch (error) {
-        console.error('Error forcing load of real data:', error);
-        showMessage(`Error: ${error.message}`, 'error');
+        console.error('Error forcing data load:', error);
+        showMessage(`Failed to load real data: ${error.message}`, 'error');
+        updateDataSourceIndicator('error', `Error: ${error.message}`);
     } finally {
         showLoader(false);
     }
+};
+
+// Make sure DOM is ready before running the script
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onDomReady);
+} else {
+    onDomReady();
 }
