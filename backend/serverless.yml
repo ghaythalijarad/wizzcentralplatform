@@ -28,6 +28,7 @@ provider:
     COGNITO_CLIENT_SECRET: h017ovuq5gv490hgtisr9sj33gq2c3tlvubrutl2v6to765k6o
     COGNITO_REGION: us-east-1
     JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
+    NOTIFICATIONS_TABLE: "${self:service}-notifications-${self:provider.stage}"
     
   iam:
     role:
@@ -338,6 +339,115 @@ functions:
           cors: true
           authorizer: authorize
 
+  # Merchant Integration Endpoints
+  receiveStatusUpdate:
+    handler: src/handlers/merchant-integration.receiveStatusUpdate
+    events:
+      - http:
+          path: api/merchant-status-updates
+          method: post
+          cors: true
+          
+  sendOrderToMerchant:
+    handler: src/handlers/merchant-integration.sendOrderToMerchant
+    events:
+      - http:
+          path: api/send-order-to-merchant
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  getOrderStatus:
+    handler: src/handlers/merchant-integration.getOrderStatus
+    events:
+      - http:
+          path: api/orders/{orderId}/status
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  getCustomerOrderHistory:
+    handler: src/handlers/merchant-integration.getCustomerOrderHistory
+    events:
+      - http:
+          path: api/customers/{customerId}/order-history
+          method: get
+          cors: true
+          authorizer: authorize
+
+  # Notification Management
+  getUserNotifications:
+    handler: src/handlers/notifications.getUserNotifications
+    events:
+      - http:
+          path: api/users/{userId}/notifications
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  markNotificationRead:
+    handler: src/handlers/notifications.markNotificationRead
+    events:
+      - http:
+          path: api/notifications/{notificationId}/read
+          method: put
+          cors: true
+          authorizer: authorize
+          
+  markAllNotificationsRead:
+    handler: src/handlers/notifications.markAllNotificationsRead
+    events:
+      - http:
+          path: api/users/{userId}/notifications/read-all
+          method: put
+          cors: true
+          authorizer: authorize
+          
+  deleteNotification:
+    handler: src/handlers/notifications.deleteNotification
+    events:
+      - http:
+          path: api/notifications/{notificationId}
+          method: delete
+          cors: true
+          authorizer: authorize
+          
+  sendNotification:
+    handler: src/handlers/notifications.sendNotification
+    events:
+      - http:
+          path: api/notifications/send
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  getNotificationStats:
+    handler: src/handlers/notifications.getNotificationStats
+    events:
+      - http:
+          path: api/notifications/stats
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  acceptOrderAssignment:
+    handler: src/handlers/notifications.acceptOrderAssignment
+    events:
+      - http:
+          path: api/orders/{orderId}/accept-assignment
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  updateDeliveryStatus:
+    handler: src/handlers/notifications.updateDeliveryStatus
+    events:
+      - http:
+          path: api/orders/{orderId}/delivery-status
+          method: put
+          cors: true
+          authorizer: authorize
+
   # Promotion Management
   createPromotion:
     handler: src/handlers/promotions.createPromotion
@@ -585,4 +695,29 @@ resources:
         KeySchema:
           - AttributeName: promotionId
             KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    NotificationsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.NOTIFICATIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: notificationId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: notificationId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserNotificationsIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST

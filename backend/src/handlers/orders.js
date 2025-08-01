@@ -14,6 +14,9 @@ const { validateInput } = require('../utils/validation');
 const { verifyToken } = require('../utils/auth');
 const { sendEmail } = require('../utils/email');
 
+// Import merchant integration functionality
+const merchantIntegration = require('./merchant-integration');
+
 const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION });
 
 // Validation schemas

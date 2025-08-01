@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders Test - No Auth</title>
+    <link rel="stylesheet" href="dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container" style="max-width: 1200px; margin: 0 auto; padding: 20px;">
+        <h1>Orders Management - Test Mode</h1>
+        
+        <!-- Integration Status Cards -->
+        <div class="stats-grid" style="margin-bottom: 2rem;">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(45deg, #3b82f6, #1d4ed8);">
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Integration Status</div>
+                    <div class="stat-value" id="integration-status">Connected</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(45deg, #10b981, #047857);">
+                    <i class="fas fa-bell"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Real-time Updates</div>
+                    <div class="stat-value" id="realtime-status">Active</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(45deg, #f59e0b, #d97706);">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-label">Last Update</div>
+                    <div class="stat-value" id="last-update">Just now</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div style="margin-bottom: 20px;">
+            <button class="btn-primary" onclick="createTestOrder()">
+                <i class="fas fa-plus"></i>
+                Create Test Order
+            </button>
+            <button class="btn-secondary" onclick="refreshOrders()">
+                <i class="fas fa-sync"></i>
+                Refresh
+            </button>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="table-container">
+            <div id="orders-table-status" style="display: none;"></div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Merchant</th>
+                        <th>Driver</th>
+                        <th>Status</th>
+                        <th>Total Amount</th>
+                        <th>Order Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersTableBody">
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                            <i class="fas fa-shopping-bag" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                            <div>Loading orders...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        console.log('Orders test page loaded');
+        
+        // Mock data and functions
+        const API_BASE_URL = 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev';
+        
+        // Status mapping
+        const ORDER_STATUSES = {
+            'pending':    { label: 'Pending',        class: 'pending' },
+            'confirmed':  { label: 'Confirmed',      class: 'confirmed' },
+            'preparing':  { label: 'Preparing',      class: 'preparing' },
+            'ready_for_pickup': { label: 'Ready for Pickup', class: 'ready' },
+            'picked_up':  { label: 'Picked Up',       class: 'picked-up' },
+            'out_for_delivery': { label: 'Out for Delivery', class: 'out-delivery' },
+            'delivered':  { label: 'Delivered',       class: 'delivered' },
+            'cancelled':  { label: 'Cancelled',       class: 'cancelled' },
+            'unknown':    { label: 'Unknown',         class: 'unknown' }
+        };
+
+        let ordersData = [
+            {
+                orderId: 'ORD001',
+                customerId: 'CUST001',
+                merchantId: 'MER001',
+                driverId: 'N/A',
+                status: 'pending',
+                total: '$25.99',
+                date: '8/1/2025',
+                sentToMerchant: false
+            },
+            {
+                orderId: 'ORD002',
+                customerId: 'CUST002',
+                merchantId: 'MER002',
+                driverId: 'DRV001',
+                status: 'confirmed',
+                total: '$42.50',
+                date: '8/1/2025',
+                sentToMerchant: true
+            },
+            {
+                orderId: 'ORD003',
+                customerId: 'CUST003',
+                merchantId: 'MER001',
+                driverId: 'DRV002',
+                status: 'preparing',
+                total: '$18.75',
+                date: '8/1/2025',
+                sentToMerchant: true
+            }
+        ];
+
+        function renderOrdersTable() {
+            const tbody = document.getElementById('ordersTableBody');
+            if (!tbody) return;
+            
+            if (ordersData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:2rem; color:#666;">
+                            <i class="fas fa-shopping-bag" style="font-size:3rem; color:#ccc;"></i>
+                            <div>No orders found</div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+            
+            tbody.innerHTML = ordersData.map(o => `
+                <tr>
+                    <td>${o.orderId}</td>
+                    <td>${o.customerId}</td>
+                    <td>${o.merchantId}</td>
+                    <td>${o.driverId}</td>
+                    <td><span class="status-badge ${ORDER_STATUSES[o.status]?.class || 'unknown'}">${ORDER_STATUSES[o.status]?.label || 'Unknown'}</span></td>
+                    <td>${o.total}</td>
+                    <td>${o.date}</td>
+                    <td>
+                        <button class="btn-action" onclick="viewOrder('${o.orderId}')" title="View Details">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${!o.sentToMerchant ? `
+                            <button class="btn-action" onclick="sendToMerchant('${o.orderId}')" title="Send to Merchant" style="background: #10b981; color: white;">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        ` : `
+                            <span style="color: #10b981; font-size: 12px;">✓ Sent</span>
+                        `}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function createTestOrder() {
+            const orderNumber = Date.now().toString().slice(-6);
+            const newOrder = {
+                orderId: `ORD${orderNumber}`,
+                customerId: 'CUST004',
+                merchantId: 'MER003',
+                driverId: 'N/A',
+                status: 'pending',
+                total: '$' + (Math.random() * 50 + 10).toFixed(2),
+                date: new Date().toLocaleDateString(),
+                sentToMerchant: false
+            };
+            
+            ordersData.unshift(newOrder);
+            renderOrdersTable();
+            showMessage(`Test order ${newOrder.orderId} created successfully!`, 'success');
+        }
+
+        function refreshOrders() {
+            // Simulate refresh
+            showMessage('Orders refreshed', 'success');
+            updateLastUpdateTime();
+        }
+
+        function viewOrder(orderId) {
+            const order = ordersData.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            alert(`Order Details:
+Order ID: ${order.orderId}
+Customer: ${order.customerId}
+Merchant: ${order.merchantId}
+Status: ${ORDER_STATUSES[order.status]?.label}
+Total: ${order.total}
+Sent to Merchant: ${order.sentToMerchant ? 'Yes' : 'No'}`);
+        }
+
+        async function sendToMerchant(orderId) {
+            const order = ordersData.find(o => o.orderId === orderId);
+            if (!order) return;
+            
+            showMessage(`Sending order ${orderId} to merchant...`, 'info');
+            
+            try {
+                // Test the actual API endpoint
+                const response = await fetch(`${API_BASE_URL}/api/send-order-to-merchant`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        merchantId: order.merchantId,
+                        orderData: {
+                            customerId: order.customerId,
+                            items: [
+                                { name: 'Test Item', price: parseFloat(order.total.replace('$', '')), quantity: 1 }
+                            ],
+                            total: parseFloat(order.total.replace('$', '')),
+                            deliveryAddress: {
+                                street: '123 Test Street',
+                                city: 'Test City',
+                                zipCode: '12345'
+                            }
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    order.sentToMerchant = true;
+                    order.status = 'confirmed';
+                    renderOrdersTable();
+                    showMessage(`✅ Order ${orderId} sent successfully to merchant!`, 'success');
+                    console.log('API Response:', result);
+                } else {
+                    const errorText = await response.text();
+                    showMessage(`❌ Failed to send order: ${response.status} - ${errorText}`, 'error');
+                    console.error('API Error:', errorText);
+                }
+            } catch (error) {
+                showMessage(`❌ Error: ${error.message}`, 'error');
+                console.error('Send to merchant error:', error);
+            }
+        }
+
+        function showMessage(msg, type = 'info') {
+            const el = document.getElementById('orders-table-status');
+            if (el) {
+                el.textContent = msg;
+                el.className = `table-status-${type}`;
+                el.style.display = 'block';
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    el.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function updateLastUpdateTime() {
+            const lastUpdateEl = document.getElementById('last-update');
+            if (lastUpdateEl) {
+                lastUpdateEl.textContent = new Date().toLocaleTimeString();
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Initializing orders test page...');
+            renderOrdersTable();
+            updateLastUpdateTime();
+            showMessage('Orders test page loaded successfully', 'success');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .result {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Merchant Integration Test</h1>
+        <p>This page tests the basic integration functionality.</p>
+        
+        <button onclick="testBasicConnection()">Test Basic Connection</button>
+        <button onclick="testCreateOrder()">Create Test Order</button>
+        <button onclick="testSendToMerchant()">Send to Merchant</button>
+        
+        <div id="result" class="result">Ready to test...</div>
+    </div>
+
+    <script>
+        console.log('Script loaded successfully');
+        
+        // Test variables
+        const API_BASE_URL = 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev';
+        let testOrderId = null;
+        
+        function log(message) {
+            const resultDiv = document.getElementById('result');
+            const timestamp = new Date().toLocaleTimeString();
+            resultDiv.textContent += `[${timestamp}] ${message}\n`;
+            console.log(message);
+        }
+        
+        async function testBasicConnection() {
+            log('Testing basic connection...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/health`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Connection successful: ${JSON.stringify(data)}`);
+                } else {
+                    log(`❌ Connection failed: ${response.status} - ${response.statusText}`);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function testCreateOrder() {
+            log('Creating test order...');
+            
+            const testOrder = {
+                customerId: 'CUST001',
+                merchantId: 'MER001',
+                items: [
+                    { name: 'Burger', price: 15.99, quantity: 1 },
+                    { name: 'Fries', price: 5.99, quantity: 1 }
+                ],
+                total: 21.98,
+                deliveryAddress: {
+                    street: '123 Test Street',
+                    city: 'Test City',
+                    zipCode: '12345'
+                }
+            };
+            
+            try {
+                // For testing, we'll just create a mock order ID
+                testOrderId = 'TEST_' + Date.now();
+                log(`✅ Test order created with ID: ${testOrderId}`);
+                log(`Order details: ${JSON.stringify(testOrder, null, 2)}`);
+            } catch (error) {
+                log(`❌ Error creating order: ${error.message}`);
+            }
+        }
+        
+        async function testSendToMerchant() {
+            if (!testOrderId) {
+                log('❌ Please create a test order first');
+                return;
+            }
+            
+            log(`Sending order ${testOrderId} to merchant...`);
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/send-order-to-merchant`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderId: testOrderId,
+                        merchantId: 'MER001',
+                        orderData: {
+                            customerId: 'CUST001',
+                            items: [
+                                { name: 'Burger', price: 15.99, quantity: 1 },
+                                { name: 'Fries', price: 5.99, quantity: 1 }
+                            ],
+                            total: 21.98,
+                            deliveryAddress: {
+                                street: '123 Test Street',
+                                city: 'Test City',
+                                zipCode: '12345'
+                            }
+                        }
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Order sent successfully: ${JSON.stringify(data, null, 2)}`);
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Failed to send order: ${response.status} - ${errorText}`);
+                }
+            } catch (error) {
+                log(`❌ Error sending to merchant: ${error.message}`);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded successfully');
+            log('Central Platform API: ' + API_BASE_URL);
+        });
+    </script>
+</body>
+</html>
