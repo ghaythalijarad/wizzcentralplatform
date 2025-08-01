@@ -172,6 +172,28 @@ exports.sendOrderToMerchant = async (event) => {
     await dynamodb.put(orderParams).promise();
     console.log('Order stored in Central Platform database');
 
+    // Trigger real-time notification to merchant app
+    try {
+      const { sendOrderNotification } = require('./realtime-notifications');
+      await sendOrderNotification({
+        orderId,
+        businessId,
+        customerId,
+        customerName,
+        customerPhone,
+        deliveryAddress,
+        items,
+        total: totalAmount,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        paymentMethod: 'cash'
+      });
+      console.log('✅ Real-time notification sent to merchant app');
+    } catch (notificationError) {
+      console.error('⚠️ Failed to send real-time notification:', notificationError.message);
+      // Don't fail the order creation if notification fails
+    }
+
     return successResponse({
       success: true,
       orderId,

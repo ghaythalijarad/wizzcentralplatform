@@ -683,6 +683,59 @@ functions:
           method: get
           cors: true
 
+  # Real-time WebSocket API functions
+  websocketConnect:
+    handler: src/handlers/websocket-connections.connect
+    events:
+      - websocket:
+          route: $connect
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  websocketDisconnect:
+    handler: src/handlers/websocket-connections.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  websocketDefault:
+    handler: src/handlers/websocket-connections.defaultHandler
+    events:
+      - websocket:
+          route: $default
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  # Real-time notification functions
+  sendOrderNotification:
+    handler: src/handlers/realtime-notifications.sendOrderNotification
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
+      ORDERS_TABLE: ${self:provider.environment.ORDERS_TABLE}
+
+  sendStatusUpdateNotification:
+    handler: src/handlers/realtime-notifications.sendStatusUpdateNotification
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
+
+  testNotification:
+    handler: src/handlers/realtime-notifications.testNotification
+    events:
+      - http:
+          path: /test-notification
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: ${self:provider.environment.COGNITO_USER_POOL_ARN}
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
 resources:
   Resources:
     CentralPromotionsTable:
@@ -721,3 +774,68 @@ resources:
             Projection:
               ProjectionType: ALL
         BillingMode: PAY_PER_REQUEST
+
+    WebSocketConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-websocket-connections-${self:provider.stage}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BusinessIdIndex
+            KeySchema:
+              - AttributeName: businessId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: orderId
+            AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: orderId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BusinessIdIndex
+            KeySchema:
+              - AttributeName: businessId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+  Outputs:
+    WebSocketEndpoint:
+      Description: "WebSocket API Gateway endpoint URL"
+      Value:
+        Fn::Join:
+          - ""
+          - - "wss://"
+            - Ref: "WebsocketsApi"
+            - ".execute-api."
+            - Ref: "AWS::Region"
+            - ".amazonaws.com/"
+            - ${self:provider.stage}
+    
+    OrdersTableStreamArn:
+      Description: "DynamoDB Orders Table Stream ARN"
+      Value:
+        Fn::GetAtt: [OrdersTable, StreamArn]
