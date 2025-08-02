@@ -864,8 +864,3 @@ resources:
       Description: "DynamoDB Orders Table Stream ARN"
       Value:
         Fn::GetAtt: [OrdersTable, StreamArn]
-
-# Reference the split files
-file(./serverless.orders.yml)
-file(./serverless.notifications.yml)
-file(./serverless.users.yml)
