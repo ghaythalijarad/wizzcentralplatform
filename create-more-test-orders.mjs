@@ -1,10 +1,17 @@
+// ⚠️  DEPRECATED: This test order simulator is no longer used
+// 🚀 The platform now processes REAL CUSTOMER ORDERS from the Flutter app
+// 📱 Use the customer app developed by your friend instead
+// 🔗 See REAL_ORDER_PROCESSING_GUIDE.md for the new API endpoints
+// 
+// This file has been kept for reference only and should not be executed
+//
 // Script to create additional test orders for notification testing
 // This creates more diverse orders to thoroughly test the Flutter app
 
 import fetch from 'node-fetch';
 
 const MERCHANT_API = 'https://72nmgq5rc4.execute-api.us-east-1.amazonaws.com/dev';
-const REAL_BUSINESS_ID = '7ccf646c-9594-48d4-8f63-c366d89257e5'; // Your actual business ID
+const REAL_BUSINESS_ID = '2e102ff3-72a2-4823-93b8-f975d915c82e'; // Your actual business ID
 
 async function createOrderForRealBusiness(customerName, customerPhone, items, totalAmount, customerEmail = null) {
     const orderId = `ORD_${Date.now()}_${Math.floor(Math.random() * 1000)}`;

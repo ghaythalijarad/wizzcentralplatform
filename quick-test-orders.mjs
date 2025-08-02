@@ -1,3 +1,10 @@
+// ⚠️  DEPRECATED: This test order simulator is no longer used
+// 🚀 The platform now processes REAL CUSTOMER ORDERS from the Flutter app
+// 📱 Use the customer app developed by your friend instead
+// 🔗 See REAL_ORDER_PROCESSING_GUIDE.md for the new API endpoints
+// 
+// This file has been kept for reference only and should not be executed
+//
 // Quick test order generator
 import fetch from 'node-fetch';
 

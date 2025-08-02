@@ -3,6 +3,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.dart_tool/
 
 # Runtime data
 pids
@@ -136,10 +137,29 @@ backend/api-url.txt
 *_fixed.*
 *_clean.*
 *_new.*
+*.backup
+*.mjs.backup
+*.js.backup
 
 # Test results
 test-results/
 coverage/
+
+# Test and temporary scripts
+another-single-order.mjs
+create-more-test-orders.mjs
+create-new-test-orders.mjs
+create-real-orders.mjs
+new-single-order.mjs
+quick-test-orders.mjs
+simple-order-test.mjs
+single-order-now.mjs
+single-test-order.mjs
+final-single-test-order.mjs
+check-notification-status.mjs
+notification-diagnostic.js
+test-customer-api.mjs
+create-order-for-your-business.mjs
 
 # Package lock files (optional - you can include these if you want)
 # package-lock.json
@@ -166,14 +186,3 @@ amplifytools.xcconfig
 .secret-*
 **.sample
 #amplify-do-not-edit-end
-
-# Ignore backup and duplicate JS files
-*.backup
-*-new.js
-
-# Ignore test HTML and JS files
-test-*.html
-test-*.js
-
-# Ignore generated package files
-package-gen*.json

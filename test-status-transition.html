@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Status Transition Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .log { background: #f5f5f5; padding: 10px; border-radius: 3px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 3px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        input, select { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Status Transition Fix Test</h1>
+        
+        <div class="test-section">
+            <h2>Authentication</h2>
+            <button class="btn-primary" onclick="testAuth()">Test Authentication</button>
+            <div id="authResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Merchant Lookup</h2>
+            <input type="text" id="merchantId" placeholder="Enter merchant ID" value="723a276a-ad62-482c-898c-076d1f8d5c0e">
+            <button class="btn-primary" onclick="lookupMerchant()">Lookup Merchant</button>
+            <div id="merchantResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Status Transition Test</h2>
+            <select id="action">
+                <option value="approve">Approve (approve -> approved)</option>
+                <option value="reject">Reject (reject -> rejected)</option>
+                <option value="suspend">Suspend (suspend -> suspended)</option>
+                <option value="review">Review (review -> under-review)</option>
+            </select>
+            <input type="text" id="reason" placeholder="Reason for status change" value="Testing status transition fix">
+            <button class="btn-success" onclick="testStatusTransition()">Test Status Transition</button>
+            <div id="statusResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Debug Logs</h2>
+            <div id="debugLogs" class="log"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        let authToken = null;
+        let currentMerchant = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const debugLogs = document.getElementById('debugLogs');
+            const logEntry = `[${timestamp}] ${message}\n`;
+            debugLogs.innerHTML += `<span class="${type}">${logEntry}</span>`;
+            debugLogs.scrollTop = debugLogs.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="log ${type}">${message}</div>`;
+        }
+
+        async function testAuth() {
+            log('🔐 Testing authentication...', 'info');
+            showResult('authResult', 'Testing authentication...');
+            
+            try {
+                // Try to get existing token from sessionStorage
+                authToken = sessionStorage.getItem('accessToken') || sessionStorage.getItem('idToken');
+                
+                if (authToken) {
+                    log('✅ Found existing auth token', 'success');
+                    showResult('authResult', '✅ Authentication successful (existing token)', 'success');
+                    return;
+                }
+
+                // If no token, prompt for login
+                const email = prompt('Enter email:') || 'ghaith.hallaheebi@gmail.com';
+                const password = prompt('Enter password:');
+                
+                if (!email || !password) {
+                    throw new Error('Email and password required');
+                }
+
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                log(`Login response: ${JSON.stringify(data)}`, 'info');
+
+                if (response.ok && data.tokens) {
+                    authToken = data.tokens.AccessToken || data.tokens.IdToken;
+                    sessionStorage.setItem('accessToken', authToken);
+                    log('✅ Authentication successful', 'success');
+                    showResult('authResult', '✅ Authentication successful', 'success');
+                } else {
+                    throw new Error(data.error || 'Login failed');
+                }
+            } catch (error) {
+                log(`❌ Authentication failed: ${error.message}`, 'error');
+                showResult('authResult', `❌ Authentication failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function lookupMerchant() {
+            const merchantId = document.getElementById('merchantId').value;
+            
+            if (!merchantId) {
+                showResult('merchantResult', '❌ Please enter a merchant ID', 'error');
+                return;
+            }
+
+            if (!authToken) {
+                showResult('merchantResult', '❌ Please authenticate first', 'error');
+                return;
+            }
+
+            log(`🔍 Looking up merchant: ${merchantId}`, 'info');
+            showResult('merchantResult', 'Looking up merchant...');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                log(`Merchant lookup response: ${JSON.stringify(data, null, 2)}`, 'info');
+
+                if (response.ok && data.merchant) {
+                    currentMerchant = data.merchant;
+                    const merchantInfo = `
+✅ Merchant found:
+- ID: ${data.merchant.businessId}
+- Name: ${data.merchant.businessName}
+- Current Status: ${data.merchant.status}
+- Email: ${data.merchant.email}
+                    `;
+                    showResult('merchantResult', merchantInfo, 'success');
+                    log(`✅ Merchant found with status: ${data.merchant.status}`, 'success');
+                } else {
+                    throw new Error(data.error || 'Merchant not found');
+                }
+            } catch (error) {
+                log(`❌ Merchant lookup failed: ${error.message}`, 'error');
+                showResult('merchantResult', `❌ Merchant lookup failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testStatusTransition() {
+            const merchantId = document.getElementById('merchantId').value;
+            const action = document.getElementById('action').value;
+            const reason = document.getElementById('reason').value;
+
+            if (!merchantId) {
+                showResult('statusResult', '❌ Please enter a merchant ID', 'error');
+                return;
+            }
+
+            if (!authToken) {
+                showResult('statusResult', '❌ Please authenticate first', 'error');
+                return;
+            }
+
+            if (!reason) {
+                showResult('statusResult', '❌ Please enter a reason', 'error');
+                return;
+            }
+
+            log(`🔄 Testing status transition: ${action} for merchant ${merchantId}`, 'info');
+            log(`Current merchant status: ${currentMerchant?.status || 'unknown'}`, 'info');
+            showResult('statusResult', 'Testing status transition...');
+
+            try {
+                const payload = {
+                    action: action,
+                    reason: reason,
+                    sendEmail: false
+                };
+
+                log(`Request payload: ${JSON.stringify(payload, null, 2)}`, 'info');
+
+                const response = await fetch(`${API_BASE_URL}/merchants/${merchantId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                log(`Status transition response (${response.status}): ${JSON.stringify(data, null, 2)}`, 'info');
+
+                if (response.ok) {
+                    const successMsg = `
+✅ Status transition successful!
+- Action: ${action}
+- Previous Status: ${currentMerchant?.status}
+- New Status: ${data.merchant?.status}
+- Reason: ${reason}
+                    `;
+                    showResult('statusResult', successMsg, 'success');
+                    log('✅ Status transition successful', 'success');
+                    
+                    // Update current merchant data
+                    if (data.merchant) {
+                        currentMerchant = data.merchant;
+                    }
+                } else {
+                    const errorMsg = data.error || data.message || 'Status transition failed';
+                    showResult('statusResult', `❌ Status transition failed: ${errorMsg}`, 'error');
+                    log(`❌ Status transition failed: ${errorMsg}`, 'error');
+                    
+                    // Log validation errors specifically
+                    if (data.errors && Array.isArray(data.errors)) {
+                        data.errors.forEach(error => {
+                            log(`Validation error: ${error.field} - ${error.message}`, 'error');
+                        });
+                    }
+                }
+            } catch (error) {
+                log(`❌ Network error during status transition: ${error.message}`, 'error');
+                showResult('statusResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-load if we have stored credentials
+        window.onload = function() {
+            log('🚀 Status transition test page loaded', 'info');
+            if (sessionStorage.getItem('accessToken')) {
+                log('Found existing auth token', 'info');
+                authToken = sessionStorage.getItem('accessToken');
+            }
+        };
+    </script>
+</body>
+</html>

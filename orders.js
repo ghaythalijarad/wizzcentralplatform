@@ -682,7 +682,7 @@ async function generateTestOrder() {
         // Create test order data
         const orderData = {
             orderId: orderId,
-            businessId: "7ccf646c-9594-48d4-8f63-c366d89257e5", // Real business ID from Flutter app
+            businessId: "2e102ff3-72a2-4823-93b8-f975d915c82e", // CORRECTED: Real business ID for Flutter app
             customerId: `CUST${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
             customerName: randomCustomer.name,
             customerPhone: randomCustomer.phone,

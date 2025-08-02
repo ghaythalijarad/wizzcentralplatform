@@ -400,7 +400,7 @@ window.WebSocketManager = WebSocketManager;
 document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('orders.html')) {
         // Initialize WebSocket for merchant real-time notifications
-        const businessId = '7ccf646c-9594-48d4-8f63-c366d89257e5'; // Your business ID
+        const businessId = '2e102ff3-72a2-4823-93b8-f975d915c82e'; // CORRECTED: Your actual business ID
         
         window.wsManager = new WebSocketManager();
         

@@ -39,7 +39,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class WebSocketService {
   static const String WS_URL = 'wss://your-websocket-api.execute-api.us-east-1.amazonaws.com/dev';
-  static const String BUSINESS_ID = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+  static const String BUSINESS_ID = '2e102ff3-72a2-4823-93b8-f975d915c82e';
   
   WebSocketChannel? _channel;
   StreamController<Map<String, dynamic>>? _messageController;
@@ -439,7 +439,7 @@ node create-real-orders.mjs
 ```dart
 class Config {
   static const String WEBSOCKET_URL = 'wss://your-websocket-api.execute-api.us-east-1.amazonaws.com/dev';
-  static const String BUSINESS_ID = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+  static const String BUSINESS_ID = '2e102ff3-72a2-4823-93b8-f975d915c82e';
   static const String API_BASE_URL = 'https://72nmgq5rc4.execute-api.us-east-1.amazonaws.com/dev';
 }
 ```
