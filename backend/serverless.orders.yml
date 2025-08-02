@@ -1,0 +1,6 @@
+# /Users/ghaythallaheebi/wizzcentralplatform/backend/serverless.orders.yml
+# This file contains all the resources related to the order-receiving service.
+# It is referenced by the main serverless.yml file.
+
+Resources:
+  # Add your order-receiving resources here

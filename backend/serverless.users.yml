@@ -1,0 +1,6 @@
+# /Users/ghaythallaheebi/wizzcentralplatform/backend/serverless.users.yml
+# This file contains all the resources related to the user management service.
+# It is referenced by the main serverless.yml file.
+
+Resources:
+  # Add your user management resources here

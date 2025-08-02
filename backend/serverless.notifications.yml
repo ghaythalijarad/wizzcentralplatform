@@ -1,0 +1,6 @@
+# /Users/ghaythallaheebi/wizzcentralplatform/backend/serverless.notifications.yml
+# This file contains all the resources related to the notification service.
+# It is referenced by the main serverless.yml file.
+
+Resources:
+  # Add your notification resources here

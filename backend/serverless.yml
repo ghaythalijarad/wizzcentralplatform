@@ -67,6 +67,31 @@ provider:
           Resource: "arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV"
 
 functions:
+  # Customer App Functions
+  listMerchants:
+    handler: src/handlers/customers.listMerchants
+    events:
+      - http:
+          path: merchants
+          method: get
+          cors: true
+  
+  getMerchantDetails:
+    handler: src/handlers/customers.getMerchantDetails
+    events:
+      - http:
+          path: merchants/{businessId}
+          method: get
+          cors: true
+
+  getMerchantProducts:
+    handler: src/handlers/customers.getMerchantProducts
+    events:
+      - http:
+          path: merchants/{businessId}/products
+          method: get
+          cors: true
+
   # Authentication Functions
   login:
     handler: src/handlers/auth.login
@@ -839,3 +864,8 @@ resources:
       Description: "DynamoDB Orders Table Stream ARN"
       Value:
         Fn::GetAtt: [OrdersTable, StreamArn]
+
+# Reference the split files
+file(./serverless.orders.yml)
+file(./serverless.notifications.yml)
+file(./serverless.users.yml)
