@@ -1,6 +1,234 @@
-# /Users/ghaythallaheebi/wizzcentralplatform/backend/serverless.notifications.yml
-# This file contains all the resources related to the notification service.
-# It is referenced by the main serverless.yml file.
+# Notifications and real-time communications
+service: wizzcentral-notifications
 
-Resources:
-  # Add your notification resources here
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    NOTIFICATIONS_TABLE: "wizzcentral-backend-notifications-${self:provider.stage}"
+    WEBSOCKET_CONNECTIONS_TABLE: "wizzcentral-backend-websocket-connections-${self:provider.stage}"
+    JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: 
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: 
+            - "arn:aws:execute-api:${self:provider.region}:*:*/@connections/*"
+
+functions:
+  # Notification Management
+  getUserNotifications:
+    handler: src/handlers/notifications.getUserNotifications
+    events:
+      - http:
+          path: api/users/{userId}/notifications
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  markNotificationRead:
+    handler: src/handlers/notifications.markNotificationRead
+    events:
+      - http:
+          path: api/notifications/{notificationId}/read
+          method: put
+          cors: true
+          authorizer: authorize
+          
+  markAllNotificationsRead:
+    handler: src/handlers/notifications.markAllNotificationsRead
+    events:
+      - http:
+          path: api/users/{userId}/notifications/read-all
+          method: put
+          cors: true
+          authorizer: authorize
+          
+  deleteNotification:
+    handler: src/handlers/notifications.deleteNotification
+    events:
+      - http:
+          path: api/notifications/{notificationId}
+          method: delete
+          cors: true
+          authorizer: authorize
+          
+  sendNotification:
+    handler: src/handlers/notifications.sendNotification
+    events:
+      - http:
+          path: api/notifications/send
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  getNotificationStats:
+    handler: src/handlers/notifications.getNotificationStats
+    events:
+      - http:
+          path: api/notifications/stats
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  acceptOrderAssignment:
+    handler: src/handlers/notifications.acceptOrderAssignment
+    events:
+      - http:
+          path: api/orders/{orderId}/accept-assignment
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  updateDeliveryStatus:
+    handler: src/handlers/notifications.updateDeliveryStatus
+    events:
+      - http:
+          path: api/orders/{orderId}/delivery-status
+          method: put
+          cors: true
+          authorizer: authorize
+
+  # Real-time WebSocket API functions
+  websocketConnect:
+    handler: src/handlers/websocket-connections.connect
+    events:
+      - websocket:
+          route: $connect
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  websocketDisconnect:
+    handler: src/handlers/websocket-connections.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  websocketDefault:
+    handler: src/handlers/websocket-connections.defaultHandler
+    events:
+      - websocket:
+          route: $default
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  # Real-time notification functions
+  sendOrderNotification:
+    handler: src/handlers/realtime-notifications.sendOrderNotification
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
+      ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
+
+  sendStatusUpdateNotification:
+    handler: src/handlers/realtime-notifications.sendStatusUpdateNotification
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
+
+  testNotification:
+    handler: src/handlers/realtime-notifications.testNotification
+    events:
+      - http:
+          path: /test-notification
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV
+    environment:
+      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+
+  # Authorization Function
+  authorize:
+    handler: src/handlers/auth.authorize
+
+resources:
+  Resources:
+    NotificationsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.NOTIFICATIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: notificationId
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: notificationId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserNotificationsIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+
+    WebSocketConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-websocket-connections-${self:provider.stage}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BusinessIdIndex
+            KeySchema:
+              - AttributeName: businessId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
+  Outputs:
+    WebSocketEndpoint:
+      Description: "WebSocket API Gateway endpoint URL"
+      Value:
+        Fn::Join:
+          - ""
+          - - "wss://"
+            - Ref: "WebsocketsApi"
+            - ".execute-api."
+            - Ref: "AWS::Region"
+            - ".amazonaws.com/"
+            - ${self:provider.stage}
+
+plugins:
+  - serverless-offline

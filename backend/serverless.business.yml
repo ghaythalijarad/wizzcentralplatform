@@ -1,0 +1,217 @@
+# Business services: Merchants, Customers, Drivers, Products
+service: wizzcentral-business
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
+    DRIVERS_TABLE: "wizzcentral-backend-drivers-${self:provider.stage}"
+    CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
+    JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: 
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+
+functions:
+  # Customer App Functions
+  listMerchants:
+    handler: src/handlers/customers.listMerchants
+    events:
+      - http:
+          path: merchants
+          method: get
+          cors: true
+  
+  getMerchantDetails:
+    handler: src/handlers/customers.getMerchantDetails
+    events:
+      - http:
+          path: merchants/{businessId}
+          method: get
+          cors: true
+
+  getMerchantProducts:
+    handler: src/handlers/customers.getMerchantProducts
+    events:
+      - http:
+          path: merchants/{businessId}/products
+          method: get
+          cors: true
+
+  # Merchant Management
+  getMerchants:
+    handler: src/handlers/merchants.getMerchants
+    events:
+      - http:
+          path: merchants
+          method: get
+          cors: true
+          
+  createMerchant:
+    handler: src/handlers/merchants.createMerchant
+    events:
+      - http:
+          path: merchants
+          method: post
+          cors: true
+          
+  getMerchant:
+    handler: src/handlers/merchants.getMerchant
+    events:
+      - http:
+          path: merchants/{merchantId}
+          method: get
+          cors: true
+          
+  updateMerchant:
+    handler: src/handlers/merchants.updateMerchant
+    events:
+      - http:
+          path: merchants/{merchantId}
+          method: put
+          cors: true
+          
+  updateMerchantStatus:
+    handler: src/handlers/merchants.updateMerchantStatus
+    events:
+      - http:
+          path: merchants/{merchantId}/status
+          method: patch
+          cors: true
+
+  # Product Management
+  getProductsByMerchant:
+    handler: src/handlers/products.getProductsByMerchant
+    events:
+      - http:
+          path: merchants/{merchantId}/products
+          method: get
+          cors: true
+
+  updateProduct:
+    handler: src/handlers/products.updateProduct
+    events:
+      - http:
+          path: merchants/{merchantId}/products/{productId}
+          method: put
+          cors: true
+
+  getCategories:
+    handler: src/handlers/products.getCategories
+    events:
+      - http:
+          path: categories
+          method: get
+          cors: true
+          
+  getProducts:
+    handler: src/handlers/products.getProducts
+    events:
+      - http:
+          path: products
+          method: get
+          cors: true
+          
+  getProduct:
+    handler: src/handlers/products.getProduct
+    events:
+      - http:
+          path: products/{productId}
+          method: get
+          cors: true
+
+  # Driver Management
+  getDrivers:
+    handler: src/handlers/drivers.getDrivers
+    events:
+      - http:
+          path: drivers
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  createDriver:
+    handler: src/handlers/drivers.createDriver
+    events:
+      - http:
+          path: drivers
+          method: post
+          cors: true
+          authorizer: authorize
+          
+  getDriver:
+    handler: src/handlers/drivers.getDriver
+    events:
+      - http:
+          path: drivers/{driverId}
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  updateDriver:
+    handler: src/handlers/drivers.updateDriver
+    events:
+      - http:
+          path: drivers/{driverId}
+          method: put
+          cors: true
+          authorizer: authorize
+
+  # Customer Management
+  getCustomers:
+    handler: src/handlers/customers.getCustomers
+    events:
+      - http:
+          path: customers
+          method: get
+          cors: true
+          authorizer: authorize
+          
+  getCustomer:
+    handler: src/handlers/customers.getCustomer
+    events:
+      - http:
+          path: customers/{customerId}
+          method: get
+          cors: true
+          authorizer: authorize
+
+  # Authorization Function
+  authorize:
+    handler: src/handlers/auth.authorize
+
+resources:
+  Resources:
+    DriversTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DRIVERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: driverId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: driverId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+plugins:
+  - serverless-offline
