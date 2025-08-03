@@ -1,0 +1,206 @@
+service: wizzcentral-websocket
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 30
+  
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    WEBSOCKET_CONNECTIONS_TABLE: "${self:service}-connections-${self:provider.stage}"
+    NOTIFICATIONS_TABLE: "${self:service}-notifications-${self:provider.stage}"
+    ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
+    MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
+    DRIVERS_TABLE: "wizzcentral-backend-drivers-${self:provider.stage}"
+    CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
+    JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
+    
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: 
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/order-receiver-*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/WizzUser_users_*"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/wizzcentral-backend-*"
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: 
+            - "arn:aws:execute-api:${self:provider.region}:*:*/@connections/*"
+
+functions:
+  # WebSocket Connection Management
+  websocketConnect:
+    handler: src/handlers/websocket-connections.connect
+    events:
+      - websocket:
+          route: $connect
+          
+  websocketDisconnect:
+    handler: src/handlers/websocket-connections.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+          
+  websocketDefault:
+    handler: src/handlers/websocket-connections.default
+    events:
+      - websocket:
+          route: $default
+
+  # Real-time Notification Functions
+  sendOrderNotification:
+    handler: src/handlers/websocket-connections.sendOrderNotification
+    events:
+      - http:
+          path: websocket/notify/order
+          method: post
+          cors: true
+
+  sendStatusUpdateNotification:
+    handler: src/handlers/websocket-connections.sendStatusUpdate
+    events:
+      - http:
+          path: websocket/notify/status
+          method: post
+          cors: true
+
+  # Real-time order updates for merchants
+  notifyMerchantNewOrder:
+    handler: src/handlers/merchant-realtime-notifications.notifyNewOrder
+    events:
+      - http:
+          path: merchant/notifications/new-order
+          method: post
+          cors: true
+
+  notifyMerchantOrderUpdate:
+    handler: src/handlers/merchant-realtime-notifications.notifyOrderUpdate
+    events:
+      - http:
+          path: merchant/notifications/order-update
+          method: post
+          cors: true
+
+resources:
+  Resources:
+    # WebSocket Connections Table
+    WebSocketConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.WEBSOCKET_CONNECTIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
+          - AttributeName: userType
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BusinessUserTypeIndex
+            KeySchema:
+              - AttributeName: businessId
+                KeyType: HASH
+              - AttributeName: userType
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+        BillingMode: PROVISIONED
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        SSESpecification:
+          SSEEnabled: true
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        Tags:
+          - Key: Environment
+            Value: ${self:provider.stage}
+          - Key: Service
+            Value: ${self:service}
+
+    # WebSocket Notifications Table
+    WebSocketNotificationsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.NOTIFICATIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: notificationId
+            AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
+          - AttributeName: timestamp
+            AttributeType: N
+        KeySchema:
+          - AttributeName: notificationId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: BusinessTimestampIndex
+            KeySchema:
+              - AttributeName: businessId
+                KeyType: HASH
+              - AttributeName: timestamp
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+        BillingMode: PROVISIONED
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        Tags:
+          - Key: Environment
+            Value: ${self:provider.stage}
+          - Key: Service
+            Value: ${self:service}
+
+  Outputs:
+    WebSocketApiId:
+      Description: WebSocket API ID
+      Value:
+        Ref: WebsocketsApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-websocket-api-id
+        
+    WebSocketApiEndpoint:
+      Description: WebSocket API Endpoint
+      Value: 
+        Fn::Join:
+          - ""
+          - - "wss://"
+            - Ref: WebsocketsApi
+            - ".execute-api."
+            - ${self:provider.region}
+            - ".amazonaws.com/"
+            - ${self:provider.stage}
+      Export:
+        Name: ${self:service}-${self:provider.stage}-websocket-endpoint
+
+plugins:
+  - serverless-offline

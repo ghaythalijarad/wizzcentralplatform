@@ -15,7 +15,7 @@ class WizzCentralConfig {
   
   // 🌐 API ENDPOINTS (Production Ready)
   static const String API_BASE_URL = 'https://72nmgq5rc4.execute-api.us-east-1.amazonaws.com/dev';
-  static const String WEBSOCKET_URL = 'wss://your-websocket-api.execute-api.us-east-1.amazonaws.com/dev';
+  static const String WEBSOCKET_URL = 'wss://blh9qss3kf.execute-api.us-east-1.amazonaws.com/dev';
   static const String STAGE = 'dev';
   
   // 🔐 AUTHENTICATION

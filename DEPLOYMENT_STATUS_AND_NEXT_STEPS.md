@@ -43,10 +43,14 @@ WebSocket Functions:
 
 ### **WebSocket Endpoint**
 ```
-Primary Endpoint: wss://8yn5wr533l.execute-api.us-east-1.amazonaws.com/dev
-Secondary Endpoint: wss://ujyixy3uh5.execute-api.us-east-1.amazonaws.com/dev
-Status: DEPLOYED ✅ (Multiple endpoints available)
+Primary Endpoint: wss://blh9qss3kf.execute-api.us-east-1.amazonaws.com/dev
+Status: DEPLOYED ✅ (Successfully deployed with dedicated stack)
 Handler: src/handlers/websocket-connections.js ✅
+REST API Endpoints:
+  - POST https://oqb39yuen4.execute-api.us-east-1.amazonaws.com/dev/websocket/notify/order
+  - POST https://oqb39yuen4.execute-api.us-east-1.amazonaws.com/dev/websocket/notify/status
+  - POST https://oqb39yuen4.execute-api.us-east-1.amazonaws.com/dev/merchant/notifications/new-order
+  - POST https://oqb39yuen4.execute-api.us-east-1.amazonaws.com/dev/merchant/notifications/order-update
 ```
 
 ---
