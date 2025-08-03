@@ -64,9 +64,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initializeOrdersManagement() {
     showLoader(true, 'Fetching orders...');
     try {
-        // Use centralized AWS utilities
-        const dynamoDB = await AWSUtils.getDynamoDBClient();
-        await loadOrdersFromDynamoDB(dynamoDB);
+        // Use backend API instead of direct DynamoDB access
+        await loadOrdersFromBackend();
         hideMessage();
     } catch (error) {
         console.error('Error loading orders:', error);
@@ -80,22 +79,62 @@ async function initializeOrdersManagement() {
     }
 }
 
-// Load from DynamoDB
+// Load from Backend API instead of direct DynamoDB access
+async function loadOrdersFromBackend() {
+    console.log('Loading orders from backend API...');
+    
+    try {
+        // Get the API base URL from config
+        const API_BASE_URL = window.WIZZCENTRAL_CONFIG?.API_BASE_URL || 'https://9lqviiloy8.execute-api.us-east-1.amazonaws.com/dev';
+        
+        // Make API call to list orders
+        const response = await fetch(`${API_BASE_URL}/orders`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${sessionStorage.getItem('idToken') || ''}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Backend API response:', result);
+        
+        // Handle different response formats
+        const orders = result.orders || result.data?.orders || result.Items || [];
+        
+        ordersData = orders.map(item => ({
+            orderId: item.orderId,
+            customerId: item.customerId,
+            merchantId: item.merchantId,
+            driverId: item.driverId || 'N/A',
+            status: item.status || 'unknown',
+            total: item.total != null ? `$${parseFloat(item.total).toFixed(2)}` : 'N/A',
+            date: formatDate(item.createdAt),
+            fullData: item
+        }));
+        
+        console.log(`✅ Loaded ${ordersData.length} orders from backend API`);
+        
+    } catch (error) {
+        console.error('❌ Error loading orders from backend:', error);
+        
+        // Show user-friendly error message
+        showMessage(`Failed to load orders: ${error.message}. Showing sample data.`, 'error');
+        
+        // Fall back to sample data
+        ordersData = getSampleOrdersData();
+        console.log('Using sample data fallback');
+    }
+}
+
+// Load from DynamoDB (kept for backward compatibility, but not used)
 async function loadOrdersFromDynamoDB(dynamoDB) {
-    if (!dynamoDB) throw new Error('DynamoDB client not initialized');
-    const params = { TableName: ORDERS_TABLE };
-    const result = await dynamoDB.scan(params).promise();
-    ordersData = (result.Items || []).map(item => ({
-        orderId: item.orderId,
-        customerId: item.customerId,
-        merchantId: item.merchantId,
-        driverId: item.driverId || 'N/A',
-        status: item.status || 'unknown',
-        total: item.total != null ? `$${item.total.toFixed(2)}` : 'N/A',
-        date: formatDate(item.createdAt),
-        fullData: item
-    }));
-    console.log(`Loaded ${ordersData.length} orders`);
+    console.warn('Direct DynamoDB access deprecated - using backend API instead');
+    await loadOrdersFromBackend();
 }
 
 // Sample fallback
@@ -422,8 +461,8 @@ async function refreshOrdersData(showLoading = true) {
     if (showLoading) showLoader(true,'Refreshing orders...');
     
     try { 
-        const dynamoDB = await AWSUtils.getDynamoDBClient();
-        await loadOrdersFromDynamoDB(dynamoDB); 
+        await loadOrdersFromBackend(); 
+        filteredOrders = [...ordersData];
         renderOrdersTable(); 
         if (showLoading) hideMessage(); 
         updateLastUpdateTime();
