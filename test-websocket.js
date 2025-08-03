@@ -1,4 +1,4 @@
-const WebSocket = require('ws');
+import WebSocket from 'ws';
 
 // Test WebSocket connection
 const WEBSOCKET_URL = 'wss://blh9qss3kf.execute-api.us-east-1.amazonaws.com/dev';
