@@ -1,10 +1,14 @@
 const path = require('path');
 
 module.exports = {
-  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
   target: 'node',
-  optimization: {
-    minimize: false
+  mode: 'production',
+  entry: './src/handlers/amazon-connect-enhanced.js',
+  externals: {
+    'aws-sdk': 'aws-sdk'
+  },
+  resolve: {
+    extensions: ['.js', '.json']
   },
   module: {
     rules: [
@@ -20,15 +24,9 @@ module.exports = {
       }
     ]
   },
-  resolve: {
-    extensions: ['.js', '.json']
-  },
-  externals: {
-    'aws-sdk': 'aws-sdk',
-    '@aws-sdk/client-dynamodb': '@aws-sdk/client-dynamodb',
-    '@aws-sdk/lib-dynamodb': '@aws-sdk/lib-dynamodb',
-    '@aws-sdk/client-ses': '@aws-sdk/client-ses',
-    '@aws-sdk/client-cognito-identity-provider': '@aws-sdk/client-cognito-identity-provider'
+  output: {
+    libraryTarget: 'commonjs',
+    path: path.resolve(__dirname, '.webpack'),
+    filename: '[name].js'
   }
-};
 };

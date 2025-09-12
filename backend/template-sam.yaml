@@ -1,0 +1,188 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: WizzCentral WebSocket Chat - SAM Template
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+  DeploymentRegion:
+    Type: String
+    Default: us-east-1
+
+# Remove Globals with !Ref in env to avoid SAM CLI parsing bug
+Globals: {}
+
+Resources:
+  # ---------------------------
+  # Lambda Functions
+  # ---------------------------
+  WebSocketHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/websocket-handler/
+      Handler: index.handler
+      Runtime: nodejs18.x
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          WEBSOCKET_CONNECTIONS_TABLE: !Sub websocket-connections-${StageName}
+          CHAT_SESSIONS_TABLE: !Sub chat-sessions-${StageName}
+          CHAT_MESSAGES_TABLE: !Sub chat-messages-${StageName}
+          STAGE: !Ref StageName
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub websocket-connections-${StageName}
+        - DynamoDBCrudPolicy:
+            TableName: !Sub chat-sessions-${StageName}
+        - DynamoDBCrudPolicy:
+            TableName: !Sub chat-messages-${StageName}
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/@connections/*
+
+  ChatBridgeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/chat-bridge/
+      Handler: index.sendChatMessage
+      Runtime: nodejs18.x
+      MemorySize: 512
+      Timeout: 29
+      Environment:
+        Variables:
+          CHAT_SESSIONS_TABLE: !Sub chat-sessions-${StageName}
+          CHAT_MESSAGES_TABLE: !Sub chat-messages-${StageName}
+          STAGE: !Ref StageName
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Sub chat-sessions-${StageName}
+        - DynamoDBCrudPolicy:
+            TableName: !Sub chat-messages-${StageName}
+        - Statement:
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/@connections/*
+      Events:
+        ChatSend:
+            Type: HttpApi
+            Properties:
+              ApiId: !Ref HttpApi
+              Path: /chat/send
+              Method: POST
+
+  # ---------------------------
+  # API Gateway WebSocket
+  # ---------------------------
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub wizzcentral-websocket-${StageName}
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  WebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: !Ref StageName
+      AutoDeploy: true
+
+  WebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${WebSocketHandler.Arn}/invocations
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  ChatDriverConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat_driver_connect
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  ChatAgentConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat_agent_connect
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  ChatMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat_message
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  ChatTypingRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat_typing
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  ChatSessionCloseRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: chat_session_close
+      Target: !Sub integrations/${WebSocketIntegration}
+
+  AllowInvokeWebSocketHandler:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref WebSocketHandler
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  # ---------------------------
+  # HTTP API (for ChatBridge)
+  # ---------------------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+
+  # ---------------------------
+  # DynamoDB Tables
+  # ---------------------------
+  # NOTE: Existing tables are managed by another stack (wizzcentral-websocket-dev).
+  # We reference them by name and do NOT create them here to avoid conflicts.
+
+Outputs:
+  WebSocketUrl:
+    Description: WebSocket endpoint URL
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  WebSocketApiId:
+    Description: API ID of the WebSocket API
+    Value: !Ref WebSocketApi

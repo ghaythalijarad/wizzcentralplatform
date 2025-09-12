@@ -1,75 +1,102 @@
 // Centralized Authentication Utilities for WizzCentral Platform
 console.log('Loading auth-utils.js...');
 
-window.Auth = {
-    // Check if user is authenticated
-    requireAuthentication() {
-        const idToken = sessionStorage.getItem('idToken');
-        const accessToken = sessionStorage.getItem('accessToken');
-        
-        if (!idToken || !accessToken) {
-            console.warn('No authentication tokens found, redirecting to login');
-            window.location.href = 'index.html';
-            return false;
-        }
-        
-        // Validate token expiration
-        if (idToken) {
-            try {
-                const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
-                const currentTime = Math.floor(Date.now() / 1000);
-                
-                if (tokenPayload.exp && tokenPayload.exp < currentTime) {
-                    console.warn('Authentication token has expired. Redirecting to login.');
+console.log('Legacy root auth-utils.js loaded (compat layer)');
+if (!window.Auth || !window.Auth.getPostLoginRedirectUrl) {
+    console.log('Activating legacy Auth only because modern Auth not present');
+    window.Auth = {
+        // Check if user is authenticated
+        requireAuthentication() {
+            // Check for multiple possible token storage patterns
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            const userEmail = sessionStorage.getItem('userEmail');
+            const userId = sessionStorage.getItem('userId');
+            const idToken = sessionStorage.getItem('idToken');
+            const accessToken = sessionStorage.getItem('accessToken');
+
+            // Check if user is marked as authenticated with basic info
+            if (isAuthenticated === 'true' && userEmail && userId) {
+                console.log('Authentication check passed (basic auth)');
+                return true;
+            }
+
+            // Check for full token-based authentication
+            if (idToken && accessToken) {
+                // Validate token expiration
+                try {
+                    const tokenPayload = JSON.parse(atob(idToken.split('.')[1]));
+                    const currentTime = Math.floor(Date.now() / 1000);
+
+                    if (tokenPayload.exp && tokenPayload.exp < currentTime) {
+                        console.warn('Authentication token has expired. Redirecting to login.');
+                        sessionStorage.clear();
+                        window.location.href = window.location.origin + '/frontend/index.html';
+                        return false;
+                    }
+                    console.log('Authentication check passed (token-based auth)');
+                    return true;
+                } catch (error) {
+                    console.error('Invalid token format. Redirecting to login.');
                     sessionStorage.clear();
-                    window.location.href = 'index.html';
+                    window.location.href = window.location.origin + '/frontend/index.html';
                     return false;
                 }
+            }
+
+            console.warn('No valid authentication found, redirecting to login');
+            window.location.href = window.location.origin + '/frontend/index.html';
+            return false;
+        },
+
+        // Store authentication tokens
+        setToken(key, value) {
+            sessionStorage.setItem(key, value);
+        },
+
+        // Get authentication token
+        getToken(key) {
+            return sessionStorage.getItem(key);
+        },
+
+        // Clear all authentication tokens
+        clearTokens() {
+            sessionStorage.clear();
+            localStorage.removeItem('rememberLogin');
+            localStorage.removeItem('lastEmail');
+        },
+
+        // Global logout function
+        logout: async () => {
+            try {
+                if (typeof AWS !== 'undefined' && AWS.config && AWS.config.credentials) {
+                    AWS.config.credentials.clearCachedId();
+                }
+                Auth.clearTokens();
+                window.location.href = window.location.origin + '/frontend/index.html';
             } catch (error) {
-                console.error('Invalid token format. Redirecting to login.');
-                sessionStorage.clear();
-                window.location.href = 'index.html';
-                return false;
+                console.error('Logout error:', error);
+                window.location.href = window.location.origin + '/frontend/index.html';
             }
         }
-        
-        console.log('Authentication check passed');
-        return true;
-    },
+    };
 
-    // Store authentication tokens
-    setToken(key, value) {
-        sessionStorage.setItem(key, value);
-    },
+    // Set global logout function
+    window.logout = Auth.logout;
 
-    // Get authentication token
-    getToken(key) {
-        return sessionStorage.getItem(key);
-    },
+    // Automatically check authentication on dashboard pages
+    document.addEventListener('DOMContentLoaded', function () {
+        // Only run authentication check on dashboard pages
+        const isDashboardPage = document.body.dataset.page === 'dashboard' ||
+            window.location.pathname.includes('dashboard') ||
+            document.title.toLowerCase().includes('dashboard');
 
-    // Clear all authentication tokens
-    clearTokens() {
-        sessionStorage.clear();
-        localStorage.removeItem('rememberLogin');
-        localStorage.removeItem('lastEmail');
-    },
-
-    // Global logout function
-    logout: async () => {
-        try {
-            if (typeof AWS !== 'undefined' && AWS.config && AWS.config.credentials) {
-                AWS.config.credentials.clearCachedId();
-            }
-            Auth.clearTokens();
-            window.location.href = 'index.html';
-        } catch (error) {
-            console.error('Logout error:', error);
-            window.location.href = 'index.html';
+        if (isDashboardPage) {
+            console.log('Dashboard page detected, checking authentication...');
+            Auth.requireAuthentication();
         }
-    }
-};
+    });
 
-// Set global logout function
-window.logout = Auth.logout;
-
-console.log('Auth utilities loaded successfully');
+    console.log('Auth utilities loaded successfully');
+} else {
+    console.log('Modern Auth utilities already present - skipping legacy Auth override');
+}

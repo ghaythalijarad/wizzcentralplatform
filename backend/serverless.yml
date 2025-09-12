@@ -1,4 +1,4 @@
-service: wizzcentral-backend
+service: wizzcentral-chat-bridge
 
 provider:
   name: aws
@@ -6,861 +6,136 @@ provider:
   region: us-east-1
   stage: ${opt:stage, 'dev'}
   memorySize: 256
-  timeout: 30
   
   environment:
     STAGE: ${self:provider.stage}
-    REGION: ${self:provider.region}
-    USERS_TABLE: "WizzUser_users_${self:provider.stage}"
-    MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
-    DRIVERS_TABLE: "${self:service}-drivers-${self:provider.stage}"
-    CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
-    ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
-    PROMOTIONS_TABLE: "WizzCentral_promotions-${self:provider.stage}"
-    PROMOTION_USAGE_TABLE: "${self:service}-promotion-usage-${self:provider.stage}"
-    SUPPORT_TICKETS_TABLE: "${self:service}-support-tickets-${self:provider.stage}"
-    FAQS_TABLE: "${self:service}-faqs-${self:provider.stage}"
-    KNOWLEDGE_BASE_TABLE: "${self:service}-knowledge-base-${self:provider.stage}"
-    COGNITO_USER_POOL_ID: us-east-1_aX8X9oQTV
-    COGNITO_USER_POOL_ARN: arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV
-    COGNITO_JWKS_URL: https://cognito-idp.us-east-1.amazonaws.com/us-east-1_aX8X9oQTV/.well-known/jwks.json
-    COGNITO_CLIENT_ID: 3u9frkvcn18lidj5dpm1a94mf2
-    COGNITO_CLIENT_SECRET: h017ovuq5gv490hgtisr9sj33gq2c3tlvubrutl2v6to765k6o
-    COGNITO_REGION: us-east-1
-    JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
-    NOTIFICATIONS_TABLE: "${self:service}-notifications-${self:provider.stage}"
-    
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-          Resource: 
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/order-receiver-discounts-dev"
-        - Effect: Allow
-          Action:
-            - ses:SendEmail
-            - ses:SendRawEmail
-          Resource: "*"
-        - Effect: Allow
-          Action:
-            - s3:GetObject
-            - s3:PutObject
-            - s3:DeleteObject
-          Resource: "arn:aws:s3:::wizzcentral-uploads-${self:provider.stage}/*"
-        - Effect: Allow
-          Action:
-            - cognito-idp:AdminGetUser
-            - cognito-idp:AdminCreateUser
-            - cognito-idp:AdminUpdateUserAttributes
-            - cognito-idp:AdminSetUserPassword
-            - cognito-idp:AdminInitiateAuth
-            - cognito-idp:AdminRespondToAuthChallenge
-            - cognito-idp:ListUsers
-          Resource: "arn:aws:cognito-idp:us-east-1:109804294167:userpool/us-east-1_aX8X9oQTV"
+    WEBSOCKET_CONNECTIONS_TABLE: websocket-connections-${self:provider.stage}
+    CHAT_SESSIONS_TABLE: chat-sessions-${self:provider.stage}
+    WEBSOCKET_API_ENDPOINT: wss://3g9xqhaxic.execute-api.us-east-1.amazonaws.com/dev
+  
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - arn:aws:dynamodb:${self:provider.region}:*:table/websocket-connections-${self:provider.stage}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/websocket-connections-${self:provider.stage}/index/*
+        - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}/index/*
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource:
+        - arn:aws:execute-api:${self:provider.region}:*:*/dev/POST/@connections/*
+        - arn:aws:execute-api:${self:provider.region}:*:*/dev/DELETE/@connections/*
+
+package:
+  patterns:
+    - '!**/*'
+    - 'src/handlers/**'
+    - 'package.json'
+    - 'package-lock.json'
+    - 'node_modules/@aws-sdk/**'
+    - 'node_modules/@smithy/**'
+    - 'node_modules/@aws/**'
+    - 'node_modules/tslib/**'
 
 functions:
-  # Customer App Functions
-  listMerchants:
-    handler: src/handlers/customers.listMerchants
+  sendChatMessage:
+    handler: src/handlers/chat-bridge.sendChatMessage
+    description: "Bridge HTTP chat messages to WebSocket Live Chat interface"
+    timeout: 12
     events:
       - http:
-          path: merchants
-          method: get
-          cors: true
-  
-  getMerchantDetails:
-    handler: src/handlers/customers.getMerchantDetails
-    events:
-      - http:
-          path: merchants/{businessId}
-          method: get
-          cors: true
-
-  getMerchantProducts:
-    handler: src/handlers/customers.getMerchantProducts
-    events:
-      - http:
-          path: merchants/{businessId}/products
-          method: get
-          cors: true
-
-  # Authentication Functions
-  login:
-    handler: src/handlers/auth.login
-    events:
-      - http:
-          path: auth/login
+          path: api/chat/send
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
+      - http:
+          path: api/chat/send
+          method: options
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
 
-  getUser:
-    handler: src/handlers/auth.getUser
+  postAgentReply:
+    handler: src/handlers/chat-bridge.postAgentReply
+    description: "Agent reply -> store + broadcast"
+    timeout: 12
     events:
       - http:
-          path: auth/user
-          method: get
-          cors: true
-          
-  register:
-    handler: src/handlers/auth.register
-    events:
-      - http:
-          path: auth/register
+          path: api/chat/reply
           method: post
-          cors: true
-          
-  refreshToken:
-    handler: src/handlers/auth.refreshToken
-    events:
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
       - http:
-          path: auth/refresh
-          method: post
-          cors: true
-          
-  initiatePasswordReset:
-    handler: src/handlers/auth.initiatePasswordReset
-    events:
-      - http:
-          path: auth/forgot-password
-          method: post
-          cors: true
-          
-  confirmPasswordReset:
-    handler: src/handlers/auth.confirmPasswordReset
-    events:
-      - http:
-          path: auth/reset-password
-          method: post
-          cors: true
-          
-  changePassword:
-    handler: src/handlers/auth.changePassword
-    events:
-      - http:
-          path: auth/change-password
-          method: post
-          cors: true
-          authorizer: authorize
+          path: api/chat/reply
+          method: options
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
 
-  # User Management
-  getProfile:
-    handler: src/handlers/users.getProfile
+  getChatHistory:
+    handler: src/handlers/chat-bridge.getChatHistory
+    description: "Get chat history for debugging and support"
+    timeout: 12
     events:
       - http:
-          path: users/profile
+          path: api/chat/history
           method: get
-          cors: true
-          authorizer: authorize
-          
-  updateProfile:
-    handler: src/handlers/users.updateProfile
-    events:
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
       - http:
-          path: users/profile
-          method: put
-          cors: true
-          authorizer: authorize
-
-  # Merchant Management
-  getMerchants:
-    handler: src/handlers/merchants.getMerchants
-    events:
-      - http:
-          path: merchants
+          path: api/chat/history/{sessionId}
           method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  createMerchant:
-    handler: src/handlers/merchants.createMerchant
-    events:
-      - http:
-          path: merchants
-          method: post
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  getMerchant:
-    handler: src/handlers/merchants.getMerchant
-    events:
-      - http:
-          path: merchants/{merchantId}
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  updateMerchant:
-    handler: src/handlers/merchants.updateMerchant
-    events:
-      - http:
-          path: merchants/{merchantId}
-          method: put
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  updateMerchantStatus:
-    handler: src/handlers/merchants.updateMerchantStatus
-    events:
-      - http:
-          path: merchants/{merchantId}/status
-          method: patch
-          cors: true
-          # Temporarily remove authorizer for testing "Load failed" error
-          # authorizer: authorize
-
-  # Product Management
-  getProductsByMerchant:
-    handler: src/handlers/products.getProductsByMerchant
-    events:
-      - http:
-          path: merchants/{merchantId}/products
-          method: get
-          cors: true
-          # authorizer: authorize # Add auth later
-
-  updateProduct:
-    handler: src/handlers/products.updateProduct
-    events:
-      - http:
-          path: merchants/{merchantId}/products/{productId}
-          method: put
-          cors: true
-          # authorizer: authorize # Add auth later
-
-  # Driver Management
-  getDrivers:
-    handler: src/handlers/drivers.getDrivers
-    events:
-      - http:
-          path: drivers
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  createDriver:
-    handler: src/handlers/drivers.createDriver
-    events:
-      - http:
-          path: drivers
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getDriver:
-    handler: src/handlers/drivers.getDriver
-    events:
-      - http:
-          path: drivers/{driverId}
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  updateDriver:
-    handler: src/handlers/drivers.updateDriver
-    events:
-      - http:
-          path: drivers/{driverId}
-          method: put
-          cors: true
-          authorizer: authorize
-
-  # Customer Management
-  getCustomers:
-    handler: src/handlers/customers.getCustomers
-    events:
-      - http:
-          path: customers
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  getCustomer:
-    handler: src/handlers/customers.getCustomer
-    events:
-      - http:
-          path: customers/{customerId}
-          method: get
-          cors: true
-          authorizer: authorize
-
-  # Order Management
-  listOrders:
-    handler: src/handlers/orders.listOrders
-    events:
-      - http:
-          path: orders
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for frontend access
-          
-  createOrder:
-    handler: src/handlers/orders.createOrder
-    events:
-      - http:
-          path: orders
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getOrder:
-    handler: src/handlers/orders.getOrder
-    events:
-      - http:
-          path: orders/{orderId}
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for frontend access
-          
-  updateOrder:
-    handler: src/handlers/orders.updateOrder
-    events:
-      - http:
-          path: orders/{orderId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  cancelOrder:
-    handler: src/handlers/orders.cancelOrder
-    events:
-      - http:
-          path: orders/{orderId}/cancel
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getCustomerOrders:
-    handler: src/handlers/orders.getCustomerOrders
-    events:
-      - http:
-          path: customers/{customerId}/orders
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  getMerchantOrders:
-    handler: src/handlers/orders.getMerchantOrders
-    events:
-      - http:
-          path: merchants/{merchantId}/orders
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  getDriverOrders:
-    handler: src/handlers/orders.getDriverOrders
-    events:
-      - http:
-          path: drivers/{driverId}/orders
-          method: get
-          cors: true
-          authorizer: authorize
-
-  # Merchant Integration Endpoints
-  receiveStatusUpdate:
-    handler: src/handlers/merchant-integration.receiveStatusUpdate
-    events:
-      - http:
-          path: api/merchant-status-updates
-          method: post
-          cors: true
-          
-  sendOrderToMerchant:
-    handler: src/handlers/merchant-integration.sendOrderToMerchant
-    events:
-      - http:
-          path: api/send-order-to-merchant
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getOrderStatus:
-    handler: src/handlers/merchant-integration.getOrderStatus
-    events:
-      - http:
-          path: api/orders/{orderId}/status
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  getCustomerOrderHistory:
-    handler: src/handlers/merchant-integration.getCustomerOrderHistory
-    events:
-      - http:
-          path: api/customers/{customerId}/order-history
-          method: get
-          cors: true
-          authorizer: authorize
-
-  # Notification Management
-  getUserNotifications:
-    handler: src/handlers/notifications.getUserNotifications
-    events:
-      - http:
-          path: api/users/{userId}/notifications
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  markNotificationRead:
-    handler: src/handlers/notifications.markNotificationRead
-    events:
-      - http:
-          path: api/notifications/{notificationId}/read
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  markAllNotificationsRead:
-    handler: src/handlers/notifications.markAllNotificationsRead
-    events:
-      - http:
-          path: api/users/{userId}/notifications/read-all
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  deleteNotification:
-    handler: src/handlers/notifications.deleteNotification
-    events:
-      - http:
-          path: api/notifications/{notificationId}
-          method: delete
-          cors: true
-          authorizer: authorize
-          
-  sendNotification:
-    handler: src/handlers/notifications.sendNotification
-    events:
-      - http:
-          path: api/notifications/send
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getNotificationStats:
-    handler: src/handlers/notifications.getNotificationStats
-    events:
-      - http:
-          path: api/notifications/stats
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  acceptOrderAssignment:
-    handler: src/handlers/notifications.acceptOrderAssignment
-    events:
-      - http:
-          path: api/orders/{orderId}/accept-assignment
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  updateDeliveryStatus:
-    handler: src/handlers/notifications.updateDeliveryStatus
-    events:
-      - http:
-          path: api/orders/{orderId}/delivery-status
-          method: put
-          cors: true
-          authorizer: authorize
-
-  # Promotion Management
-  createPromotion:
-    handler: src/handlers/promotions.createPromotion
-    events:
-      - http:
-          path: promotions
-          method: post
-          cors: true
-          # authorizer: authorize
-  getPromotion:
-    handler: src/handlers/promotions.getPromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
-          method: get
-          cors: true
-          # authorizer: authorize
-  updatePromotion:
-    handler: src/handlers/promotions.updatePromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
-          method: put
-          cors: true
-          # authorizer: authorize
-  deletePromotion:
-    handler: src/handlers/promotions.deletePromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
-          method: delete
-          cors: true
-          # authorizer: authorize
-  listPromotions:
-    handler: src/handlers/promotions.listPromotions
-    events:
-      - http:
-          path: promotions
-          method: get
-          cors: true
-          # authorizer: authorize
-  validatePromotionCode:
-    handler: src/handlers/promotions.validatePromotionCode
-    events:
-      - http:
-          path: promotions/validate
-          method: post
-          cors: true
-          # authorizer: authorize
-
-  # Support Management - Tickets
-  listTickets:
-    handler: src/handlers/support.listTickets
-    events:
-      - http:
-          path: support/tickets
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  createTicket:
-    handler: src/handlers/support.createTicket
-    events:
-      - http:
-          path: support/tickets
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getTicket:
-    handler: src/handlers/support.getTicket
-    events:
-      - http:
-          path: support/tickets/{ticketId}
-          method: get
-          cors: true
-          authorizer: authorize
-          
-  updateTicket:
-    handler: src/handlers/support.updateTicket
-    events:
-      - http:
-          path: support/tickets/{ticketId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  addMessage:
-    handler: src/handlers/support.addMessage
-    events:
-      - http:
-          path: support/tickets/{ticketId}/messages
-          method: post
-          cors: true
-          authorizer: authorize
-
-  # Support Management - FAQs
-  listFAQs:
-    handler: src/handlers/support.listFAQs
-    events:
-      - http:
-          path: support/faqs
-          method: get
-          cors: true
-          
-  createFAQ:
-    handler: src/handlers/support.createFAQ
-    events:
-      - http:
-          path: support/faqs
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getFAQ:
-    handler: src/handlers/support.getFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: get
-          cors: true
-          
-  updateFAQ:
-    handler: src/handlers/support.updateFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  deleteFAQ:
-    handler: src/handlers/support.deleteFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: delete
-          cors: true
-          authorizer: authorize
-
-  # Support Management - Knowledge Base
-  listKnowledgeBase:
-    handler: src/handlers/support.listKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base
-          method: get
-          cors: true
-          
-  createKnowledgeBase:
-    handler: src/handlers/support.createKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getKnowledgeBase:
-    handler: src/handlers/support.getKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base/{articleId}
-          method: get
-          cors: true
-          
-  updateKnowledgeBase:
-    handler: src/handlers/support.updateKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base/{articleId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  deleteKnowledgeBase:
-    handler: src/handlers/support.deleteKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base/{articleId}
-          method: delete
-          cors: true
-          authorizer: authorize
-
-  # Product Management
-  getCategories:
-    handler: src/handlers/products.getCategories
-    events:
-      - http:
-          path: categories
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  getProducts:
-    handler: src/handlers/products.getProducts
-    events:
-      - http:
-          path: products
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-          
-  getProduct:
-    handler: src/handlers/products.getProduct
-    events:
-      - http:
-          path: products/{productId}
-          method: get
-          cors: true
-          # authorizer: authorize  # Temporarily disabled for testing
-
-  # Analytics & Dashboard
-  getDashboardStats:
-    handler: src/handlers/analytics.getDashboardStats
-    events:
-      - http:
-          path: analytics/dashboard
-          method: get
-          cors: true
-          authorizer: authorize
-
-  # Authorization Function
-  authorize:
-    handler: src/handlers/auth.authorize
-
-  # Hello World Function
-  hello:
-    handler: src/handlers/hello.hello
-    events:
-      - http:
-          path: hello
-          method: get
-          cors: true
-
-  # Real-time WebSocket API functions
-  websocketConnect:
-    handler: src/handlers/websocket-connections.connect
-    events:
-      - websocket:
-          route: $connect
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
-
-  websocketDisconnect:
-    handler: src/handlers/websocket-connections.disconnect
-    events:
-      - websocket:
-          route: $disconnect
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
-
-  websocketDefault:
-    handler: src/handlers/websocket-connections.defaultHandler
-    events:
-      - websocket:
-          route: $default
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
-
-  # Real-time notification functions
-  sendOrderNotification:
-    handler: src/handlers/realtime-notifications.sendOrderNotification
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
-      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
-      ORDERS_TABLE: ${self:provider.environment.ORDERS_TABLE}
-
-  sendStatusUpdateNotification:
-    handler: src/handlers/realtime-notifications.sendStatusUpdateNotification
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
-      NOTIFICATIONS_TABLE: ${self:provider.environment.NOTIFICATIONS_TABLE}
-
-  testNotification:
-    handler: src/handlers/realtime-notifications.testNotification
-    events:
-      - http:
-          path: /test-notification
-          method: post
-          cors: true
-          authorizer:
-            name: CognitoAuthorizer
-            type: COGNITO_USER_POOLS
-            arn: ${self:provider.environment.COGNITO_USER_POOL_ARN}
-    environment:
-      WEBSOCKET_CONNECTIONS_TABLE: ${self:service}-websocket-connections-${self:provider.stage}
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
 
 resources:
-  Resources:
-    CentralPromotionsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.PROMOTIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: promotionId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: promotionId
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-
-    NotificationsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.NOTIFICATIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: notificationId
-            AttributeType: S
-          - AttributeName: userId
-            AttributeType: S
-          - AttributeName: createdAt
-            AttributeType: S
-        KeySchema:
-          - AttributeName: notificationId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: UserNotificationsIndex
-            KeySchema:
-              - AttributeName: userId
-                KeyType: HASH
-              - AttributeName: createdAt
-                KeyType: RANGE
-            Projection:
-              ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-
-    WebSocketConnectionsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:service}-websocket-connections-${self:provider.stage}
-        AttributeDefinitions:
-          - AttributeName: connectionId
-            AttributeType: S
-          - AttributeName: businessId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: connectionId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: BusinessIdIndex
-            KeySchema:
-              - AttributeName: businessId
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-        TimeToLiveSpecification:
-          AttributeName: ttl
-          Enabled: true
-
-    OrdersTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.ORDERS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: orderId
-            AttributeType: S
-          - AttributeName: businessId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: orderId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: BusinessIdIndex
-            KeySchema:
-              - AttributeName: businessId
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-
   Outputs:
-    WebSocketEndpoint:
-      Description: "WebSocket API Gateway endpoint URL"
+    ChatBridgeApiEndpoint:
+      Description: "HTTP API endpoint for chat bridge"
       Value:
         Fn::Join:
           - ""
-          - - "wss://"
-            - Ref: "WebsocketsApi"
+          - - "https://"
+            - Ref: ApiGatewayRestApi
             - ".execute-api."
-            - Ref: "AWS::Region"
+            - ${self:provider.region}
             - ".amazonaws.com/"
             - ${self:provider.stage}
-    
-    OrdersTableStreamArn:
-      Description: "DynamoDB Orders Table Stream ARN"
-      Value:
-        Fn::GetAtt: [OrdersTable, StreamArn]
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 3001
+    host: 0.0.0.0

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Agent Live Chat Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            height: 90vh;
+        }
+        .connection-panel, .chat-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .connection-panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .connect-btn {
+            background: #28a745;
+            color: white;
+        }
+        .connect-btn:hover {
+            background: #1e7e34;
+        }
+        .disconnect-btn {
+            background: #dc3545;
+            color: white;
+        }
+        .disconnect-btn:hover {
+            background: #c82333;
+        }
+        .chat-messages {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-y: auto;
+            max-height: 60vh;
+            background: #fafafa;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .message.driver {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .message.agent {
+            background: #e8f5e8;
+            border-left: 4px solid #4caf50;
+        }
+        .message.system {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            font-style: italic;
+        }
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .message-time {
+            font-size: 11px;
+            color: #888;
+            float: right;
+        }
+        .log-panel {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        h1, h2, h3 {
+            color: #333;
+            margin-top: 0;
+        }
+        .active-sessions {
+            margin-top: 20px;
+        }
+        .session-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 3px solid #007bff;
+            cursor: pointer;
+        }
+        .session-item:hover {
+            background: #e9ecef;
+        }
+        .session-item.active {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center; color: #333;">🎧 Support Agent Live Chat Interface</h1>
+    
+    <div class="container">
+        <div class="connection-panel">
+            <h2>WebSocket Connection</h2>
+            
+            <div id="connectionStatus" class="status disconnected">
+                ❌ Disconnected
+            </div>
+            
+            <label for="wsEndpoint">WebSocket Endpoint:</label>
+            <input type="text" id="wsEndpoint" value="wss://lwk0wf6rpl.execute-api.us-east-1.amazonaws.com/dev">
+            
+            <button id="connectBtn" class="connect-btn">🔗 Connect as Support Agent</button>
+            <button id="disconnectBtn" class="disconnect-btn" style="display: none;">❌ Disconnect</button>
+            
+            <div class="active-sessions">
+                <h3>Active Chat Sessions</h3>
+                <div id="sessionsList">
+                    <p>No active sessions</p>
+                </div>
+            </div>
+            
+            <div class="log-panel">
+                <strong>Connection Log:</strong>
+                <div id="connectionLog"></div>
+            </div>
+        </div>
+        
+        <div class="chat-panel">
+            <h2>Live Chat Messages</h2>
+            <div id="chatMessages" class="chat-messages">
+                <div class="message system">
+                    <div class="message-header">
+                        System
+                        <span class="message-time">Now</span>
+                    </div>
+                    Connect to WebSocket to start receiving chat messages from drivers.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let activeSessions = new Map();
+
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const chatMessages = document.getElementById('chatMessages');
+        const connectionLog = document.getElementById('connectionLog');
+        const sessionsList = document.getElementById('sessionsList');
+        const wsEndpointInput = document.getElementById('wsEndpoint');
+
+        connectBtn.addEventListener('click', connectWebSocket);
+        disconnectBtn.addEventListener('click', disconnectWebSocket);
+
+        function connectWebSocket() {
+            const endpoint = wsEndpointInput.value.trim();
+            if (!endpoint) {
+                addLog('❌ Please enter a WebSocket endpoint');
+                return;
+            }
+
+            addLog(`🔄 Connecting to ${endpoint}...`);
+            updateConnectionStatus('connecting', '🔄 Connecting...');
+
+            try {
+                ws = new WebSocket(endpoint);
+
+                ws.onopen = function(event) {
+                    addLog('✅ WebSocket connected successfully');
+                    updateConnectionStatus('connected', '✅ Connected');
+                    isConnected = true;
+                    
+                    connectBtn.style.display = 'none';
+                    disconnectBtn.style.display = 'block';
+
+                    // Send registration message to identify as support agent
+                    const registerMessage = {
+                        action: 'register',
+                        userType: 'agent',
+                        agentId: 'support-agent-' + Date.now(),
+                        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    ws.send(JSON.stringify(registerMessage));
+                    addLog('📝 Registered as support agent');
+                    
+                    addSystemMessage('Connected to live chat system. Waiting for driver messages...');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        addLog(`📨 Received: ${JSON.stringify(data)}`);
+                        handleIncomingMessage(data);
+                    } catch (error) {
+                        addLog(`❌ Error parsing message: ${error.message}`);
+                        addSystemMessage(`Raw message received: ${event.data}`);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    addLog(`🔌 WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`);
+                    updateConnectionStatus('disconnected', '❌ Disconnected');
+                    isConnected = false;
+                    
+                    connectBtn.style.display = 'block';
+                    disconnectBtn.style.display = 'none';
+                    
+                    addSystemMessage('Disconnected from live chat system.');
+                };
+
+                ws.onerror = function(error) {
+                    addLog(`❌ WebSocket error: ${error.message || 'Unknown error'}`);
+                    updateConnectionStatus('disconnected', '❌ Connection Error');
+                };
+
+            } catch (error) {
+                addLog(`❌ Failed to create WebSocket: ${error.message}`);
+                updateConnectionStatus('disconnected', '❌ Connection Failed');
+            }
+        }
+
+        function disconnectWebSocket() {
+            if (ws && isConnected) {
+                ws.close();
+                addLog('🔌 Disconnecting WebSocket...');
+            }
+        }
+
+        function handleIncomingMessage(data) {
+            switch (data.type) {
+                case 'chat_message':
+                    handleChatMessage(data);
+                    break;
+                case 'session_update':
+                    handleSessionUpdate(data);
+                    break;
+                case 'connection_ack':
+                    addSystemMessage('Successfully registered as support agent');
+                    break;
+                default:
+                    addSystemMessage(`Received message type: ${data.type}`);
+                    break;
+            }
+        }
+
+        function handleChatMessage(data) {
+            const { sessionId, messageText, senderType, metadata } = data;
+            
+            // Update active sessions
+            if (!activeSessions.has(sessionId)) {
+                activeSessions.set(sessionId, {
+                    sessionId,
+                    driverName: metadata?.senderName || 'Unknown Driver',
+                    driverId: metadata?.senderId || 'unknown',
+                    lastMessage: new Date().toISOString()
+                });
+                updateSessionsList();
+            }
+
+            // Add message to chat
+            addChatMessage({
+                sessionId,
+                sender: metadata?.senderName || metadata?.senderId || 'Driver',
+                senderType: senderType || 'driver',
+                message: messageText,
+                timestamp: metadata?.timestamp || new Date().toISOString()
+            });
+        }
+
+        function handleSessionUpdate(data) {
+            addLog(`📋 Session update: ${JSON.stringify(data)}`);
+        }
+
+        function addChatMessage({ sessionId, sender, senderType, message, timestamp }) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${senderType}`;
+            
+            const time = new Date(timestamp).toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    ${sender} (${sessionId})
+                    <span class="message-time">${time}</span>
+                </div>
+                ${message}
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addSystemMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    System
+                    <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                </div>
+                ${message}
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function updateConnectionStatus(status, text) {
+            connectionStatus.className = `status ${status}`;
+            connectionStatus.textContent = text;
+        }
+
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${time}] ${message}`;
+            connectionLog.appendChild(logEntry);
+            connectionLog.scrollTop = connectionLog.scrollHeight;
+        }
+
+        function updateSessionsList() {
+            if (activeSessions.size === 0) {
+                sessionsList.innerHTML = '<p>No active sessions</p>';
+                return;
+            }
+
+            sessionsList.innerHTML = Array.from(activeSessions.values()).map(session => `
+                <div class="session-item" onclick="selectSession('${session.sessionId}')">
+                    <strong>${session.driverName}</strong> (${session.driverId})
+                    <br><small>Session: ${session.sessionId}</small>
+                    <br><small>Last: ${new Date(session.lastMessage).toLocaleTimeString()}</small>
+                </div>
+            `).join('');
+        }
+
+        function selectSession(sessionId) {
+            addLog(`📋 Selected session: ${sessionId}`);
+            // Here you could filter messages to show only this session
+        }
+
+        // Auto-load on page start
+        window.addEventListener('load', function() {
+            addLog('🚀 Support agent interface loaded');
+        });
+    </script>
+</body>
+</html>

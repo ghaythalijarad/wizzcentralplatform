@@ -48,12 +48,22 @@ window.AWSUtils = {
                 console.log('Loaded amplify_outputs.json from /amplify_outputs.json');
             } catch (e1) {
                 console.warn('Root amplify_outputs.json not found or failed, trying /frontend/amplify_outputs.json', e1);
-                const feResp = await fetch('/frontend/amplify_outputs.json');
-                if (!feResp.ok) {
-                    throw new Error(`Failed to fetch amplify_outputs.json: ${feResp.status}`);
+                try {
+                    const feResp = await fetch('/frontend/amplify_outputs.json');
+                    if (!feResp.ok) {
+                        throw new Error(`Failed to fetch amplify_outputs.json: ${feResp.status}`);
+                    }
+                    outputs = await feResp.json();
+                    console.log('Loaded amplify_outputs.json from /frontend/amplify_outputs.json');
+                } catch (e2) {
+                    console.warn('Both config paths failed, trying relative path');
+                    const relResp = await fetch('./amplify_outputs.json');
+                    if (!relResp.ok) {
+                        throw new Error(`Failed to fetch amplify_outputs.json from all paths: ${relResp.status}`);
+                    }
+                    outputs = await relResp.json();
+                    console.log('Loaded amplify_outputs.json from ./amplify_outputs.json');
                 }
-                outputs = await feResp.json();
-                console.log('Loaded amplify_outputs.json from /frontend/amplify_outputs.json');
             }
 
             const region = outputs?.auth?.aws_region || outputs?.data?.aws_region || outputs?.aws_region || 'us-east-1';

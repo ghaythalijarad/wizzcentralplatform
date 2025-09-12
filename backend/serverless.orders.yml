@@ -18,6 +18,14 @@ provider:
     DRIVERS_TABLE: "wizzcentral-backend-drivers-${self:provider.stage}"
     JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
     
+    # Cognito User Pool configuration for new AWS account
+    USER_POOL_ID: "us-east-1_Cp9YnOQWi"
+    USER_POOL_NAME: "wizzcentral"
+    USER_POOL_CLIENT_ID: "97sgkf07b6n8qeugfcsntbd8c"
+    
+    # SNS Topic ARN for order events
+    ORDER_EVENTS_TOPIC_ARN: !Ref OrderEventsTopic
+    
   iam:
     role:
       statements:
@@ -30,7 +38,19 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
           Resource: 
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+            - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/*"
+        - Effect: "Allow"
+          Action:
+            - "sns:Publish"
+          Resource:
+            - "arn:aws:sns:${self:provider.region}:${aws:accountId}:*"
+        - Effect: "Allow"
+          Action:
+            - "cognito-idp:AdminGetUser"
+            - "cognito-idp:AdminListGroupsForUser"
+            - "cognito-idp:GetUser"
+          Resource:
+            - "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/us-east-1_Cp9YnOQWi"
 
 functions:
   # Order Management
@@ -142,34 +162,28 @@ functions:
           cors: true
           authorizer: authorize
 
+  # NEW: Merchant Order Management Function
+  merchantOrderManagement:
+    handler: src/handlers/merchant-integration.merchantOrderManagement
+    events:
+      - http:
+          path: merchant/order/{orderId}/{action}
+          method: put
+          cors: true
+          authorizer: authorize
+
   # Authorization Function
   authorize:
     handler: src/handlers/auth.authorize
 
 resources:
   Resources:
-    OrdersTable:
-      Type: AWS::DynamoDB::Table
+    # SNS Topic for Order Events
+    OrderEventsTopic:
+      Type: AWS::SNS::Topic
       Properties:
-        TableName: ${self:provider.environment.ORDERS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: orderId
-            AttributeType: S
-          - AttributeName: businessId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: orderId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: BusinessIdIndex
-            KeySchema:
-              - AttributeName: businessId
-                KeyType: HASH
-            Projection:
-              ProjectionType: ALL
-        BillingMode: PAY_PER_REQUEST
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
+        TopicName: OrderEventsTopic
+        DisplayName: "Order Events Topic for WizzCentral Platform"
 
 plugins:
   - serverless-offline

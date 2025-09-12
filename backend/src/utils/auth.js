@@ -1,144 +1,107 @@
+/**
+ * Authentication utilities for JWT validation
+ */
+
 const { CognitoJwtVerifier } = require('aws-jwt-verify');
-const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
-const CLIENT_ID = process.env.COGNITO_CLIENT_ID;
-const JWT_SECRET = process.env.JWT_SECRET || 'wizzcentral-super-secret-key-2024';
+// Create a verifier for Cognito JWT tokens
+const verifier = CognitoJwtVerifier.create({
+    userPoolId: process.env.USER_POOL_ID,
+    tokenUse: "access",
+    clientId: null, // Allow any client ID
+});
 
-class AuthUtils {
-  constructor() {
-    // Initialize Cognito JWT verifier
-    this.accessTokenVerifier = CognitoJwtVerifier.create({
-      userPoolId: USER_POOL_ID,
-      tokenUse: 'access',
-      clientId: CLIENT_ID,
-    });
-
-    this.idTokenVerifier = CognitoJwtVerifier.create({
-      userPoolId: USER_POOL_ID,
-      tokenUse: 'id',
-      clientId: CLIENT_ID,
-    });
-  }
-
-  // Verify Cognito Access Token
-  async verifyAccessToken(token) {
+/**
+ * Validate JWT token from API Gateway event
+ * @param {Object} event - API Gateway event
+ * @returns {Object|null} User data if valid, null if invalid
+ */
+async function validateJWT(event) {
     try {
-      return await this.accessTokenVerifier.verify(token);
-    } catch (error) {
-      throw new Error('Invalid or expired access token');
-    }
-  }
+      // Get token from Authorization header
+      const authHeader = event.headers?.Authorization || event.headers?.authorization;
 
-  // Verify Cognito ID Token
-  async verifyIdToken(token) {
-    try {
-      return await this.idTokenVerifier.verify(token);
-    } catch (error) {
-      throw new Error('Invalid or expired ID token');
-    }
-  }
-
-  // Verify any Cognito token (tries both access and ID)
-  async verifyCognitoToken(token) {
-    try {
-      // Try access token first
-      return await this.verifyAccessToken(token);
-    } catch (error) {
-      try {
-        // Fallback to ID token
-        return await this.verifyIdToken(token);
-      } catch (idError) {
-        throw new Error('Invalid or expired token');
+      if (!authHeader) {
+          console.log('No Authorization header found');
+          return null;
       }
-    }
-  }
 
-  // Hash password (still useful for local storage or additional security)
-  async hashPassword(password) {
-    const saltRounds = 12;
-    return await bcrypt.hash(password, saltRounds);
-  }
+      const token = authHeader.replace('Bearer ', '');
 
-  // Compare password (still useful for local validation)
-  async comparePassword(password, hashedPassword) {
-    return await bcrypt.compare(password, hashedPassword);
-  }
+      if (!token) {
+          console.log('No token found in Authorization header');
+          return null;
+      }
 
-  // Extract token from Authorization header
-  extractTokenFromHeader(authHeader) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error('Invalid authorization header');
-    }
-    return authHeader.substring(7);
-  }
+      // Verify the Cognito JWT token
+      const payload = await verifier.verify(token);
 
-  // Extract token from event (API Gateway)
-  extractTokenFromEvent(event) {
-    const authHeader = event.headers?.Authorization || 
-                      event.headers?.authorization || 
-                      event.authorizationToken;
-    
-    if (!authHeader) {
-      throw new Error('No authorization header found');
-    }
+      console.log('JWT validation successful:', {
+          sub: payload.sub,
+          username: payload.username,
+          email: payload.email
+      });
 
-    return this.extractTokenFromHeader(authHeader);
-  }
-
-  // Generate policy for API Gateway authorizer
-  generatePolicy(principalId, effect, resource, context = {}) {
-    const authResponse = {
-      principalId
+      return {
+          userId: payload.sub,
+          username: payload.username,
+          email: payload.email,
+          groups: payload['cognito:groups'] || [],
+          ...payload
     };
 
-    if (effect && resource) {
-      const policyDocument = {
-        Version: '2012-10-17',
-        Statement: [
-          {
-            Action: 'execute-api:Invoke',
-            Effect: effect,
-            Resource: resource
-          }
-        ]
-      };
-      authResponse.policyDocument = policyDocument;
-    }
-
-    // Add context information
-    authResponse.context = context;
-
-    return authResponse;
-  }
-
-  // Validate user role
-  hasRole(userRole, requiredRoles) {
-    if (!Array.isArray(requiredRoles)) {
-      requiredRoles = [requiredRoles];
-    }
-    return requiredRoles.includes(userRole);
-  }
-
-  // Check if user has admin privileges
-  isAdmin(userRole) {
-    return userRole === 'admin' || userRole === 'super_admin';
-  }
-
-  // Check if user can access resource
-  canAccessResource(userRole, resourceOwner, userId) {
-    // Admin can access all resources
-    if (this.isAdmin(userRole)) {
-      return true;
-    }
-    
-    // User can access their own resources
-    if (resourceOwner === userId) {
-      return true;
-    }
-    
-    return false;
+  } catch (error) {
+      console.error('JWT validation failed:', error.message);
+      return null;
   }
 }
 
-module.exports = new AuthUtils();
+/**
+ * Generate a JWT token for internal service communication
+ * @param {Object} payload - Token payload
+ * @param {string} secret - JWT secret
+ * @param {string} expiresIn - Expiration time (e.g., '1h', '24h')
+ * @returns {string} JWT token
+ */
+function generateInternalJWT(payload, secret = process.env.JWT_SECRET, expiresIn = '1h') {
+    return jwt.sign(payload, secret, { expiresIn });
+}
+
+/**
+ * Verify internal JWT token
+ * @param {string} token - JWT token
+ * @param {string} secret - JWT secret
+ * @returns {Object|null} Decoded payload if valid, null if invalid
+ */
+function verifyInternalJWT(token, secret = process.env.JWT_SECRET) {
+    try {
+        return jwt.verify(token, secret);
+    } catch (error) {
+        console.error('Internal JWT verification failed:', error.message);
+        return null;
+  }
+}
+
+/**
+ * Extract user ID from event (either from JWT or path parameters)
+ * @param {Object} event - API Gateway event
+ * @returns {string|null} User ID if found
+ */
+async function extractUserId(event) {
+    // First try to get from JWT
+    const user = await validateJWT(event);
+    if (user) {
+        return user.userId;
+    }
+
+    // Fallback to path parameters
+    return event.pathParameters?.userId || null;
+}
+
+module.exports = {
+    validateJWT,
+    generateInternalJWT,
+    verifyInternalJWT,
+    extractUserId
+};

@@ -1,0 +1,8 @@
+{
+  "Variables": {
+    "WEBSOCKET_CONNECTIONS_TABLE": "websocket-connections-dev",
+    "STAGE": "dev",
+    "WEBSOCKET_API_ENDPOINT": "wss://lwk0wf6rpl.execute-api.us-east-1.amazonaws.com/dev",
+    "CHAT_SESSIONS_TABLE": "chat-sessions-dev"
+  }
+}

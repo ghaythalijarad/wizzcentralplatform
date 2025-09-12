@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Bridge Test - Driver Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .response.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .response.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .chat-history {
+            margin-top: 30px;
+            border-top: 2px solid #eee;
+            padding-top: 20px;
+        }
+        .session {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .message {
+            background: #e9ecef;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        #loadHistory {
+            background: #28a745;
+            margin-bottom: 20px;
+        }
+        #loadHistory:hover {
+            background: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 WhizzDriver Chat Bridge Test</h1>
+            <p>Test the HTTP to WebSocket chat bridge functionality</p>
+        </div>
+
+        <form id="chatForm">
+            <div class="form-group">
+                <label for="driverId">Driver ID:</label>
+                <input type="text" id="driverId" value="test-driver-001" required>
+            </div>
+
+            <div class="form-group">
+                <label for="driverName">Driver Name:</label>
+                <input type="text" id="driverName" value="Test Driver" required>
+            </div>
+
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea id="message" rows="4" placeholder="Type your support message here..." required></textarea>
+            </div>
+
+            <button type="submit">📨 Send Message to Support</button>
+        </form>
+
+        <div id="response" class="response" style="display: none;"></div>
+
+        <div class="chat-history">
+            <button id="loadHistory" type="button">📋 Load Chat History</button>
+            <div id="historyContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // API endpoints - update these to match your deployment
+        const CHAT_BRIDGE_API = 'https://ru65nhlwhc.execute-api.us-east-1.amazonaws.com/dev/api/chat/send';
+        const CHAT_HISTORY_API = 'https://ru65nhlwhc.execute-api.us-east-1.amazonaws.com/dev/api/chat/history';
+
+        document.getElementById('chatForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const driverId = document.getElementById('driverId').value;
+            const driverName = document.getElementById('driverName').value;
+            const message = document.getElementById('message').value;
+
+            const payload = {
+                message: message,
+                contentType: 'text/plain',
+                metadata: {
+                    senderId: driverId,
+                    senderType: 'driver',
+                    senderName: driverName,
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            try {
+                showResponse('Sending message...', false);
+                
+                const response = await fetch(CHAT_BRIDGE_API, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    showResponse(`✅ Message sent successfully!\n\nSession ID: ${result.sessionId}\nMessage ID: ${result.messageId}\nStatus: ${result.message}`, true);
+                    document.getElementById('message').value = ''; // Clear the message
+                } else {
+                    showResponse(`❌ Failed to send message:\n${result.error || 'Unknown error'}`, false);
+                }
+            } catch (error) {
+                showResponse(`❌ Network error:\n${error.message}`, false);
+            }
+        });
+
+        document.getElementById('loadHistory').addEventListener('click', async function() {
+            try {
+                showResponse('Loading chat history...', false);
+                
+                const response = await fetch(`${CHAT_HISTORY_API}?limit=10`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    displayChatHistory(result.sessions || []);
+                    showResponse(`✅ Loaded ${result.sessions?.length || 0} chat sessions`, true);
+                } else {
+                    showResponse(`❌ Failed to load history:\n${result.error || 'Unknown error'}`, false);
+                }
+            } catch (error) {
+                showResponse(`❌ Network error:\n${error.message}`, false);
+            }
+        });
+
+        function showResponse(text, isSuccess) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = text;
+            responseDiv.className = `response ${isSuccess ? 'success' : 'error'}`;
+            responseDiv.style.display = 'block';
+        }
+
+        function displayChatHistory(sessions) {
+            const container = document.getElementById('historyContainer');
+            
+            if (sessions.length === 0) {
+                container.innerHTML = '<p>No chat sessions found.</p>';
+                return;
+            }
+
+            container.innerHTML = sessions.map(session => `
+                <div class="session">
+                    <h4>🚗 ${session.driverName || 'Unknown Driver'} (${session.driverId})</h4>
+                    <p><strong>Session:</strong> ${session.sessionId}</p>
+                    <p><strong>Status:</strong> ${session.status}</p>
+                    <p><strong>Created:</strong> ${new Date(session.createdAt).toLocaleString()}</p>
+                    <p><strong>Last Message:</strong> ${new Date(session.lastMessageAt).toLocaleString()}</p>
+                    
+                    ${session.messages && session.messages.length > 0 ? `
+                        <h5>Messages (${session.messages.length}):</h5>
+                        ${session.messages.map(msg => `
+                            <div class="message">
+                                <strong>${msg.senderName || msg.senderId}:</strong> ${msg.text}
+                                <br><small>${new Date(msg.timestamp).toLocaleString()}</small>
+                            </div>
+                        `).join('')}
+                    ` : '<p><em>No messages in this session</em></p>'}
+                </div>
+            `).join('');
+        }
+
+        // Auto-load history on page load
+        window.addEventListener('load', function() {
+            document.getElementById('loadHistory').click();
+        });
+    </script>
+</body>
+</html>

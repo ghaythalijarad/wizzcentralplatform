@@ -5,202 +5,187 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   stage: ${opt:stage, 'dev'}
-  memorySize: 256
+  memorySize: 512
   timeout: 30
-  
   environment:
+    WEBSOCKET_CONNECTIONS_TABLE: websocket-connections-${self:provider.stage}
+    CHAT_SESSIONS_TABLE: chat-sessions-${self:provider.stage}
+    CHAT_MESSAGES_TABLE: chat-messages-${self:provider.stage}
+    WEBSOCKET_API_ENDPOINT: wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev
     STAGE: ${self:provider.stage}
-    REGION: ${self:provider.region}
-    WEBSOCKET_CONNECTIONS_TABLE: "${self:service}-connections-${self:provider.stage}"
-    NOTIFICATIONS_TABLE: "${self:service}-notifications-${self:provider.stage}"
-    ORDERS_TABLE: "order-receiver-orders-${self:provider.stage}"
-    MERCHANTS_TABLE: "order-receiver-businesses-${self:provider.stage}"
-    DRIVERS_TABLE: "wizzcentral-backend-drivers-${self:provider.stage}"
-    CUSTOMERS_TABLE: "WizzUser_users_${self:provider.stage}"
-    JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
-    
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
   iam:
     role:
       statements:
         - Effect: Allow
           Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
             - dynamodb:PutItem
+            - dynamodb:GetItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: 
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:service}-*"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/order-receiver-*"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/WizzUser_users_*"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/wizzcentral-backend-*"
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/websocket-connections-${self:provider.stage}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/websocket-connections-${self:provider.stage}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}/index/*
+            - arn:aws:dynamodb:${self:provider.region}:*:table/chat-messages-${self:provider.stage}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/chat-messages-${self:provider.stage}/index/*
         - Effect: Allow
           Action:
             - execute-api:ManageConnections
-          Resource: 
-            - "arn:aws:execute-api:${self:provider.region}:*:*/@connections/*"
+          Resource: arn:aws:execute-api:${self:provider.region}:*:*/*/@connections/*
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    target: node18
+    platform: node
+    concurrency: 10
+    external: ['aws-sdk']
+
+package:
+  individually: true
+  excludeDevDependencies: true
 
 functions:
-  # WebSocket Connection Management
   websocketConnect:
-    handler: src/handlers/websocket-connections.connect
+    handler: src/handlers/websocket-connections.handler
+    timeout: 10
     events:
       - websocket:
           route: $connect
-          
   websocketDisconnect:
-    handler: src/handlers/websocket-connections.disconnect
+    handler: src/handlers/websocket-connections.handler
+    timeout: 6
     events:
       - websocket:
           route: $disconnect
-          
   websocketDefault:
-    handler: src/handlers/websocket-connections.default
+    handler: src/handlers/websocket-connections.handler
+    timeout: 10
     events:
       - websocket:
           route: $default
-
-  # Real-time Notification Functions
-  sendOrderNotification:
-    handler: src/handlers/websocket-connections.sendOrderNotification
+  liveChatConnect:
+    handler: src/handlers/websocket-connections.handler
+    timeout: 12
+    events:
+      - websocket:
+          route: chat_driver_connect
+      - websocket:
+          route: chat_agent_connect
+  liveChatMessage:
+    handler: src/handlers/websocket-connections.handler
+    timeout: 12
+    events:
+      - websocket:
+          route: chat_message
+      - websocket:
+          route: chat_typing
+      - websocket:
+          route: chat_session_close
+  chatBridge:
+    handler: src/handlers/chat-bridge.sendChatMessage
+    timeout: 29
     events:
       - http:
-          path: websocket/notify/order
-          method: post
-          cors: true
-
-  sendStatusUpdateNotification:
-    handler: src/handlers/websocket-connections.sendStatusUpdate
-    events:
-      - http:
-          path: websocket/notify/status
-          method: post
-          cors: true
-
-  # Real-time order updates for merchants
-  notifyMerchantNewOrder:
-    handler: src/handlers/merchant-realtime-notifications.notifyNewOrder
-    events:
-      - http:
-          path: merchant/notifications/new-order
-          method: post
-          cors: true
-
-  notifyMerchantOrderUpdate:
-    handler: src/handlers/merchant-realtime-notifications.notifyOrderUpdate
-    events:
-      - http:
-          path: merchant/notifications/order-update
+          path: /chat/send
           method: post
           cors: true
 
 resources:
   Resources:
-    # WebSocket Connections Table
     WebSocketConnectionsTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.WEBSOCKET_CONNECTIONS_TABLE}
+        TableName: websocket-connections-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
         AttributeDefinitions:
           - AttributeName: connectionId
             AttributeType: S
-          - AttributeName: businessId
+          - AttributeName: userId
             AttributeType: S
           - AttributeName: userType
             AttributeType: S
+          - AttributeName: businessId
+            AttributeType: S
         KeySchema:
           - AttributeName: connectionId
             KeyType: HASH
         GlobalSecondaryIndexes:
-          - IndexName: BusinessUserTypeIndex
+          - IndexName: UserTypeIndex
             KeySchema:
-              - AttributeName: businessId
-                KeyType: HASH
               - AttributeName: userType
+                KeyType: HASH
+              - AttributeName: userId
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL
-            ProvisionedThroughput:
-              ReadCapacityUnits: 5
-              WriteCapacityUnits: 5
-        BillingMode: PROVISIONED
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
-        StreamSpecification:
-          StreamViewType: NEW_AND_OLD_IMAGES
-        SSESpecification:
-          SSEEnabled: true
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
-        Tags:
-          - Key: Environment
-            Value: ${self:provider.stage}
-          - Key: Service
-            Value: ${self:service}
-
-    # WebSocket Notifications Table
-    WebSocketNotificationsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.NOTIFICATIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: notificationId
-            AttributeType: S
-          - AttributeName: businessId
-            AttributeType: S
-          - AttributeName: timestamp
-            AttributeType: N
-        KeySchema:
-          - AttributeName: notificationId
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: BusinessTimestampIndex
+          - IndexName: BusinessIdIndex
             KeySchema:
               - AttributeName: businessId
                 KeyType: HASH
-              - AttributeName: timestamp
-                KeyType: RANGE
             Projection:
               ProjectionType: ALL
-            ProvisionedThroughput:
-              ReadCapacityUnits: 5
-              WriteCapacityUnits: 5
-        BillingMode: PROVISIONED
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
         TimeToLiveSpecification:
           AttributeName: ttl
           Enabled: true
-        Tags:
-          - Key: Environment
-            Value: ${self:provider.stage}
-          - Key: Service
-            Value: ${self:service}
-
-  Outputs:
-    WebSocketApiId:
-      Description: WebSocket API ID
-      Value:
-        Ref: WebsocketsApi
-      Export:
-        Name: ${self:service}-${self:provider.stage}-websocket-api-id
-        
-    WebSocketApiEndpoint:
-      Description: WebSocket API Endpoint
-      Value: 
-        Fn::Join:
-          - ""
-          - - "wss://"
-            - Ref: WebsocketsApi
-            - ".execute-api."
-            - ${self:provider.region}
-            - ".amazonaws.com/"
-            - ${self:provider.stage}
-      Export:
-        Name: ${self:service}-${self:provider.stage}-websocket-endpoint
+    ChatSessionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: chat-sessions-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: sessionId
+            AttributeType: S
+          - AttributeName: driverId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: sessionId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: DriverIdIndex
+            KeySchema:
+              - AttributeName: driverId
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+    ChatMessagesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: chat-messages-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: sessionId
+            AttributeType: S
+          - AttributeName: messageKey
+            AttributeType: S
+          - AttributeName: senderType
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: sessionId
+            KeyType: HASH
+          - AttributeName: messageKey
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: SenderIndex
+            KeySchema:
+              - AttributeName: senderType
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
 
 plugins:
+  - serverless-esbuild
   - serverless-offline

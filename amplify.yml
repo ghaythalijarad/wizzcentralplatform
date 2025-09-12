@@ -3,19 +3,30 @@ frontend:
   phases:
     preBuild:
       commands:
-        - echo "Installing dependencies..."
+        - echo "Starting build process..."
         - npm ci
     build:
       commands:
-        - echo "Building frontend..."
-        - echo "Frontend is static files, copying to build directory"
+        - echo "Building WizzCentral Platform..."
+        - echo "Cleaning build directory..."
+        - rm -rf dist/
         - mkdir -p dist
+        - echo "Copying frontend files directly to build root..."
         - cp -r frontend/* dist/
-        - cp index.html dist/ 2>/dev/null || true
-        - echo "Build completed"
+        - echo "Ensuring proper index.html at root..."
+        - cp frontend/index.html dist/index.html
+        - echo "Adding redirects configuration..."
+        - cp frontend/public/_redirects dist/_redirects 2>/dev/null || cp _redirects dist/_redirects 2>/dev/null || echo "No redirects file found"
+        - echo "Listing build contents..."
+        - ls -la dist/
+        - echo "Build completed successfully"
     postBuild:
       commands:
-        - echo "Post build completed"
+        - echo "Post-build validation..."
+        - test -f dist/index.html && echo "✅ index.html exists" || echo "❌ index.html missing"
+        - test -f dist/config.js && echo "✅ config.js exists" || echo "❌ config.js missing"
+        - test -d dist/pages && echo "✅ pages directory exists" || echo "❌ pages directory missing"
+        - echo "Post-build completed"
   artifacts:
     baseDirectory: dist
     files:

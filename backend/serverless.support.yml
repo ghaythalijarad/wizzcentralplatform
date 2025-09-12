@@ -1,4 +1,4 @@
-# Support and miscellaneous services
+# Support Center Service Configuration
 service: wizzcentral-support
 
 provider:
@@ -8,15 +8,17 @@ provider:
   stage: ${opt:stage, 'dev'}
   memorySize: 256
   timeout: 30
+  profile: wizz-drivers-ghayth-dev
   
   environment:
     STAGE: ${self:provider.stage}
     REGION: ${self:provider.region}
-    PROMOTIONS_TABLE: "WizzCentral_promotions-${self:provider.stage}"
-    PROMOTION_USAGE_TABLE: "wizzcentral-backend-promotion-usage-${self:provider.stage}"
-    SUPPORT_TICKETS_TABLE: "wizzcentral-backend-support-tickets-${self:provider.stage}"
-    FAQS_TABLE: "wizzcentral-backend-faqs-${self:provider.stage}"
-    KNOWLEDGE_BASE_TABLE: "wizzcentral-backend-knowledge-base-${self:provider.stage}"
+    TICKETS_TABLE: "wizzcentral-support-tickets-${self:provider.stage}"
+    FAQS_TABLE: "wizzcentral-support-faqs-${self:provider.stage}"
+    KNOWLEDGE_BASE_TABLE: "wizzcentral-support-knowledge-base-${self:provider.stage}"
+    CHAT_SESSIONS_TABLE: "chat-sessions-${self:provider.stage}"
+    WEBSOCKET_CONNECTIONS_TABLE: "websocket-connections-${self:provider.stage}"
+    WEBSOCKET_API_ENDPOINT: "wss://3g9xqhaxic.execute-api.us-east-1.amazonaws.com/dev"
     JWT_SECRET: ${env:JWT_SECRET, 'wizzcentral-super-secret-key-2024'}
     
   iam:
@@ -31,236 +33,91 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
           Resource: 
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+            - "arn:aws:dynamodb:*:*:table/wizzcentral-support-*"
+            - "arn:aws:dynamodb:*:*:table/chat-sessions-*"
+            - "arn:aws:dynamodb:*:*:table/websocket-connections-*"
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource: 
+            - "arn:aws:execute-api:*:*:*/dev/POST/@connections/*"
 
 functions:
-  # Promotion Management
-  createPromotion:
-    handler: src/handlers/promotions.createPromotion
+  # Support Ticket Management
+  getTickets:
+    handler: src/handlers/support.getTickets
     events:
       - http:
-          path: promotions
-          method: post
-          cors: true
-          
-  getPromotion:
-    handler: src/handlers/promotions.getPromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
+          path: api/support/tickets
           method: get
           cors: true
-          
-  updatePromotion:
-    handler: src/handlers/promotions.updatePromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
-          method: put
-          cors: true
-          
-  deletePromotion:
-    handler: src/handlers/promotions.deletePromotion
-    events:
-      - http:
-          path: promotions/{promotionId}
-          method: delete
-          cors: true
-          
-  listPromotions:
-    handler: src/handlers/promotions.listPromotions
-    events:
-      - http:
-          path: promotions
-          method: get
-          cors: true
-          
-  validatePromotionCode:
-    handler: src/handlers/promotions.validatePromotionCode
-    events:
-      - http:
-          path: promotions/validate
-          method: post
-          cors: true
-
-  # Support Management - Tickets
-  listTickets:
-    handler: src/handlers/support.listTickets
-    events:
-      - http:
-          path: support/tickets
-          method: get
-          cors: true
-          authorizer: authorize
           
   createTicket:
     handler: src/handlers/support.createTicket
     events:
       - http:
-          path: support/tickets
+          path: api/support/tickets
           method: post
           cors: true
-          authorizer: authorize
-          
-  getTicket:
-    handler: src/handlers/support.getTicket
-    events:
-      - http:
-          path: support/tickets/{ticketId}
-          method: get
-          cors: true
-          authorizer: authorize
           
   updateTicket:
     handler: src/handlers/support.updateTicket
     events:
       - http:
-          path: support/tickets/{ticketId}
+          path: api/support/tickets/{ticketId}
           method: put
           cors: true
-          authorizer: authorize
-          
-  addMessage:
-    handler: src/handlers/support.addMessage
-    events:
-      - http:
-          path: support/tickets/{ticketId}/messages
-          method: post
-          cors: true
-          authorizer: authorize
 
-  # Support Management - FAQs
-  listFAQs:
-    handler: src/handlers/support.listFAQs
+  # FAQ Management
+  getFAQs:
+    handler: src/handlers/support.getFAQs
     events:
       - http:
-          path: support/faqs
+          path: api/support/faqs
           method: get
           cors: true
-          
-  createFAQ:
-    handler: src/handlers/support.createFAQ
-    events:
-      - http:
-          path: support/faqs
-          method: post
-          cors: true
-          authorizer: authorize
-          
-  getFAQ:
-    handler: src/handlers/support.getFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: get
-          cors: true
-          
-  updateFAQ:
-    handler: src/handlers/support.updateFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  deleteFAQ:
-    handler: src/handlers/support.deleteFAQ
-    events:
-      - http:
-          path: support/faqs/{faqId}
-          method: delete
-          cors: true
-          authorizer: authorize
 
-  # Support Management - Knowledge Base
-  listKnowledgeBase:
-    handler: src/handlers/support.listKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base
-          method: get
-          cors: true
-          
-  createKnowledgeBase:
-    handler: src/handlers/support.createKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base
-          method: post
-          cors: true
-          authorizer: authorize
-          
+  # Knowledge Base Management
   getKnowledgeBase:
     handler: src/handlers/support.getKnowledgeBase
     events:
       - http:
-          path: support/knowledge-base/{articleId}
+          path: api/support/knowledge-base
           method: get
           cors: true
-          
-  updateKnowledgeBase:
-    handler: src/handlers/support.updateKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base/{articleId}
-          method: put
-          cors: true
-          authorizer: authorize
-          
-  deleteKnowledgeBase:
-    handler: src/handlers/support.deleteKnowledgeBase
-    events:
-      - http:
-          path: support/knowledge-base/{articleId}
-          method: delete
-          cors: true
-          authorizer: authorize
 
-  # Analytics & Dashboard
-  getDashboardStats:
-    handler: src/handlers/analytics.getDashboardStats
+  # Chat Bridge Functions
+  sendChatMessage:
+    handler: src/handlers/chat-bridge.sendChatMessage
     events:
       - http:
-          path: analytics/dashboard
+          path: chat/send
+          method: post
+          cors: true
+      - http:
+          path: chat/send
+          method: options
+          cors: true
+          
+  getChatHistory:
+    handler: src/handlers/chat-bridge.getChatHistory
+    events:
+      - http:
+          path: chat/history
           method: get
           cors: true
-          authorizer: authorize
-
-  # Authorization Function
-  authorize:
-    handler: src/handlers/auth.authorize
+      - http:
+          path: chat/history/{sessionId}
+          method: get
+          cors: true
 
 resources:
   Resources:
-    CentralPromotionsTable:
+    # Support Tickets Table
+    TicketsTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.PROMOTIONS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: promotionId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: promotionId
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-
-    PromotionUsageTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.PROMOTION_USAGE_TABLE}
-        AttributeDefinitions:
-          - AttributeName: usageId
-            AttributeType: S
-        KeySchema:
-          - AttributeName: usageId
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-
-    SupportTicketsTable:
-      Type: AWS::DynamoDB::Table
-      Properties:
-        TableName: ${self:provider.environment.SUPPORT_TICKETS_TABLE}
+        TableName: wizzcentral-support-tickets-${self:provider.stage}
         AttributeDefinitions:
           - AttributeName: ticketId
             AttributeType: S
@@ -268,11 +125,12 @@ resources:
           - AttributeName: ticketId
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-
+        
+    # FAQs Table
     FAQsTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.FAQS_TABLE}
+        TableName: wizzcentral-support-faqs-${self:provider.stage}
         AttributeDefinitions:
           - AttributeName: faqId
             AttributeType: S
@@ -280,11 +138,12 @@ resources:
           - AttributeName: faqId
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
-
+        
+    # Knowledge Base Table
     KnowledgeBaseTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: ${self:provider.environment.KNOWLEDGE_BASE_TABLE}
+        TableName: wizzcentral-support-knowledge-base-${self:provider.stage}
         AttributeDefinitions:
           - AttributeName: articleId
             AttributeType: S

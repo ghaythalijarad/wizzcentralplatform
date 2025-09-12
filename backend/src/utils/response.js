@@ -1,95 +1,71 @@
-// HTTP response utilities for Lambda functions
+/**
+ * Standard response utilities for API Gateway Lambda functions
+ */
 
-class ResponseHelper {
-  static success(statusCode, data, message) {
-    const response = {
-      success: true,
-      timestamp: new Date().toISOString()
-    };
+const corsHeaders = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+};
 
-    if (data) {
-      response.data = data;
-    }
-    
-    if (message) {
-      response.message = message;
-    }
-    
+/**
+ * Create a successful response
+ * @param {Object} data - Response data
+ * @param {number} statusCode - HTTP status code (default: 200)
+ * @returns {Object} API Gateway response object
+ */
+function successResponse(data, statusCode = 200) {
     return {
-      statusCode,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true,
-        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-      },
-      body: JSON.stringify(response)
+        statusCode,
+        headers: corsHeaders,
+        body: JSON.stringify({
+            success: true,
+            data,
+            timestamp: new Date().toISOString()
+        })
     };
-  }
-
-  static error(statusCode = 400, message = 'An error occurred', details = null) {
-    return {
-      statusCode,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true,
-        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-      },
-      body: JSON.stringify({
-        success: false,
-        error: {
-          message,
-          details,
-          statusCode
-        },
-        timestamp: new Date().toISOString()
-      })
-    };
-  }
-
-  static validation(errors) {
-    return this.error(422, 'Validation failed', errors);
-  }
-
-  static badRequest(message = 'Bad request') {
-    return this.error(400, message);
-  }
-
-  static unauthorized(message = 'Unauthorized') {
-    return this.error(401, message);
-  }
-
-  static forbidden(message = 'Forbidden') {
-    return this.error(403, message);
-  }
-
-  static notFound(message = 'Resource not found') {
-    return this.error(404, message);
-  }
-
-  static conflict(message = 'Resource already exists') {
-    return this.error(409, message);
-  }
-
-  static serverError(message = 'Internal server error') {
-    return this.error(500, message);
-  }
-
-  static cors() {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Credentials': true,
-        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS'
-      },
-      body: ''
-    };
-  }
 }
 
-module.exports = ResponseHelper;
+/**
+ * Create an error response
+ * @param {string} message - Error message
+ * @param {number} statusCode - HTTP status code (default: 500)
+ * @param {Object} details - Additional error details
+ * @returns {Object} API Gateway response object
+ */
+function errorResponse(message, statusCode = 500, details = null) {
+    const response = {
+        statusCode,
+      headers: corsHeaders,
+      body: JSON.stringify({
+          success: false,
+          error: {
+              message,
+              details,
+        timestamp: new Date().toISOString()
+      }
+    })
+  };
+
+    // Log error for debugging
+    console.error(`Error ${statusCode}: ${message}`, details);
+
+    return response;
+}
+
+/**
+ * Create a validation error response
+ * @param {Array} errors - Array of validation errors
+ * @returns {Object} API Gateway response object
+ */
+function validationErrorResponse(errors) {
+    return errorResponse('Validation failed', 400, { validationErrors: errors });
+}
+
+module.exports = {
+    successResponse,
+    errorResponse,
+    validationErrorResponse,
+    corsHeaders
+};
