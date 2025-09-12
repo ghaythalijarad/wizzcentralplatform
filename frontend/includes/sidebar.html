@@ -1,0 +1,81 @@
+<!-- Shared sidebar navigation with modern flat design -->
+<div class="sidebar bg-gradient-primary text-white shadow-xl" id="sidebar">
+    <div class="sidebar-header p-6 border-b border-white/20">
+        <div class="logo flex items-center gap-3 text-xl font-bold">
+            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <i class="fas fa-rocket text-white"></i>
+            </div>
+            <span class="text-white">WizzCentral</span>
+        </div>
+        <button class="sidebar-toggle btn btn-ghost btn-sm text-white hover:bg-white/20" id="sidebarToggle" aria-label="Toggle sidebar">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+    <nav class="sidebar-nav flex-1 py-4">
+        <ul class="space-y-1">
+            <li class="nav-item" data-page="dashboard">
+                <a href="/frontend/pages/dashboard.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-tachometer-alt w-5"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="drivers">
+                <a href="/frontend/pages/drivers.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-motorcycle w-5"></i>
+                    <span>Drivers</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="customers">
+                <a href="/frontend/pages/customers.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-users w-5"></i>
+                    <span>Customers</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="merchants">
+                <a href="/frontend/pages/merchants.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-store w-5"></i>
+                    <span>Merchants</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="orders">
+                <a href="/frontend/pages/orders.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-shopping-bag w-5"></i>
+                    <span>Orders</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="promotions">
+                <a href="/frontend/pages/promotions.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-tags w-5"></i>
+                    <span>Promotions</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="support">
+                <a href="/frontend/pages/support.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-headset w-5"></i>
+                    <span>Support</span>
+                </a>
+            </li>
+            <li class="nav-item" data-page="validation">
+                <a href="/frontend/pages/validation.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
+                    <i class="fas fa-clipboard-check w-5"></i>
+                    <span>Validation</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    <div class="sidebar-footer p-6 border-t border-white/20 bg-white/10">
+        <div class="user-profile flex items-center gap-3 mb-4">
+            <div class="user-avatar w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <i class="fas fa-user text-white"></i>
+            </div>
+            <div class="user-info flex-1">
+                <span class="user-name block text-sm font-medium text-white">Admin User</span>
+                <span class="user-role block text-xs text-white/70">Administrator</span>
+            </div>
+        </div>
+        <button class="logout-btn btn btn-secondary btn-sm w-full justify-start" onclick="logout()">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+        </button>
+    </div>
+</div>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Support (Live Chat)</title>
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link rel="stylesheet" href="../enhanced-amazon-connect-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles/platform-theme.css">
+    <style>
+        /* Keep only Live Chat related styles */
+        .page-content { padding: 1.5rem; background: #f8fafc; min-height: calc(100vh - 120px); }
+        .tab-content { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb; min-height: 600px; padding: 0; overflow: hidden; display:block; }
+        .live-chat-container { padding: 0; }
+        .chat-layout { display: grid; grid-template-columns: 320px 1fr; gap: 0; min-height: 520px; border-top: 1px solid #e5e7eb; }
+        .chat-sidebar { background: #f8fafc; border-right: 1px solid #e5e7eb; padding: 14px; }
+        .sessions-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; }
+        .sessions-header h2 { margin:0; font-size: 16px; color:#111827; }
+        .session-controls { display:flex; flex-direction:column; gap:10px; margin-bottom: 8px; }
+        .session-search { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size: 13px; }
+        .session-filters { display:flex; gap:6px; }
+        .filter-btn { border:1px solid #e5e7eb; background:#fff; color:#374151; padding:6px 10px; border-radius:16px; font-size:12px; cursor:pointer; }
+        .filter-btn.active { background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+        #chat-sessions-list { display:flex; flex-direction:column; gap:8px; }
+        .no-sessions { text-align:center; color:#6b7280; padding: 1.25rem 0; }
+        .no-sessions .icon { font-size: 22px; margin-bottom: 6px; }
+        .chat-main { display:flex; flex-direction:column; }
+        .chat-conversation { padding: 14px; height: 100%; }
+        #conversation-area { background:#fff; border-radius: 8px; border:1px solid #e5e7eb; padding: 10px; height: 100%; min-height: 460px; overflow:auto; }
+        .chat-transcript { display:flex; flex-direction:column; gap:10px; }
+        .chat-message { border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; }
+        .chat-message-header { font-size:12px; color:#6b7280; display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+        .chat-message-content { white-space: pre-wrap; word-break: break-word; font-size: 14px; color:#111827; }
+        .chat-typing-indicator { margin-top: 8px; font-size: 12px; color:#6b7280; }
+        .chat-header { display:flex; align-items:center; justify-content:space-between; padding: 14px; }
+        .chat-header h1 { margin:0; font-size: 18px; color:#111827; display:flex; align-items:center; gap:8px; }
+        .connection-status { display:flex; align-items:center; gap:10px; }
+        .status-indicator { width:10px; height:10px; border-radius:50%; background:#f59e0b; }
+        .refresh-btn { border:1px solid #e5e7eb; background:#fff; color:#374151; padding:6px 10px; border-radius:8px; font-size:12px; cursor:pointer; }
+        .lc-session-chip { margin: 4px 0; }
+        @media (max-width: 1024px) { .chat-layout { grid-template-columns: 1fr; } .chat-sidebar { order:2; } .chat-main { order:1; } }
+    </style>
+    <script>
+        // Disable global WebSocketManager on this page; we use LiveChatSocket directly
+        window.DISABLE_GLOBAL_WS_MANAGER = true;
+    </script>
+</head>
+
+<body data-page="support">
+    <div id="sidebar-placeholder"></div>
+
+    <div class="main-content" id="mainContent">
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle" title="Toggle menu" aria-label="Toggle navigation menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="page-header">
+                    <h1 class="page-title">Support Center</h1>
+                    <p class="page-subtitle">Live Chat</p>
+                </div>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-secondary" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <!-- Live Chat Only -->
+            <div class="tab-content" id="livechatTab">
+                <div class="live-chat-container">
+                    <div class="chat-header">
+                        <h1><i class="fas fa-headset"></i> Live Chat Support</h1>
+                        <div class="connection-status">
+                            <div class="status-indicator" id="status-indicator"></div>
+                            <span id="live-chat-status">Initializing live chat connection…</span>
+                            <button class="refresh-btn" onclick="reconnectChatBroker()" title="Reconnect">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="connectAgentBanner" class="agent-banner" style="display:none;margin:8px 14px; padding:8px 12px; border-radius:6px; background:#f1f5f9; font-size:13px; color:#334155;"></div>
+
+                    <div class="chat-layout">
+                        <div class="chat-sidebar">
+                            <div class="sessions-header">
+                                <h2><i class="fas fa-comments"></i> Active Sessions</h2>
+                                <button class="refresh-btn" onclick="refreshChatSessions()" title="Refresh Sessions">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                            <div class="session-controls">
+                                <input type="text" class="session-search" placeholder="Search conversations..." id="session-search">
+                                <div class="session-filters">
+                                    <button class="filter-btn active" data-filter="all">All</button>
+                                    <button class="filter-btn" data-filter="unread">Unread</button>
+                                    <button class="filter-btn" data-filter="active">Active</button>
+                                    <button class="filter-btn" data-filter="priority">Priority</button>
+                                </div>
+                            </div>
+                            <div id="chat-sessions-list">
+                                <div class="no-sessions">
+                                    <div class="icon">💬</div>
+                                    Waiting for incoming chat sessions...
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-main">
+                            <div class="chat-conversation">
+                                <div id="conversation-area">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">🎧</div>
+                                        <h3>Welcome to Live Chat Support</h3>
+                                        <p>You are automatically online and ready to help customers</p>
+                                        <div style="margin-top: 16px;">
+                                            <div class="agent-status-info">
+                                                <i class="fas fa-check-circle" style="color: #10b981;"></i>
+                                                <span style="color: #10b981; font-weight: 600;">Agent Online</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Required configuration and core libs -->
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/navigation.js"></script>
+
+    <!-- OOP Modular Architecture core -->
+    <script src="../js/core/EventBus.js"></script>
+    <script src="../js/core/ThemeManager.js"></script>
+    <script src="../js/core/ModalManager.js"></script>
+    <script src="../js/core/ValidationManager.js"></script>
+    <script src="../js/core/StorageManager.js"></script>
+
+    <!-- Live Chat modules only -->
+    <script src="../js/support/ChatSessionService.js"></script>
+    <script src="../js/support/LiveChatSocket.js"></script>
+    <script src="../js/support/LiveChatUI.js"></script>
+
+    <script>
+        // Live Chat only initialization
+        let liveChatSocket = null;
+        window.__liveChatEventsBound = window.__liveChatEventsBound || false;
+
+        function reconnectChatBroker() {
+            const statusElement = document.getElementById('live-chat-status');
+            if (statusElement) { statusElement.textContent = 'Reconnecting...'; statusElement.style.color = '#f59e0b'; }
+            if (liveChatSocket) { liveChatSocket.disconnect(); }
+            setTimeout(() => { initializeLiveChat(); }, 1000);
+        }
+
+        function initializeLiveChat() {
+            const statusElement = document.getElementById('live-chat-status');
+            try {
+                if (statusElement) { statusElement.textContent = 'Connecting to live chat...'; statusElement.style.color = '#f59e0b'; }
+                const endpoint = (window.WIZZCENTRAL_CONFIG && window.WIZZCENTRAL_CONFIG.WEBSOCKET && window.WIZZCENTRAL_CONFIG.WEBSOCKET.LIVE_CHAT_URL) || 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
+                const businessId = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+                liveChatSocket = new window.LiveChatSocket({ businessId, endpoint, userId: 'wizzcentral-platform', agentId: 'platform-agent-' + Date.now(), agentName: 'WizzCentral Support Agent' });
+
+                if (!window.__liveChatEventsBound && window.EventBus) {
+                    window.__liveChatEventsBound = true;
+                    window.EventBus.on('liveChat.connected', function () {
+                        if (statusElement) { statusElement.textContent = 'Connected - Listening for driver messages'; statusElement.style.color = '#10b981'; }
+                        const banner = document.getElementById('connectAgentBanner');
+                        if (banner) { banner.style.display = 'block'; banner.innerHTML = '✅ Live Chat connected! Ready to receive messages from drivers.'; banner.style.background = '#d1fae5'; banner.style.color = '#065f46'; }
+                    });
+                    window.EventBus.on('liveChat.active_sessions', function () { if (window.LiveChatUI && window.ChatSessionService) { window.LiveChatUI.renderSessionChips(); } });
+                    window.EventBus.on('liveChat.chat_message', function (msg) {
+                        if (window.ChatSessionService) {
+                            const sessionId = msg.sessionId || msg.session_id; const active = window.ChatSessionService.activeSessionId;
+                            if (sessionId && active && sessionId === active && typeof window.renderTranscriptForActiveSession === 'function') { window.renderTranscriptForActiveSession(); }
+                        }
+                    });
+                    window.EventBus.on('liveChat.disconnected', function (data) { if (statusElement) { const code = data && data.code ? ` (${data.code})` : ''; statusElement.textContent = `Disconnected${code}`; statusElement.style.color = '#ef4444'; } });
+                    window.EventBus.on('liveChat.error', function () { if (statusElement) { statusElement.textContent = 'Connection Error'; statusElement.style.color = '#ef4444'; } });
+                }
+
+                liveChatSocket.init();
+                liveChatSocket.connect().catch(error => {
+                    console.error('Failed to connect to live chat:', error);
+                    if (statusElement) { statusElement.textContent = 'Connection Failed'; statusElement.style.color = '#ef4444'; }
+                });
+            } catch (error) {
+                console.error('Failed to initialize live chat:', error);
+                if (statusElement) { statusElement.textContent = 'Initialization Error'; statusElement.style.color = '#ef4444'; }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(() => {
+                console.log('🚀 Initializing Live Chat Only page...');
+                const activeContent = document.querySelector('.tab-content'); if (activeContent) activeContent.style.display = 'block';
+                initializeLiveChat();
+                if ('Notification' in window && Notification.permission === 'default') { Notification.requestPermission(); }
+            }, 300);
+        });
+
+        function refreshChatSessions() { if (window.ChatSessionService && window.LiveChatUI) { window.LiveChatUI.renderSessionChips(); } }
+    </script>
+</body>
+
+</html>

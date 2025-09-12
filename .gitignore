@@ -80,7 +80,7 @@ typings/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist - commented out for Amplify deployment
 
 # Gatsby files
 .cache/
@@ -174,7 +174,7 @@ amplify/mock-api-resources
 amplify/backend/amplify-meta.json
 amplify/backend/.temp
 build/
-dist/
+# dist/ - commented out for Amplify deployment
 node_modules/
 aws-exports.js
 awsconfiguration.json

@@ -1,0 +1,25 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Installing dependencies..."
+        - npm ci
+    build:
+      commands:
+        - echo "Building frontend..."
+        - echo "Frontend is static files, copying to build directory"
+        - mkdir -p dist
+        - cp -r frontend/* dist/
+        - cp index.html dist/ 2>/dev/null || true
+        - echo "Build completed"
+    postBuild:
+      commands:
+        - echo "Post build completed"
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*

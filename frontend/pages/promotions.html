@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Promotions Management</title>
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Modal dialog styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            padding: 1.5rem;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body data-page="promotions">
+    <!-- Sidebar include placeholder -->
+    <div id="sidebar-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Promotions Management</h1>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-secondary" onclick="refreshMerchantDiscounts()" style="margin-right: 10px;">
+                    <i class="fas fa-sync-alt"></i>
+                    Refresh Discounts
+                </button>
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">3</span>
+                    </button>
+                </div>
+                <div class="user-menu">
+                    <button class="user-menu-btn">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Promotion Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon active">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="activePromotionsCount">0</h3>
+                        <p>Active Promotions</p>
+                        <span class="stat-change positive">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon orders">
+                        <i class="fas fa-shopping-cart"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="promotionOrdersCount">0</h3>
+                        <p>Orders with Promos</p>
+                        <span class="stat-change positive">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon revenue">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="discountValueToday">$0</h3>
+                        <p>Discount Value Today</p>
+                        <span class="stat-change positive">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon conversion">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="conversionRate">0%</h3>
+                        <p>Conversion Rate</p>
+                        <span class="stat-change positive">Loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Button to open Create Promotion modal -->
+            <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
+                <button id="openAddPromotionModalBtn" class="btn-primary">
+                    <i class="fas fa-plus-circle"></i> Create New Promotion
+                </button>
+            </div>
+
+            <!-- Create Promotion Modal Dialog -->
+            <div id="addPromotionModal" class="modal">
+                <div class="modal-content">
+                    <button id="closeAddPromotionModalBtn" class="modal-close">&times;</button>
+                    <h2 style="margin-top: 0;"><i class="fas fa-tags"></i> New Promotion</h2>
+                    <form id="addPromotionForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="title">Promotion Title *</label>
+                                <input type="text" id="title" name="title" required
+                                    placeholder="e.g., Summer Sale 2025">
+                            </div>
+                            <div class="form-group">
+                                <label for="code">Promotion Code *</label>
+                                <input type="text" id="code" name="code" required placeholder="e.g., SUMMER25"
+                                    style="text-transform: uppercase;">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="type">Discount Type *</label>
+                                <select id="type" name="type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="percentage">Percentage Off</option>
+                                    <option value="fixed_amount">Fixed Amount Off</option>
+                                    <option value="free_delivery">Free Delivery</option>
+                                    <option value="bogo">Buy One Get One</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="value">Discount Value *</label>
+                                <input type="number" id="value" name="value" required min="0" step="0.01"
+                                    placeholder="e.g., 25 or 10.50">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="description">Description *</label>
+                            <textarea id="description" name="description" required
+                                placeholder="Brief description of the promotion"></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="startDate">Start Date *</label>
+                                <input type="datetime-local" id="startDate" name="startDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="endDate">End Date *</label>
+                                <input type="datetime-local" id="endDate" name="endDate" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="limit">Usage Limit (optional)</label>
+                                <input type="number" id="limit" name="limit" min="1" placeholder="e.g., 100">
+                            </div>
+                            <div class="form-group">
+                                <label for="minOrder">Min Order Value (optional)</label>
+                                <input type="number" id="minOrder" name="minOrder" min="0" step="0.01"
+                                    placeholder="e.g., 50.00">
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="reset" class="btn-secondary">Clear Form</button>
+                            <button type="submit" class="btn-primary">Create Promotion</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Merchant Discounts Section -->
+            <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
+                <div class="section-header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007cba;">
+                    <h2 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-store" style="margin-right: 0.5rem; color: #007cba;"></i>
+                        Merchant Discounts
+                    </h2>
+                    <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
+                        <span class="stat-item"
+                            style="padding: 0.25rem 0.75rem; background: #e3f2fd; border-radius: 20px; font-size: 0.9rem;">
+                            Total: <strong id="totalMerchantDiscounts" style="color: #1976d2;">0</strong>
+                        </span>
+                        <span class="stat-item"
+                            style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
+                            Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Discount</th>
+                                <th>Merchant</th>
+                                <th>Type</th>
+                                <th>Value</th>
+                                <th>Status</th>
+                                <th>Usage</th>
+                                <th>Valid Until</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="merchantDiscountsTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                    <i class="fas fa-spinner fa-spin"
+                                        style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                                    <div>Loading merchant discounts...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- WizzCentral Promotions Section -->
+            <div class="page-section" style="margin-top: 2rem;">
+                <div class="section-header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f0f8ff; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <h2 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-tags" style="margin-right: 0.5rem; color: #28a745;"></i>
+                        WizzCentral Promotions
+                    </h2>
+                </div>
+
+                <!-- Filters and Search -->
+                <div class="table-controls">
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search promotions..." id="searchInput">
+                    </div>
+                    <div class="filter-container">
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="expired">Expired</option>
+                            <option value="draft">Draft</option>
+                        </select>
+                        <select id="typeFilter">
+                            <option value="">All Types</option>
+                            <option value="percentage">Percentage</option>
+                            <option value="fixed_amount">Fixed Amount</option>
+                            <option value="free_delivery">Free Delivery</option>
+                            <option value="bogo">Buy One Get One</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Promotions Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Promotion</th>
+                                <th>Type</th>
+                                <th>Discount</th>
+                                <th>Status</th>
+                                <th>Usage</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="promotionsTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                    <i class="fas fa-tags"
+                                        style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                                    <div>Loading promotions from backend...</div>
+                                </td>
+                            </tr>
+                            <button class="btn-action" onclick="activatePromotion('PROMO003')" title="Activate Now">
+                                <i class="fas fa-play"></i>
+                            </button>
+                </div>
+                </td>
+                </tr>
+                <tr>
+                    <td>
+                        <div class="promotion-info">
+                            <div class="promotion-icon">
+                                <i class="fas fa-gift"></i>
+                            </div>
+                            <div>
+                                <div class="promotion-title">New Customer Bonus</div>
+                                <div class="promotion-code">WELCOME20</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>Fixed Amount</td>
+                    <td><span class="discount-badge">$20 OFF</span></td>
+                    <td><span class="promotion-status expired">Expired</span></td>
+                    <td>156 / 100</td>
+                    <td>Jun 01, 2025</td>
+                    <td>Jun 30, 2025</td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn-action" onclick="viewPromotion('PROMO004')" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-action" onclick="clonePromotion('PROMO004')" title="Clone">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button class="btn-action danger" onclick="deletePromotion('PROMO004')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+                </table>
+            </div>
+        </div> <!-- Close WizzCentral Promotions Section -->
+    </div>
+    </div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+
+    <!-- Configuration -->
+    <script src="../config.js"></script>
+
+    <!-- Centralized utilities -->
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+
+    <!-- Data service (depends on aws-utils) -->
+    <script src="../data-service.js"></script>
+
+    <!-- Page-specific scripts -->
+    <script src="../assets/js/navigation.js"></script>
+    <script src="../promotions.js"></script>
+
+    <!-- Modal script -->
+    <script>
+        // Get modal elements
+        const modal = document.getElementById('addPromotionModal');
+        const openModalBtn = document.getElementById('openAddPromotionModalBtn');
+        const closeModalBtn = document.getElementById('closeAddPromotionModalBtn');
+
+        // Open modal event
+        openModalBtn.addEventListener('click', () => {
+            modal.style.display = 'flex';
+        });
+
+        // Close modal event
+        closeModalBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // Close modal on outside click
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>

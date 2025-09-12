@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WizzCentral Platform - Login</title>
+  <link rel="stylesheet" href="styles/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+  <script>
+    // Early auto-forward to break login loop if session already valid
+    (function () {
+      try {
+        const hasSession = sessionStorage.getItem('isAuthenticated') === 'true' && !!sessionStorage.getItem('idToken');
+        if (hasSession) {
+          console.log('🔁 Login page: existing authenticated session detected, auto-forwarding...');
+          // Load auth utils dynamically if not yet present to resolve returnUrl
+          const go = function () {
+            try {
+              if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+                const target = window.Auth.getPostLoginRedirectUrl();
+                console.log('➡️ Redirect target (returnUrl or dashboard):', target);
+                window.location.replace(target);
+              } else {
+                // Use configurable default if available with hosting-aware fallback
+                const cfg = window.WIZZCENTRAL_CONFIG || {};
+                const path = window.location.pathname || '';
+                const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+                const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
+                const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
+                window.location.replace(window.location.origin + normalized);
+              }
+            } catch (e) {
+              const cfg = window.WIZZCENTRAL_CONFIG || {};
+              const path = window.location.pathname || '';
+              const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
+              const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
+              window.location.replace(window.location.origin + normalized);
+            }
+          };
+          if (!window.Auth) {
+            const s = document.createElement('script');
+            s.src = 'assets/js/auth-utils.js';
+            s.onload = go; s.onerror = go; document.head.appendChild(s);
+          } else { go(); }
+          return; // Prevent showing form
+        }
+      } catch (e) { console.warn('Auto-forward check failed', e); }
+    })();
+  </script>
+
+  <!-- AWS SDKs -->
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+  <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+  
+  <!-- Application config -->
+  <script src="config.js"></script>
+  <!-- Auth Service (direct Cognito) -->
+  <script src="auth-service.js"></script>
+  <!-- Ensure auth utils available on login page for returnUrl logic -->
+  <script src="assets/js/auth-utils.js"></script>
+
+  <!-- Main Content -->
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="logo">
+          <i class="fas fa-rocket"></i>
+          <h1>WizzCentral</h1>
+        </div>
+        <p class="subtitle">Welcome back! Please sign in to your account.</p>
+        <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
+          🔧 <strong>Organized Frontend Version</strong><br>
+          Test credentials pre-filled
+        </p>
+      </div>
+
+      <form class="login-form" id="loginForm">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <div class="input-wrapper">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="email" name="email" placeholder="Enter your email" required value="g87_a@yahoo.com">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="input-wrapper">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="password" name="password" placeholder="Enter your password" required
+              value="Gha@551987">
+            <button type="button" class="password-toggle" id="passwordToggle">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-options">
+          <div class="remember-me">
+            <input type="checkbox" id="remember" name="remember">
+            <label for="remember">Remember me</label>
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn">
+          <span>Sign In</span>
+          <i class="fas fa-arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- Status Message -->
+      <div id="statusMessage"
+        style="display: none; margin-top: 20px; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; background: #f8f9fa;">
+        <div id="statusText"></div>
+      </div>
+    </div>
+
+    <div class="background-animation">
+      <div class="floating-shape shape-1"></div>
+      <div class="floating-shape shape-2"></div>
+      <div class="floating-shape shape-3"></div>
+      <div class="floating-shape shape-4"></div>
+    </div>
+  </div>
+
+  <script>
+    console.log('🚀 WizzCentral Login Page Loading (Organized Frontend)...');
+
+    let isConfigLoaded = false;
+
+    // Status message functions
+    function showStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('statusMessage');
+      const statusText = document.getElementById('statusText');
+
+      statusText.innerHTML = message;
+      statusDiv.style.display = 'block';
+
+      // Style based on type
+      if (type === 'success') {
+        statusDiv.style.backgroundColor = '#d4edda';
+        statusDiv.style.borderLeft = '4px solid #28a745';
+        statusDiv.style.color = '#155724';
+      } else if (type === 'error') {
+        statusDiv.style.backgroundColor = '#f8d7da';
+        statusDiv.style.borderLeft = '4px solid #dc3545';
+        statusDiv.style.color = '#721c24';
+      } else if (type === 'warning') {
+        statusDiv.style.backgroundColor = '#fff3cd';
+        statusDiv.style.borderLeft = '4px solid #ffc107';
+        statusDiv.style.color = '#856404';
+      } else {
+        statusDiv.style.backgroundColor = '#d1ecf1';
+        statusDiv.style.borderLeft = '4px solid #17a2b8';
+        statusDiv.style.color = '#0c5460';
+      }
+    }
+
+    // Login handler using AuthService
+    async function handleLogin(email, password, remember) {
+      const loginBtn = document.querySelector('.login-btn');
+      if (!loginBtn) return;
+
+      const originalText = loginBtn.innerHTML;
+
+      // Update button state
+      loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Signing In...</span>';
+      loginBtn.disabled = true;
+
+      showStatus('🔄 Authenticating with AWS Cognito...', 'info');
+
+      try {
+        console.log('🔐 Attempting login with email:', email);
+
+        // Wait for AuthService to be available
+        let retries = 0;
+        while (!window.AuthService && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries++;
+        }
+        
+        if (!window.AuthService) {
+          throw new Error('Authentication service not available');
+        }
+        
+        // Initialize and perform login
+        await AuthService.initialize();
+        const result = await AuthService.login(email, password);
+
+        if (result.success) {
+          console.log('✅ Login successful');
+          showStatus('✅ <strong>Login successful!</strong><br>Storing authentication tokens and redirecting...', 'success');
+
+          // Store user info and session
+          sessionStorage.setItem('userEmail', email);
+          sessionStorage.setItem('isAuthenticated', 'true');
+
+          // Store remember preference
+          if (remember) {
+            localStorage.setItem('rememberLogin', 'true');
+            localStorage.setItem('lastEmail', email);
+          } else {
+            localStorage.removeItem('rememberLogin');
+            localStorage.removeItem('lastEmail');
+          }
+
+          console.log('📦 Authentication data stored successfully');
+
+          // Redirect to app page
+          setTimeout(() => {
+            console.log('🚀 Determining redirect URL...');
+
+            let redirectUrl;
+            if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+              redirectUrl = window.Auth.getPostLoginRedirectUrl();
+            } else {
+              const cfg = window.WIZZCENTRAL_CONFIG || {};
+              const path = window.location.pathname || '';
+              const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
+              const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
+              redirectUrl = window.location.origin + normalized;
+            }
+
+            console.log('🚀 Redirecting to:', redirectUrl);
+            window.location.href = redirectUrl;
+          }, 1500);
+
+        } else {
+          console.log('❌ Login failed:', result.message);
+          showStatus(`❌ <strong>Login Failed</strong><br>${result.message}`, 'error');
+        }
+
+      } catch (error) {
+        console.error('❌ Login error:', error);
+
+        let errorMessage = 'Login failed';
+        const errorString = error.message || error.toString();
+
+        if (errorString.includes('NotAuthorizedException') || errorString.includes('Incorrect username or password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (errorString.includes('UserNotConfirmedException')) {
+          errorMessage = 'Please verify your email address';
+        } else if (errorString.includes('UserNotFoundException')) {
+          errorMessage = 'User not found';
+        } else if (errorString.includes('TooManyRequestsException')) {
+          errorMessage = 'Too many login attempts. Please try again later.';
+        } else if (error.message && error.message !== 'Authentication failed') {
+          errorMessage = error.message;
+        }
+
+        showStatus(`❌ <strong>Login Failed</strong><br>${errorMessage}`, 'error');
+      } finally {
+        // Reset button state
+        loginBtn.innerHTML = originalText;
+        loginBtn.disabled = false;
+      }
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log('🚀 Login page loaded - Organized Frontend');
+
+      // Check if configuration is loaded
+      if (window.WIZZCENTRAL_CONFIG) {
+        console.log('✅ Configuration loaded');
+        isConfigLoaded = true;
+        showStatus('✅ <strong>Ready for Authentication</strong><br>AWS Cognito configuration loaded successfully.', 'success');
+      } else {
+        console.error('❌ Configuration not loaded');
+        showStatus('❌ <strong>Configuration Error</strong><br>AWS Cognito configuration not loaded. Please refresh the page.', 'error');
+      }
+
+      // Password toggle functionality
+      const passwordToggle = document.getElementById('passwordToggle');
+      const passwordInput = document.getElementById('password');
+
+      if (passwordToggle && passwordInput) {
+        passwordToggle.addEventListener('click', function () {
+          const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+          passwordInput.setAttribute('type', type);
+
+          const icon = this.querySelector('i');
+          icon.classList.toggle('fa-eye');
+          icon.classList.toggle('fa-eye-slash');
+        });
+      }
+
+      // Form submission
+      const loginForm = document.getElementById('loginForm');
+      if (loginForm) {
+        loginForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+
+          if (!isConfigLoaded) {
+            showStatus('❌ <strong>Configuration Not Ready</strong><br>Please refresh the page.', 'error');
+            return;
+          }
+
+          const email = document.getElementById('email').value.trim();
+          const password = document.getElementById('password').value.trim();
+          const remember = document.getElementById('remember').checked;
+
+          if (!email || !password) {
+            showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
+            return;
+          }
+
+          handleLogin(email, password, remember);
+        });
+      }
+
+      // Auto-fill remembered email
+      const rememberLogin = localStorage.getItem('rememberLogin');
+      const lastEmail = localStorage.getItem('lastEmail');
+      const emailInput = document.getElementById('email');
+
+      if (rememberLogin === 'true' && lastEmail && emailInput) {
+        emailInput.value = lastEmail;
+        const rememberCheckbox = document.getElementById('remember');
+        if (rememberCheckbox) rememberCheckbox.checked = true;
+      }
+    });
+  </script>
+</body>
+
+</html>

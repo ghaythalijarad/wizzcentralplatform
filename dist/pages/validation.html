@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WizzCentral Validation</title>
+  <link rel="stylesheet" href="../styles/dashboard.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:12px 0}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .k{color:#6b7280}
+    .ok{color:#16a34a}
+    .warn{color:#d97706}
+    .err{color:#b91c1c}
+    code{background:#f3f4f6;padding:2px 4px;border-radius:4px}
+    .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;background:#f9fafb;cursor:pointer}
+    .btn-primary{background:#009de0;color:#fff;border-color:#009de0}
+    table{width:100%}
+    th,td{padding:8px;text-align:left}
+  </style>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+</head>
+<body data-page="validation">
+  <div id="sidebar-placeholder"></div>
+
+  <div class="main-content" id="mainContent">
+    <div class="top-bar">
+      <div class="top-bar-left">
+        <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+        <h1 class="page-title">Validation & E2E Checks</h1>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="card">
+        <h3>Hosting & Navigation</h3>
+        <div>Path: <code id="v-path"></code></div>
+        <div>Detected base: <code id="v-base"></code></div>
+        <div>Dashboard URL: <code id="v-dash"></code></div>
+        <div class="row" style="margin-top:8px">
+          <a class="btn" id="goDash" href="/frontend/pages/dashboard.html"><i class="fas fa-gauge"></i>Dashboard</a>
+          <a class="btn" id="goDrivers" href="/frontend/pages/drivers.html"><i class="fas fa-motorcycle"></i>Drivers</a>
+          <a class="btn" id="goMerchants" href="/frontend/pages/merchants.html"><i class="fas fa-store"></i>Merchants</a>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Authentication</h3>
+        <div id="v-auth"></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="btnLogin"><i class="fas fa-right-to-bracket"></i>Go to Login</button>
+          <button class="btn" id="btnLogout"><i class="fas fa-arrow-right-from-bracket"></i>Logout</button>
+          <button class="btn" id="btnPost"><i class="fas fa-share"></i>Show Post-Login URL</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>AWS & DynamoDB</h3>
+        <div id="v-aws"></div>
+        <div class="row" style="margin:8px 0">
+          <button class="btn-primary btn" id="btnInit"><i class="fas fa-bolt"></i>Initialize AWS</button>
+          <button class="btn btn" id="btnRun"><i class="fas fa-list-check"></i>Run All Table Counts</button>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Table</th><th>Status</th><th>Count</th></tr></thead>
+          <tbody id="v-tables">
+            <tr data-table="WizzUser_users_dev"><td>WizzUser_users_dev</td><td class="k">pending</td><td>0</td></tr>
+            <tr data-table="WhizzMerchants_Businesses"><td>WhizzMerchants_Businesses</td><td class="k">pending</td><td>0</td></tr>
+            <tr data-table="WhizzDrivers_dev"><td>WhizzDrivers_dev</td><td class="k">pending</td><td>0</td></tr>
+            <tr data-table="WizzUser_transactions_dev"><td>WizzUser_transactions_dev</td><td class="k">pending</td><td>0</td></tr>
+            <tr data-table="WhizzMerchants_Discounts"><td>WhizzMerchants_Discounts</td><td class="k">pending</td><td>0</td></tr>
+            <tr data-table="WhizzMerchants_Products"><td>WhizzMerchants_Products</td><td class="k">pending</td><td>0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="../config.js?v=20250906"></script>
+  <script src="../assets/js/auth-utils.js?v=20250906"></script>
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+  <script src="../assets/js/aws-utils.js?v=20250906"></script>
+  <script src="../data-service.js?v=20250906"></script>
+  <script src="../assets/js/navigation.js?v=20250906"></script>
+  <script>
+    function base(){ const p=location.pathname||''; if(p.startsWith('/frontend/')) return '/frontend'; if(p.startsWith('/pages/')) return ''; const i=p.indexOf('/pages/'); return i>0?p.slice(0,i):'' }
+    function setTxt(id, txt){ const n=document.getElementById(id); if(n) n.textContent = txt }
+    function short(t){ if(!t) return '∅'; return t.length>18? t.slice(0,8)+'…'+t.slice(-8):t }
+    function stampAuth(){
+      const tok = sessionStorage.getItem('idToken');
+      let exp='n/a', iss='n/a';
+      if(tok){ try{ const p=JSON.parse(atob(tok.split('.')[1]||'')); if(p.exp){ const left = p.exp - Math.floor(Date.now()/1000); exp = left+'s'; } if(p.iss) iss=p.iss; }catch(e){} }
+      const html = `isAuthenticated=<code>${sessionStorage.getItem('isAuthenticated')}</code>, user=<code>${sessionStorage.getItem('userEmail')||''}</code><br>
+                    idToken=<code>${short(tok||'')}</code>, expIn=<code>${exp}</code>, iss=<code>${iss}</code>`;
+      document.getElementById('v-auth').innerHTML = html;
+    }
+    function stampHost(){
+      const bp = base();
+      setTxt('v-path', location.pathname + location.search);
+      setTxt('v-base', bp || '(empty)');
+      const dash = (bp||'') + '/pages/dashboard.html';
+      setTxt('v-dash', dash);
+      // normalize quick links
+      ['goDash','goDrivers','goMerchants','goDiag'].forEach(id=>{ const a=document.getElementById(id); if(!a) return; if(bp==='') a.href = a.getAttribute('href').replace(/^\/frontend/, ''); });
+    }
+    function stampAWS(){
+      const ok = (window.AWSUtils && AWSUtils.isInitialized);
+      const err = sessionStorage.getItem('lastRedirectReason');
+      document.getElementById('v-aws').innerHTML = `AWS: <span class="${ok?'ok':'warn'}">${ok?'initialized':'not-initialized'}</span>` + (err?`<span class="k"> (last: ${err})</span>`:'');
+    }
+    async function runInit(){
+      try{ await AWSUtils.initialize(); }catch(e){ console.warn('AWS init error', e) }
+      stampAWS();
+    }
+    async function countOne(tr){
+      const table = tr.getAttribute('data-table');
+      const st = tr.children[1]; const ct = tr.children[2];
+      st.textContent = 'checking…'; st.className='k'; ct.textContent='0';
+      try{
+        await window.dataService.initialize();
+        const res = await window.dataService.scan(table, { Select: 'COUNT' });
+        const c = (res && typeof res.Count==='number') ? res.Count : 0;
+        st.textContent = 'ok'; st.className='ok'; ct.textContent = String(c);
+      }catch(e){
+        const msg = (e && (e.message||e.code)) || 'error';
+        st.textContent = msg.includes('AccessDenied')?'access denied':'error';
+        st.className = msg.includes('AccessDenied')?'warn':'err';
+        ct.textContent = '0';
+      }
+    }
+    async function runAll(){
+      const rows = Array.from(document.querySelectorAll('#v-tables tr'));
+      for(const tr of rows){ await countOne(tr); }
+    }
+    document.addEventListener('DOMContentLoaded', ()=>{
+      stampHost(); stampAuth(); stampAWS();
+      document.getElementById('btnLogin').onclick = ()=>{ if(window.Auth && Auth.redirectToLogin) Auth.redirectToLogin('validation:manual'); else location.href = (base()?'/frontend':'')+'/index.html'; };
+      document.getElementById('btnLogout').onclick = ()=>{ if(window.logout) logout(); else { sessionStorage.clear(); location.reload(); } };
+      document.getElementById('btnPost').onclick = ()=>{ try{ const u = Auth.getPostLoginRedirectUrl(); alert(u); }catch(e){ alert('n/a'); } };
+      document.getElementById('btnInit').onclick = runInit;
+      document.getElementById('btnRun').onclick = runAll;
+    });
+  </script>
+</body>
+</html>

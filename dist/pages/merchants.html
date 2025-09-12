@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>WizzCentral Platform - Merchants Management</title>
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link rel="stylesheet" href="../styles/merchants-table.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- Additional styles for products view -->
+    <style>
+        .view-container {
+            transition: all 0.3s ease;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .product-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-color: #3b82f6;
+        }
+
+        .product-card img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background: #f3f4f6;
+        }
+
+        .product-card h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.4;
+        }
+
+        .product-card p {
+            margin: 0 0 0.75rem 0;
+            color: #6b7280;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .product-card .price {
+            color: #059669;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .category-section {
+            margin-bottom: 2.5rem;
+        }
+
+        .category-section h2 {
+            margin: 0 0 1rem 0;
+            color: #1e293b;
+            font-size: 1.4rem;
+            font-weight: 600;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #3b82f6;
+            display: inline-block;
+        }
+
+        .no-products-message {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .no-products-message i {
+            font-size: 3rem;
+            color: #d1d5db;
+            margin-bottom: 1rem;
+        }
+
+        .btn-view-products {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background-color 0.2s;
+        }
+
+        .btn-view-products:hover {
+            background: #047857;
+        }
+
+        .btn-toggle-status {
+            border: none;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            transition: all 0.2s;
+            margin-left: 0.25rem;
+        }
+
+        .btn-toggle-status.approved {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fbbf24;
+        }
+
+        .btn-toggle-status.approved:hover {
+            background: #fde68a;
+            color: #92400e;
+        }
+
+        .btn-toggle-status.pending {
+            background: #dcfce7;
+            color: #059669;
+            border: 1px solid #22c55e;
+        }
+
+        .btn-toggle-status.pending:hover {
+            background: #bbf7d0;
+            color: #047857;
+        }
+
+        .btn-toggle-status:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            padding: 0.75rem 1.5rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .btn-secondary {
+            padding: 0.75rem 1.5rem;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .form-message {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .form-message.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .form-message.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+
+<body data-page="merchants">
+    <!-- Sidebar include placeholder -->
+    <div id="sidebar-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <div class="top-bar">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="page-title">Merchants Management</h1>
+            <div class="auth-status" id="authStatus" style="display: flex; align-items: center; gap: 10px;">
+                <span id="authIndicator"
+                    style="padding: 5px 10px; border-radius: 4px; font-size: 0.8rem;">Checking...</span>
+                <button id="loginBtn"
+                    onclick="(window.Auth&&window.Auth.redirectToLogin)?window.Auth.redirectToLogin('merchants:login-button'):window.location.href=window.location.origin + '/frontend/index.html'"
+                    style="display: none; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Login</button>
+                <button id="loadRealDataBtn" onclick="forceLoadRealData()"
+                    style="display: none; padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Load
+                    Real Data</button>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="page-content">
+            <!-- Auth and Data Status -->
+            <div id="dataStatus"
+                style="margin-bottom: 1rem; padding: 10px; border-radius: 4px; background: #f8f9fa; border-left: 4px solid #007bff;">
+                <div>
+                    <strong>Data Source:</strong> <span id="dataSourceIndicator">Loading merchants...</span>
+                </div>
+            </div>
+
+            <!-- Merchants List View (default) -->
+            <div id="merchantsListView" class="view-container">
+                <!-- Merchants Table -->
+                <div class="table-container">
+                    <div id="merchants-table-status"></div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Business</th>
+                                <th>Owner</th>
+                                <th>Status</th>
+                                <th>Orders</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Address</th>
+                                <th>Last Update</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="merchantsTableBody">
+                            <!-- Merchants will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Merchant Products View (hidden by default) -->
+            <div id="merchantProductsView" class="view-container" style="display: none;">
+                <!-- Navigation Header -->
+                <div class="products-nav-header"
+                    style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e5e7eb;">
+                    <button id="backToMerchantsBtn" class="btn-secondary"
+                        style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Merchants
+                    </button>
+                    <div class="merchant-info">
+                        <h2 id="selectedMerchantName" style="margin: 0; color: #1e293b; font-size: 1.5rem;"></h2>
+                        <p id="selectedMerchantDetails" style="margin: 0; color: #6b7280; font-size: 0.9rem;"></p>
+                    </div>
+                    <button id="refreshProductsBtn" class="btn-primary"
+                        style="margin-left: auto; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-sync"></i>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Products Status Message -->
+                <div id="productsStatus"
+                    style="margin-bottom: 1rem; padding: 10px; border-radius: 4px; background: #f8f9fa; border-left: 4px solid #007bff; display: none;">
+                    <span id="productsStatusText"></span>
+                </div>
+
+                <!-- Container for products -->
+                <div id="merchantProductsContainer" class="products-grid">
+                    <!-- Products will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Edit Product Modal -->
+            <div id="editProductModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Edit Product</h2>
+                        <span class="close-button"
+                            onclick="document.getElementById('editProductModal').style.display='none'">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editProductForm">
+                            <input type="hidden" id="editProductId">
+                            <div class="form-group">
+                                <label for="editProductName">Product Name (English)</label>
+                                <input type="text" id="editProductName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductNameAr">Product Name (Arabic)</label>
+                                <input type="text" id="editProductNameAr">
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductDescription">Description (English)</label>
+                                <textarea id="editProductDescription" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductDescriptionAr">Description (Arabic)</label>
+                                <textarea id="editProductDescriptionAr" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductAllergens">Allergens (comma-separated)</label>
+                                <textarea id="editProductAllergens" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductIngredients">Ingredients (comma-separated)</label>
+                                <textarea id="editProductIngredients" rows="2"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductPrice">Price</label>
+                                <input type="number" id="editProductPrice" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductCategory">Category</label>
+                                <select id="editProductCategory" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductPreparationTime">Preparation Time (minutes)</label>
+                                <input type="number" id="editProductPreparationTime" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductIsAvailable">
+                                    <input type="checkbox" id="editProductIsAvailable">
+                                    Is Available
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="editProductImageUrl">Image URL</label>
+                                <input type="text" id="editProductImageUrl">
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Changes</button>
+                                <button type="button" class="btn-secondary"
+                                    onclick="document.getElementById('editProductModal').style.display='none'">Cancel</button>
+                            </div>
+                        </form>
+                        <div id="editProductFormMessage" class="form-message" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- end page-content -->
+
+        <!-- Status Update Modal -->
+        <div id="statusModal" class="modal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+            <div class="modal-content"
+                style="background:white; padding:1rem; border-radius:8px; max-width:400px; width:90%; position:relative;">
+                <button onclick="closeModal('statusModal')"
+                    style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Update Merchant Status</h3>
+                <div id="statusModalBody"></div>
+                <div style="margin-top:1rem; text-align:right;">
+                    <button class="btn-secondary" onclick="closeModal('statusModal')"
+                        style="margin-right: 0.5rem;">Cancel</button>
+                    <button class="btn-primary" onclick="updateMerchantStatus()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Merchant Details Modal -->
+        <div id="viewMerchantModal" class="modal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+            <div class="modal-content"
+                style="background:white; padding:1rem; border-radius:8px; max-width:600px; width:90%; position:relative;">
+                <button onclick="closeModal('viewMerchantModal')"
+                    style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <h3 style="margin-bottom: 1rem;">Merchant Details</h3>
+                <div id="merchantDetailsBody"></div>
+                <div style="margin-top:1rem; text-align:right;">
+                    <button class="btn-primary" onclick="closeModal('viewMerchantModal')">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Merchant Modal -->
+        <div id="editMerchantModal" class="modal"
+            style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index: 1000;">
+            <div class="modal-content"
+                style="background:white; padding:1.5rem; border-radius:8px; max-width:700px; width:95%; max-height:90vh; overflow-y:auto; position:relative;">
+                <button onclick="closeModal('editMerchantModal')"
+                    style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280; padding:4px;">&times;</button>
+
+                <h3 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.5rem;">Edit Merchant</h3>
+
+                <form id="editMerchantForm" style="display: grid; gap: 1rem;">
+                    <!-- Basic Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editBusinessName"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business
+                                Name</label>
+                            <input type="text" id="editBusinessName" name="businessName" required
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editOwnerName"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Owner
+                                Name</label>
+                            <input type="text" id="editOwnerName" name="ownerName"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editEmail"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Email</label>
+                            <input type="email" id="editEmail" name="email" required
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                        <div>
+                            <label for="editPhoneNumber"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Phone
+                                Number</label>
+                            <input type="tel" id="editPhoneNumber" name="phoneNumber" required
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                        </div>
+                    </div>
+
+                    <!-- Business Type and Status -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label for="editBusinessType"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Business
+                                Type</label>
+                            <select id="editBusinessType" name="businessType"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <option value="restaurant">Restaurant</option>
+                                <option value="store">Store</option>
+                                <option value="cafe">Cafe</option>
+                                <option value="cloudkitchen">Cloud Kitchen</option>
+                                <option value="pharmacy">Pharmacy</option>
+                                <option value="retail">Retail</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="editStatus"
+                                style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Status</label>
+                            <select id="editStatus" name="status"
+                                style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="under_review">Under Review</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Status Change Reason (shows only when status is changed) -->
+                    <div id="statusReasonSection" style="display: none;">
+                        <label for="editStatusReason"
+                            style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">
+                            Reason for Status Change <span style="color: #ef4444;">*</span>
+                        </label>
+                        <textarea id="editStatusReason" name="statusReason" rows="2" minlength="10" maxlength="500"
+                            placeholder="Please provide a reason for the status change..."
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem; resize: vertical;"></textarea>
+                        <small style="color: #6b7280; font-size: 0.75rem;">This will be included in the email
+                            notification sent to the merchant.</small>
+                    </div>
+
+                    <!-- Address - Match DynamoDB structure -->
+                    <div>
+                        <label
+                            style="display: block; margin-bottom: 0.75rem; font-weight: 600; color: #374151;">Address</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <input type="text" id="editStreet" name="street" placeholder="Street Address"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCity" name="city" placeholder="City"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <input type="text" id="editDistrict" name="district" placeholder="District"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                            <div>
+                                <input type="text" id="editCountry" name="country" placeholder="Country" value="Iraq"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.875rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Remove Description and Website sections as they're not in DynamoDB -->
+
+                    <!-- Form Messages -->
+                    <div id="editFormMessages" style="display: none;"></div>
+
+                    <!-- Submit Buttons -->
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeModal('editMerchantModal')"
+                            style="padding: 0.75rem 1.5rem; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Cancel
+                        </button>
+                        <button type="submit" id="saveEditBtn"
+                            style="padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem;">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- AWS SDK and Core Scripts -->
+        <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1454.0.min.js"></script>
+        <script>
+            console.log('AWS SDK loaded:', typeof AWS !== 'undefined');
+
+            // Prevent dashboard.js from overriding our functions
+            window.MERCHANTS_PAGE = true;
+        </script>
+
+        <!-- Configuration -->
+        <script src="../config.js?v=2024-merchants"></script>
+        <script>
+            console.log('Config loaded:', typeof window.WIZZCENTRAL_CONFIG !== 'undefined');
+        </script>
+
+        <!-- Centralized utilities -->
+        <script src="../assets/js/auth-utils.js?v=2024-merchants"></script>
+        <script src="../assets/js/aws-utils.js?v=2024-merchants"></script>
+
+        <!-- Data service (depends on aws-utils) -->
+        <script src="../data-service.js?v=2024-merchants"></script>
+
+        <!-- Shared sidebar loader -->
+        <script src="../assets/js/navigation.js?v=2024-merchants"></script>
+
+        <!-- Page-specific scripts -->
+        <script src="../merchants.js?v=2024-merchants"></script>
+        <script>
+            console.log('Merchants page script loaded');
+            // Initialize merchants page when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', window.onDomReady);
+            } else {
+                window.onDomReady();
+            }
+        </script>
+</body>
+
+</html>
