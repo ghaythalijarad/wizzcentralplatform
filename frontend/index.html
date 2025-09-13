@@ -263,19 +263,36 @@
       }
     }
 
-    // Initialize page
-    document.addEventListener('DOMContentLoaded', function () {
+    // Initialize page with improved configuration loading
+    function initializePage() {
       console.log('🚀 Login page loaded - Organized Frontend');
 
-      // Check if configuration is loaded
-      if (window.WIZZCENTRAL_CONFIG) {
-        console.log('✅ Configuration loaded');
-        isConfigLoaded = true;
-        showStatus('✅ <strong>Ready for Authentication</strong><br>AWS Cognito configuration loaded successfully.', 'success');
-      } else {
-        console.error('❌ Configuration not loaded');
-        showStatus('❌ <strong>Configuration Error</strong><br>AWS Cognito configuration not loaded. Please refresh the page.', 'error');
+      // Check if configuration is loaded with retry mechanism
+      let retryCount = 0;
+      const maxRetries = 10;
+      
+      function checkConfiguration() {
+        if (window.WIZZCENTRAL_CONFIG) {
+          console.log('✅ Configuration loaded');
+          isConfigLoaded = true;
+          showStatus('✅ <strong>Ready for Authentication</strong><br>AWS Cognito configuration loaded successfully.', 'success');
+          return true;
+        } else if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`⏳ Configuration not ready, retry ${retryCount}/${maxRetries}...`);
+          setTimeout(checkConfiguration, 100);
+          return false;
+        } else {
+          console.error('❌ Configuration not loaded after retries');
+          showStatus('❌ <strong>Configuration Error</strong><br>AWS Cognito configuration not loaded. Please refresh the page.', 'error');
+          return false;
+        }
       }
+      
+      checkConfiguration();
+    }
+
+    document.addEventListener('DOMContentLoaded', initializePage);
 
       // Password toggle functionality
       const passwordToggle = document.getElementById('passwordToggle');
@@ -298,21 +315,26 @@
         loginForm.addEventListener('submit', function (e) {
           e.preventDefault();
 
-          if (!isConfigLoaded) {
-            showStatus('❌ <strong>Configuration Not Ready</strong><br>Please refresh the page.', 'error');
-            return;
-          }
+          // Wait for configuration to be loaded
+          const waitForConfig = () => {
+            if (isConfigLoaded) {
+              const email = document.getElementById('email').value.trim();
+              const password = document.getElementById('password').value.trim();
+              const remember = document.getElementById('remember').checked;
 
-          const email = document.getElementById('email').value.trim();
-          const password = document.getElementById('password').value.trim();
-          const remember = document.getElementById('remember').checked;
+              if (!email || !password) {
+                showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
+                return;
+              }
 
-          if (!email || !password) {
-            showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
-            return;
-          }
-
-          handleLogin(email, password, remember);
+              handleLogin(email, password, remember);
+            } else {
+              console.log('Waiting for configuration to load...');
+              setTimeout(waitForConfig, 100);
+            }
+          };
+          
+          waitForConfig();
         });
       }
 

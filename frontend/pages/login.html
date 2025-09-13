@@ -93,14 +93,28 @@
             try {
                 console.log('Loading configuration...');
 
-                if (window.WIZZCENTRAL_CONFIG) {
-                    isConfigLoaded = true;
-                    console.log('Configuration loaded successfully');
-                    console.log('User Pool:', window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID);
-                    console.log('Client ID:', window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID);
-                } else {
-                    throw new Error('Configuration not available');
+                // Retry mechanism for configuration loading
+                let retryCount = 0;
+                const maxRetries = 10;
+                
+                function checkConfig() {
+                    if (window.WIZZCENTRAL_CONFIG) {
+                        isConfigLoaded = true;
+                        console.log('Configuration loaded successfully');
+                        console.log('User Pool:', window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID);
+                        console.log('Client ID:', window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID);
+                        return true;
+                    } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`Configuration not ready, retry ${retryCount}/${maxRetries}...`);
+                        setTimeout(checkConfig, 100);
+                        return false;
+                    } else {
+                        throw new Error('Configuration not available after retries');
+                    }
                 }
+                
+                checkConfig();
             } catch (error) {
                 console.error('Configuration loading failed:', error);
                 showMessage('Authentication configuration missing', 'error');
@@ -140,33 +154,38 @@
                 e.preventDefault();
                 console.log('Form submitted');
 
-                if (!isConfigLoaded) {
-                    showMessage('Authentication system not ready. Please refresh the page.', 'error');
-                    return;
-                }
+                // Wait for configuration to be loaded
+                const waitForConfig = () => {
+                    if (isConfigLoaded) {
+                        const email = emailInput?.value?.trim() || '';
+                        const password = passwordInput?.value?.trim() || '';
+                        const remember = document.getElementById('remember')?.checked || false;
 
-                const email = emailInput?.value?.trim() || '';
-                const password = passwordInput?.value?.trim() || '';
-                const remember = document.getElementById('remember')?.checked || false;
+                        // Basic validation
+                        if (!email || !password) {
+                            showMessage('Please fill in all required fields.', 'error');
+                            return;
+                        }
 
-                // Basic validation
-                if (!email || !password) {
-                    showMessage('Please fill in all required fields.', 'error');
-                    return;
-                }
+                        if (!isValidEmail(email)) {
+                            showMessage('Please enter a valid email address.', 'error');
+                            return;
+                        }
 
-                if (!isValidEmail(email)) {
-                    showMessage('Please enter a valid email address.', 'error');
-                    return;
-                }
+                        if (password.length < 6) {
+                            showMessage('Password must be at least 6 characters long.', 'error');
+                            return;
+                        }
 
-                if (password.length < 6) {
-                    showMessage('Password must be at least 6 characters long.', 'error');
-                    return;
-                }
-
-                console.log('Validation passed, calling handleLogin');
-                handleLogin(email, password, remember);
+                        console.log('Validation passed, calling handleLogin');
+                        handleLogin(email, password, remember);
+                    } else {
+                        console.log('Waiting for configuration to load...');
+                        setTimeout(waitForConfig, 100);
+                    }
+                };
+                
+                waitForConfig();
             });
 
             // Auto-fill remembered email
