@@ -57,9 +57,34 @@
           meta.driverName ||
           ''
         ).toString().toLowerCase();
-        const flags = [sessionData.isTest, meta.isTest, meta.source === 'test', meta.source === 'mock'];
-        const looksTesty = id.startsWith('test_') || name.includes('test') || name.includes('demo');
-        return Boolean(flags.some(Boolean) || looksTesty);
+        
+        // Enhanced test detection patterns
+        const testFlags = [
+          sessionData.isTest, 
+          meta.isTest, 
+          meta.source === 'test', 
+          meta.source === 'mock',
+          meta.source === 'demo'
+        ];
+        
+        // More comprehensive test patterns
+        const testPatterns = [
+          id.startsWith('test_'),
+          id.startsWith('mock_'),
+          id.startsWith('demo_'),
+          id.includes('test'),
+          id.includes('mock'),
+          id.includes('demo'),
+          name.includes('test'),
+          name.includes('mock'),
+          name.includes('demo'),
+          name === 'driver 123',
+          name === 'test driver',
+          name === 'mock driver',
+          id.startsWith('support_session_') && name.toLowerCase().includes('test')
+        ];
+        
+        return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
       } catch (e) {
         return false;
       }
