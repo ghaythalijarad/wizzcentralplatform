@@ -65,6 +65,25 @@
   <!-- Ensure auth utils available on login page for returnUrl logic -->
   <script src="assets/js/auth-utils.js"></script>
 
+  <!-- Immediate form submission prevention -->
+  <script>
+    console.log('🔧 Setting up immediate form protection...');
+    
+    // Prevent any form submission until our handlers are ready
+    window.addEventListener('load', function() {
+      const form = document.getElementById('loginForm');
+      if (form) {
+        console.log('🛡️ Form protection activated');
+        form.onsubmit = function(e) {
+          console.log('🚫 Form submission blocked by protection');
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        };
+      }
+    });
+  </script>
+
   <!-- Main Content -->
   <div class="login-container">
     <div class="login-card">
@@ -80,7 +99,7 @@
         </p>
       </div>
 
-      <form class="login-form" id="loginForm" method="post" action="#">
+      <form class="login-form" id="loginForm" method="post" action="#" onsubmit="return false;">
         <div class="form-group">
           <label for="email">Email Address</label>
           <div class="input-wrapper">
@@ -108,7 +127,7 @@
           </div>
         </div>
 
-        <button type="submit" class="login-btn">
+        <button type="button" class="login-btn" onclick="manualLogin(); return false;">
           <span>Sign In</span>
           <i class="fas fa-arrow-right"></i>
         </button>
@@ -161,6 +180,23 @@
         statusDiv.style.color = '#0c5460';
       }
     }
+
+    // Manual login function that can be called directly
+    window.manualLogin = function() {
+      console.log('🚀 Manual login triggered');
+      
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const remember = document.getElementById('remember').checked;
+
+      if (!email || !password) {
+        showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
+        return;
+      }
+
+      console.log('🔐 Starting manual login with:', email);
+      handleLogin(email, password, remember);
+    };
 
     // Login handler using AuthService
     async function handleLogin(email, password, remember) {
