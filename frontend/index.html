@@ -80,7 +80,7 @@
         </p>
       </div>
 
-      <form class="login-form" id="loginForm">
+      <form class="login-form" id="loginForm" method="post" action="#">
         <div class="form-group">
           <label for="email">Email Address</label>
           <div class="input-wrapper">
@@ -276,6 +276,9 @@
           console.log('✅ Configuration loaded');
           isConfigLoaded = true;
           showStatus('✅ <strong>Ready for Authentication</strong><br>AWS Cognito configuration loaded successfully.', 'success');
+          
+          // Initialize UI elements after configuration is loaded
+          initializeUI();
           return true;
         } else if (retryCount < maxRetries) {
           retryCount++;
@@ -292,8 +295,7 @@
       checkConfiguration();
     }
 
-    document.addEventListener('DOMContentLoaded', initializePage);
-
+    function initializeUI() {
       // Password toggle functionality
       const passwordToggle = document.getElementById('passwordToggle');
       const passwordInput = document.getElementById('password');
@@ -312,12 +314,19 @@
       // Form submission
       const loginForm = document.getElementById('loginForm');
       if (loginForm) {
+        console.log('✅ Login form found, attaching event listener');
+        
         loginForm.addEventListener('submit', function (e) {
-          e.preventDefault();
+          console.log('🔥 Form submit event triggered');
+          e.preventDefault(); // Prevent default form submission
+          e.stopPropagation(); // Stop event bubbling
+          
+          console.log('🔒 Default form submission prevented');
 
           // Wait for configuration to be loaded
           const waitForConfig = () => {
             if (isConfigLoaded) {
+              console.log('✅ Configuration ready, processing login');
               const email = document.getElementById('email').value.trim();
               const password = document.getElementById('password').value.trim();
               const remember = document.getElementById('remember').checked;
@@ -327,20 +336,57 @@
                 return;
               }
 
+              console.log('🚀 Calling handleLogin with:', email);
               handleLogin(email, password, remember);
             } else {
-              console.log('Waiting for configuration to load...');
+              console.log('⏳ Waiting for configuration to load...');
               setTimeout(waitForConfig, 100);
             }
           };
           
           waitForConfig();
+          
+          return false; // Additional prevention of form submission
         });
+        
+        // Also prevent form submission on any button clicks
+        const submitButton = loginForm.querySelector('button[type="submit"], .login-btn');
+        if (submitButton) {
+          submitButton.addEventListener('click', function(e) {
+            console.log('🔥 Submit button clicked');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Trigger form submission event
+            const form = document.getElementById('loginForm');
+            if (form) {
+              const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+              form.dispatchEvent(submitEvent);
+            }
+            
+            return false;
+          });
+        }
+        
+      } else {
+        console.error('❌ Login form not found!');
       }
 
       // Auto-fill remembered email
       const rememberLogin = localStorage.getItem('rememberLogin');
       const lastEmail = localStorage.getItem('lastEmail');
+
+      if (rememberLogin === 'true' && lastEmail) {
+        const emailInput = document.getElementById('email');
+        if (emailInput) {
+          emailInput.value = lastEmail;
+          const rememberCheckbox = document.getElementById('remember');
+          if (rememberCheckbox) rememberCheckbox.checked = true;
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initializePage);
       const emailInput = document.getElementById('email');
 
       if (rememberLogin === 'true' && lastEmail && emailInput) {
