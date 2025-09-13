@@ -289,7 +289,7 @@ window.Auth = {
             if (path.startsWith('/frontend/')) {
                 return '/frontend';
             }
-            // If we are already under /pages/*, no prefix is needed
+            // If we are already under /pages/*, no prefix is needed (frontend is root)
             if (path.startsWith('/pages/')) {
                 return '';
             }

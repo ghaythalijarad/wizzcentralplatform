@@ -28,6 +28,9 @@ class NavigationManager {
             // Setup DOM references
             this.setupDOMReferences();
 
+            // Auto-correct duplicated /pages/ segments in current URL if present
+            this.fixDuplicatedPagesInPath();
+
             // Normalize/repair nav links for current hosting base path
             this.rewriteNavLinks();
 
@@ -53,6 +56,29 @@ class NavigationManager {
         }
     }
 
+    // Collapse any repeated /pages/ segments in the current path and redirect once
+    fixDuplicatedPagesInPath() {
+        try {
+            const { pathname, search, hash } = window.location;
+            if (/(\/pages\/){2,}/.test(pathname)) {
+                const cleaned = pathname.replace(/(?:\/pages\/)+/g, '/pages/');
+                if (cleaned !== pathname) {
+                    const basePrefix = this._getBasePrefix();
+                    // Ensure we keep the frontend prefix if needed
+                    let finalPath = cleaned;
+                    if (basePrefix === '/frontend' && !cleaned.startsWith('/frontend/')) {
+                        finalPath = '/frontend' + cleaned;
+                    }
+                    const target = finalPath + (search || '') + (hash || '');
+                    console.warn('🧼 Fixing duplicated /pages/ in URL ->', target);
+                    window.location.replace(target);
+                }
+            }
+        } catch (e) {
+            console.warn('fixDuplicatedPagesInPath failed', e);
+        }
+    }
+
     async loadSidebar() {
         const container = document.getElementById('sidebar-placeholder');
         if (!container) {
@@ -60,10 +86,10 @@ class NavigationManager {
         }
 
         const candidates = [
-            '/frontend/includes/sidebar.html',
             '/includes/sidebar.html',
+            'includes/sidebar.html',
             '../includes/sidebar.html',
-            'includes/sidebar.html'
+            '/frontend/includes/sidebar.html'
         ];
 
         let lastError = null;
@@ -204,10 +230,14 @@ class NavigationManager {
     _getBasePrefix() {
         try {
             const path = window.location.pathname || '';
-            if (path.startsWith('/frontend/')) return '/frontend';
+            // When served from Amplify with frontend as root, no prefix needed
             if (path.startsWith('/pages/')) return '';
+            // When served from repo with /frontend/ in path, use /frontend prefix
+            if (path.startsWith('/frontend/')) return '/frontend';
+            // When path contains /pages/ somewhere, extract prefix
             const idx = path.indexOf('/pages/');
             if (idx > -1) return path.slice(0, idx);
+            // For root pages like / or /index.html, no prefix
             if (path === '/' || path === '/index.html' || path === '/login.html') return '';
         } catch (_) { }
         return '';
@@ -221,50 +251,52 @@ class NavigationManager {
         // Ignore anchors and javascript links
         if (rawHref.startsWith('#') || rawHref.startsWith('javascript:')) return null;
 
-        const basePrefix = this._getBasePrefix();
-
-        // Build a URL to easily parse pathname/search/hash (supports relative links)
+        // Build a URL to parse search/hash reliably without inheriting deep nested paths
         let url;
         try {
-            url = new URL(rawHref, window.location.origin + (window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/'));
-        } catch (_) {
-            try {
-                url = new URL(rawHref, window.location.origin);
-            } catch (e) {
-                return null;
-            }
+            url = new URL(rawHref, window.location.origin + '/');
+        } catch (e) {
+            return null;
         }
 
         let path = url.pathname || '';
 
-        // Normalize to '/pages/...'
-        let tail = '';
-        if (path.includes('/pages/')) {
-            tail = path.slice(path.indexOf('/pages/'));
-        } else if (/^\/?:?frontend\/pages\//.test(path)) {
-            tail = path.replace(/^\/?frontend/, ''); // ensure '/pages/...'
-        } else if (/^\/?pages\//.test(path)) {
-            tail = path.startsWith('/') ? path : '/' + path;
-        } else {
-            // handle relative like '../pages/...'
-            const idx = path.indexOf('/pages/');
-            if (idx > -1) tail = path.slice(idx);
+        // Do not normalize explicit login/index destinations
+        if (/\/index\.html$/i.test(path) || /\/login\.html$/i.test(path)) {
+            return null;
         }
 
-        if (!tail) return null; // Unknown pattern
+        const basePrefix = this._getBasePrefix();
 
-        // Remove trailing slash to avoid '/pages/foo/'
-        if (tail.endsWith('/')) tail = tail.slice(0, -1);
+        // Helper to ensure filename has .html
+        const ensureHtml = (name) => /\.[a-z0-9]+$/i.test(name) ? name : (name + '.html');
 
-        // Append .html if missing an extension
-        if (!/\.[a-z0-9]+$/i.test(tail)) {
-            tail += '.html';
+        // 1) If path already contains /pages/, collapse to the final filename under a single /pages/
+        let match = path.match(/\/pages\/(?:.*\/)?([^\/?#]+)$/i);
+        if (match && match[1]) {
+            const file = ensureHtml(match[1]);
+            const tail = '/pages/' + file;
+            return (basePrefix || '') + tail + (url.search || '') + (url.hash || '');
         }
 
-        // Reconstruct with base prefix and preserve query/hash
-        let newHref = (basePrefix || '') + tail + (url.search || '') + (url.hash || '');
-        if (!newHref.startsWith('/')) newHref = '/' + newHref;
-        return newHref;
+        // 2) If path starts with /frontend/pages but regex above failed (edge cases)
+        match = path.match(/\/frontend\/pages\/(?:.*\/)?([^\/?#]+)$/i);
+        if (match && match[1]) {
+            const file = ensureHtml(match[1]);
+            const tail = '/pages/' + file;
+            return (basePrefix || '') + tail + (url.search || '') + (url.hash || '');
+        }
+
+        // 3) If a plain html file name or relative like merchants or merchants.html
+        const fileOnly = path.replace(/^\/+/, '');
+        if (/^[A-Za-z0-9_-]+(\.[a-z0-9]+)?$/i.test(fileOnly)) {
+            const file = ensureHtml(fileOnly);
+            const tail = '/pages/' + file;
+            return (basePrefix || '') + tail + (url.search || '') + (url.hash || '');
+        }
+
+        // 4) Unknown pattern -> do not intercept
+        return null;
     }
 
     // Detect current base prefix ('' or '/frontend') and rewrite sidebar links accordingly

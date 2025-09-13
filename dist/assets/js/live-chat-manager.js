@@ -448,14 +448,26 @@ class LiveChatManager {
     handleActiveSessions(message) {
         console.log('📊 Active sessions received:', message);
         
-        // Store active sessions
+        // Store active sessions with filtering
         if (message.sessions && Array.isArray(message.sessions)) {
             this.chatSessions.clear();
+            let addedCount = 0;
+            
             message.sessions.forEach(session => {
-                this.chatSessions.set(session.sessionId, session);
+                // Apply enhanced filtering
+                if (!this.isTestSession(session) && this.isAllowedDriverSession(session)) {
+                    this.chatSessions.set(session.sessionId, session);
+                    addedCount++;
+                } else {
+                    console.log('🚫 Filtered out session:', session.sessionId, session.driverName || 'Unknown');
+                }
             });
-            console.log(`📊 Loaded ${message.sessions.length} active chat sessions`);
+            
+            console.log(`📊 Loaded ${addedCount} genuine WizzDriver sessions (filtered ${message.sessions.length - addedCount} test/mock sessions)`);
         }
+        
+        // Update UI with filtered sessions
+        this.updateChatSessionsList();
         
         this.emit('active_sessions', message);
     }
@@ -600,20 +612,34 @@ class LiveChatManager {
             const sessionId = `support_session_${driverId}_${Date.now()}`;
             
             if (driverInfo.feature === 'live_chat_support') {
+                // Create preliminary session data for filtering
+                const sessionData = {
+                    sessionId: sessionId,
+                    driverName: driverName,
+                    driverPhone: driverPhone,
+                    driverId: driverId,
+                    messages: [],
+                    lastActivity: new Date().toISOString(),
+                    status: 'connected',
+                    unreadCount: 0,
+                    metadata: driverInfo
+                };
+                
+                // Apply enhanced filtering
+                if (this.isTestSession(sessionData)) {
+                    console.log('🚫 Filtered out test driver connection:', driverName, sessionId);
+                    return;
+                }
+                
+                if (!this.isAllowedDriverSession(sessionData)) {
+                    console.log('🚫 Filtered out non-WizzDriver connection:', driverName, sessionId);
+                    return;
+                }
+                
                 let session = this.chatSessions.get(sessionId);
                 if (!session) {
-                    session = {
-                        sessionId: sessionId,
-                        driverName: driverName,
-                        driverPhone: driverPhone,
-                        driverId: driverId,
-                        messages: [],
-                        lastActivity: new Date().toISOString(),
-                        status: 'connected',
-                        unreadCount: 0
-                    };
-                    this.chatSessions.set(sessionId, session);
-                    console.log('🆕 Created session for connected driver:', sessionId);
+                    this.chatSessions.set(sessionId, sessionData);
+                    console.log('🆕 Created session for genuine WizzDriver:', sessionId, driverName);
                     
                     // Update UI
                     this.updateChatSessionsList();
@@ -632,6 +658,245 @@ class LiveChatManager {
     handleTypingIndicator(message) {
         console.log('⌨️ Typing indicator:', message);
         this.emit('typing_indicator', message);
+    }
+
+    /**
+     * Enhanced filtering to exclude test/mock sessions
+     */
+    isTestSession(sessionData = {}) {
+        try {
+            const meta = sessionData.metadata || {};
+            const id = (sessionData.sessionId || sessionData.id || '').toString().toLowerCase();
+            const name = (
+                sessionData.driverName ||
+                sessionData.driverInfo?.driverName ||
+                meta.driverName ||
+                ''
+            ).toString().toLowerCase();
+            
+            // Enhanced test detection patterns
+            const testFlags = [
+                sessionData.isTest, 
+                meta.isTest, 
+                meta.source === 'test', 
+                meta.source === 'mock',
+                meta.source === 'demo'
+            ];
+            
+            // More comprehensive test patterns
+            const testPatterns = [
+                id.startsWith('test_'),
+                id.startsWith('mock_'),
+                id.startsWith('demo_'),
+                id.includes('test'),
+                id.includes('mock'),
+                id.includes('demo'),
+                name.includes('test'),
+                name.includes('mock'),
+                name.includes('demo'),
+                name === 'driver 123',
+                name === 'test driver',
+                name === 'mock driver',
+                id.startsWith('support_session_') && name.toLowerCase().includes('test')
+            ];
+            
+            return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if session is from genuine WizzDriver app AND actively contacting support
+     */
+    isAllowedDriverSession(sessionData = {}) {
+        try {
+            const meta = sessionData.metadata || {};
+            const platform = sessionData.platform || meta.platform || sessionData.driverInfo?.platform;
+            const sourceRaw = meta.source || sessionData.source || sessionData.driverInfo?.source;
+            const source = typeof sourceRaw === 'string' ? sourceRaw.toLowerCase() : null;
+            const userAgent = (meta.userAgent || '').toString();
+            const driverName = (sessionData.driverName || '').toLowerCase();
+            
+            // First check: Must be from WizzDriver Flutter app
+            const allowByPlatform = typeof platform === 'string' && platform.toLowerCase() === 'flutter';
+            const allowBySource = source === 'wizzdriver' || source === 'flutter_http_bridge';
+            const allowByUA = /dart|flutter/i.test(userAgent);
+            
+            // Additional validation for genuine driver names
+            const hasRealDriverName = driverName && 
+                !driverName.includes('test') && 
+                !driverName.includes('mock') && 
+                !driverName.includes('demo') &&
+                driverName !== 'driver 123' &&
+                driverName !== 'driver';
+            
+            // Must have at least one positive indicator for WizzDriver app
+            const hasPositiveIndicator = allowByPlatform || allowBySource || allowByUA;
+            
+            // Explicitly disallow test/mock sources
+            const explicitNonFlutter = typeof platform === 'string' && platform && platform.toLowerCase() !== 'flutter';
+            const explicitMock = typeof source === 'string' && /test|mock|demo|web|browser/i.test(source);
+            if (explicitNonFlutter || explicitMock) return false;
+            
+            // Second check: Must be an active live chat session initiated by driver
+            const isActiveChatSession = this.isActiveLiveChatSession(sessionData);
+            
+            // CORE REQUIREMENT: Only show drivers who actively contacted live chat support
+            // Must have: WizzDriver app + Real driver name + Active chat session
+            const isValidWizzDriverSession = hasPositiveIndicator && hasRealDriverName;
+            
+            // Return true only if BOTH conditions are met:
+            // 1. Valid WizzDriver app session with real driver name
+            // 2. Driver actively initiated a live chat conversation
+            return isValidWizzDriverSession && isActiveChatSession;
+            
+        } catch (e) {
+            return false; // Default to reject on error for security
+        }
+    }
+
+    /**
+     * Check if session is an active live chat initiated by a driver
+     */
+    isActiveLiveChatSession(sessionData = {}) {
+        try {
+            const meta = sessionData.metadata || {};
+            const hasMessages = sessionData.messages && sessionData.messages.length > 0;
+            const hasCustomerMessage = sessionData.messages?.some(msg => 
+                msg.senderType === 'customer' || msg.senderType === 'driver'
+            );
+            
+            // Check for active chat indicators
+            const chatIndicators = [
+                // Has actual conversation
+                hasMessages && hasCustomerMessage,
+                
+                // Session was initiated by clicking "Live Chat" in WizzDriver app
+                meta.source === 'wizz_driver_app',
+                meta.initiatedBy === 'driver',
+                meta.chatType === 'support',
+                
+                // Driver explicitly requested support
+                meta.action === 'contact_support',
+                meta.userAction === 'start_chat',
+                
+                // Has initial support message
+                sessionData.initialMessage && sessionData.initialMessage.length > 0,
+                
+                // Driver-initiated session (not just connected)
+                sessionData.status === 'chat_active' || sessionData.status === 'waiting_for_agent',
+                
+                // Has recent activity (not just idle connection)
+                sessionData.lastActivity && (Date.now() - new Date(sessionData.lastActivity).getTime()) < 300000, // 5 minutes
+                
+                // Session has chat context
+                sessionData.context === 'support_chat' || sessionData.type === 'support_request'
+            ];
+            
+            return chatIndicators.some(Boolean);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Clean up all existing test/mock sessions
+     */
+    cleanupTestSessions() {
+        console.log('🧹 Cleaning up test/mock sessions...');
+        
+        let removedCount = 0;
+        const sessionsToRemove = [];
+        
+        this.chatSessions.forEach((session, sessionId) => {
+            if (this.isTestSession(session) || !this.isAllowedDriverSession(session)) {
+                sessionsToRemove.push(sessionId);
+                removedCount++;
+            }
+        });
+        
+        // Remove the filtered sessions
+        sessionsToRemove.forEach(sessionId => {
+            const session = this.chatSessions.get(sessionId);
+            console.log('🗑️ Removing test/mock session:', sessionId, session?.driverName);
+            this.chatSessions.delete(sessionId);
+        });
+        
+        console.log(`✅ Cleanup complete: Removed ${removedCount} test/mock sessions`);
+        
+        // Update UI
+        this.updateChatSessionsList();
+        
+        return removedCount;
+    }
+
+    /**
+     * Debug method to show session filtering details
+     */
+    debugSessionFiltering() {
+        console.log('🔍 Debug: Current session filtering status');
+        
+        this.chatSessions.forEach((session, sessionId) => {
+            const isTest = this.isTestSession(session);
+            const isAllowed = this.isAllowedDriverSession(session);
+            const status = isTest ? '❌ TEST' : isAllowed ? '✅ ALLOWED' : '🚫 FILTERED';
+            
+            console.log(`${status} ${sessionId}: ${session.driverName}`, {
+                isTest,
+                isAllowed,
+                metadata: session.metadata,
+                driverName: session.driverName
+            });
+        });
+    }
+
+    /**
+     * Filter sessions to show only genuine WizzDriver app sessions
+     */
+    filterGenuineSessions() {
+        const filteredSessions = new Map();
+        
+        this.chatSessions.forEach((session, sessionId) => {
+            // Skip test sessions
+            if (this.isTestSession(session)) {
+                console.log('🚫 Filtering out test session:', sessionId, session.driverName);
+                return;
+            }
+            
+            // Only allow genuine WizzDriver sessions
+            if (this.isAllowedDriverSession(session)) {
+                filteredSessions.set(sessionId, session);
+            } else {
+                console.log('🚫 Filtering out non-WizzDriver session:', sessionId, session.driverName);
+            }
+        });
+        
+        this.chatSessions = filteredSessions;
+        console.log(`✅ Filtered to ${filteredSessions.size} genuine WizzDriver sessions`);
+        
+        return filteredSessions;
+    }
+
+    /**
+     * Manually refresh sessions and apply filtering
+     */
+    refreshSessions() {
+        console.log('🔄 Manually refreshing and filtering sessions...');
+        
+        // Apply filtering to existing sessions
+        this.filterGenuineSessions();
+        
+        // Update the UI
+        this.updateChatSessionsList();
+        
+        // Request fresh session data from server if connected
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({
+                type: 'get_active_sessions',
+                agentId: this.agentId
+            }));
+        }
     }
 
     /**

@@ -33,17 +33,17 @@ function connectToLiveChat() {
     console.log('🔌 Connecting to Live Chat WebSocket...');
     
     try {
-        liveChatWS = new WebSocket(WEBSOCKET_URL + '?userType=support&sessionId=bridge');
+        liveChatWS = new WebSocket(WEBSOCKET_URL + '?userType=support&agentId=bridge_agent&businessId=7ccf646c-9594-48d4-8f63-c366d89257e5');
         
         liveChatWS.on('open', () => {
             console.log('✅ Connected to Live Chat WebSocket');
             
             // Send authentication as support agent
             liveChatWS.send(JSON.stringify({
-                type: 'chat_agent_connect',
+                type: 'agent_connect',
                 agentId: 'bridge_agent',
                 agentName: 'Message Bridge',
-                sessionId: null  // Will join active sessions as needed
+                businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5'
             }));
         });
         
@@ -133,32 +133,23 @@ const server = http.createServer((req, res) => {
                     // Find or create session for this driver
                     let sessionId = driverSessions.get(driverId);
                     if (!sessionId) {
-                        sessionId = `session_${driverId}_${Date.now()}`;
+                        sessionId = `test-session-${Date.now()}`;
                         driverSessions.set(driverId, sessionId);
-                        
-                        // Send driver connect message first
-                        liveChatWS.send(JSON.stringify({
-                            type: 'chat_driver_connect',
-                            driverId: driverId,
-                            driverName: driverName,
-                            driverPhone: flutterMessage.metadata?.driverPhone || null,
-                            currentOrder: flutterMessage.metadata?.currentOrder || null,
-                            location: flutterMessage.metadata?.location || null
-                        }));
                         
                         console.log(`✨ Created new session ${sessionId} for driver ${driverId}`);
                     }
                     
-                    // Forward message to Live Chat
+                    // Forward message to Live Chat using correct format
                     const webSocketMessage = {
-                        type: 'chat_message',
+                        type: 'driver_message',
                         sessionId: sessionId,
-                        messageText: flutterMessage.message,
-                        senderType: 'driver',
+                        content: flutterMessage.message,
+                        driverId: driverId,
+                        driverName: driverName,
+                        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
+                        timestamp: new Date().toISOString(),
                         metadata: {
-                            senderId: driverId,
-                            senderName: driverName,
-                            timestamp: flutterMessage.metadata?.timestamp || new Date().toISOString(),
+                            platform: 'flutter',
                             source: 'flutter_http_bridge'
                         }
                     };

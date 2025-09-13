@@ -5,13 +5,13 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   stage: ${opt:stage, 'dev'}
-  profile: wizz-drivers-ghayth-dev
   memorySize: 256
   
   environment:
     STAGE: ${self:provider.stage}
     WEBSOCKET_CONNECTIONS_TABLE: websocket-connections-${self:provider.stage}
     CHAT_SESSIONS_TABLE: chat-sessions-${self:provider.stage}
+    CHAT_MESSAGES_TABLE: chat-messages-${self:provider.stage}
     WEBSOCKET_API_ENDPOINT: wss://3g9xqhaxic.execute-api.us-east-1.amazonaws.com/dev
   
   iamRoleStatements:
@@ -28,6 +28,8 @@ provider:
         - arn:aws:dynamodb:${self:provider.region}:*:table/websocket-connections-${self:provider.stage}/index/*
         - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}
         - arn:aws:dynamodb:${self:provider.region}:*:table/chat-sessions-${self:provider.stage}/index/*
+        - arn:aws:dynamodb:${self:provider.region}:*:table/chat-messages-${self:provider.stage}
+        - arn:aws:dynamodb:${self:provider.region}:*:table/chat-messages-${self:provider.stage}/index/*
     - Effect: Allow
       Action:
         - execute-api:ManageConnections

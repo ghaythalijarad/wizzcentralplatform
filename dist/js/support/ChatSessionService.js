@@ -22,15 +22,40 @@
           meta.driverName ||
           ''
         ).toString().toLowerCase();
-        const flags = [sessionData.isTest, meta.isTest, meta.source === 'test', meta.source === 'mock'];
-        const looksTesty = id.startsWith('test_') || name.includes('test') || name.includes('demo');
-        return Boolean(flags.some(Boolean) || looksTesty);
+        
+        // Enhanced test detection patterns
+        const testFlags = [
+          sessionData.isTest, 
+          meta.isTest, 
+          meta.source === 'test', 
+          meta.source === 'mock',
+          meta.source === 'demo'
+        ];
+        
+        // More comprehensive test patterns
+        const testPatterns = [
+          id.startsWith('test_'),
+          id.startsWith('mock_'),
+          id.startsWith('demo_'),
+          id.includes('test'),
+          id.includes('mock'),
+          id.includes('demo'),
+          name.includes('test'),
+          name.includes('mock'),
+          name.includes('demo'),
+          name === 'driver 123',
+          name === 'test driver',
+          name === 'mock driver',
+          id.startsWith('support_session_') && name.toLowerCase().includes('test')
+        ];
+        
+        return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
       } catch (e) {
         return false;
       }
     }
 
-    // Only allow sessions from WizzDriver (Flutter). If metadata exists and points elsewhere, reject.
+    // Only allow sessions from WizzDriver (Flutter) that are actively contacting support
     _isAllowedDriverSession(sessionData = {}) {
       try {
         const meta = sessionData.metadata || {};
@@ -38,19 +63,85 @@
         const sourceRaw = meta.source || sessionData.source || sessionData.driverInfo?.source;
         const source = typeof sourceRaw === 'string' ? sourceRaw.toLowerCase() : null;
         const userAgent = (meta.userAgent || '').toString();
-        // Positive allowlist
+        const driverName = (sessionData.driverName || '').toLowerCase();
+        
+        // First check: Must be from WizzDriver Flutter app
         const allowByPlatform = typeof platform === 'string' && platform.toLowerCase() === 'flutter';
-        const allowBySource = source === 'wizzdriver' || source === 'http_api' || source === 'flutter_http_bridge';
+        const allowBySource = source === 'wizzdriver' || source === 'flutter_http_bridge';
         const allowByUA = /dart|flutter/i.test(userAgent);
-        if (allowByPlatform || allowBySource || allowByUA) return true;
-        // If metadata explicitly indicates a non-flutter origin (like web/test/mock), disallow
+        
+        // Additional validation for genuine driver names
+        const hasRealDriverName = driverName && 
+          !driverName.includes('test') && 
+          !driverName.includes('mock') && 
+          !driverName.includes('demo') &&
+          driverName !== 'driver 123' &&
+          driverName !== 'driver';
+        
+        // Must have at least one positive indicator for WizzDriver app
+        const hasPositiveIndicator = allowByPlatform || allowBySource || allowByUA;
+        
+        // Explicitly disallow test/mock sources
         const explicitNonFlutter = typeof platform === 'string' && platform && platform.toLowerCase() !== 'flutter';
-        const explicitMock = typeof source === 'string' && /test|mock|demo/i.test(source);
+        const explicitMock = typeof source === 'string' && /test|mock|demo|web|browser/i.test(source);
         if (explicitNonFlutter || explicitMock) return false;
-        // If we have no decisive metadata, default to allow
-        return true;
+        
+        // Second check: Must be an active live chat session initiated by driver
+        const isActiveChatSession = this._isActiveLiveChatSession(sessionData);
+        
+        // CORE REQUIREMENT: Only show drivers who actively contacted live chat support
+        // Must have: WizzDriver app + Real driver name + Active chat session
+        const isValidWizzDriverSession = hasPositiveIndicator && hasRealDriverName;
+        
+        // Return true only if BOTH conditions are met:
+        // 1. Valid WizzDriver app session with real driver name
+        // 2. Driver actively initiated a live chat conversation
+        return isValidWizzDriverSession && isActiveChatSession;
+        
       } catch (e) {
-        return true;
+        return false; // Default to reject on error for security
+      }
+    }
+
+    // Check if session is an active live chat initiated by a driver
+    _isActiveLiveChatSession(sessionData = {}) {
+      try {
+        const meta = sessionData.metadata || {};
+        const hasMessages = sessionData.messages && sessionData.messages.length > 0;
+        const hasCustomerMessage = sessionData.messages?.some(msg => 
+          msg.senderType === 'customer' || msg.senderType === 'driver'
+        );
+        
+        // Check for active chat indicators
+        const chatIndicators = [
+          // Has actual conversation
+          hasMessages && hasCustomerMessage,
+          
+          // Session was initiated by clicking "Live Chat" in WizzDriver app
+          meta.source === 'wizz_driver_app',
+          meta.initiatedBy === 'driver',
+          meta.chatType === 'support',
+          
+          // Driver explicitly requested support
+          meta.action === 'contact_support',
+          meta.userAction === 'start_chat',
+          
+          // Has initial support message
+          sessionData.initialMessage && sessionData.initialMessage.length > 0,
+          
+          // Driver-initiated session (not just connected)
+          sessionData.status === 'chat_active' || sessionData.status === 'waiting_for_agent',
+          
+          // Has recent activity (not just idle connection)
+          sessionData.lastActivity && (Date.now() - new Date(sessionData.lastActivity).getTime()) < 300000, // 5 minutes
+          
+          // Session has chat context
+          sessionData.context === 'support_chat' || sessionData.type === 'support_request'
+        ];
+        
+        return chatIndicators.some(Boolean);
+      } catch (e) {
+        return false;
       }
     }
 

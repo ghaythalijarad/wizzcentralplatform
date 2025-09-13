@@ -172,8 +172,45 @@
         platform: 'web',
         appVersion: '1.0.0'
       });
-      if (this.token) params.append('token', this.token);
+      
+      // Add JWT token for authentication if available
+      const token = this._getAuthToken();
+      if (token) {
+        params.append('token', token);
+        console.log('🔑 Adding authentication token to WebSocket URL');
+      } else {
+        console.warn('⚠️ No authentication token available - connection may be rejected');
+      }
+      
       return `${this.endpoint}?${params.toString()}`;
+    }
+
+    // Get authentication token for WebSocket connection
+    _getAuthToken() {
+      try {
+        // Try to get JWT token from auth utils
+        if (window.Auth && typeof window.Auth.getIdToken === 'function') {
+          const idToken = window.Auth.getIdToken();
+          if (idToken) {
+            console.log('✅ Using idToken for WebSocket authentication');
+            return idToken;
+          }
+        }
+
+        // Fallback to direct sessionStorage access
+        const idToken = sessionStorage.getItem('idToken');
+        if (idToken) {
+          console.log('✅ Using sessionStorage idToken for WebSocket authentication');
+          return idToken;
+        }
+
+        // Generate a temporary token for browser clients (fallback)
+        console.warn('⚠️ No JWT available, using temporary browser token');
+        return `browser_agent_${this.agentId}_${Date.now()}`;
+      } catch (error) {
+        console.error('❌ Error getting auth token:', error);
+        return null;
+      }
     }
 
     connect() {
@@ -686,6 +723,15 @@
         // Queue message for later sending
         this._queueMessage(data);
         console.log('📤 Message queued (not connected):', data.type || data.action);
+        
+        // Attempt reconnection if not already connecting
+        if (!this.connected && this.connectionState !== 'connecting') {
+          console.log('🔄 Auto-reconnecting to send queued message...');
+          this.connect().catch(error => {
+            console.error('Auto-reconnect failed:', error);
+          });
+        }
+        
         return false;
       }
     }
