@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test - Debug Version</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 50px; }
+        .test-box { border: 1px solid #ccc; padding: 20px; margin: 20px 0; }
+        .success { border-color: green; background: #f0fff0; }
+        .error { border-color: red; background: #fff0f0; }
+        .info { border-color: blue; background: #f0f0ff; }
+        button { padding: 10px 20px; margin: 10px; }
+        input { padding: 8px; margin: 5px; }
+        #console { height: 200px; overflow-y: scroll; background: #f5f5f5; padding: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Central Platform Login Debug Test</h1>
+    
+    <div class="test-box info">
+        <h3>Test 1: Check if Main Platform Loads</h3>
+        <button onclick="testPlatformLoad()">Test Platform Load</button>
+        <div id="loadResult"></div>
+    </div>
+
+    <div class="test-box info">
+        <h3>Test 2: Test Manual Login Function</h3>
+        <input type="email" id="testEmail" value="g87_a@yahoo.com" placeholder="Email">
+        <input type="password" id="testPassword" value="Gha@551987" placeholder="Password">
+        <br>
+        <button onclick="testManualLogin()">Test Manual Login</button>
+        <div id="loginResult"></div>
+    </div>
+
+    <div class="test-box info">
+        <h3>Test 3: Check AWS Cognito Direct</h3>
+        <button onclick="testCognitoDirect()">Test Cognito Authentication</button>
+        <div id="cognitoResult"></div>
+    </div>
+
+    <div class="test-box info">
+        <h3>Console Output:</h3>
+        <div id="console"></div>
+    </div>
+
+    <script>
+        // Capture console logs
+        const originalLog = console.log;
+        const consoleDiv = document.getElementById('console');
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            consoleDiv.innerHTML += args.join(' ') + '<br>';
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        function testPlatformLoad() {
+            console.log('🧪 Testing platform load...');
+            
+            fetch('https://main.d2f5oacwil9cbi.amplifyapp.com')
+                .then(response => {
+                    console.log('✅ Platform responded with status:', response.status);
+                    return response.text();
+                })
+                .then(html => {
+                    const hasManualLogin = html.includes('manualLogin');
+                    const hasConfig = html.includes('WIZZCENTRAL_CONFIG');
+                    const hasAuthService = html.includes('auth-service.js');
+                    
+                    document.getElementById('loadResult').innerHTML = `
+                        <p>✅ Platform loads successfully</p>
+                        <p>Manual Login Function: ${hasManualLogin ? '✅' : '❌'}</p>
+                        <p>Configuration: ${hasConfig ? '✅' : '❌'}</p>
+                        <p>Auth Service: ${hasAuthService ? '✅' : '❌'}</p>
+                    `;
+                    
+                    console.log('Platform load test complete');
+                })
+                .catch(error => {
+                    console.log('❌ Platform load failed:', error);
+                    document.getElementById('loadResult').innerHTML = '<p class="error">❌ Platform load failed</p>';
+                });
+        }
+
+        function testManualLogin() {
+            console.log('🧪 Testing manual login simulation...');
+            
+            const email = document.getElementById('testEmail').value;
+            const password = document.getElementById('testPassword').value;
+            
+            // Simulate what the manual login should do
+            const testData = {
+                email: email,
+                password: password,
+                action: 'test_login'
+            };
+            
+            console.log('📝 Login data prepared:', testData);
+            
+            // Test if we can reach the platform
+            fetch('https://main.d2f5oacwil9cbi.amplifyapp.com', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'text/html'
+                }
+            })
+            .then(response => {
+                console.log('✅ Platform is reachable for login test');
+                document.getElementById('loginResult').innerHTML = `
+                    <p>✅ Platform reachable</p>
+                    <p>📝 Test credentials: ${email}</p>
+                    <p>⚠️ Manual login would need to be tested on actual platform</p>
+                    <p><a href="https://main.d2f5oacwil9cbi.amplifyapp.com" target="_blank">🔗 Open Platform</a></p>
+                `;
+            })
+            .catch(error => {
+                console.log('❌ Login test failed:', error);
+                document.getElementById('loginResult').innerHTML = '<p class="error">❌ Platform not reachable</p>';
+            });
+        }
+
+        function testCognitoDirect() {
+            console.log('🧪 Testing AWS Cognito connectivity...');
+            
+            // Test if we can reach Cognito endpoint
+            const cognitoEndpoint = 'https://cognito-idp.us-east-1.amazonaws.com/';
+            
+            fetch(cognitoEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-amz-json-1.1',
+                    'X-Amz-Target': 'AWSCognitoIdentityProviderService.ListUsers'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                console.log('✅ Cognito endpoint reachable, status:', response.status);
+                document.getElementById('cognitoResult').innerHTML = `
+                    <p>✅ AWS Cognito endpoint is reachable</p>
+                    <p>Status: ${response.status} (expected: 400+ due to missing auth)</p>
+                    <p>This confirms Cognito service is available</p>
+                `;
+            })
+            .catch(error => {
+                if (error.name === 'TypeError' && error.message.includes('CORS')) {
+                    console.log('✅ Cognito endpoint reachable (CORS expected)');
+                    document.getElementById('cognitoResult').innerHTML = `
+                        <p>✅ AWS Cognito endpoint is reachable</p>
+                        <p>CORS error is expected for direct calls</p>
+                        <p>This confirms Cognito service is available</p>
+                    `;
+                } else {
+                    console.log('❌ Cognito test failed:', error);
+                    document.getElementById('cognitoResult').innerHTML = '<p class="error">❌ Cognito endpoint not reachable</p>';
+                }
+            });
+        }
+
+        // Auto-run first test
+        console.log('🚀 Starting login debug tests...');
+        setTimeout(testPlatformLoad, 1000);
+    </script>
+</body>
+</html>

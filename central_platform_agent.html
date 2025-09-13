@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central Platform Live Chat - Agent Connection</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.connected { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.disconnected { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.connecting { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .messages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #ddd;
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            margin: 20px 0;
+        }
+        .message {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #007bff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message-meta {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .message-content {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        button:disabled { 
+            background: #6c757d; 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 1px solid #90caf9;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+            border: 1px solid #81c784;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #2e7d32;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎧 Central Platform Live Chat</h1>
+            <p>Support Agent Interface - Ready to receive driver messages</p>
+        </div>
+
+        <div class="success-box">
+            <strong>🎉 Authentication Setup Complete!</strong><br>
+            • Admin user <code>g87_a@yahoo.com</code> is in the <strong>admins</strong> group<br>
+            • WebSocket handler recognizes admin/agent groups<br>
+            • Flutter app is sending messages successfully<br>
+            • All infrastructure is ready for live chat!
+        </div>
+
+        <div id="connectionStatus" class="status disconnected">
+            ❌ Not Connected - Click "Connect as Support Agent" to start receiving messages
+        </div>
+
+        <div class="button-group">
+            <button id="connectBtn" onclick="connectAsAgent()">🔌 Connect as Support Agent</button>
+            <button id="loginBtn" onclick="openCentralPlatform()">🌐 Login to Central Platform</button>
+            <button id="disconnectBtn" onclick="disconnectAgent()" disabled>🔌 Disconnect</button>
+            <button onclick="clearMessages()">🗑️ Clear Messages</button>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="messageCount">0</div>
+                <div class="stat-label">Messages Received</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="connectionTime">--</div>
+                <div class="stat-label">Connected Time</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="lastMessage">Never</div>
+                <div class="stat-label">Last Message</div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>🎯 How to Test:</strong><br>
+            1. Click "Connect as Support Agent" below<br>
+            2. Go to your iPhone Flutter app<br>
+            3. Navigate: More → Live Support Chat<br>
+            4. Send a message like "Hello from enhanced live chat!"<br>
+            5. Watch the message appear here in real-time! 🚀
+        </div>
+
+        <h3>📨 Live Messages from Drivers</h3>
+        <div id="messages" class="messages">
+            <div style="text-align: center; color: #666; padding: 40px;">
+                <strong>Waiting for messages...</strong><br>
+                Connect as agent and send a message from the Flutter app to see it here.
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>💡 Alternative Connection Methods:</strong><br>
+            • <strong>Recommended:</strong> Use "Login to Central Platform" for full admin access<br>
+            • <strong>Quick Test:</strong> Use "Connect as Support Agent" for direct WebSocket connection<br>
+            • Both methods will receive live chat messages from the Flutter app
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let connectionStatus = document.getElementById('connectionStatus');
+        let messagesDiv = document.getElementById('messages');
+        let connectBtn = document.getElementById('connectBtn');
+        let disconnectBtn = document.getElementById('disconnectBtn');
+        let messageCount = 0;
+        let connectionStartTime = null;
+
+        const WEBSOCKET_URL = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
+        const BUSINESS_ID = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+
+        function updateStatus(message, className) {
+            connectionStatus.textContent = message;
+            connectionStatus.className = `status ${className}`;
+        }
+
+        function updateStats() {
+            document.getElementById('messageCount').textContent = messageCount;
+            
+            if (connectionStartTime) {
+                const elapsed = Math.floor((Date.now() - connectionStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('connectionTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+        }
+
+        function addMessage(data) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            const timestamp = new Date(data.timestamp || Date.now()).toLocaleString();
+            const driverId = data.driverId || data.sessionId || data.senderName || 'Unknown Driver';
+            const message = data.message || data.messageText || data.content || JSON.stringify(data);
+            
+            messageDiv.innerHTML = `
+                <div class="message-meta">
+                    <span>🚗 ${driverId}</span>
+                    <span>⏰ ${timestamp}</span>
+                </div>
+                <div class="message-content">${message}</div>
+            `;
+            
+            // Clear "waiting" message if this is the first message
+            if (messagesDiv.children.length === 1 && messagesDiv.textContent.includes('Waiting for messages')) {
+                messagesDiv.innerHTML = '';
+            }
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            messageCount++;
+            document.getElementById('lastMessage').textContent = new Date().toLocaleTimeString();
+            updateStats();
+
+            // Play notification sound
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn9v1uWkgCCuCzNnl2JcaC2eSwOGtdEQUYrfp671kFgoZrO7Wx2MdCzKG09bfnSkINXvX8di4fiEJU6vo4qpgGAozZK/kxXEqBSl+zd3j0pUcEF2z5uvCbCEIJojQ0PK+bSAHVqni4aFhGQodMr/r0HZGLFRJ9JjQ9MRsGQgzfeDtxHIrBSF1xObI4KYsF1iowOGtdEQUYrfp671kFgoZrO7Wx2MdCzKG09bfnSkINXvX8di4fiEJU6vo4qpgGAozZK/kxXEqBSl+zd3j0pUcEF2z5uvCbCEIJojQ0PK+bSAHVqni4aFhGQodMr/r0HZGLFRJ9JjQ9MRsGQgzfeDtxHIrBSF1xObI4KYsF1iowOGtdEQUYrfp671kFgoZrO7Wx2MdCzKG09bfnSkINXvX8di4fiEJU6vo4qpgGAozZK/kxXEqBSl+zd3j0pUcEF2z5uvCbCEIJojQ0PK+bSAHVqni4aFhGQodMr/r0HZGLFRJ9JjQ9MRsGQgzfeDtxHIrBSF1xObI4KYsF1iowOGtdEQUYrfp671kFgoZrO7Wx2MdCzKG09bfnSkINXvX8di4fiEJU6vo4qpgGAozZK/kxXEqBSl+zd3j0pUcEF2z5uvCbCEIJojQ0PK+bSAHVqni4aFhGQodMr/r0HZGLFRJ9JjQ9MRsGQgzfeDtxHIrBSF1xObI4KYsF1iowOGtdEQUYrfp671kFgoZrO7Wx2MdCzKG09bfnSkINXvX8di4fiEJU6vo4qpgGAozZK/kxXEqBSl+zd3j0pUcEF2z5uvCbCEIJojQ0PK+bSAHVqni4aFhGQodMr/r0HZGLFRJ9JjQ9MRsGQgzfeDtxHIrBSF1xObI4KYsF1iow==');
+            audio.volume = 0.2;
+            audio.play().catch(() => {}); // Ignore if audio fails
+        }
+
+        function connectAsAgent() {
+            updateStatus('🔄 Connecting as support agent...', 'connecting');
+            connectBtn.disabled = true;
+
+            try {
+                // Use support agent bypass - no JWT required
+                const agentUrl = `${WEBSOCKET_URL}?userType=support&businessId=${BUSINESS_ID}&agentId=live-chat-agent-${Date.now()}&platform=web`;
+                
+                console.log('🔗 Connecting to:', agentUrl);
+                ws = new WebSocket(agentUrl);
+
+                ws.onopen = function() {
+                    console.log('✅ WebSocket connected as support agent');
+                    updateStatus('✅ Connected as Support Agent - Ready to receive messages!', 'connected');
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    connectionStartTime = Date.now();
+                    updateStats();
+                    
+                    // Send agent online notification
+                    ws.send(JSON.stringify({
+                        type: 'chat_agent_connect',
+                        agentId: 'live-chat-agent-' + Date.now(),
+                        agentName: 'Support Agent',
+                        businessId: BUSINESS_ID,
+                        timestamp: new Date().toISOString()
+                    }));
+                };
+
+                ws.onmessage = function(event) {
+                    console.log('📨 Received message:', event.data);
+                    try {
+                        const data = JSON.parse(event.data);
+                        addMessage(data);
+                    } catch (e) {
+                        // If it's not JSON, treat as plain message
+                        addMessage({ message: event.data, timestamp: new Date().toISOString() });
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    console.error('❌ WebSocket error:', error);
+                    updateStatus('❌ Connection Error - Try "Login to Central Platform" instead', 'disconnected');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                };
+
+                ws.onclose = function(event) {
+                    console.log('🔌 WebSocket closed:', event.code, event.reason);
+                    updateStatus('❌ Disconnected', 'disconnected');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    connectionStartTime = null;
+                };
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('❌ Connection Failed', 'disconnected');
+                connectBtn.disabled = false;
+            }
+        }
+
+        function disconnectAgent() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            updateStatus('❌ Disconnected', 'disconnected');
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            connectionStartTime = null;
+        }
+
+        function clearMessages() {
+            messagesDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 40px;"><strong>Messages cleared.</strong><br>Send a new message from the Flutter app.</div>';
+            messageCount = 0;
+            document.getElementById('lastMessage').textContent = 'Never';
+            updateStats();
+        }
+
+        function openCentralPlatform() {
+            window.open('https://main.d2f5oacwil9cbi.amplifyapp.com', '_blank');
+        }
+
+        // Update connection time every second
+        setInterval(updateStats, 1000);
+
+        // Auto-focus when page loads
+        window.addEventListener('load', function() {
+            console.log('🚀 Central Platform Live Chat Agent Interface Ready');
+        });
+    </script>
+</body>
+</html>
