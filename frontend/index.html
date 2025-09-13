@@ -423,14 +423,6 @@
     }
 
     document.addEventListener('DOMContentLoaded', initializePage);
-      const emailInput = document.getElementById('email');
-
-      if (rememberLogin === 'true' && lastEmail && emailInput) {
-        emailInput.value = lastEmail;
-        const rememberCheckbox = document.getElementById('remember');
-        if (rememberCheckbox) rememberCheckbox.checked = true;
-      }
-    });
   </script>
 </body>
 
