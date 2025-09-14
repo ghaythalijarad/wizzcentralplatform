@@ -38,9 +38,9 @@ function connectToLiveChat() {
         liveChatWS.on('open', () => {
             console.log('✅ Connected to Live Chat WebSocket');
             
-            // Send authentication as support agent
+            // Send authentication as support agent  
             liveChatWS.send(JSON.stringify({
-                type: 'agent_connect',
+                type: 'chat_agent_connect',
                 agentId: 'bridge_agent',
                 agentName: 'Message Bridge',
                 businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5'
@@ -51,6 +51,12 @@ function connectToLiveChat() {
             try {
                 const message = JSON.parse(data);
                 console.log('📨 Received from Live Chat:', message.type);
+                
+                if (message.type === 'error') {
+                    console.log('❌ Error details:', JSON.stringify(message, null, 2));
+                } else {
+                    console.log('✅ Success message:', JSON.stringify(message, null, 2));
+                }
                 
                 // Handle responses from Live Chat and potentially forward back to Flutter
                 if (message.type === 'chat_message' && message.senderType === 'agent') {
@@ -130,30 +136,42 @@ const server = http.createServer((req, res) => {
                     const driverId = flutterMessage.metadata?.senderId;
                     const driverName = flutterMessage.metadata?.senderName || 'Driver';
                     
-                    // Find or create session for this driver
-                    let sessionId = driverSessions.get(driverId);
+                    // Use sessionId from request or find/create session for this driver
+                    let sessionId = flutterMessage.sessionId;
                     if (!sessionId) {
-                        sessionId = `test-session-${Date.now()}`;
+                        sessionId = driverSessions.get(driverId);
+                        if (!sessionId) {
+                            sessionId = `session-${Date.now()}-${driverId}`;
+                            driverSessions.set(driverId, sessionId);
+                            console.log(`✨ Created new session ${sessionId} for driver ${driverId}`);
+                        }
+                    } else {
+                        // Store the provided session ID
                         driverSessions.set(driverId, sessionId);
-                        
-                        console.log(`✨ Created new session ${sessionId} for driver ${driverId}`);
+                        console.log(`📝 Using provided session ${sessionId} for driver ${driverId}`);
                     }
                     
-                    // Forward message to Live Chat using correct format
+                    // Forward message to Live Chat using correct format for agent forwarding
                     const webSocketMessage = {
-                        type: 'driver_message',
+                        type: 'chat_message',
                         sessionId: sessionId,
+                        message: flutterMessage.message,
                         content: flutterMessage.message,
+                        senderType: 'driver',
+                        senderId: driverId,
+                        senderName: driverName,
                         driverId: driverId,
                         driverName: driverName,
                         businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
                         timestamp: new Date().toISOString(),
                         metadata: {
                             platform: 'flutter',
-                            source: 'flutter_http_bridge'
+                            source: 'flutter_http_bridge',
+                            forwardedBy: 'bridge_agent'
                         }
                     };
                     
+                    console.log('🔍 Sending WebSocket message:', JSON.stringify(webSocketMessage, null, 2));
                     liveChatWS.send(JSON.stringify(webSocketMessage));
                     console.log('📡 Message bridged to Live Chat WebSocket');
                     

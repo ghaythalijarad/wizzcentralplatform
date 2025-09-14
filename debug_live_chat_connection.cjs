@@ -8,14 +8,15 @@ const WebSocket = require('ws');
 const WEBSOCKET_URL = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
 const BUSINESS_ID = '7ccf646c-9594-48d4-8f63-c366d89257e5';
 
-// Test agent connection parameters
+// Test agent connection parameters (no token for testing - should allow anonymous connections)
 const testAgentParams = {
     businessId: BUSINESS_ID,
     userId: 'test-support-agent',
-    userType: 'agent_dashboard',
-    platform: 'dashboard',
-    version: '1.0.0',
-    token: 'test-agent-token' // Add authentication token
+    userType: 'support',
+    agentId: 'platform-ui-001',
+    platform: 'web',
+    appVersion: '1.0.0'
+    // Removed token to test without authentication
 };
 
 // Build WebSocket URL with parameters
