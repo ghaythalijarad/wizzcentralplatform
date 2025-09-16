@@ -87,8 +87,8 @@ class NavigationManager {
 
         const candidates = [
             '/includes/sidebar.html',
-            'includes/sidebar.html',
             '../includes/sidebar.html',
+            'includes/sidebar.html',
             '/frontend/includes/sidebar.html'
         ];
 

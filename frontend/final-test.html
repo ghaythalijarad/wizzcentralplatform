@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral - Final Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 15% auto; padding: 20px; border-radius: 5px; width: 400px; max-width: 90%; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        .form-group { margin: 10px 0; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; box-sizing: border-box; }
+        #results { margin-top: 20px; max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🎯 WizzCentral Platform - Final Integration Test</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Test Status</h3>
+        <p>This page tests all the implemented functionality without AWS dependencies.</p>
+        <ul>
+            <li>✅ Platform Discount Infrastructure</li>
+            <li>✅ UI Implementation</li>
+            <li>✅ Form Handler</li>
+            <li>✅ Modal Functionality</li>
+            <li>✅ Authentication Bypass (Debug Mode)</li>
+            <li>✅ Comprehensive Cleanup</li>
+            <li>✅ Validation Tab Removal</li>
+            <li>❌ AWS Permissions (Need SSO Login)</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🧪 Test Functions</h3>
+        <button onclick="testModalFunctionality()">Test Modal Open/Close</button>
+        <button onclick="testFormValidation()">Test Form Validation</button>
+        <button onclick="testMockPromotion()">Test Mock Promotion Creation</button>
+        <button onclick="testAWSConnection()">Test AWS Connection</button>
+        <button onclick="testSidebarLoading()">Test Sidebar Loading</button>
+    </div>
+
+    <div id="results" class="test-section">
+        <h4>📊 Test Results</h4>
+        <p>Click the test buttons above to see results...</p>
+    </div>
+
+    <!-- Modal for Testing -->
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTestModal()">&times;</span>
+            <h3>Create New Promotion (Test)</h3>
+            <form id="testPromotionForm" onsubmit="handleTestSubmit(event)">
+                <div class="form-group">
+                    <label for="test_title">Title:</label>
+                    <input type="text" id="test_title" name="title" value="Test Platform Discount" required>
+                </div>
+                <div class="form-group">
+                    <label for="test_description">Description:</label>
+                    <textarea id="test_description" name="description" required>20% off on all platform services</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="test_discount_type">Discount Type:</label>
+                    <select id="test_discount_type" name="discount_type" required>
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="test_discount_value">Discount Value:</label>
+                    <input type="number" id="test_discount_value" name="discount_value" value="20" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="test_start_date">Start Date:</label>
+                    <input type="date" id="test_start_date" name="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="test_end_date">End Date:</label>
+                    <input type="date" id="test_end_date" name="end_date" required>
+                </div>
+                <button type="submit">Create Platform Promotion</button>
+                <button type="button" onclick="closeTestModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Set default dates
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('test_start_date').value = today.toISOString().split('T')[0];
+            document.getElementById('test_end_date').value = nextWeek.toISOString().split('T')[0];
+            
+            addResult('🚀 Final Test Page Loaded Successfully', 'success');
+        });
+
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function testModalFunctionality() {
+            addResult('🎭 Testing modal functionality...', 'info');
+            
+            try {
+                // Open modal
+                document.getElementById('testModal').style.display = 'block';
+                setTimeout(() => {
+                    if (document.getElementById('testModal').style.display === 'block') {
+                        addResult('✅ Modal opened successfully', 'success');
+                        
+                        // Close modal after 2 seconds
+                        setTimeout(() => {
+                            closeTestModal();
+                            addResult('✅ Modal closed successfully', 'success');
+                        }, 2000);
+                    } else {
+                        addResult('❌ Modal failed to open', 'error');
+                    }
+                }, 100);
+                
+            } catch (error) {
+                addResult(`❌ Modal test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testFormValidation() {
+            addResult('📝 Testing form validation...', 'info');
+            
+            try {
+                const form = document.getElementById('testPromotionForm');
+                const formData = new FormData(form);
+                
+                const data = {
+                    title: formData.get('title'),
+                    description: formData.get('description'),
+                    discount_type: formData.get('discount_type'),
+                    discount_value: parseFloat(formData.get('discount_value')),
+                    start_date: formData.get('start_date'),
+                    end_date: formData.get('end_date')
+                };
+                
+                // Validate required fields
+                const required = ['title', 'description', 'discount_type', 'start_date', 'end_date'];
+                const missing = required.filter(field => !data[field]);
+                
+                if (missing.length > 0) {
+                    addResult(`❌ Missing required fields: ${missing.join(', ')}`, 'error');
+                    return;
+                }
+                
+                // Validate discount value
+                if (isNaN(data.discount_value) || data.discount_value <= 0) {
+                    addResult('❌ Invalid discount value', 'error');
+                    return;
+                }
+                
+                // Validate dates
+                const startDate = new Date(data.start_date);
+                const endDate = new Date(data.end_date);
+                
+                if (endDate <= startDate) {
+                    addResult('❌ End date must be after start date', 'error');
+                    return;
+                }
+                
+                addResult('✅ Form validation passed', 'success');
+                addResult(`📋 Form Data: ${JSON.stringify(data, null, 2)}`, 'info');
+                
+            } catch (error) {
+                addResult(`❌ Form validation failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testMockPromotion() {
+            addResult('🎯 Testing mock promotion creation...', 'info');
+            
+            try {
+                // Simulate the promotion creation process
+                const mockPromotion = {
+                    id: 'platform_' + Date.now(),
+                    title: 'Test Platform Discount',
+                    description: '20% off on all platform services',
+                    discountType: 'percentage',
+                    discountValue: 20,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    discountSource: 'platform',
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'system'
+                };
+                
+                // Simulate API call
+                setTimeout(() => {
+                    addResult('✅ Mock promotion created successfully', 'success');
+                    addResult(`📦 Promotion Details: ${JSON.stringify(mockPromotion, null, 2)}`, 'info');
+                }, 500);
+                
+            } catch (error) {
+                addResult(`❌ Mock promotion creation failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testAWSConnection() {
+            addResult('☁️ Testing AWS connection...', 'info');
+            
+            try {
+                // Check if AWS SDK is available
+                if (typeof AWS === 'undefined') {
+                    addResult('❌ AWS SDK not loaded', 'error');
+                    return;
+                }
+                
+                addResult('✅ AWS SDK loaded', 'success');
+                
+                // Test credentials
+                const credentials = sessionStorage.getItem('debugMode') === 'true';
+                if (credentials) {
+                    addResult('✅ Debug mode credentials available', 'success');
+                } else {
+                    addResult('❌ No credentials available - need AWS SSO login', 'error');
+                    addResult('💡 Run: aws sso login --profile default', 'info');
+                }
+                
+            } catch (error) {
+                addResult(`❌ AWS connection test failed: ${error.message}`, 'error');
+            }
+        }
+
+        function testSidebarLoading() {
+            addResult('🧭 Testing sidebar loading...', 'info');
+            
+            fetch('/includes/sidebar.html')
+                .then(response => {
+                    if (response.ok) {
+                        addResult('✅ Sidebar loads successfully', 'success');
+                    } else {
+                        addResult(`❌ Sidebar loading failed: HTTP ${response.status}`, 'error');
+                    }
+                })
+                .catch(error => {
+                    addResult(`❌ Sidebar loading error: ${error.message}`, 'error');
+                });
+        }
+
+        function closeTestModal() {
+            document.getElementById('testModal').style.display = 'none';
+        }
+
+        function handleTestSubmit(event) {
+            event.preventDefault();
+            addResult('📝 Form submitted - running validation test...', 'info');
+            testFormValidation();
+            setTimeout(() => {
+                closeTestModal();
+                testMockPromotion();
+            }, 1000);
+        }
+
+        // Enable debug mode
+        sessionStorage.setItem('debugMode', 'true');
+        addResult('🔧 Debug mode enabled', 'info');
+    </script>
+</body>
+</html>

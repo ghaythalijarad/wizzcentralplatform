@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Promotion Creation Workflow</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-header {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 1rem;
+        }
+        .test-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0.5rem;
+            font-size: 1rem;
+        }
+        .test-button:hover {
+            background: #2980b9;
+        }
+        .test-result {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .log-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1 class="test-header">🧪 Promotion Creation Workflow Test</h1>
+        <p>This test will verify that the promotion creation functionality works end-to-end.</p>
+        
+        <div>
+            <button class="test-button" onclick="testBasicDependencies()">1. Test Dependencies</button>
+            <button class="test-button" onclick="testFormElements()">2. Test Form Elements</button>
+            <button class="test-button" onclick="testModalFunctionality()">3. Test Modal</button>
+            <button class="test-button" onclick="testDataService()">4. Test Data Service</button>
+            <button class="test-button" onclick="testFullWorkflow()">5. Full Workflow Test</button>
+            <button class="test-button" onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="testResults"></div>
+    </div>
+
+    <script>
+        let testResults = [];
+        
+        function addResult(type, title, message, details = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const result = {
+                timestamp,
+                type,
+                title,
+                message,
+                details
+            };
+            testResults.push(result);
+            updateDisplay();
+        }
+        
+        function updateDisplay() {
+            const container = document.getElementById('testResults');
+            container.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.type}">
+                    <strong>[${result.timestamp}] ${result.title}</strong><br>
+                    ${result.message}
+                    ${result.details ? `<div class="log-output">${result.details}</div>` : ''}
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function clearResults() {
+            testResults = [];
+            updateDisplay();
+        }
+        
+        async function testBasicDependencies() {
+            addResult('info', 'Testing Dependencies', 'Checking if required scripts and objects are loaded...');
+            
+            const checks = [
+                { name: 'window.dataService', exists: !!window.dataService },
+                { name: 'promotions-clean.js', exists: !!window.initializePromotionsPage },
+                { name: 'jQuery (if used)', exists: !!window.$ },
+                { name: 'AWS SDK', exists: !!window.AWS },
+                { name: 'Config object', exists: !!window.WIZZCENTRAL_CONFIG }
+            ];
+            
+            const results = checks.map(check => 
+                `${check.exists ? '✅' : '❌'} ${check.name}: ${check.exists ? 'Available' : 'Missing'}`
+            ).join('\n');
+            
+            const allPresent = checks.every(check => check.exists);
+            addResult(allPresent ? 'success' : 'error', 
+                'Dependency Check Complete', 
+                allPresent ? 'All dependencies are available' : 'Some dependencies are missing',
+                results
+            );
+        }
+        
+        function testFormElements() {
+            addResult('info', 'Testing Form Elements', 'Checking if all form elements exist...');
+            
+            const elements = [
+                'addPromotionForm',
+                'addPromotionModal',
+                'openAddPromotionModalBtn',
+                'closeAddPromotionModalBtn',
+                'title',
+                'code',
+                'type',
+                'value',
+                'description',
+                'startDate',
+                'endDate'
+            ];
+            
+            const results = elements.map(id => {
+                const element = document.getElementById(id);
+                return `${element ? '✅' : '❌'} #${id}: ${element ? 'Found' : 'Missing'}`;
+            }).join('\n');
+            
+            const allFound = elements.every(id => document.getElementById(id));
+            addResult(allFound ? 'success' : 'error',
+                'Form Elements Check Complete',
+                allFound ? 'All form elements found' : 'Some form elements are missing',
+                results
+            );
+        }
+        
+        function testModalFunctionality() {
+            addResult('info', 'Testing Modal', 'Testing modal open/close functionality...');
+            
+            try {
+                const modal = document.getElementById('addPromotionModal');
+                const openBtn = document.getElementById('openAddPromotionModalBtn');
+                const closeBtn = document.getElementById('closeAddPromotionModalBtn');
+                
+                if (!modal || !openBtn || !closeBtn) {
+                    throw new Error('Modal elements not found');
+                }
+                
+                // Test opening modal
+                openBtn.click();
+                const isOpen = modal.style.display === 'flex';
+                
+                // Test closing modal
+                closeBtn.click();
+                const isClosed = modal.style.display === 'none';
+                
+                const results = [
+                    `Modal element: ${modal ? 'Found' : 'Missing'}`,
+                    `Open button: ${openBtn ? 'Found' : 'Missing'}`,
+                    `Close button: ${closeBtn ? 'Found' : 'Missing'}`,
+                    `Modal opens correctly: ${isOpen ? 'Yes' : 'No'}`,
+                    `Modal closes correctly: ${isClosed ? 'Yes' : 'No'}`
+                ].join('\n');
+                
+                addResult(isOpen && isClosed ? 'success' : 'error',
+                    'Modal Functionality Test Complete',
+                    isOpen && isClosed ? 'Modal works correctly' : 'Modal has issues',
+                    results
+                );
+                
+            } catch (error) {
+                addResult('error', 'Modal Test Failed', error.message);
+            }
+        }
+        
+        async function testDataService() {
+            addResult('info', 'Testing Data Service', 'Testing data service initialization and methods...');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('window.dataService not available');
+                }
+                
+                // Test initialization
+                await window.dataService.initialize();
+                addResult('success', 'Data Service Initialized', 'Data service initialized successfully');
+                
+                // Test platform discount creation (dry run)
+                const testDiscount = {
+                    discountId: 'test_' + Date.now(),
+                    title: 'Test Discount',
+                    description: 'Test Description',
+                    type: 'percentage',
+                    value: 10,
+                    code: 'TEST10',
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                    isActive: true,
+                    discountSource: 'platform'
+                };
+                
+                // Check if createPlatformDiscount method exists
+                if (typeof window.dataService.createPlatformDiscount === 'function') {
+                    addResult('success', 'Data Service Method Available', 'createPlatformDiscount method is available');
+                } else {
+                    throw new Error('createPlatformDiscount method not found');
+                }
+                
+            } catch (error) {
+                addResult('error', 'Data Service Test Failed', error.message);
+            }
+        }
+        
+        async function testFullWorkflow() {
+            addResult('info', 'Full Workflow Test', 'Testing complete promotion creation workflow...');
+            
+            try {
+                // 1. Open modal
+                const openBtn = document.getElementById('openAddPromotionModalBtn');
+                const modal = document.getElementById('addPromotionModal');
+                
+                openBtn.click();
+                if (modal.style.display !== 'flex') {
+                    throw new Error('Modal did not open');
+                }
+                
+                // 2. Fill form with test data
+                const form = document.getElementById('addPromotionForm');
+                const testData = {
+                    title: 'Test Promotion ' + Date.now(),
+                    code: 'TEST' + Date.now(),
+                    type: 'percentage',
+                    value: '15',
+                    description: 'Test promotion created by automated test',
+                    startDate: new Date().toISOString().slice(0, 16),
+                    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0, 16),
+                    limit: '100',
+                    minOrder: '25'
+                };
+                
+                for (const [field, value] of Object.entries(testData)) {
+                    const element = document.getElementById(field);
+                    if (element) {
+                        element.value = value;
+                    }
+                }
+                
+                addResult('info', 'Form Filled', 'Test data filled into form');
+                
+                // 3. Submit form programmatically
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                form.dispatchEvent(submitEvent);
+                
+                addResult('info', 'Form Submitted', 'Form submission triggered');
+                
+                // 4. Wait a moment and check if modal closed
+                setTimeout(() => {
+                    if (modal.style.display === 'none') {
+                        addResult('success', 'Full Workflow Test Complete', 'Promotion creation workflow completed successfully');
+                    } else {
+                        addResult('error', 'Workflow Issue', 'Modal did not close after submission');
+                    }
+                }, 2000);
+                
+            } catch (error) {
+                addResult('error', 'Full Workflow Test Failed', error.message);
+            }
+        }
+        
+        // Auto-run basic dependency check on load
+        window.addEventListener('load', () => {
+            setTimeout(testBasicDependencies, 1000);
+        });
+    </script>
+</body>
+</html>

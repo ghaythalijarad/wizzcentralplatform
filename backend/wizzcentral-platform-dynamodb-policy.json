@@ -1,0 +1,24 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Scan",
+        "dynamodb:Query",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WizzCentral_Platform_Discounts",
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WizzCentral_Platform_Discounts/*",
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzMerchants_Discounts",
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzMerchants_Discounts/*",
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzMerchants_Businesses",
+        "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzMerchants_Businesses/*"
+      ]
+    }
+  ]
+}

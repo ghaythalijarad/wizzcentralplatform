@@ -10,7 +10,7 @@ const WebSocket = require('ws');
 const url = require('url');
 
 // Configuration
-const HTTP_PORT = 8087;  // Different port from existing broker
+const HTTP_PORT = 8087;  // Port expected by Flutter app
 const WEBSOCKET_URL = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
 
 // Store active chat sessions and WebSocket connections
@@ -53,13 +53,10 @@ function connectToLiveChat() {
                 console.log('📨 Received from Live Chat:', message.type);
                 
                 if (message.type === 'error') {
-                    console.log('❌ Error details:', JSON.stringify(message, null, 2));
-                } else {
-                    console.log('✅ Success message:', JSON.stringify(message, null, 2));
-                }
-                
-                // Handle responses from Live Chat and potentially forward back to Flutter
-                if (message.type === 'chat_message' && message.senderType === 'agent') {
+                    console.log('❌ Error from Live Chat:', JSON.stringify(message, null, 2));
+                } else if (message.type === 'chat_session_created') {
+                    console.log('✅ Session created:', message.sessionId);
+                } else if (message.type === 'chat_message' && message.senderType === 'agent') {
                     console.log('💬 Agent response received - could forward to Flutter app if needed');
                     // Future: implement bidirectional communication
                 }
@@ -122,35 +119,32 @@ const server = http.createServer((req, res) => {
                     messageLength: flutterMessage.message?.length
                 });
                 
-                // Store message in history
+                // Generate message ID and session ID
                 const messageWithId = {
-                    id: Date.now().toString(),
-                    timestamp: new Date().toISOString(),
-                    source: 'flutter_driver',
-                    ...flutterMessage
+                    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    ...flutterMessage,
+                    timestamp: new Date().toISOString()
                 };
+                
+                // Store in history
                 messageHistory.push(messageWithId);
                 
-                // Bridge to WebSocket Live Chat if connected
+                // Determine session ID and driver info
+                const driverId = flutterMessage.metadata?.senderId || flutterMessage.metadata?.driverId;
+                const driverName = flutterMessage.metadata?.senderName || flutterMessage.metadata?.driverName || `Driver ${driverId}`;
+                
+                // Use provided session ID or create new one
+                let sessionId = flutterMessage.sessionId;
+                if (!sessionId) {
+                    sessionId = `session_${driverId}_${Date.now()}`;
+                    driverSessions.set(driverId, sessionId);
+                    console.log(`📝 Created new session ${sessionId} for driver ${driverId}`);
+                } else {
+                    console.log(`📝 Using provided session ${sessionId} for driver ${driverId}`);
+                }
+                
+                // Forward to Live Chat if connected
                 if (liveChatWS && liveChatWS.readyState === WebSocket.OPEN) {
-                    const driverId = flutterMessage.metadata?.senderId;
-                    const driverName = flutterMessage.metadata?.senderName || 'Driver';
-                    
-                    // Use sessionId from request or find/create session for this driver
-                    let sessionId = flutterMessage.sessionId;
-                    if (!sessionId) {
-                        sessionId = driverSessions.get(driverId);
-                        if (!sessionId) {
-                            sessionId = `session-${Date.now()}-${driverId}`;
-                            driverSessions.set(driverId, sessionId);
-                            console.log(`✨ Created new session ${sessionId} for driver ${driverId}`);
-                        }
-                    } else {
-                        // Store the provided session ID
-                        driverSessions.set(driverId, sessionId);
-                        console.log(`📝 Using provided session ${sessionId} for driver ${driverId}`);
-                    }
-                    
                     // Forward message to Live Chat using correct format for agent forwarding
                     const webSocketMessage = {
                         type: 'chat_message',
@@ -190,6 +184,7 @@ const server = http.createServer((req, res) => {
                     res.end(JSON.stringify({
                         success: true,
                         messageId: messageWithId.id,
+                        sessionId: sessionId,
                         bridged: false,
                         message: 'Message received but Live Chat not available'
                     }));

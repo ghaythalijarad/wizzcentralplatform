@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Chat Test - WizzCentral Support</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .header h1 {
+            color: #667eea;
+            margin: 0;
+            font-size: 2.5em;
+        }
+
+        .status-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .status-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+
+        .status-card .value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .chat-area {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            background: white;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .message .meta {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .message .content {
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .indicator.connected {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .indicator.disconnected {
+            background: #dc3545;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .log {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Live Chat Test Dashboard</h1>
+            <p>Real-time monitoring of Flutter app messages</p>
+        </div>
+
+        <div class="status-panel">
+            <div class="status-card">
+                <h3><span class="indicator disconnected" id="wsIndicator"></span>WebSocket Status</h3>
+                <div class="value" id="wsStatus">Disconnected</div>
+            </div>
+            <div class="status-card">
+                <h3>📨 Messages Received</h3>
+                <div class="value" id="messageCount">0</div>
+            </div>
+            <div class="status-card">
+                <h3>🔄 Active Connections</h3>
+                <div class="value" id="connectionCount">0</div>
+            </div>
+        </div>
+
+        <div class="chat-area" id="chatArea">
+            <div style="text-align: center; color: #666; padding: 50px;">
+                <h3>Waiting for messages from Flutter app...</h3>
+                <p>Make sure the Flutter app is running and connected to live chat</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="connectWebSocket()">🔌 Connect to WebSocket</button>
+            <button onclick="clearMessages()">🗑️ Clear Messages</button>
+            <button onclick="sendTestMessage()">📤 Send Test Message</button>
+            <button onclick="checkBridgeStatus()">🌉 Check Bridge Status</button>
+        </div>
+
+        <div class="log" id="debugLog"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let messageCount = 0;
+        let isConnected = false;
+
+        const wsUrl = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
+        const bridgeUrl = 'http://localhost:8087';
+
+        function log(message) {
+            const logDiv = document.getElementById('debugLog');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function updateUI() {
+            document.getElementById('wsStatus').textContent = isConnected ? 'Connected' : 'Disconnected';
+            document.getElementById('messageCount').textContent = messageCount;
+            const indicator = document.getElementById('wsIndicator');
+            indicator.className = `indicator ${isConnected ? 'connected' : 'disconnected'}`;
+        }
+
+        function addMessage(content, sender = 'Driver', timestamp = new Date()) {
+            const chatArea = document.getElementById('chatArea');
+            
+            // Clear initial message if this is the first real message
+            if (messageCount === 0) {
+                chatArea.innerHTML = '';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <div class="meta">
+                    <strong>${sender}</strong> • ${timestamp.toLocaleTimeString()}
+                </div>
+                <div class="content">${content}</div>
+            `;
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+            
+            messageCount++;
+            updateUI();
+        }
+
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('⚠️ WebSocket already connected');
+                return;
+            }
+
+            log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function(event) {
+                    log('✅ WebSocket connected successfully');
+                    isConnected = true;
+                    updateUI();
+                    
+                    // Send connection message
+                    const connectMsg = {
+                        action: 'support-agent-connect',
+                        agentId: 'test-support-agent',
+                        timestamp: new Date().toISOString()
+                    };
+                    ws.send(JSON.stringify(connectMsg));
+                    log('📤 Sent support agent connection message');
+                };
+                
+                ws.onmessage = function(event) {
+                    log(`📨 Received: ${event.data}`);
+                    
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.content) {
+                            addMessage(data.content, data.sender || 'Driver');
+                        } else if (data.message) {
+                            addMessage(data.message, data.from || 'Driver');
+                        } else {
+                            addMessage(JSON.stringify(data), 'System');
+                        }
+                    } catch (e) {
+                        if (event.data && event.data !== 'null') {
+                            addMessage(event.data, 'Raw Message');
+                        }
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    log(`🔌 WebSocket closed: ${event.code} - ${event.reason}`);
+                    isConnected = false;
+                    updateUI();
+                };
+                
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`);
+                    isConnected = false;
+                    updateUI();
+                };
+                
+            } catch (error) {
+                log(`❌ Failed to create WebSocket connection: ${error}`);
+            }
+        }
+
+        function clearMessages() {
+            document.getElementById('chatArea').innerHTML = `
+                <div style="text-align: center; color: #666; padding: 50px;">
+                    <h3>Messages cleared</h3>
+                    <p>Waiting for new messages...</p>
+                </div>
+            `;
+            messageCount = 0;
+            updateUI();
+            log('🗑️ Messages cleared');
+        }
+
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected');
+                return;
+            }
+
+            const testMessage = {
+                action: 'support-response',
+                content: 'Hello from support! This is a test message.',
+                agentId: 'test-support-agent',
+                timestamp: new Date().toISOString()
+            };
+
+            ws.send(JSON.stringify(testMessage));
+            log('📤 Sent test message to Flutter app');
+            addMessage('Hello from support! This is a test message.', 'Support Agent');
+        }
+
+        async function checkBridgeStatus() {
+            try {
+                const response = await fetch(`${bridgeUrl}/health`);
+                const data = await response.json();
+                log(`🌉 Bridge Status: ${JSON.stringify(data)}`);
+            } catch (error) {
+                log(`❌ Bridge check failed: ${error}`);
+            }
+        }
+
+        // Auto-connect on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            log('🚀 Live Chat Test Dashboard initialized');
+            updateUI();
+            
+            // Auto-connect after a short delay
+            setTimeout(() => {
+                connectWebSocket();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

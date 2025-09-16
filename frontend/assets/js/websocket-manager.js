@@ -16,6 +16,10 @@ class WebSocketManager {
         this.listeners = {};
         this.eventHandlers = {}; // Add event handling capability
 
+        // Channel-based routing for live chat and other features
+        this.channels = new Map(); // channel -> Set<handler>
+        this.globalHandlers = new Set();
+
         // New stability features
         this.connectionId = null;
         this.messageQueue = [];
@@ -193,7 +197,7 @@ class WebSocketManager {
         this.updateConnectionStatus('Error', 'error');
         this.emit('error', error);
     }    /**
-     * Enhanced message handling with acknowledgments
+     * Enhanced message handling with acknowledgments and channel routing
      */
     onMessage(event) {
         try {
@@ -214,13 +218,38 @@ class WebSocketManager {
                 return;
             }
 
-            // Handle different message types
+            // Route to channel subscribers first (new channel-based routing)
+            const channel = message.channel || (message.meta && message.meta.channel);
+            if (channel && this.channels.has(channel)) {
+                this.channels.get(channel).forEach(handler => {
+                    try {
+                        handler(message);
+                    } catch (e) {
+                        console.error(`❌ Channel handler error for ${channel}:`, e);
+                    }
+                });
+            }
+
+            // Route to global handlers (for backward compatibility)
+            this.globalHandlers.forEach(handler => {
+                try {
+                    handler(message);
+                } catch (e) {
+                    console.error('❌ Global handler error:', e);
+                }
+            });
+
+            // Handle different message types (existing functionality)
             switch (message.type) {
                 case 'connection_established':
                     console.log('🎉 Connection established:', message.message);
                     break;
 
                 case 'chat_message':
+                case 'CHAT_MESSAGE':
+                case 'INCOMING_CHAT':
+                case 'AGENT_JOINED':
+                case 'CHAT_END':
                     this.handleChatMessage(message);
                     break;
 
@@ -606,6 +635,99 @@ class WebSocketManager {
             clearInterval(this.healthCheckTimer);
             this.healthCheckTimer = null;
         }
+    }
+
+    /**
+     * Subscribe to a channel for live chat and other features
+     * @param {string} channel - Channel name (e.g., 'chat', 'orders', 'location')
+     * @param {function} handler - Message handler function
+     * @returns {function} - Unsubscribe function
+     */
+    subscribe(channel, handler) {
+        if (!this.channels.has(channel)) {
+            this.channels.set(channel, new Set());
+        }
+        
+        const channelSet = this.channels.get(channel);
+        channelSet.add(handler);
+        
+        console.log(`📡 Subscribed to channel: ${channel} (${channelSet.size} subscribers)`);
+        
+        // Return unsubscribe function
+        return () => {
+            channelSet.delete(handler);
+            if (channelSet.size === 0) {
+                this.channels.delete(channel);
+            }
+            console.log(`📡 Unsubscribed from channel: ${channel}`);
+        };
+    }
+
+    /**
+     * Add global message handler (for backward compatibility)
+     * @param {function} handler - Message handler function
+     * @returns {function} - Unsubscribe function
+     */
+    onMessage(handler) {
+        this.globalHandlers.add(handler);
+        return () => this.globalHandlers.delete(handler);
+    }
+
+    /**
+     * Publish a message to a specific channel
+     * @param {object} options - Message options
+     * @param {string} options.action - Action for API Gateway routing
+     * @param {string} options.channel - Channel name
+     * @param {string} options.subchannel - Subchannel for further routing
+     * @param {string} options.type - Message type
+     * @param {object} options.payload - Message payload
+     * @param {object} options.meta - Additional metadata
+     * @returns {boolean} - True if sent immediately, false if queued
+     */
+    publish({ action, channel, subchannel, type, payload, meta = {} }) {
+        const message = {
+            action: action || 'route',
+            channel,
+            subchannel,
+            type,
+            payload,
+            meta: {
+                timestamp: Date.now(),
+                connectionId: this.connectionId,
+                ...meta
+            }
+        };
+        
+        return this.sendMessage(message);
+    }
+
+    /**
+     * Set authentication for this connection
+     * @param {object} auth - Authentication data (userId, token, etc.)
+     */
+    setAuth(auth) {
+        this.auth = auth;
+        if (this.isConnected) {
+            this.sendMessage({
+                action: 'authenticate',
+                type: 'AUTH',
+                auth: this.auth
+            });
+        }
+    }
+
+    /**
+     * Get detailed status including channel information
+     * @returns {object} - Connection status
+     */
+    getDetailedStatus() {
+        return {
+            ...this.getStatus(),
+            channelCount: this.channels.size,
+            subscriberCount: Array.from(this.channels.values()).reduce((sum, set) => sum + set.size, 0),
+            channels: Array.from(this.channels.keys()),
+            globalHandlers: this.globalHandlers.size
+        };
     }
 }
 

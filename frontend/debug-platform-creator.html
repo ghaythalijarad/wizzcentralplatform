@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Platform Discount Creator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .create-btn { background: #28a745; }
+        .create-btn:hover { background: #1e7e34; }
+        .debug-btn { background: #fd7e14; }
+        .debug-btn:hover { background: #e55a00; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐛 Debug Platform Discount Creator</h1>
+    <p>Debug version with authentication bypass for testing platform discount creation.</p>
+
+    <!-- Debug Controls -->
+    <div id="debugCard" class="card warning">
+        <h3>🔧 Debug Controls</h3>
+        <p>This page bypasses authentication to test platform discount creation directly.</p>
+        <button class="debug-btn" onclick="initializeDebugMode()">🚀 Initialize Debug Mode</button>
+        <button class="debug-btn" onclick="testDynamoDBConnection()">🔍 Test DynamoDB</button>
+        <button onclick="checkExistingDiscounts()">📋 List Existing Platform Discounts</button>
+        <div id="debugStatus"></div>
+    </div>
+
+    <!-- Status Card -->
+    <div id="statusCard" class="card info">
+        <h3>📊 System Status</h3>
+        <div id="statusText">Waiting for debug initialization...</div>
+    </div>
+
+    <!-- Quick Create Form -->
+    <div class="card">
+        <h3>🆕 Create Platform Discount</h3>
+        <form id="discountForm">
+            <div class="form-row">
+                <div>
+                    <label>Title:</label>
+                    <input type="text" id="title" value="Debug Flash Sale 2025" required>
+                </div>
+                <div>
+                    <label>Discount Type:</label>
+                    <select id="type">
+                        <option value="percentage">Percentage</option>
+                        <option value="fixed">Fixed Amount</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div>
+                    <label>Value:</label>
+                    <input type="number" id="value" value="30" min="1" required>
+                </div>
+                <div>
+                    <label>Code:</label>
+                    <input type="text" id="code" value="DEBUG30" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div>
+                    <label>Min Order Value:</label>
+                    <input type="number" id="minOrder" value="75" min="0">
+                </div>
+                <div>
+                    <label>Usage Limit:</label>
+                    <input type="number" id="limit" value="50" min="1">
+                </div>
+            </div>
+            
+            <label>Description:</label>
+            <textarea id="description" rows="3">Debug platform discount for testing purposes</textarea>
+            
+            <div class="form-row">
+                <div>
+                    <label>Start Date:</label>
+                    <input type="date" id="startDate" required>
+                </div>
+                <div>
+                    <label>End Date:</label>
+                    <input type="date" id="endDate" required>
+                </div>
+            </div>
+            
+            <button type="submit" class="create-btn">🚀 Create Platform Discount</button>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <div id="resultCard" class="card" style="display: none;">
+        <h3>✅ Results</h3>
+        <div id="resultText"></div>
+        <button onclick="openPromotionsPage()">📋 View Promotions Page</button>
+        <button onclick="checkExistingDiscounts()">🔄 Refresh Platform Discounts</button>
+    </div>
+
+    <!-- Existing Discounts -->
+    <div id="existingCard" class="card" style="display: none;">
+        <h3>📋 Existing Platform Discounts</h3>
+        <div id="existingText"></div>
+    </div>
+
+    <!-- Debug Log -->
+    <div class="card">
+        <h3>🐛 Debug Log</h3>
+        <button onclick="clearLog()">🗑️ Clear</button>
+        <div id="debugLog" class="log">Debug platform discount creator initializing...\n</div>
+    </div>
+
+    <script>
+        // Simple logging
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('debugLog');
+            logEl.textContent += `[${time}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[DebugPlatformDiscounts] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('debugLog').textContent = 'Log cleared.\n';
+        }
+
+        function setStatus(message, type = 'info') {
+            const card = document.getElementById('statusCard');
+            const text = document.getElementById('statusText');
+            card.className = `card ${type}`;
+            text.innerHTML = message;
+        }
+
+        function showResult(message, type = 'success') {
+            const card = document.getElementById('resultCard');
+            const text = document.getElementById('resultText');
+            card.style.display = 'block';
+            card.className = `card ${type}`;
+            text.innerHTML = message;
+        }
+
+        function showExisting(message) {
+            const card = document.getElementById('existingCard');
+            const text = document.getElementById('existingText');
+            card.style.display = 'block';
+            text.innerHTML = message;
+        }
+
+        function setDebugStatus(message, type = 'info') {
+            const el = document.getElementById('debugStatus');
+            el.innerHTML = `<div class="mt-2 p-2 border rounded bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} text-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'}">${message}</div>`;
+        }
+
+        function openPromotionsPage() {
+            window.open('/pages/promotions.html', '_blank');
+        }
+
+        // Initialize debug mode with authentication bypass
+        async function initializeDebugMode() {
+            log('🔧 Initializing debug mode...');
+            setDebugStatus('Initializing debug mode...', 'info');
+            
+            try {
+                // Set debug mode flags in sessionStorage
+                sessionStorage.setItem('debugMode', 'true');
+                sessionStorage.setItem('debugForceUnauth', 'true');
+                log('✅ Debug flags set in sessionStorage');
+                
+                // Clear any existing auth tokens to force unauth mode
+                sessionStorage.removeItem('idToken');
+                sessionStorage.removeItem('accessToken');
+                log('🧹 Cleared auth tokens to force unauth mode');
+                
+                // Wait for AWS SDK to load
+                if (typeof AWS === 'undefined') {
+                    throw new Error('AWS SDK not loaded');
+                }
+                log('✅ AWS SDK loaded');
+                
+                // Wait for dataService
+                if (!window.dataService) {
+                    log('⏳ Waiting for dataService...');
+                    await waitForDataService();
+                }
+                log('✅ DataService available');
+                
+                // Test AWS initialization in debug mode
+                log('🧪 Testing AWS initialization...');
+                await window.AWSUtils.initialize();
+                log('✅ AWS initialized in debug mode');
+                
+                setStatus('✅ Debug mode active! Ready to create platform discounts.', 'success');
+                setDebugStatus('✅ Debug mode successfully initialized with unauthenticated credentials', 'success');
+                
+            } catch (error) {
+                log(`❌ Debug initialization failed: ${error.message}`);
+                setStatus(`❌ Debug initialization failed: ${error.message}`, 'error');
+                setDebugStatus(`❌ Failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testDynamoDBConnection() {
+            log('🧪 Testing DynamoDB connection...');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+                
+                // Test scan of platform discounts table
+                const result = await window.dataService.scan('WizzCentral_Platform_Discounts', { Limit: 3 });
+                const count = result.Items?.length || 0;
+                log(`✅ DynamoDB test successful: Found ${count} platform discounts`);
+                setDebugStatus(`✅ DynamoDB connection working (${count} items found)`, 'success');
+                
+            } catch (error) {
+                log(`❌ DynamoDB test failed: ${error.message}`);
+                setDebugStatus(`❌ DynamoDB test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkExistingDiscounts() {
+            log('📋 Loading existing platform discounts...');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+                
+                const discounts = await window.dataService.getPlatformDiscounts();
+                log(`✅ Found ${discounts.length} platform discounts`);
+                
+                if (discounts.length === 0) {
+                    showExisting('No platform discounts found in the database.');
+                } else {
+                    let html = `<strong>Found ${discounts.length} platform discounts:</strong><br><br>`;
+                    discounts.forEach((discount, i) => {
+                        html += `
+                            <div style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                                <strong>${discount.title || discount.name || 'Unnamed'}</strong><br>
+                                Code: <code>${discount.code || 'No code'}</code><br>
+                                Value: ${discount.value}${discount.type === 'percentage' ? '%' : '$'} off<br>
+                                ID: <small>${discount.discountId}</small><br>
+                                Status: ${discount.isActive ? '✅ Active' : '❌ Inactive'}<br>
+                                Created: ${discount.createdAt ? new Date(discount.createdAt).toLocaleDateString() : 'Unknown'}
+                            </div>
+                        `;
+                    });
+                    showExisting(html);
+                }
+                
+            } catch (error) {
+                log(`❌ Failed to load platform discounts: ${error.message}`);
+                showExisting(`❌ Failed to load platform discounts: ${error.message}`);
+            }
+        }
+
+        async function waitForDataService() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 20;
+                
+                const check = () => {
+                    attempts++;
+                    if (window.dataService) {
+                        resolve();
+                    } else if (attempts >= maxAttempts) {
+                        reject(new Error('DataService failed to load'));
+                    } else {
+                        setTimeout(check, 500);
+                    }
+                };
+                
+                check();
+            });
+        }
+
+        // Initialize form with current date
+        function initForm() {
+            const today = new Date().toISOString().split('T')[0];
+            const nextMonth = new Date();
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            const endDate = nextMonth.toISOString().split('T')[0];
+            
+            document.getElementById('startDate').value = today;
+            document.getElementById('endDate').value = endDate;
+            
+            log('Form initialized with default values');
+        }
+
+        // Create platform discount
+        async function createPlatformDiscount(formData) {
+            log('🚀 Creating platform discount...');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+                
+                // Build discount object
+                const discount = {
+                    discountId: `debug_platform_${Date.now()}`,
+                    title: formData.get('title'),
+                    name: formData.get('title'),
+                    description: formData.get('description'),
+                    type: formData.get('type'),
+                    value: Number(formData.get('value')),
+                    code: formData.get('code').toUpperCase(),
+                    minOrderValue: Number(formData.get('minOrder')),
+                    startDate: formData.get('startDate'),
+                    endDate: formData.get('endDate'),
+                    isActive: true,
+                    usage: 0,
+                    limit: Number(formData.get('limit')),
+                    discountSource: 'platform',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    createdBy: 'debug-creator'
+                };
+                
+                log(`Discount details: ${discount.title} (${discount.code}) - ${discount.value}${discount.type === 'percentage' ? '%' : '$'} off`);
+                
+                // Save to DynamoDB
+                const startTime = Date.now();
+                const result = await window.dataService.createPlatformDiscount(discount);
+                const duration = Date.now() - startTime;
+                
+                if (result.success) {
+                    log(`✅ Platform discount created successfully in ${duration}ms`);
+                    showResult(`
+                        🎉 <strong>Platform discount created successfully!</strong><br><br>
+                        📝 <strong>Details:</strong><br>
+                        • Title: ${discount.title}<br>
+                        • Code: ${discount.code}<br>
+                        • Value: ${discount.value}${discount.type === 'percentage' ? '%' : '$'} off<br>
+                        • Min Order: $${discount.minOrderValue}<br>
+                        • Usage Limit: ${discount.limit}<br>
+                        • ID: ${result.discountId}<br><br>
+                        ⚡ Created in ${duration}ms<br><br>
+                        🔧 <strong>Debug info:</strong> Created using unauthenticated credentials
+                    `);
+                    
+                    // Reset form
+                    document.getElementById('discountForm').reset();
+                    initForm();
+                    
+                } else {
+                    throw new Error('Failed to save to DynamoDB');
+                }
+                
+            } catch (error) {
+                log(`❌ Creation failed: ${error.message}`);
+                showResult(`❌ <strong>Failed to create discount:</strong><br>${error.message}`, 'error');
+            }
+        }
+
+        // Form submission handler
+        document.getElementById('discountForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            log('📝 Form submitted');
+            
+            const formData = new FormData(e.target);
+            await createPlatformDiscount(formData);
+        });
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            log('🐛 Debug Platform Discount Creator loaded');
+            initForm();
+            // Don't auto-initialize debug mode, let user click the button
+        });
+    </script>
+
+    <!-- Load dependencies -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js?v=7"></script>
+    <script src="data-service.js?v=7"></script>
+</body>
+</html>

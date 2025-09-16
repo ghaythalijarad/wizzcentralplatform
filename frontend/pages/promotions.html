@@ -150,10 +150,6 @@
                 <h1 class="page-title">Promotions Management</h1>
             </div>
             <div class="top-bar-right">
-                <button class="btn-secondary" onclick="refreshMerchantDiscounts()" style="margin-right: 10px;">
-                    <i class="fas fa-sync-alt"></i>
-                    Refresh Discounts
-                </button>
                 <div class="notifications">
                     <button class="notification-btn">
                         <i class="fas fa-bell"></i>
@@ -321,13 +317,6 @@
                                 Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
                             </span>
                         </div>
-                        <button onclick="window.debugMerchantDiscounts()" class="btn-secondary"
-                            style="padding: 0.5rem 1rem; font-size: 0.9rem;">
-                            <i class="fas fa-bug"></i> Debug
-                        </button>
-                        <button onclick="window.testAWSConnection()" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
-                            <i class="fas fa-database"></i> Test AWS
-                        </button>
                         <button onclick="refreshMerchantDiscounts()" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
                             <i class="fas fa-sync-alt"></i> Refresh
                         </button>
@@ -335,14 +324,6 @@
                 </div>
 
                 <div class="table-container">
-                    <!-- Debug Info Panel -->
-                    <div id="debugInfo"
-                        style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007cba;">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #007cba;">Debug Information</h4>
-                        <div id="debugContent" style="font-family: monospace; font-size: 0.875rem; color: #666;"></div>
-                        <button onclick="document.getElementById('debugInfo').style.display='none'"
-                            style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Hide</button>
-                    </div>
                     <table class="data-table">
                         <thead>
                             <tr>

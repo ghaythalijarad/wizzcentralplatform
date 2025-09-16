@@ -1,0 +1,24 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem"
+            ],
+            "Resource": [
+                "arn:aws:dynamodb:us-east-1:*:table/ChatSessions",
+                "arn:aws:dynamodb:us-east-1:*:table/ChatSessions/index/*",
+                "arn:aws:dynamodb:us-east-1:*:table/ChatMessages",
+                "arn:aws:dynamodb:us-east-1:*:table/ChatMessages/index/*",
+                "arn:aws:dynamodb:us-east-1:*:table/WebSocketConnections",
+                "arn:aws:dynamodb:us-east-1:*:table/WebSocketConnections/index/*"
+            ]
+        }
+    ]
+}

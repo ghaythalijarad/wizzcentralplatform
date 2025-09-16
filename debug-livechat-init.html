@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug LiveChat Initialization</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .info { background: #e3f2fd; color: #1565c0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 LiveChat Manager Debug</h1>
+    <div id="debug-output"></div>
+    
+    <script>
+        function log(message, type = 'info') {
+            const output = document.getElementById('debug-output');
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(div);
+            console.log(message);
+        }
+        
+        log('🚀 Starting LiveChat initialization debug...', 'info');
+        
+        // Check if scripts are loaded
+        setTimeout(() => {
+            log('📋 Checking script availability...', 'info');
+            
+            const checks = [
+                { name: 'WebSocketManager', obj: window.WebSocketManager },
+                { name: 'LiveChatManager', obj: window.LiveChatManager },
+                { name: 'AgentChatInterface', obj: window.AgentChatInterface },
+                { name: 'wsManager instance', obj: window.wsManager },
+                { name: 'liveChatManager instance', obj: window.liveChatManager }
+            ];
+            
+            checks.forEach(check => {
+                if (check.obj) {
+                    log(`✅ ${check.name} is available`, 'success');
+                    if (typeof check.obj === 'function') {
+                        log(`   📝 ${check.name} is a constructor function`, 'info');
+                    } else if (typeof check.obj === 'object') {
+                        log(`   📦 ${check.name} is an object instance`, 'info');
+                    }
+                } else {
+                    log(`❌ ${check.name} is NOT available`, 'error');
+                }
+            });
+            
+            // Try to create instances
+            log('🧪 Testing LiveChatManager instantiation...', 'info');
+            try {
+                const testManager = new LiveChatManager({
+                    userType: 'agent',
+                    userId: 'debug_agent',
+                    userDisplayName: 'Debug Agent'
+                });
+                log('✅ LiveChatManager instance created successfully', 'success');
+                
+                // Try to create AgentChatInterface
+                log('🧪 Testing AgentChatInterface instantiation...', 'info');
+                const testInterface = new AgentChatInterface({
+                    containerId: 'test-container',
+                    agentId: 'debug_agent_interface',
+                    agentName: 'Debug Agent Interface'
+                });
+                log('✅ AgentChatInterface instance created successfully', 'success');
+                
+            } catch (error) {
+                log(`❌ Error creating instances: ${error.message}`, 'error');
+                log(`   Stack trace: ${error.stack}`, 'error');
+            }
+            
+        }, 1000);
+    </script>
+    
+    <!-- Load all the same scripts as support.html -->
+    <script src="frontend/config.js"></script>
+    <script src="frontend/assets/js/auth-utils.js"></script>
+    <script src="frontend/assets/js/navigation.js"></script>
+    
+    <!-- OOP Modular Architecture core -->
+    <script src="frontend/js/core/EventBus.js"></script>
+    <script src="frontend/js/core/ThemeManager.js"></script>
+    <script src="frontend/js/core/ModalManager.js"></script>
+    <script src="frontend/js/core/StorageManager.js"></script>
+    
+    <!-- WebSocket infrastructure -->
+    <script src="frontend/assets/js/ws-compat-shim.js"></script>
+    <script src="frontend/assets/js/websocket-manager.js"></script>
+    
+    <!-- Live Chat modules -->
+    <script src="frontend/assets/js/live-chat-manager.js"></script>
+    <script src="frontend/assets/js/agent-chat-interface.js"></script>
+    
+    <div id="test-container" style="width: 100px; height: 100px; background: #f0f0f0; margin-top: 20px;">
+        Test Container
+    </div>
+</body>
+</html>

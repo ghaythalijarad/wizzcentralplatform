@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral - Diagnostic Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .warning { background: #fff3cd; border-color: #ffeaa7; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        
+        .login-form {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 0.5rem;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        
+        pre {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WizzCentral Platform - Diagnostic Login</h1>
+        
+        <div id="diagnostics">
+            <div class="section info">
+                <h3>🔍 Running Diagnostics...</h3>
+                <p>Checking system status...</p>
+            </div>
+        </div>
+        
+        <div class="login-form">
+            <h3>🔐 Quick Login</h3>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" value="g87_a@yahoo.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" value="Gha@551987">
+                </div>
+                <button type="submit" class="btn">🚀 Login</button>
+                <button type="button" class="btn btn-success" onclick="skipToPromotions()">⚡ Skip to Promotions</button>
+                <button type="button" class="btn btn-danger" onclick="clearAll()">🧹 Clear All</button>
+            </form>
+        </div>
+        
+        <div id="status" class="section" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Diagnostic checks
+        function runDiagnostics() {
+            const diagnostics = document.getElementById('diagnostics');
+            let html = '';
+            
+            // Check current URL and server
+            html += `<div class="section info">
+                <h3>🌐 Environment Info</h3>
+                <p><strong>Current URL:</strong> ${window.location.href}</p>
+                <p><strong>Server:</strong> ${window.location.origin}</p>
+                <p><strong>Protocol:</strong> ${window.location.protocol}</p>
+            </div>`;
+            
+            // Check sessionStorage
+            const sessionKeys = Object.keys(sessionStorage);
+            html += `<div class="section ${sessionKeys.length > 0 ? 'warning' : 'success'}">
+                <h3>💾 Session Storage</h3>
+                <p><strong>Keys found:</strong> ${sessionKeys.length}</p>
+                ${sessionKeys.length > 0 ? `<pre>${sessionKeys.join(', ')}</pre>` : '<p>✅ Clean session</p>'}
+            </div>`;
+            
+            // Check localStorage  
+            const localKeys = Object.keys(localStorage);
+            html += `<div class="section ${localKeys.length > 0 ? 'warning' : 'success'}">
+                <h3>🗄️ Local Storage</h3>
+                <p><strong>Keys found:</strong> ${localKeys.length}</p>
+                ${localKeys.length > 0 ? `<pre>${localKeys.join(', ')}</pre>` : '<p>✅ Clean storage</p>'}
+            </div>`;
+            
+            // Check script loading
+            setTimeout(() => {
+                const scripts = {
+                    'AWS SDK': typeof AWS !== 'undefined',
+                    'Config': typeof window.WIZZCENTRAL_CONFIG !== 'undefined',
+                    'AuthService': typeof window.AuthService !== 'undefined',
+                    'Auth Utils': typeof window.Auth !== 'undefined'
+                };
+                
+                let scriptsHtml = '<div class="section info"><h3>📜 Script Status</h3>';
+                for (const [name, loaded] of Object.entries(scripts)) {
+                    scriptsHtml += `<p>${loaded ? '✅' : '❌'} ${name}: ${loaded ? 'Loaded' : 'Missing'}</p>`;
+                }
+                scriptsHtml += '</div>';
+                
+                diagnostics.innerHTML = html + scriptsHtml;
+            }, 1000);
+            
+            diagnostics.innerHTML = html;
+        }
+        
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.className = `section ${type}`;
+            status.innerHTML = `<h3>${message}</h3>`;
+            status.style.display = 'block';
+        }
+        
+        function skipToPromotions() {
+            showStatus('🚀 Setting up mock session and redirecting to promotions...', 'info');
+            
+            // Set minimal auth tokens
+            sessionStorage.setItem('isAuthenticated', 'true');
+            sessionStorage.setItem('userEmail', 'g87_a@yahoo.com');
+            sessionStorage.setItem('userId', 'debug-user');
+            
+            setTimeout(() => {
+                window.location.href = 'pages/promotions.html';
+            }, 1000);
+        }
+        
+        function clearAll() {
+            sessionStorage.clear();
+            localStorage.clear();
+            showStatus('✅ All storage cleared. Page will reload in 2 seconds.', 'success');
+            setTimeout(() => location.reload(), 2000);
+        }
+        
+        // Simple login - bypass complex auth for now
+        document.getElementById('loginForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showStatus('❌ Please fill in both email and password', 'error');
+                return;
+            }
+            
+            showStatus('🔄 Simulating login...', 'info');
+            
+            // Simulate successful login
+            setTimeout(() => {
+                sessionStorage.setItem('isAuthenticated', 'true');
+                sessionStorage.setItem('userEmail', email);
+                sessionStorage.setItem('userId', 'user-' + Date.now());
+                sessionStorage.setItem('idToken', 'mock-token-' + Date.now());
+                
+                showStatus('✅ Login successful! Redirecting to dashboard...', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'pages/dashboard.html';
+                }, 1500);
+            }, 1000);
+        });
+        
+        // Run diagnostics when page loads
+        document.addEventListener('DOMContentLoaded', runDiagnostics);
+    </script>
+    
+    <!-- Load dependencies for diagnostics -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="auth-service.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+</body>
+</html>

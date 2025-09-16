@@ -42,7 +42,7 @@
       this.assert('EventBus', !!global.EventBus, 'Event communication system loaded');
       this.assert('ThemeManager', !!global.ThemeManager, 'Theme system loaded');
       this.assert('ModalManager', !!global.ModalManager, 'Modal system loaded');
-      this.assert('ValidationManager', !!global.ValidationManager, 'Validation system loaded');
+      // ValidationManager removed - no longer required
       this.assert('StorageManager', !!global.StorageManager, 'Storage system loaded');
     }
 

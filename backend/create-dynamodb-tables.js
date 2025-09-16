@@ -9,6 +9,183 @@ const { CreateTableCommand, DescribeTableCommand } = require('@aws-sdk/client-dy
 const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 const tables = [
+  // Unified WebSocket Chat System Tables
+  {
+    TableName: 'ChatSessions',
+    KeySchema: [
+      { AttributeName: 'sessionId', KeyType: 'HASH' }
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'sessionId', AttributeType: 'S' },
+      { AttributeName: 'status', AttributeType: 'S' },
+      { AttributeName: 'userType', AttributeType: 'S' },
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'createdAt', AttributeType: 'S' }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'StatusIndex',
+        KeySchema: [
+          { AttributeName: 'status', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      },
+      {
+        IndexName: 'UserTypeIndex',
+        KeySchema: [
+          { AttributeName: 'userType', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      },
+      {
+        IndexName: 'UserIdIndex',
+        KeySchema: [
+          { AttributeName: 'userId', KeyType: 'HASH' },
+          { AttributeName: 'createdAt', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      }
+    ],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 10,
+      WriteCapacityUnits: 10
+    },
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: 'NEW_AND_OLD_IMAGES'
+    },
+    SSESpecification: {
+      SSEEnabled: true
+    },
+    Tags: [
+      { Key: 'Service', Value: 'UnifiedChat' },
+      { Key: 'Environment', Value: 'dev' },
+      { Key: 'Feature', Value: 'ChatSessions' }
+    ]
+  },
+  {
+    TableName: 'ChatMessages',
+    KeySchema: [
+      { AttributeName: 'sessionId', KeyType: 'HASH' },
+      { AttributeName: 'timestamp', KeyType: 'RANGE' }
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'sessionId', AttributeType: 'S' },
+      { AttributeName: 'timestamp', AttributeType: 'S' },
+      { AttributeName: 'messageId', AttributeType: 'S' },
+      { AttributeName: 'senderId', AttributeType: 'S' }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'MessageIdIndex',
+        KeySchema: [
+          { AttributeName: 'messageId', KeyType: 'HASH' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      },
+      {
+        IndexName: 'SenderIdIndex',
+        KeySchema: [
+          { AttributeName: 'senderId', KeyType: 'HASH' },
+          { AttributeName: 'timestamp', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      }
+    ],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 15,
+      WriteCapacityUnits: 15
+    },
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: 'NEW_AND_OLD_IMAGES'
+    },
+    SSESpecification: {
+      SSEEnabled: true
+    },
+    Tags: [
+      { Key: 'Service', Value: 'UnifiedChat' },
+      { Key: 'Environment', Value: 'dev' },
+      { Key: 'Feature', Value: 'ChatMessages' }
+    ]
+  },
+  {
+    TableName: 'WebSocketConnections',
+    KeySchema: [
+      { AttributeName: 'connectionId', KeyType: 'HASH' }
+    ],
+    AttributeDefinitions: [
+      { AttributeName: 'connectionId', AttributeType: 'S' },
+      { AttributeName: 'userType', AttributeType: 'S' },
+      { AttributeName: 'userId', AttributeType: 'S' },
+      { AttributeName: 'connectedAt', AttributeType: 'S' }
+    ],
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'UserTypeIndex',
+        KeySchema: [
+          { AttributeName: 'userType', KeyType: 'HASH' },
+          { AttributeName: 'connectedAt', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      },
+      {
+        IndexName: 'UserIdIndex',
+        KeySchema: [
+          { AttributeName: 'userId', KeyType: 'HASH' },
+          { AttributeName: 'connectedAt', KeyType: 'RANGE' }
+        ],
+        Projection: { ProjectionType: 'ALL' },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 5,
+          WriteCapacityUnits: 5
+        }
+      }
+    ],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 10,
+      WriteCapacityUnits: 10
+    },
+    TimeToLiveSpecification: {
+      AttributeName: 'ttl',
+      Enabled: true
+    },
+    SSESpecification: {
+      SSEEnabled: true
+    },
+    Tags: [
+      { Key: 'Service', Value: 'UnifiedChat' },
+      { Key: 'Environment', Value: 'dev' },
+      { Key: 'Feature', Value: 'WebSocketConnections' }
+    ]
+  },
+  // Existing Amazon Connect Tables
   {
     TableName: 'AmazonConnect-ChatHistory-dev',
     KeySchema: [

@@ -1,0 +1,5 @@
+// ONE-LINE TEST - Copy/paste this into browser console on promotions page:
+
+javascript:(function(){sessionStorage.setItem('debugMode','true');const btn=document.getElementById('openAddPromotionModalBtn');if(!btn){alert('❌ Create button not found');return;}btn.click();const modal=document.getElementById('addPromotionModal');if(!modal||modal.style.display!=='flex'){alert('❌ Modal did not open');return;}const fields={title:'TEST '+Date.now(),code:'TEST123',type:'percentage',value:'15',description:'Quick test',startDate:new Date().toISOString().slice(0,16),endDate:new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,16)};for(const[id,value]of Object.entries(fields)){const field=document.getElementById(id);if(field)field.value=value;}const form=document.getElementById('addPromotionForm');if(!form){alert('❌ Form not found');return;}console.log('📝 Submitting...');form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));setTimeout(()=>{if(modal.style.display==='none'){alert('🎉 SUCCESS! Promotion created');}else{alert('❌ FAILED - check console');}},2000);})();
+
+// OR use the multiline version below:

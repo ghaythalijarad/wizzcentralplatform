@@ -177,6 +177,7 @@
       const token = this._getAuthToken();
       if (token) {
         params.append('token', token);
+        params.append('LIVECHAT_TOKEN', token);
         console.log('🔑 Adding authentication token to WebSocket URL');
       } else {
         console.warn('⚠️ No authentication token available - connection may be rejected');

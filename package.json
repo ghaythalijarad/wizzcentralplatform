@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "ampx sandbox",
-    "build": "vite build",
-    "preview": "vite preview"
+    "start": "vite frontend",
+    "build": "vite build frontend",
+    "preview": "vite preview frontend"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",
@@ -17,7 +18,7 @@
     "aws-amplify": "^6.0.0",
     "aws-sdk": "^2.1692.0",
     "dotenv": "^17.2.1",
-    "node-fetch": "^3.3.2",
+    "node-fetch": "^2.6.7",
     "ws": "^8.18.3"
   }
 }

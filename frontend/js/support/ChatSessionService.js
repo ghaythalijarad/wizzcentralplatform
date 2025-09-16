@@ -275,22 +275,7 @@
         return false;
       }
 
-      // Validate message if ValidationManager is available
-      if (global.ValidationManager) {
-        const validation = global.ValidationManager.validateChatMessage({
-          ...message,
-          sessionId,
-          senderName: message.senderName || message.sender || 'Unknown',
-          senderType: message.senderType || 'user',
-          messageText: message.messageText || message.text || message.message || ''
-        });
-
-        if (!validation.valid) {
-          console.warn('[ChatSessionService] Message validation failed:', validation.errors);
-          this._notifySubscribers('messageValidationFailed', { sessionId, errors: validation.errors });
-          return false;
-        }
-      }
+      // Message validation (ValidationManager removed)
 
       let normalizedMessage = {
         id: message.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -302,14 +287,7 @@
         ...message
       };
 
-      // Sanitize message if ValidationManager is available
-      if (global.ValidationManager) {
-        normalizedMessage = global.ValidationManager.sanitizeChatMessage(normalizedMessage);
-        if (!normalizedMessage) {
-          console.warn('[ChatSessionService] Message sanitization failed');
-          return false;
-        }
-      }
+      // Message sanitization (ValidationManager removed)
 
       session.messages.push(normalizedMessage);
       session.lastActivity = normalizedMessage.timestamp;

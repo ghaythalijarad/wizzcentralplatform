@@ -1,77 +1,165 @@
 /**
- * Live Chat WebSocket Manager for WizzCentral Platform
- * Connects to the dedicated live chat WebSocket service to receive driver messages
+ * Live Chat Manager - Unified Version for Customer, Driver, and Merchant Apps
+ * Uses the centralized WebSocketManager with channel-based routing
  */
 
 class LiveChatManager {
-    constructor() {
-        this.ws = null;
-        this.isConnected = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 1000;
-        this.pingInterval = null;
-        this.lastHeartbeatResponse = null;
-        this.connectionTimeout = null;
-        this.chatSessions = new Map(); // Store active chat sessions
+    constructor({ userType, userId, userDisplayName = null } = {}) {
+        this.userType = userType; // 'customer' | 'driver' | 'merchant' | 'agent'
+        this.userId = userId;
+        this.userDisplayName = userDisplayName || `${userType}_${userId}`;
+        this.sessionId = null;
+        this.agentName = null;
+        this.isActive = false;
+        
+        // Get WebSocket connection from the global manager
+        this.wsManager = window.wsManager || window.WebSocketManager;
+        if (!this.wsManager) {
+            console.error('❌ LiveChatManager: WebSocketManager not available');
+            return;
+        }
+
+        // Subscribe to chat channel
+        this.unsubscribe = this.wsManager.subscribe('chat', (message) => {
+            this.handleChatMessage(message);
+        });
+
+        // Event handlers
+        this.onMessage = null;
+        this.onSessionStart = null;
+        this.onSessionEnd = null;
+        this.onAgentJoined = null;
+        this.onAgentLeft = null;
+        this.onTyping = null;
+        this.onError = null;
+
+        // Legacy compatibility
+        this.chatSessions = new Map();
+        this.activeSessionId = null;
         this.listeners = {};
-        this.activeSessionId = null; // Currently selected session
-        
-        // Authentication tracking
-        this.authenticationSent = false;
-        this.authenticationTime = null;
-        
-        // Connection monitoring
-        this.connectionCheckInterval = null;
-        this.startConnectionMonitoring();
+
+        console.log(`💬 LiveChatManager initialized for ${userType}: ${userId}`);
     }
 
     /**
-     * Initialize live chat connection
+     * Initialize a new chat session
      */
-    async connect() {
-        if (this.isConnected) {
-            console.log('⚠️ Live chat already connected');
-            this.updateConnectionStatus('Already Connected', 'success');
-            return true;
+    initChat(context = {}) {
+        if (this.isActive) {
+            console.warn('💬 Chat session already active');
+            return;
         }
 
-        try {
-            // Use the CORRECT live chat WebSocket endpoint that matches the Flutter app
-            const wsUrl = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
-            console.log(`🔌 Connecting to Live Chat WebSocket: ${wsUrl}`);
-            
-            // Update status to show connection attempt
-            this.updateConnectionStatus('Connecting to Live Chat...', 'warning');
-            
-            this.ws = new WebSocket(wsUrl);
-            this.setupEventHandlers();
-            
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    this.updateConnectionStatus('Connection Timeout', 'error');
-                    reject(new Error('Live chat WebSocket connection timeout'));
-                }, 10000);
+        const chatContext = {
+            userType: this.userType,
+            userId: this.userId,
+            userDisplayName: this.userDisplayName,
+            timestamp: Date.now(),
+            ...context
+        };
 
-                this.ws.onopen = () => {
-                    clearTimeout(timeout);
-                    this.onConnected();
-                    resolve(true);
-                };
+        console.log(`💬 Initiating chat session for ${this.userType}: ${this.userId}`);
 
-                this.ws.onerror = (error) => {
-                    clearTimeout(timeout);
-                    console.error('Live chat WebSocket connection error:', error);
-                    this.updateConnectionStatus('Connection Failed', 'error');
-                    reject(error);
-                };
-            });
+        this.wsManager.publish({
+            action: 'chat_init',
+            channel: 'chat',
+            subchannel: `${this.userType}_support`,
+            type: 'CHAT_INIT',
+            payload: {
+                userId: this.userId,
+                userType: this.userType,
+                userDisplayName: this.userDisplayName,
+                context: chatContext
+            },
+            meta: {
+                userId: this.userId,
+                userType: this.userType
+            }
+        });
 
-        } catch (error) {
-            console.error('Failed to initialize Live Chat WebSocket:', error);
-            this.updateConnectionStatus('Connection Error', 'error');
+        this.isActive = true;
+    }
+
+    /**
+     * Send a message in the chat
+     */
+    sendMessage(text, messageType = 'text') {
+        if (!this.isActive || !this.sessionId) {
+            console.error('💬 Cannot send message: No active chat session');
             return false;
         }
+
+        if (!text || text.trim().length === 0) {
+            console.warn('💬 Cannot send empty message');
+            return false;
+        }
+
+        const message = {
+            action: 'chat_message',
+            channel: 'chat',
+            subchannel: `${this.userType}_support`,
+            type: 'CHAT_MESSAGE',
+            payload: {
+                sessionId: this.sessionId,
+                senderId: this.userId,
+                senderType: this.userType,
+                senderName: this.userDisplayName,
+                content: text.trim(),
+                messageType: messageType,
+                timestamp: Date.now()
+            },
+            meta: {
+                userId: this.userId,
+                userType: this.userType,
+                sessionId: this.sessionId
+            }
+        };
+
+        console.log(`💬 Sending message:`, message.payload.content);
+        return this.wsManager.publish(message);
+    }
+
+    /**
+     * End the current chat session
+     */
+    endChat() {
+        if (!this.isActive) {
+            console.warn('💬 No active chat session to end');
+            return;
+        }
+
+        console.log(`💬 Ending chat session: ${this.sessionId}`);
+
+        this.wsManager.publish({
+            action: 'chat_end',
+            channel: 'chat',
+            subchannel: `${this.userType}_support`,
+            type: 'CHAT_END',
+            payload: {
+                sessionId: this.sessionId,
+                userId: this.userId,
+                userType: this.userType,
+                timestamp: Date.now()
+            }
+        });
+
+        this.resetSession();
+    }
+
+    // ... rest of the methods (handleChatMessage, etc.)
+    
+    // Legacy compatibility methods
+    async connect() {
+        console.log('💬 LiveChatManager: Using unified WebSocket connection');
+        return this.wsManager ? this.wsManager.isConnected : false;
+    }
+
+    disconnect() {
+        this.endChat();
+    }
+
+    updateConnectionStatus(message, type) {
+        console.log(`💬 Connection Status: ${message} (${type})`);
     }
 
     /**
@@ -1532,20 +1620,31 @@ class LiveChatManager {
 // Make LiveChatManager available globally
 window.LiveChatManager = LiveChatManager;
 
-// Auto-initialize live chat for platform
+// Auto-initialize live chat for platform (only if not manually initialized)
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing Live Chat Manager...');
-    
-    window.liveChatManager = new LiveChatManager();
-    
-    // Connect to live chat WebSocket
-    window.liveChatManager.connect().then((connected) => {
-        if (connected) {
-            console.log('🎉 Live Chat enabled - platform will receive driver messages!');
-        } else {
-            console.warn('⚠️ Live Chat not available');
+    // Only auto-initialize if we're not on a page that manually initializes it
+    if (!window.manualLiveChatInit && !window.liveChatManager) {
+        console.log('🚀 Auto-initializing Live Chat Manager...');
+        
+        try {
+            window.liveChatManager = new LiveChatManager({
+                userType: 'agent',
+                userId: 'platform_agent_' + Date.now(),
+                userDisplayName: 'Platform Agent'
+            });
+            
+            // Connect to live chat WebSocket
+            window.liveChatManager.connect().then((connected) => {
+                if (connected) {
+                    console.log('🎉 Live Chat enabled - platform will receive driver messages!');
+                } else {
+                    console.warn('⚠️ Live Chat not available');
+                }
+            }).catch((error) => {
+                console.error('❌ Failed to enable Live Chat:', error);
+            });
+        } catch (error) {
+            console.error('❌ Failed to auto-initialize Live Chat:', error);
         }
-    }).catch((error) => {
-        console.error('❌ Failed to enable Live Chat:', error);
-    });
+    }
 });
