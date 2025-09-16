@@ -7,22 +7,94 @@
     const TABLES = {
         businesses: 'WhizzMerchants_Businesses',
         discounts: 'WhizzMerchants_Discounts',
+        platformDiscounts: 'WizzCentral_Platform_Discounts', // Platform-wide discounts managed by central platform
         drivers: 'WhizzDrivers_dev',
         orders: 'WizzUser_transactions_dev', // Using transactions as proxy for orders
         customers: 'WizzUser_users_dev',
         supportTickets: 'wizzcentral-backend-support-tickets-dev' // Using the proper support tickets table
     };
 
+    // Helper to detect errors that suggest missing table or lacking permissions
+    function _shouldFallbackPlatformTable(err) {
+        const msg = (err && (err.message || err.code || String(err))) || '';
+        const s = msg.toLowerCase();
+        return (
+            s.includes('resourcenotfound') ||
+            s.includes('requested resource not found') ||
+            s.includes('cannot do operations on a non-existent table') ||
+            s.includes('accessdenied') ||
+            s.includes('not authorized') ||
+            s.includes('missing authentication')
+        );
+    }
+
+    let _cachedClient = null;
+    let _initPromise = null;
+
     async function getClientSafe() {
+        // Return cached client if available
+        if (_cachedClient) {
+            return _cachedClient;
+        }
+
+        // Prevent multiple concurrent initializations
+        if (_initPromise) {
+            return await _initPromise;
+        }
+
+        _initPromise = (async () => {
+            try {
+                console.log('INFO: Initializing DynamoDB client...');
+                
+                if (!window.AWSUtils) {
+                    throw new Error('AWSUtils not loaded - check script loading order');
+                }
+                
+                // Initialize AWS with retry logic
+                let initAttempts = 0;
+                const maxAttempts = 3;
+                
+                while (initAttempts < maxAttempts) {
+                    try {
+                        await AWSUtils.initialize();
+                        break;
+                    } catch (initError) {
+                        initAttempts++;
+                        console.warn(`AWS init attempt ${initAttempts}/${maxAttempts} failed:`, initError.message);
+                        if (initAttempts >= maxAttempts) throw initError;
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between retries
+                    }
+                }
+                
+                const client = await AWSUtils.getDynamoDBClient();
+                if (!client) {
+                    throw new Error('DynamoDB client unavailable - check AWS credentials and permissions');
+                }
+                
+                console.log('SUCCESS: DynamoDB client initialized');
+                _cachedClient = client;
+                return client;
+            } catch (e) {
+                console.error('ERROR: Failed to initialize DynamoDB client:', e?.message || e);
+                _initPromise = null; // Reset promise on error
+                return null;
+            }
+        })();
+
+        return await _initPromise;
+    }
+
+    // Debug: list DynamoDB tables using low-level client
+    async function listTables() {
+        const client = await getClientSafe();
+        if (!client) return [];
         try {
-            if (!window.AWSUtils) throw new Error('AWSUtils missing');
-            await AWSUtils.initialize();
-            const client = await AWSUtils.getDynamoDBClient();
-            if (!client) throw new Error('DynamoDB client unavailable');
-            return client;
+            const ddb = new AWS.DynamoDB();
+            const res = await ddb.listTables({}).promise();
+            return res?.TableNames || [];
         } catch (e) {
-            console.warn('data-service getClientSafe():', e?.message || e);
-            return null;
+            console.warn('listTables failed:', e?.message || e);
+            return [];
         }
     }
 
@@ -42,6 +114,91 @@
             console.error('data-service scan error:', e);
             return { Items: [], Count: 0 };
         }
+    }
+
+    async function putDocumentItem(tableName, item) {
+        console.log('DEBUG: putDocumentItem table:', tableName);
+        console.log('DEBUG: putDocumentItem item keys:', Object.keys(item).join(', '));
+        
+        // Enhanced client retrieval with retry logic
+        let client = await getClientSafe();
+        
+        // If client is unavailable, try to reinitialize once
+        if (!client) {
+            console.warn('WARN: DynamoDB client unavailable, attempting reinitialization...');
+            _cachedClient = null;
+            _initPromise = null;
+            
+            try {
+                // Force re-initialization
+                if (window.AWSUtils) {
+                    window.AWSUtils.isInitialized = false;
+                    window.AWSUtils.dynamodbClient = null;
+                    await window.AWSUtils.initialize();
+                }
+                client = await getClientSafe();
+            } catch (reinitError) {
+                console.error('ERROR: Failed to reinitialize AWS client:', reinitError.message);
+            }
+        }
+        
+        if (!client) {
+            const msg = 'DynamoDB client unavailable, cannot save item. Check AWS credentials and initialization.';
+            console.error('ERROR:', msg);
+            console.error('TROUBLESHOOTING: 1) Run enhanced DynamoDB fix script, 2) Verify AWS credentials, 3) Check IAM permissions');
+            console.error('FIX SCRIPT: await fetch("/enhanced-dynamodb-fix.js").then(r => r.text()).then(eval)');
+            throw new Error(msg);
+        }
+        
+        try {
+            const startTime = Date.now();
+            await client.put({ TableName: tableName, Item: item }).promise();
+            const duration = Date.now() - startTime;
+            console.log(`SUCCESS: DocumentClient.put succeeded in ${duration}ms`);
+            return true;
+        } catch (e) {
+            // Surface AWS error details upstream with enhanced messaging
+            const awsMsg = e?.message || e?.code || String(e);
+            console.error('ERROR: DocumentClient.put failed:', awsMsg, e);
+            console.error('TABLE:', tableName, 'ITEM_KEYS:', Object.keys(item));
+            
+            // Provide specific guidance based on error type
+            if (awsMsg.includes('AccessDenied') || awsMsg.includes('not authorized')) {
+                console.error('💡 SOLUTION: This appears to be an IAM permissions issue');
+                console.error('   Check that the authenticated role has DynamoDB write permissions');
+            } else if (awsMsg.includes('ResourceNotFoundException')) {
+                console.error('💡 SOLUTION: Table does not exist:', tableName);
+                console.error('   Verify the table name or create the table in DynamoDB');
+            }
+            
+            throw new Error(`DynamoDB put failed: ${awsMsg}`);
+        }
+    }
+
+    // New: delete helper using DocumentClient.delete
+    async function deleteDocumentItem(tableName, key) {
+        const client = await getClientSafe();
+        if (!client) {
+            const msg = 'DynamoDB client unavailable, cannot delete item';
+            console.error('ERROR:', msg);
+            throw new Error(msg);
+        }
+        try {
+            const startTime = Date.now();
+            await client.delete({ TableName: tableName, Key: key }).promise();
+            const duration = Date.now() - startTime;
+            console.log(`SUCCESS: DocumentClient.delete succeeded in ${duration}ms`);
+            return true;
+        } catch (e) {
+            const awsMsg = e?.message || e?.code || String(e);
+            console.error('ERROR: DocumentClient.delete failed:', awsMsg, e);
+            throw new Error(awsMsg);
+        }
+    }
+
+    // Replace old putItem to call DocumentClient.put for backward compatibility
+    async function putItem(tableName, item) {
+        return putDocumentItem(tableName, item);
     }
 
     async function getRecentBusinesses(limit = 5) {
@@ -81,6 +238,208 @@
         return items;
     }
 
+    // Platform Discount Functions
+    async function getPlatformDiscounts(forceFresh = false) {
+        // Try the dedicated platform table first
+        const primary = await scan(TABLES.platformDiscounts, { Limit: 100 });
+        const primaryItems = Array.isArray(primary.Items) ? primary.Items : [];
+        if (primaryItems.length > 0) return primaryItems;
+        // Fallback: use merchant discounts table where discountSource == 'platform'
+        const fallback = await scan(TABLES.discounts, {
+            Limit: 100,
+            FilterExpression: 'discountSource = :src',
+            ExpressionAttributeValues: { ':src': 'platform' }
+        });
+        return Array.isArray(fallback.Items) ? fallback.Items : [];
+    }
+
+    async function createPlatformDiscount(discountData) {
+        console.log('DEBUG: createPlatformDiscount started');
+        const startTime = Date.now();
+
+        const discountId = discountData.discountId || `platform_${Date.now()}`;
+
+        // Normalize type
+        const normalizedType = (discountData.type === 'fixed_amount') ? 'fixed' : discountData.type;
+
+        // Build minimal item for DocumentClient (remove optional fields that are undefined)
+        const nowIso = new Date().toISOString();
+        const item = {
+            discountId,
+            id: discountId, // compatibility for tables keyed by 'id'
+            title: discountData.title || discountData.name || '',
+            name: discountData.name || discountData.title || '',
+            description: discountData.description || '',
+            type: normalizedType,
+            value: typeof discountData.value === 'number' ? discountData.value : Number(discountData.value || 0),
+            code: discountData.code || '',
+            startDate: discountData.startDate || '',
+            endDate: discountData.endDate || '',
+            isActive: discountData.isActive !== false,
+            usage: typeof discountData.usage === 'number' ? discountData.usage : 0,
+            limit: discountData.limit ? Number(discountData.limit) : 0,
+            minOrderValue: discountData.minOrderValue != null ? Number(discountData.minOrderValue) : 0,
+            currentUsage: typeof discountData.currentUsage === 'number' ? discountData.currentUsage : 0,
+            discountSource: 'platform',
+            createdAt: discountData.createdAt || nowIso,
+            updatedAt: nowIso,
+            createdBy: discountData.createdBy || 'central-platform',
+            applicableToAll: discountData.applicableToAll !== false,
+            customerSegments: Array.isArray(discountData.customerSegments) && discountData.customerSegments.length ? discountData.customerSegments : ['all']
+        };
+
+        // Add optional fields only if they have meaningful values
+        if (discountData.usageLimit != null && discountData.usageLimit > 0) {
+            item.usageLimit = Number(discountData.usageLimit);
+        }
+        if (discountData.minOrderAmount != null && discountData.minOrderAmount > 0) {
+            item.minOrderAmount = Number(discountData.minOrderAmount);
+        }
+
+        try {
+            await putDocumentItem(TABLES.platformDiscounts, item);
+            const duration = Date.now() - startTime;
+            console.log(`SUCCESS: createPlatformDiscount completed in ${duration}ms (primary table)`);
+            return { success: true, discountId };
+        } catch (e) {
+            // Fallback to merchant discounts table if platform table is missing or blocked
+            if (_shouldFallbackPlatformTable(e)) {
+                console.warn('WARN: Primary platform discounts table unavailable. Falling back to merchant discounts table for platform entries.');
+                try {
+                    await putDocumentItem(TABLES.discounts, item);
+                    const duration = Date.now() - startTime;
+                    console.log(`SUCCESS: createPlatformDiscount completed in ${duration}ms (fallback table)`);
+                    return { success: true, discountId };
+                } catch (e2) {
+                    const duration = Date.now() - startTime;
+                    console.error(`ERROR: createPlatformDiscount fallback failed after ${duration}ms:`, e2?.message || e2);
+                    throw new Error(`Create platform discount failed (fallback): ${e2?.message || e2}`);
+                }
+            }
+            const duration = Date.now() - startTime;
+            console.error(`ERROR: createPlatformDiscount failed after ${duration}ms:`, e?.message || e);
+            throw new Error(`Create platform discount failed: ${e?.message || e}`);
+        }
+    }
+
+    async function updatePlatformDiscount(discountId, updates) {
+        // Try to find in primary platform table first
+        let tableForUpdate = TABLES.platformDiscounts;
+        let res = await scan(tableForUpdate, {
+            FilterExpression: 'discountId = :id OR id = :id',
+            ExpressionAttributeValues: { ':id': discountId }
+        });
+        let current = (res.Items || [])[0];
+
+        // If not found, fallback to discounts table
+        if (!current) {
+            tableForUpdate = TABLES.discounts;
+            res = await scan(tableForUpdate, {
+                FilterExpression: 'discountId = :id OR id = :id',
+                ExpressionAttributeValues: { ':id': discountId }
+            });
+            current = (res.Items || [])[0];
+        }
+
+        if (!current) throw new Error('Platform discount not found');
+
+        // Normalize type
+        if (updates?.type) {
+            updates.type = (updates.type === 'fixed_amount') ? 'fixed' : updates.type;
+        }
+
+        const updated = {
+            ...current,
+            ...(updates || {}),
+            updatedAt: new Date().toISOString(),
+            discountSource: 'platform'
+        };
+        if (!updated.discountId && updated.id) updated.discountId = updated.id;
+        if (!updated.id && updated.discountId) updated.id = updated.discountId;
+        // Keep common mirrors in sync when present
+        if (updated.title && !updated.name) updated.name = updated.title;
+        if (updated.name && !updated.title) updated.title = updated.name;
+        if (updated.minOrderAmount != null && updated.minOrderValue == null) updated.minOrderValue = Number(updated.minOrderAmount);
+        if (updated.minOrderValue != null && updated.minOrderAmount == null) updated.minOrderAmount = Number(updated.minOrderValue);
+        if (updated.usageLimit != null && updated.limit == null) updated.limit = Number(updated.usageLimit);
+        if (updated.limit != null && updated.usageLimit == null) updated.usageLimit = Number(updated.limit);
+        if (updated.currentUsage != null && updated.usage == null) updated.usage = Number(updated.currentUsage);
+        if (updated.usage != null && updated.currentUsage == null) updated.currentUsage = Number(updated.usage);
+
+        try {
+            await putDocumentItem(tableForUpdate, updated);
+            return { success: true };
+        } catch (e) {
+            throw new Error(`Update platform discount failed: ${e?.message || e}`);
+        }
+    }
+
+    async function deletePlatformDiscount(discountId) {
+        // Attempt delete on primary table first
+        try {
+            await deleteDocumentItem(TABLES.platformDiscounts, { discountId });
+            return { success: true };
+        } catch (e) {
+            // Try alternative key in primary table
+            try {
+                await deleteDocumentItem(TABLES.platformDiscounts, { id: discountId });
+                return { success: true };
+            } catch (e1) {
+                if (_shouldFallbackPlatformTable(e) || _shouldFallbackPlatformTable(e1)) {
+                    // Fallback table attempts: both key shapes
+                    try {
+                        await deleteDocumentItem(TABLES.discounts, { discountId });
+                        return { success: true };
+                    } catch (e2) {
+                        try {
+                            await deleteDocumentItem(TABLES.discounts, { id: discountId });
+                            return { success: true };
+                        } catch (e3) {
+                            throw new Error(`Delete platform discount failed (fallback): ${e3?.message || e3}`);
+                        }
+                    }
+                }
+                throw new Error(`Delete platform discount failed: ${e1?.message || e1}`);
+            }
+        }
+    }
+
+    // Merchant Discounts CRUD (limited)
+    async function updateMerchantDiscount(discountId, updates) {
+        // Fetch current discount via scan (simple PK table assumption)
+        const res = await scan(TABLES.discounts, {
+            FilterExpression: 'discountId = :id OR id = :id',
+            ExpressionAttributeValues: { ':id': discountId }
+        });
+        const current = (res.Items || [])[0];
+        if (!current) throw new Error('Merchant discount not found');
+        const updated = {
+            ...current,
+            ...(updates || {}),
+            updatedAt: new Date().toISOString()
+        };
+        try {
+            await putDocumentItem(TABLES.discounts, updated);
+            return { success: true };
+        } catch (e) {
+            throw new Error(`Update merchant discount failed: ${e?.message || e}`);
+        }
+    }
+
+    async function deleteMerchantDiscount(discountId) {
+        try {
+            await deleteDocumentItem(TABLES.discounts, { discountId });
+            return { success: true };
+        } catch (e) {
+            try {
+                await deleteDocumentItem(TABLES.discounts, { id: discountId });
+                return { success: true };
+            } catch (e2) {
+                throw new Error(`Delete merchant discount failed: ${e2?.message || e2}`);
+            }
+        }
+    }
+
     // Added: Fetch drivers from DynamoDB (WhizzDrivers_dev)
     async function getDrivers(limit = 100) {
         const res = await scan(TABLES.drivers, { Limit: limit });
@@ -104,25 +463,6 @@
         const res = await scan(TABLES.supportTickets, { Limit: limit });
         const items = Array.isArray(res.Items) ? res.Items : [];
         return items;
-    }
-
-    async function putItem(tableName, item) {
-        const client = await getClientSafe();
-        if (!client) {
-            console.warn('DynamoDB client unavailable, cannot save item');
-            return false;
-        }
-        const params = {
-            TableName: tableName,
-            Item: item
-        };
-        try {
-            await client.putItem(params).promise();
-            return true;
-        } catch (e) {
-            console.error('data-service putItem error:', e);
-            return false;
-        }
     }
 
     async function createSupportTicket(ticketData) {
@@ -176,11 +516,24 @@
         getRecentBusinesses,
         getMerchantDiscounts,
         getBusinesses,
+        // Back-compat alias
+        getAllBusinesses: getBusinesses,
+        getPlatformDiscounts,
+        createPlatformDiscount,
+        updatePlatformDiscount,
+        deletePlatformDiscount,
+        updateMerchantDiscount,
+        deleteMerchantDiscount,
         getDrivers,
         getOrders,
         getCustomers,
         getSupportTickets,
         createSupportTicket,
+        listTables,
+        // Debug helper passthrough
+        getDynamoDBClient: async () => {
+            try { return await AWSUtils.getDynamoDBClient(); } catch (_) { return null; }
+        },
     };
 
     console.log('data-service.js ready');

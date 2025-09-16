@@ -18,13 +18,15 @@ window.AWSUtils = {
         });
     },
 
-    // Initialize AWS SDK and DynamoDB client
+    // Initialize AWS SDK and DynamoDB client (optimized)
     async initialize() {
         if (this.isInitialized && this.dynamodbClient) {
+            console.log('AWS already initialized, using cached client');
             return this.dynamodbClient;
         }
 
         try {
+            const startTime = Date.now();
             const debugMode = sessionStorage.getItem('debugMode') === 'true';
             const idToken = sessionStorage.getItem('idToken');
             const accessToken = sessionStorage.getItem('accessToken');
@@ -39,32 +41,31 @@ window.AWSUtils = {
                 throw new Error('AWS SDK not loaded.');
             }
 
-            // Fetch configuration with robust path resolution (root first, then /frontend fallback)
-            let outputs = null;
-            try {
-                const rootResp = await fetch('/amplify_outputs.json');
-                if (!rootResp.ok) throw new Error(`root status ${rootResp.status}`);
-                outputs = await rootResp.json();
-                console.log('Loaded amplify_outputs.json from /amplify_outputs.json');
-            } catch (e1) {
-                console.warn('Root amplify_outputs.json not found or failed, trying /frontend/amplify_outputs.json', e1);
-                try {
-                    const feResp = await fetch('/frontend/amplify_outputs.json');
-                    if (!feResp.ok) {
-                        throw new Error(`Failed to fetch amplify_outputs.json: ${feResp.status}`);
-                    }
-                    outputs = await feResp.json();
-                    console.log('Loaded amplify_outputs.json from /frontend/amplify_outputs.json');
-                } catch (e2) {
-                    console.warn('Both config paths failed, trying relative path');
-                    const relResp = await fetch('./amplify_outputs.json');
-                    if (!relResp.ok) {
-                        throw new Error(`Failed to fetch amplify_outputs.json from all paths: ${relResp.status}`);
-                    }
-                    outputs = await relResp.json();
-                    console.log('Loaded amplify_outputs.json from ./amplify_outputs.json');
-                }
-            }
+            // Use embedded configuration to avoid CORS issues
+            const outputs = {
+                "auth": {
+                    "user_pool_id": "us-east-1_LDgfo1Pmc",
+                    "aws_region": "us-east-1",
+                    "user_pool_client_id": "3ngjf86vuq8up86urecprvm08j",
+                    "identity_pool_id": "us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a",
+                    "mfa_methods": [],
+                    "standard_required_attributes": ["email"],
+                    "username_attributes": ["email"],
+                    "user_verification_types": ["email"],
+                    "groups": [],
+                    "mfa_configuration": "NONE",
+                    "password_policy": {
+                        "min_length": 8,
+                        "require_lowercase": true,
+                        "require_numbers": true,
+                        "require_symbols": true,
+                        "require_uppercase": true
+                    },
+                    "unauthenticated_identities_enabled": true
+                },
+                "version": "1.4"
+            };
+            console.log('Using embedded AWS configuration');
 
             const region = outputs?.auth?.aws_region || outputs?.data?.aws_region || outputs?.aws_region || 'us-east-1';
             const userPoolId = outputs?.auth?.user_pool_id;
@@ -77,9 +78,9 @@ window.AWSUtils = {
 
             AWS.config.region = region;
 
-            // Debug Mode: Allow unauthenticated Cognito identity (optionally force even if idToken exists)
-            if (debugMode && (debugForceUnauth || !idToken)) {
-                console.warn('AWSUtils: Debug mode ' + (debugForceUnauth ? 'FORCING UNAUTH' : 'no idToken') + '. Using unauthenticated Cognito Identity.');
+            // Debug Mode: Allow unauthenticated Cognito identity ONLY if explicitly forced and no idToken
+            if (debugMode && debugForceUnauth && !idToken) {
+                console.warn('AWSUtils: Debug mode FORCING UNAUTH. Using unauthenticated Cognito Identity.');
                 AWS.config.credentials = new AWS.CognitoIdentityCredentials({
                     IdentityPoolId: identityPoolId
                 });
@@ -91,7 +92,8 @@ window.AWSUtils = {
                     removeUndefinedValues: true
                 });
                 this.isInitialized = true;
-                console.log('AWS initialized (debug unauth).');
+                const duration = Date.now() - startTime;
+                console.log(`AWS initialized (debug unauth) in ${duration}ms.`);
                 return this.dynamodbClient;
             }
 

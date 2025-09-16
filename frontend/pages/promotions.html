@@ -41,6 +41,97 @@
             font-size: 1.5rem;
             cursor: pointer;
         }
+
+        /* Enhanced datetime input styling to ensure calendar and time icons visibility */
+        input[type="datetime-local"] {
+            position: relative;
+            padding-right: 50px !important;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 40px;
+        }
+
+        /* WebKit browsers (Chrome, Safari, Edge) */
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+            font-size: 16px;
+            opacity: 1 !important;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+        }
+
+        input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator {
+            color: #333;
+        }
+
+        /* Firefox datetime input styling */
+        input[type="datetime-local"]::-moz-calendar-picker-indicator {
+            cursor: pointer;
+            opacity: 1 !important;
+            background: transparent;
+        }
+
+        /* Enhanced wrapper for datetime inputs */
+        .datetime-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        /* Fallback icon for browsers with poor datetime support */
+        .datetime-input-wrapper::after {
+            content: '\f073';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #666;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* Show fallback icon only if native picker is not visible */
+        input[type="datetime-local"]:invalid + .datetime-input-wrapper::after,
+        input[type="datetime-local"][value=""]:not(:focus) + .datetime-input-wrapper::after {
+            opacity: 1;
+        }
+
+        /* Force visibility of native datetime picker */
+        input[type="datetime-local"]::-webkit-inner-spin-button,
+        input[type="datetime-local"]::-webkit-clear-button {
+            display: none;
+        }
+
+        /* Ensure consistent styling across all browsers */
+        input[type="datetime-local"] {
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+            appearance: none;
+            background-image: none;
+        }
+
+        /* Re-enable the calendar picker specifically */
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            -webkit-appearance: auto !important;
+            appearance: auto !important;
+            display: block !important;
+        }
     </style>
 </head>
 
@@ -178,13 +269,17 @@
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="startDate">Start Date *</label>
-                                <input type="datetime-local" id="startDate" name="startDate" required>
+                                <label for="startDate">Start Date & Time *</label>
+                                <div class="datetime-input-wrapper">
+                                    <input type="datetime-local" id="startDate" name="startDate" required>
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label for="endDate">End Date *</label>
-                                <input type="datetime-local" id="endDate" name="endDate" required>
-                            </div>
+                                <label for="endDate">End Date & Time *</label>
+                                <div class="datetime-input-wrapper">
+                                    <input type="datetime-local" id="endDate" name="endDate" required>
+                                </div>
+                                </div>
                         </div>
 
                         <div class="form-row">
@@ -215,19 +310,39 @@
                         <i class="fas fa-store" style="margin-right: 0.5rem; color: #007cba;"></i>
                         Merchant Discounts
                     </h2>
-                    <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
-                        <span class="stat-item"
-                            style="padding: 0.25rem 0.75rem; background: #e3f2fd; border-radius: 20px; font-size: 0.9rem;">
-                            Total: <strong id="totalMerchantDiscounts" style="color: #1976d2;">0</strong>
-                        </span>
-                        <span class="stat-item"
-                            style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
-                            Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
-                        </span>
-                    </div>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
+                            <span class="stat-item"
+                                style="padding: 0.25rem 0.75rem; background: #e3f2fd; border-radius: 20px; font-size: 0.9rem;">
+                                Total: <strong id="totalMerchantDiscounts" style="color: #1976d2;">0</strong>
+                            </span>
+                            <span class="stat-item"
+                                style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
+                                Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
+                            </span>
+                        </div>
+                        <button onclick="window.debugMerchantDiscounts()" class="btn-secondary"
+                            style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                            <i class="fas fa-bug"></i> Debug
+                        </button>
+                        <button onclick="window.testAWSConnection()" class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                            <i class="fas fa-database"></i> Test AWS
+                        </button>
+                        <button onclick="refreshMerchantDiscounts()" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        </div>
                 </div>
 
                 <div class="table-container">
+                    <!-- Debug Info Panel -->
+                    <div id="debugInfo"
+                        style="display: none; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007cba;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #007cba;">Debug Information</h4>
+                        <div id="debugContent" style="font-family: monospace; font-size: 0.875rem; color: #666;"></div>
+                        <button onclick="document.getElementById('debugInfo').style.display='none'"
+                            style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Hide</button>
+                    </div>
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -306,54 +421,15 @@
                         <tbody id="promotionsTableBody">
                             <tr>
                                 <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                                    <i class="fas fa-tags"
-                                        style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                                    <i class="fas fa-tags" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
                                     <div>Loading promotions from backend...</div>
                                 </td>
                             </tr>
-                            <button class="btn-action" onclick="activatePromotion('PROMO003')" title="Activate Now">
-                                <i class="fas fa-play"></i>
-                            </button>
-                </div>
-                </td>
-                </tr>
-                <tr>
-                    <td>
-                        <div class="promotion-info">
-                            <div class="promotion-icon">
-                                <i class="fas fa-gift"></i>
-                            </div>
-                            <div>
-                                <div class="promotion-title">New Customer Bonus</div>
-                                <div class="promotion-code">WELCOME20</div>
-                            </div>
+                        </tbody>
+                        </table>
                         </div>
-                    </td>
-                    <td>Fixed Amount</td>
-                    <td><span class="discount-badge">$20 OFF</span></td>
-                    <td><span class="promotion-status expired">Expired</span></td>
-                    <td>156 / 100</td>
-                    <td>Jun 01, 2025</td>
-                    <td>Jun 30, 2025</td>
-                    <td>
-                        <div class="actions">
-                            <button class="btn-action" onclick="viewPromotion('PROMO004')" title="View Details">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn-action" onclick="clonePromotion('PROMO004')" title="Clone">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                            <button class="btn-action danger" onclick="deletePromotion('PROMO004')" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        </div> <!-- Close WizzCentral Promotions Section -->
                         </div>
-                    </td>
-                </tr>
-                </tbody>
-                </table>
-            </div>
-        </div> <!-- Close WizzCentral Promotions Section -->
-    </div>
     </div>
 
     <!-- AWS SDK -->
@@ -364,38 +440,88 @@
 
     <!-- Centralized utilities -->
     <script src="../assets/js/auth-utils.js"></script>
-    <script src="../assets/js/aws-utils.js"></script>
+    <script src="../assets/js/aws-utils.js?v=10"></script>
 
     <!-- Data service (depends on aws-utils) -->
-    <script src="../data-service.js"></script>
+    <script src="../data-service.js?v=10"></script>
 
     <!-- Page-specific scripts -->
     <script src="../assets/js/navigation.js"></script>
-    <script src="../promotions.js"></script>
+    <!-- Include centralized ModalManager for modals/toasts -->
+    <script src="../js/core/ModalManager.js"></script>
+    <script src="../promotions-clean.js?v=10"></script>
 
     <!-- Modal script -->
     <script>
-        // Get modal elements
-        const modal = document.getElementById('addPromotionModal');
-        const openModalBtn = document.getElementById('openAddPromotionModalBtn');
-        const closeModalBtn = document.getElementById('closeAddPromotionModalBtn');
-
-        // Open modal event
-        openModalBtn.addEventListener('click', () => {
-            modal.style.display = 'flex';
-        });
-
-        // Close modal event
-        closeModalBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-
-        // Close modal on outside click
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                modal.style.display = 'none';
+        (function () {
+            function pad(n) { return String(n).padStart(2, '0'); }
+            function formatDateTimeLocal(date) {
+                const d = new Date(date);
+                const y = d.getFullYear();
+                const m = pad(d.getMonth() + 1);
+                const da = pad(d.getDate());
+                const hh = pad(d.getHours());
+                const mm = pad(d.getMinutes());
+                return `${y}-${m}-${da}T${hh}:${mm}`;
             }
-        });
+
+            function initDateTimeInputs() {
+                const startEl = document.getElementById('startDate');
+                const endEl = document.getElementById('endDate');
+                if (!startEl || !endEl) return;
+
+                // Ensure minute precision
+                startEl.setAttribute('step', '60');
+                endEl.setAttribute('step', '60');
+
+                // Defaults: now and +7 days
+                const now = new Date();
+                const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                if (!startEl.value) startEl.value = formatDateTimeLocal(now);
+                if (!endEl.value) endEl.value = formatDateTimeLocal(in7days);
+
+                // Keep end >= start
+                const ensureEndAfterStart = () => {
+                    if (startEl.value && endEl.value && endEl.value < startEl.value) {
+                        endEl.value = startEl.value;
+                    }
+                };
+
+                // Bind once
+                if (!startEl.dataset.boundEnsure) {
+                    startEl.addEventListener('change', ensureEndAfterStart);
+                    startEl.dataset.boundEnsure = '1';
+                }
+
+                ensureEndAfterStart();
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const modal = document.getElementById('addPromotionModal');
+                const openBtn = document.getElementById('openAddPromotionModalBtn');
+                const closeBtn = document.getElementById('closeAddPromotionModalBtn');
+
+                if (openBtn && modal) {
+                    openBtn.addEventListener('click', () => {
+                        initDateTimeInputs();
+                        modal.style.display = 'flex';
+                    });
+                }
+
+                if (closeBtn && modal) {
+                    closeBtn.addEventListener('click', () => {
+                        modal.style.display = 'none';
+                    });
+                }
+
+                window.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.style.display = 'none';
+                });
+
+                // Initialize defaults on first load as well
+                initDateTimeInputs();
+            });
+        })();
     </script>
 </body>
 

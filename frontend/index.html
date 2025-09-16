@@ -12,46 +12,24 @@
 
 <body>
   <script>
-    // Early auto-forward to break login loop if session already valid
-    (function () {
+    // Check for existing valid session and redirect after page loads
+    window.addEventListener('DOMContentLoaded', function() {
       try {
-        const hasSession = sessionStorage.getItem('isAuthenticated') === 'true' && !!sessionStorage.getItem('idToken');
-        if (hasSession) {
-          console.log('🔁 Login page: existing authenticated session detected, auto-forwarding...');
-          // Load auth utils dynamically if not yet present to resolve returnUrl
-          const go = function () {
-            try {
-              if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
-                const target = window.Auth.getPostLoginRedirectUrl();
-                console.log('➡️ Redirect target (returnUrl or dashboard):', target);
-                window.location.replace(target);
-              } else {
-                // Use configurable default if available with hosting-aware fallback
-                const cfg = window.WIZZCENTRAL_CONFIG || {};
-                const path = window.location.pathname || '';
-                const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
-                const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
-                const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
-                window.location.replace(window.location.origin + normalized);
-              }
-            } catch (e) {
-              const cfg = window.WIZZCENTRAL_CONFIG || {};
-              const path = window.location.pathname || '';
-              const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
-              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
-              const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
-              window.location.replace(window.location.origin + normalized);
-            }
-          };
-          if (!window.Auth) {
-            const s = document.createElement('script');
-            s.src = 'assets/js/auth-utils.js';
-            s.onload = go; s.onerror = go; document.head.appendChild(s);
-          } else { go(); }
-          return; // Prevent showing form
+        const hasValidSession = sessionStorage.getItem('isAuthenticated') === 'true' && 
+                               sessionStorage.getItem('idToken') && 
+                               sessionStorage.getItem('userEmail');
+        
+        if (hasValidSession) {
+          console.log('✅ Valid session found, redirecting to dashboard...');
+          // Simple redirect to dashboard
+          setTimeout(() => {
+            window.location.href = 'pages/dashboard.html';
+          }, 1000);
         }
-      } catch (e) { console.warn('Auto-forward check failed', e); }
-    })();
+      } catch (e) { 
+        console.warn('Session check failed', e); 
+      }
+    });
   </script>
 
   <!-- AWS SDKs -->
