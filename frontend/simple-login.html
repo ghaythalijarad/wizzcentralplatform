@@ -122,7 +122,23 @@
             showStatus('Debug login successful! Redirecting...', 'success');
             
             setTimeout(() => {
-                window.location.href = 'pages/promotions.html';
+                // Use consistent redirect logic for debug login too
+                let redirectUrl;
+                if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+                    redirectUrl = window.Auth.getPostLoginRedirectUrl();
+                } else {
+                    const currentPath = window.location.pathname;
+                    const isInFrontendFolder = currentPath.includes('/frontend/');
+
+                    if (isInFrontendFolder) {
+                        redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                    } else {
+                        redirectUrl = window.location.origin + '/pages/dashboard.html';
+                    }
+                }
+
+                console.log('Debug login redirecting to:', redirectUrl);
+                window.location.href = redirectUrl;
             }, 1000);
         }
         
@@ -151,7 +167,26 @@
                     showStatus('Login successful! Redirecting...', 'success');
                     
                     setTimeout(() => {
-                        window.location.href = 'pages/promotions.html';
+                        // Use consistent redirect logic
+                        let redirectUrl;
+                        if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+                            redirectUrl = window.Auth.getPostLoginRedirectUrl();
+                            console.log('Using Auth redirect:', redirectUrl);
+                        } else {
+                            // Consistent fallback logic
+                            const currentPath = window.location.pathname;
+                            const isInFrontendFolder = currentPath.includes('/frontend/');
+
+                            if (isInFrontendFolder) {
+                                redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                            } else {
+                                redirectUrl = window.location.origin + '/pages/dashboard.html';
+                            }
+                            console.log('Using fallback redirect:', redirectUrl);
+                        }
+
+                        console.log('Redirecting to:', redirectUrl);
+                        window.location.href = redirectUrl;
                     }, 1000);
                 } else {
                     showStatus('Login failed: ' + result.message, 'error');

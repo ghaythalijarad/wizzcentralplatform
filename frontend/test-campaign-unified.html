@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Creation Test - WizzCentral</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .test-container { background: white; padding: 30px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; color: white; }
+        .btn-primary { background: #007bff; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-danger { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Campaign Creation Test - Unified Table Structure</h1>
+        <p>This test validates that campaigns are correctly saved to the unified <code>WizzCentral_Platform_Discounts</code> table.</p>
+        
+        <button class="btn-primary" onclick="testCampaignCreation()">Test Campaign Creation</button>
+        <button class="btn-success" onclick="testCampaignRetrieval()">Test Campaign Retrieval</button>
+        <button class="btn-warning" onclick="testTableSeparation()">Test Table Separation</button>
+        <button class="btn-danger" onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    <script src="../data-service.js"></script>
+
+    <script>
+        let resultContainer;
+
+        function addResult(type, title, message, details = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const result = document.createElement('div');
+            result.className = `result ${type}`;
+            result.innerHTML = `
+                <strong>[${timestamp}] ${title}</strong><br>
+                ${message}
+                ${details ? `<pre>${details}</pre>` : ''}
+            `;
+            resultContainer.appendChild(result);
+            result.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function clearResults() {
+            resultContainer.innerHTML = '';
+        }
+
+        async function testCampaignCreation() {
+            addResult('info', 'Campaign Creation Test', 'Starting unified campaign creation test...');
+
+            try {
+                // Initialize data service
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+                
+                await window.dataService.initialize();
+                addResult('success', 'Data Service Ready', 'Data service initialized successfully');
+
+                // Create test campaign
+                const testCampaign = {
+                    title: 'Test Unified Campaign',
+                    code: 'UNIFIED' + Date.now(),
+                    type: 'first-order',
+                    description: 'Test campaign for unified table validation',
+                    discountType: 'percentage',
+                    discountValue: 20,
+                    minOrderValue: 30,
+                    usageLimit: 50,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                    autoActivate: true,
+                    singleUse: false,
+                    stackable: true,
+                    targetRestaurants: [],
+                    targetSegments: ['new-customers'],
+                    occasions: []
+                };
+
+                addResult('info', 'Creating Campaign', 'Attempting to create campaign in unified table...', 
+                    JSON.stringify(testCampaign, null, 2));
+
+                const result = await window.dataService.createCampaign(testCampaign);
+                
+                if (result) {
+                    addResult('success', 'Campaign Created Successfully', 
+                        `Campaign saved to WizzCentral_Platform_Discounts table`,
+                        JSON.stringify({
+                            campaignId: result.campaignId,
+                            discountId: result.discountId,
+                            discountSource: result.discountSource,
+                            title: result.title,
+                            code: result.code
+                        }, null, 2));
+                } else {
+                    throw new Error('Campaign creation returned null');
+                }
+
+            } catch (error) {
+                addResult('error', 'Campaign Creation Failed', error.message, error.stack);
+            }
+        }
+
+        async function testCampaignRetrieval() {
+            addResult('info', 'Campaign Retrieval Test', 'Testing campaign retrieval from unified table...');
+
+            try {
+                const campaigns = await window.dataService.getCampaigns();
+                
+                addResult('success', 'Campaigns Retrieved', 
+                    `Found ${campaigns.length} campaigns in unified table`,
+                    campaigns.length > 0 ? JSON.stringify(campaigns[0], null, 2) : 'No campaigns found');
+
+            } catch (error) {
+                addResult('error', 'Campaign Retrieval Failed', error.message);
+            }
+        }
+
+        async function testTableSeparation() {
+            addResult('info', 'Table Separation Test', 'Verifying campaigns are separated from regular discounts...');
+
+            try {
+                // Get campaigns (should only include discountSource: 'campaign')
+                const campaigns = await window.dataService.getCampaigns();
+                
+                // Get platform discounts (should exclude discountSource: 'campaign')
+                const discounts = await window.dataService.getPlatformDiscounts();
+                
+                addResult('success', 'Table Separation Verified', 
+                    `Campaigns: ${campaigns.length} | Platform Discounts: ${discounts.length}`,
+                    `Separation working correctly - campaigns filtered by discountSource`);
+
+                // Check for any overlap
+                const campaignIds = campaigns.map(c => c.campaignId || c.discountId);
+                const discountIds = discounts.map(d => d.discountId);
+                const overlap = campaignIds.filter(id => discountIds.includes(id));
+                
+                if (overlap.length === 0) {
+                    addResult('success', 'No Data Overlap', 'Campaigns and discounts properly separated');
+                } else {
+                    addResult('warning', 'Data Overlap Detected', `${overlap.length} items appear in both lists`);
+                }
+
+            } catch (error) {
+                addResult('error', 'Table Separation Test Failed', error.message);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            resultContainer = document.getElementById('results');
+            addResult('info', 'Test Page Loaded', 'Ready to test unified campaign system');
+            
+            // Show current table configuration
+            addResult('info', 'Table Configuration', 
+                'Campaigns will be saved to: WizzCentral_Platform_Discounts',
+                'Filter: discountSource = "campaign"');
+        });
+    </script>
+</body>
+</html>

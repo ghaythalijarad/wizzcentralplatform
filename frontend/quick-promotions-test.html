@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Promotions Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        button { padding: 8px 16px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Quick Promotions Loading Test</h1>
+        
+        <button onclick="testLoadingProcess()">🚀 Test Loading Process</button>
+        <button onclick="clearOutput()">🗑️ Clear Output</button>
+        
+        <div id="output"></div>
+        
+        <div id="tableContainer">
+            <h3>Promotions Table Preview</h3>
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Title</th><th>Code</th><th>Type</th><th>Value</th><th>Status</th><th>Source</th></tr>
+                </thead>
+                <tbody id="promotionsPreview">
+                    <tr><td colspan="7">Not loaded yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js?v=10"></script>
+    <script src="../data-service.js?v=10"></script>
+
+    <script>
+        let outputEl;
+
+        function log(message, type = 'info') {
+            if (!outputEl) outputEl = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            outputEl.appendChild(logEntry);
+            console.log(`[TEST] ${message}`);
+        }
+
+        function clearOutput() {
+            if (outputEl) outputEl.innerHTML = '';
+            document.getElementById('promotionsPreview').innerHTML = '<tr><td colspan="7">Cleared</td></tr>';
+        }
+
+        async function testLoadingProcess() {
+            log('🔄 Starting promotions loading test...', 'info');
+            
+            try {
+                // Step 1: Check if dataService is available
+                if (!window.dataService) {
+                    log('❌ DataService not available', 'error');
+                    return;
+                }
+                log('✅ DataService available', 'success');
+
+                // Step 2: Initialize dataService
+                log('⏳ Initializing DataService...', 'info');
+                await window.dataService.initialize();
+                log('✅ DataService initialized', 'success');
+
+                // Step 3: Test platform discounts loading
+                log('⏳ Loading platform discounts...', 'info');
+                const platformDiscounts = await window.dataService.getPlatformDiscounts();
+                log(`✅ Loaded ${platformDiscounts.length} platform discounts`, 'success');
+
+                if (platformDiscounts.length > 0) {
+                    log(`Sample discount: ${JSON.stringify(platformDiscounts[0], null, 2)}`, 'info');
+                }
+
+                // Step 4: Test the exact same loading process as promotions-clean.js
+                log('⏳ Testing promotions-clean.js style loading...', 'info');
+                
+                let promotions = [];
+                
+                // Simulate loadPlatformDiscountsData
+                const platformPromos = platformDiscounts.map(discount => {
+                    const startDate = discount.startDate || 'N/A';
+                    const endDate = discount.endDate || 'N/A';
+                    
+                    return {
+                        id: discount.discountId,
+                        title: discount.name || discount.title || 'Untitled',
+                        code: discount.code || 'N/A',
+                        type: discount.type === 'fixed_amount' ? 'fixed' : discount.type,
+                        value: discount.value || discount.discountAmount || 0,
+                        status: computeStatus(startDate, endDate, discount.isActive),
+                        usage: discount.usage || discount.currentUsage || 0,
+                        limit: discount.limit || discount.usageLimit || 0,
+                        startDate,
+                        endDate,
+                        description: discount.description || '',
+                        minOrderValue: discount.minOrderValue || discount.minOrderAmount || 0,
+                        source: 'platform'
+                    };
+                });
+
+                promotions = platformPromos;
+                log(`✅ Converted to ${promotions.length} promotions for display`, 'success');
+
+                // Step 5: Display in table
+                displayPromotions(promotions);
+
+                // Step 6: Test backend API call (expected to fail)
+                log('⏳ Testing backend API call...', 'info');
+                try {
+                    const idToken = sessionStorage.getItem('idToken');
+                    const urlLoad = window.WIZZCENTRAL_CONFIG.API_BASE_URL + '/promotions';
+                    const response = await fetch(urlLoad, { 
+                        headers: { 'Authorization': 'Bearer ' + idToken }
+                    });
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        log(`✅ Backend API returned ${result.data?.promotions?.length || 0} promotions`, 'success');
+                    } else {
+                        log(`⚠️ Backend API failed: ${result.error?.message || 'Unknown error'}`, 'error');
+                    }
+                } catch (apiError) {
+                    log(`⚠️ Backend API error (expected): ${apiError.message}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        function computeStatus(start, end, isActive) {
+            if (!isActive) return 'inactive';
+            const now = new Date();
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            
+            if (now < startDate) return 'scheduled';
+            if (now > endDate) return 'expired';
+            return 'active';
+        }
+
+        function displayPromotions(promotions) {
+            const tbody = document.getElementById('promotionsPreview');
+            
+            if (!promotions || promotions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7">No promotions found</td></tr>';
+                log('❌ No promotions to display', 'error');
+                return;
+            }
+
+            tbody.innerHTML = promotions.map(promo => `
+                <tr>
+                    <td>${promo.id}</td>
+                    <td>${promo.title}</td>
+                    <td>${promo.code}</td>
+                    <td>${promo.type}</td>
+                    <td>${promo.value}</td>
+                    <td>${promo.status}</td>
+                    <td>${promo.source}</td>
+                </tr>
+            `).join('');
+
+            log(`✅ Displayed ${promotions.length} promotions in table`, 'success');
+        }
+
+        // Auto-run test when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            log('🔍 Quick test page loaded', 'info');
+            setTimeout(testLoadingProcess, 1000);
+        });
+    </script>
+</body>
+</html>

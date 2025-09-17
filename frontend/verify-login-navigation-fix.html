@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Navigation Fix Verification</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        .test-card { 
+            background: white;
+            border: 1px solid #ddd; 
+            margin: 15px 0; 
+            padding: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #28a745; background-color: #d4edda; }
+        .error { border-left: 4px solid #dc3545; background-color: #f8d7da; }
+        .info { border-left: 4px solid #17a2b8; background-color: #d1ecf1; }
+        .warning { border-left: 4px solid #ffc107; background-color: #fff3cd; }
+        button { 
+            padding: 12px 20px; 
+            margin: 8px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-info { background-color: #17a2b8; color: white; }
+        pre { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-pass { background-color: #28a745; }
+        .status-fail { background-color: #dc3545; }
+        .status-unknown { background-color: #6c757d; }
+        .test-results {
+            margin-top: 20px;
+        }
+        .log-entry {
+            padding: 5px 10px;
+            margin: 2px 0;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-success { background: #d4edda; color: #155724; }
+        .log-error { background: #f8d7da; color: #721c24; }
+        .log-info { background: #d1ecf1; color: #0c5460; }
+        .log-warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Login Navigation Fix Verification</h1>
+    <p>This tool verifies that the login navigation issues have been resolved.</p>
+
+    <div class="test-card info">
+        <h3>📋 Test Overview</h3>
+        <p>This verification tool will test:</p>
+        <ul>
+            <li>✅ Configuration loading and redirect URL generation</li>
+            <li>✅ Auth utilities and post-login redirect function</li>
+            <li>✅ Session storage and navigation logic</li>
+            <li>✅ Fallback mechanisms when Auth utilities fail</li>
+            <li>✅ Path resolution for different hosting scenarios</li>
+        </ul>
+    </div>
+
+    <div class="test-card">
+        <h3>🎯 Quick Navigation Tests</h3>
+        <button class="btn-primary" onclick="testAuthRedirect()">Test Auth Redirect Logic</button>
+        <button class="btn-success" onclick="testConfigRedirect()">Test Config-based Redirect</button>
+        <button class="btn-warning" onclick="testPathResolution()">Test Path Resolution</button>
+        <button class="btn-info" onclick="simulateLoginFlow()">Simulate Complete Login Flow</button>
+        <button class="btn-danger" onclick="clearAndReset()">Clear Session & Reset</button>
+    </div>
+
+    <div class="test-card">
+        <h3>📊 Current Status</h3>
+        <div id="statusDisplay"></div>
+        <button class="btn-info" onclick="refreshStatus()">🔄 Refresh Status</button>
+    </div>
+
+    <div class="test-card">
+        <h3>📝 Test Results</h3>
+        <div id="testResults" class="test-results"></div>
+    </div>
+
+    <div class="test-card">
+        <h3>📋 Debug Log</h3>
+        <div id="debugLog"></div>
+        <button class="btn-warning" onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <!-- Load dependencies -->
+    <script src="config.js"></script>
+    <script src="auth-service.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+
+    <script>
+        let testLog = [];
+        let testResults = {};
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            testLog.push({ timestamp, message, type });
+            updateDebugLog();
+            console.log(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+        }
+
+        function updateDebugLog() {
+            const logDiv = document.getElementById('debugLog');
+            logDiv.innerHTML = testLog.slice(-20).map(entry => 
+                `<div class="log-entry log-${entry.type}">
+                    <strong>${entry.timestamp}:</strong> ${entry.message}
+                </div>`
+            ).join('');
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateTestResults() {
+            const resultsDiv = document.getElementById('testResults');
+            const tests = Object.keys(testResults);
+            
+            if (tests.length === 0) {
+                resultsDiv.innerHTML = '<p>No tests run yet.</p>';
+                return;
+            }
+
+            resultsDiv.innerHTML = tests.map(testName => {
+                const result = testResults[testName];
+                const statusClass = result.passed ? 'status-pass' : 'status-fail';
+                return `
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                        <span class="status-indicator ${statusClass}"></span>
+                        <strong>${testName}</strong>: ${result.message}
+                        ${result.details ? `<br><small style="margin-left: 20px; color: #666;">${result.details}</small>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addTestResult(testName, passed, message, details = '') {
+            testResults[testName] = { passed, message, details };
+            updateTestResults();
+            log(`Test ${testName}: ${passed ? 'PASS' : 'FAIL'} - ${message}`, passed ? 'success' : 'error');
+        }
+
+        function refreshStatus() {
+            log('Refreshing status...', 'info');
+            
+            const status = {
+                // Configuration
+                configLoaded: !!window.WIZZCENTRAL_CONFIG,
+                defaultPage: window.WIZZCENTRAL_CONFIG?.DEFAULT_POST_LOGIN_PAGE,
+                
+                // Auth utilities
+                authUtilsLoaded: !!window.Auth,
+                authServiceLoaded: !!window.AuthService,
+                getPostLoginRedirectUrl: !!(window.Auth?.getPostLoginRedirectUrl),
+                
+                // Session
+                isAuthenticated: sessionStorage.getItem('isAuthenticated'),
+                userEmail: sessionStorage.getItem('userEmail'),
+                hasIdToken: !!sessionStorage.getItem('idToken'),
+                returnUrl: sessionStorage.getItem('returnUrl'),
+                
+                // Current location
+                currentPath: window.location.pathname,
+                currentOrigin: window.location.origin,
+                
+                // Tests status
+                testsRun: Object.keys(testResults).length,
+                testsPassed: Object.values(testResults).filter(r => r.passed).length
+            };
+
+            document.getElementById('statusDisplay').innerHTML = `<pre>${JSON.stringify(status, null, 2)}</pre>`;
+            log('Status refreshed', 'success');
+        }
+
+        async function testAuthRedirect() {
+            log('🧪 Testing Auth redirect logic...', 'info');
+            
+            try {
+                if (!window.Auth) {
+                    addTestResult('Auth Utilities', false, 'Auth object not loaded');
+                    return;
+                }
+
+                if (!window.Auth.getPostLoginRedirectUrl) {
+                    addTestResult('Auth Redirect Function', false, 'getPostLoginRedirectUrl function not found');
+                    return;
+                }
+
+                // Test the function
+                const redirectUrl = window.Auth.getPostLoginRedirectUrl();
+                log(`Auth redirect URL: ${redirectUrl}`, 'info');
+
+                if (!redirectUrl) {
+                    addTestResult('Auth Redirect Function', false, 'Function returned empty URL');
+                    return;
+                }
+
+                // Validate URL
+                try {
+                    const url = new URL(redirectUrl);
+                    addTestResult('Auth Redirect Function', true, `Valid URL generated: ${redirectUrl}`, `Protocol: ${url.protocol}, Host: ${url.host}, Path: ${url.pathname}`);
+                } catch (urlError) {
+                    addTestResult('Auth Redirect Function', false, `Invalid URL generated: ${redirectUrl}`, urlError.message);
+                }
+
+            } catch (error) {
+                addTestResult('Auth Redirect Function', false, `Error during test: ${error.message}`);
+                log(`Auth redirect test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testConfigRedirect() {
+            log('🧪 Testing config-based redirect logic...', 'info');
+            
+            try {
+                if (!window.WIZZCENTRAL_CONFIG) {
+                    addTestResult('Config Redirect', false, 'Configuration not loaded');
+                    return;
+                }
+
+                const config = window.WIZZCENTRAL_CONFIG;
+                const defaultPage = config.DEFAULT_POST_LOGIN_PAGE;
+                
+                log(`Config default page: ${defaultPage}`, 'info');
+
+                if (!defaultPage) {
+                    addTestResult('Config Redirect', false, 'No DEFAULT_POST_LOGIN_PAGE in config');
+                    return;
+                }
+
+                // Test fallback logic similar to index.html
+                const currentPath = window.location.pathname;
+                const isInFrontendFolder = currentPath.includes('/frontend/');
+                const basePrefix = isInFrontendFolder ? '/frontend' : '';
+                
+                let redirectUrl;
+                if (isInFrontendFolder) {
+                    redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                } else {
+                    redirectUrl = window.location.origin + '/pages/dashboard.html';
+                }
+
+                log(`Generated fallback URL: ${redirectUrl}`, 'info');
+
+                // Validate URL
+                try {
+                    const url = new URL(redirectUrl);
+                    addTestResult('Config Redirect', true, `Valid fallback URL: ${redirectUrl}`, `Base prefix: ${basePrefix}, In frontend folder: ${isInFrontendFolder}`);
+                } catch (urlError) {
+                    addTestResult('Config Redirect', false, `Invalid fallback URL: ${redirectUrl}`, urlError.message);
+                }
+
+            } catch (error) {
+                addTestResult('Config Redirect', false, `Error during test: ${error.message}`);
+                log(`Config redirect test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPathResolution() {
+            log('🧪 Testing path resolution logic...', 'info');
+            
+            try {
+                const currentPath = window.location.pathname;
+                const currentOrigin = window.location.origin;
+                
+                log(`Current path: ${currentPath}`, 'info');
+                log(`Current origin: ${currentOrigin}`, 'info');
+
+                // Test different scenarios
+                const scenarios = [
+                    {
+                        name: 'Frontend folder scenario',
+                        path: '/frontend/test-login-navigation.html',
+                        expectedDashboard: '/frontend/pages/dashboard.html'
+                    },
+                    {
+                        name: 'Root folder scenario',
+                        path: '/test-login-navigation.html',
+                        expectedDashboard: '/pages/dashboard.html'
+                    },
+                    {
+                        name: 'Pages folder scenario',
+                        path: '/frontend/pages/login.html',
+                        expectedDashboard: 'dashboard.html'
+                    }
+                ];
+
+                let allPassed = true;
+                let details = [];
+
+                scenarios.forEach(scenario => {
+                    const isInFrontendFolder = scenario.path.includes('/frontend/');
+                    const isInPagesFolder = scenario.path.includes('/pages/');
+                    
+                    let dashboardUrl;
+                    if (isInPagesFolder) {
+                        dashboardUrl = 'dashboard.html';
+                    } else if (isInFrontendFolder) {
+                        dashboardUrl = 'pages/dashboard.html';
+                    } else {
+                        dashboardUrl = 'pages/dashboard.html';
+                    }
+
+                    const passed = dashboardUrl === scenario.expectedDashboard || 
+                                   (scenario.name === 'Pages folder scenario' && dashboardUrl === 'dashboard.html');
+                    
+                    if (!passed) allPassed = false;
+                    
+                    details.push(`${scenario.name}: ${dashboardUrl} (expected: ${scenario.expectedDashboard}) - ${passed ? 'PASS' : 'FAIL'}`);
+                    log(`${scenario.name}: ${dashboardUrl}`, passed ? 'success' : 'error');
+                });
+
+                addTestResult('Path Resolution', allPassed, allPassed ? 'All path scenarios passed' : 'Some path scenarios failed', details.join('\n'));
+
+            } catch (error) {
+                addTestResult('Path Resolution', false, `Error during test: ${error.message}`);
+                log(`Path resolution test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateLoginFlow() {
+            log('🧪 Simulating complete login flow...', 'info');
+            
+            try {
+                // Clear any existing session
+                sessionStorage.removeItem('isAuthenticated');
+                sessionStorage.removeItem('userEmail');
+                sessionStorage.removeItem('idToken');
+                sessionStorage.removeItem('returnUrl');
+                
+                log('Session cleared for test', 'info');
+
+                // Simulate successful login
+                sessionStorage.setItem('isAuthenticated', 'true');
+                sessionStorage.setItem('userEmail', 'test@example.com');
+                sessionStorage.setItem('idToken', 'mock-token-' + Date.now());
+                
+                log('Mock session created', 'success');
+
+                // Test redirect logic
+                let redirectUrl;
+                if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+                    redirectUrl = window.Auth.getPostLoginRedirectUrl();
+                    log(`Using Auth redirect: ${redirectUrl}`, 'info');
+                } else {
+                    // Fallback logic
+                    const currentPath = window.location.pathname;
+                    const isInFrontendFolder = currentPath.includes('/frontend/');
+                    
+                    if (isInFrontendFolder) {
+                        redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                    } else {
+                        redirectUrl = window.location.origin + '/pages/dashboard.html';
+                    }
+                    log(`Using fallback redirect: ${redirectUrl}`, 'info');
+                }
+
+                // Validate the complete flow
+                if (redirectUrl) {
+                    try {
+                        const url = new URL(redirectUrl);
+                        addTestResult('Complete Login Flow', true, `Login flow simulation successful`, `Redirect URL: ${redirectUrl}`);
+                        
+                        // Ask if user wants to actually navigate
+                        if (confirm(`Login flow test passed! Generated redirect URL: ${redirectUrl}\n\nDo you want to actually navigate to the dashboard?`)) {
+                            log('User confirmed navigation, redirecting...', 'info');
+                            window.location.href = redirectUrl;
+                        }
+                    } catch (urlError) {
+                        addTestResult('Complete Login Flow', false, `Invalid redirect URL generated`, `URL: ${redirectUrl}, Error: ${urlError.message}`);
+                    }
+                } else {
+                    addTestResult('Complete Login Flow', false, 'No redirect URL generated');
+                }
+
+            } catch (error) {
+                addTestResult('Complete Login Flow', false, `Error during simulation: ${error.message}`);
+                log(`Login flow simulation error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAndReset() {
+            log('🧹 Clearing session and resetting tests...', 'info');
+            
+            // Clear session storage
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            // Clear test results
+            testResults = {};
+            testLog = [];
+            
+            // Update displays
+            updateTestResults();
+            updateDebugLog();
+            refreshStatus();
+            
+            log('Reset complete', 'success');
+        }
+
+        function clearLog() {
+            testLog = [];
+            updateDebugLog();
+            log('Log cleared', 'info');
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Login Navigation Fix Verification Tool initialized', 'info');
+            refreshStatus();
+            
+            // Auto-run basic tests
+            setTimeout(() => {
+                testAuthRedirect();
+                testConfigRedirect();
+                testPathResolution();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

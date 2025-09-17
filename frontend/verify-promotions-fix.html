@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promotions Fix Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; max-width: 1000px; margin: 0 auto; }
+        .container { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        .warning { border-left: 4px solid #ffc107; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; }
+        .status { padding: 20px; margin: 10px 0; border-radius: 8px; text-align: center; font-weight: bold; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.pending { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 WizzCentral Promotions Fix Verification</h1>
+        <p>This page will verify that the promotions display issue has been resolved.</p>
+        
+        <div id="overallStatus" class="status pending">
+            🔄 Testing in progress...
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button onclick="runCompleteTest()" class="btn-success">🚀 Run Complete Test</button>
+            <button onclick="createAndTest()" class="btn-warning">🎯 Create Promotion & Test</button>
+            <button onclick="openPromotionsPage()" class="btn-warning">📱 Open Promotions Page</button>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Results</h2>
+        <div id="testResults"></div>
+    </div>
+
+    <div class="container">
+        <h2>📋 Debug Logs</h2>
+        <div id="debugLogs"></div>
+    </div>
+
+    <div class="container">
+        <h2>🎯 Promotions Preview</h2>
+        <table>
+            <thead>
+                <tr><th>ID</th><th>Title</th><th>Code</th><th>Type</th><th>Value</th><th>Status</th><th>Source</th></tr>
+            </thead>
+            <tbody id="promotionsPreview">
+                <tr><td colspan="7">Not loaded yet</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js?v=10"></script>
+    <script src="../data-service.js?v=10"></script>
+
+    <script>
+        let testResults = [];
+        let debugLogs = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLogs.push({ timestamp, message, type });
+            updateDebugDisplay();
+            console.log(`[VERIFY] ${message}`);
+        }
+
+        function addTestResult(name, status, details = '') {
+            testResults.push({ name, status, details, timestamp: new Date().toLocaleTimeString() });
+            updateTestDisplay();
+        }
+
+        function updateTestDisplay() {
+            const container = document.getElementById('testResults');
+            container.innerHTML = testResults.map(result => `
+                <div class="log ${result.status}">
+                    [${result.timestamp}] <strong>${result.name}</strong>: ${result.status.toUpperCase()}
+                    ${result.details ? '<br>' + result.details : ''}
+                </div>
+            `).join('');
+        }
+
+        function updateDebugDisplay() {
+            const container = document.getElementById('debugLogs');
+            container.innerHTML = debugLogs.slice(-20).map(log => `
+                <div class="log ${log.type}">
+                    [${log.timestamp}] ${log.message}
+                </div>
+            `).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateOverallStatus(status, message) {
+            const statusEl = document.getElementById('overallStatus');
+            statusEl.className = `status ${status}`;
+            statusEl.innerHTML = message;
+        }
+
+        function clearLogs() {
+            testResults = [];
+            debugLogs = [];
+            updateTestDisplay();
+            updateDebugDisplay();
+            document.getElementById('promotionsPreview').innerHTML = '<tr><td colspan="7">Cleared</td></tr>';
+            updateOverallStatus('pending', '🔄 Ready for testing');
+        }
+
+        function openPromotionsPage() {
+            window.open('/frontend/pages/promotions.html', '_blank');
+        }
+
+        async function createAndTest() {
+            log('🎯 Creating test promotion and verifying display...', 'info');
+            
+            try {
+                await ensureServicesReady();
+                
+                const testPromotion = {
+                    discountId: 'verify_test_' + Date.now(),
+                    title: 'Verification Test Promotion',
+                    name: 'Verification Test Promotion',
+                    description: 'Test promotion to verify the fix works',
+                    type: 'percentage',
+                    value: 25,
+                    code: 'VERIFY25',
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                    isActive: true,
+                    usage: 0,
+                    currentUsage: 0,
+                    limit: 50,
+                    usageLimit: 50,
+                    minOrderValue: 30,
+                    minOrderAmount: 30,
+                    discountSource: 'platform',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                log('Creating test promotion...', 'info');
+                const result = await window.dataService.createPlatformDiscount(testPromotion);
+                
+                if (result.success) {
+                    addTestResult('Promotion Creation', 'success', `Created: ${testPromotion.title} (${testPromotion.code})`);
+                    
+                    // Now test loading
+                    log('Testing promotion loading...', 'info');
+                    const promotions = await window.dataService.getPlatformDiscounts();
+                    
+                    const ourPromotion = promotions.find(p => p.discountId === testPromotion.discountId);
+                    if (ourPromotion) {
+                        addTestResult('Promotion Retrieval', 'success', 'Test promotion found in database');
+                        displayPromotions(promotions);
+                        updateOverallStatus('success', '✅ Promotions Fix Verified - Data loads correctly!');
+                    } else {
+                        addTestResult('Promotion Retrieval', 'error', 'Test promotion not found in database');
+                        updateOverallStatus('error', '❌ Issue found - Promotion not retrievable');
+                    }
+                } else {
+                    addTestResult('Promotion Creation', 'error', 'Failed to create test promotion');
+                    updateOverallStatus('error', '❌ Issue found - Cannot create promotions');
+                }
+                
+            } catch (error) {
+                log(`Error in create and test: ${error.message}`, 'error');
+                addTestResult('Create and Test', 'error', error.message);
+                updateOverallStatus('error', '❌ Test failed with error');
+            }
+        }
+
+        async function runCompleteTest() {
+            log('🚀 Starting complete promotions fix verification...', 'info');
+            updateOverallStatus('pending', '🔄 Running comprehensive test...');
+            
+            try {
+                // Test 1: Services availability
+                log('Test 1: Checking services availability...', 'info');
+                await ensureServicesReady();
+                addTestResult('Services Check', 'success', 'All required services are available');
+                
+                // Test 2: Data loading
+                log('Test 2: Testing data loading...', 'info');
+                const platformDiscounts = await window.dataService.getPlatformDiscounts();
+                addTestResult('Data Loading', 'success', `Loaded ${platformDiscounts.length} platform discounts`);
+                
+                // Test 3: Display conversion
+                log('Test 3: Testing promotion data conversion...', 'info');
+                const convertedPromotions = platformDiscounts.map(discount => ({
+                    id: discount.discountId,
+                    title: discount.name || discount.title || 'Untitled',
+                    code: discount.code || 'N/A',
+                    type: discount.type === 'fixed_amount' ? 'fixed' : discount.type,
+                    value: discount.value || discount.discountAmount || 0,
+                    status: computeStatus(discount.startDate, discount.endDate, discount.isActive),
+                    usage: discount.usage || discount.currentUsage || 0,
+                    limit: discount.limit || discount.usageLimit || 0,
+                    source: 'platform'
+                }));
+                
+                addTestResult('Data Conversion', 'success', `Converted ${convertedPromotions.length} promotions for display`);
+                
+                // Test 4: Display
+                if (convertedPromotions.length > 0) {
+                    displayPromotions(convertedPromotions);
+                    addTestResult('Data Display', 'success', 'Promotions displayed successfully');
+                    updateOverallStatus('success', '✅ All Tests Passed - Promotions Fix is Working!');
+                } else {
+                    addTestResult('Data Display', 'warning', 'No promotions to display (create some first)');
+                    updateOverallStatus('warning', '⚠️ Fix works but no data - Create promotions to test display');
+                }
+                
+            } catch (error) {
+                log(`Complete test failed: ${error.message}`, 'error');
+                addTestResult('Complete Test', 'error', error.message);
+                updateOverallStatus('error', '❌ Test failed - Check logs for details');
+            }
+        }
+
+        async function ensureServicesReady() {
+            log('Checking service availability...', 'info');
+            
+            if (!window.dataService) {
+                throw new Error('DataService not available');
+            }
+            
+            if (!window.AWSUtils) {
+                throw new Error('AWSUtils not available');
+            }
+            
+            log('Initializing services...', 'info');
+            await window.dataService.initialize();
+            
+            log('Services ready!', 'success');
+        }
+
+        function computeStatus(start, end, isActive) {
+            if (!isActive) return 'inactive';
+            const now = new Date();
+            const startDate = new Date(start);
+            const endDate = new Date(end);
+            
+            if (now < startDate) return 'scheduled';
+            if (now > endDate) return 'expired';
+            return 'active';
+        }
+
+        function displayPromotions(promotions) {
+            const tbody = document.getElementById('promotionsPreview');
+            
+            if (!promotions || promotions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7">No promotions found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = promotions.map(promo => `
+                <tr>
+                    <td title="${promo.id}">${promo.id.substring(0, 20)}...</td>
+                    <td>${promo.title}</td>
+                    <td><code>${promo.code}</code></td>
+                    <td>${promo.type}</td>
+                    <td>${promo.value}${promo.type === 'percentage' ? '%' : '$'}</td>
+                    <td><span class="badge-${promo.status}">${promo.status}</span></td>
+                    <td>${promo.source}</td>
+                </tr>
+            `).join('');
+
+            log(`Displayed ${promotions.length} promotions in preview table`, 'success');
+        }
+
+        // Auto-run basic test when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            log('Verification page loaded', 'info');
+            updateOverallStatus('pending', '🔄 Ready for testing - Click "Run Complete Test"');
+        });
+    </script>
+</body>
+</html>

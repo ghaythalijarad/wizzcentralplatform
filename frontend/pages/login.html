@@ -313,7 +313,30 @@
                     // Redirect to the dashboard page
                     setTimeout(() => {
                         console.log('Redirecting to dashboard...');
-                        window.location.href = 'dashboard.html';
+
+                        // Use proper path resolution for dashboard
+                        const currentPath = window.location.pathname;
+                        console.log('Current path:', currentPath);
+
+                        let dashboardUrl;
+                        if (currentPath.includes('/frontend/pages/')) {
+                            // We're in the pages folder, dashboard is in same folder
+                            dashboardUrl = 'dashboard.html';
+                        } else if (currentPath.includes('/frontend/')) {
+                            // We're in frontend folder, need to go to pages subfolder
+                            dashboardUrl = 'pages/dashboard.html';
+                        } else {
+                            // We're at root level
+                            dashboardUrl = 'pages/dashboard.html';
+                        }
+
+                        console.log('Dashboard URL:', dashboardUrl);
+
+                        // Additional validation - check if dashboard page exists
+                        const testUrl = new URL(dashboardUrl, window.location.href);
+                        console.log('Full dashboard URL:', testUrl.href);
+
+                        window.location.href = dashboardUrl;
                     }, 1000);
 
                 } else {

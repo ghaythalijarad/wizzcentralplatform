@@ -22,7 +22,7 @@ window.WIZZCENTRAL_CONFIG = {
 
     // WebSocket Configuration for Live Chat
     WEBSOCKET: {
-        // Live Chat Support WebSocket URL - Using SAM deployed WebSocket endpoint
+        // Live Chat Support WebSocket URL - Using working SAM deployed WebSocket endpoint
         LIVE_CHAT_URL: window.__LIVE_CHAT_WEBSOCKET_URL__ || 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
         PROTOCOLS: ['chat-protocol'],
         HEARTBEAT_INTERVAL: 30000,

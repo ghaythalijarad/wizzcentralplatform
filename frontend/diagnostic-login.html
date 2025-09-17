@@ -164,7 +164,7 @@
         }
         
         function skipToPromotions() {
-            showStatus('🚀 Setting up mock session and redirecting to promotions...', 'info');
+            showStatus('🚀 Setting up mock session and redirecting...', 'info');
             
             // Set minimal auth tokens
             sessionStorage.setItem('isAuthenticated', 'true');
@@ -172,7 +172,19 @@
             sessionStorage.setItem('userId', 'debug-user');
             
             setTimeout(() => {
-                window.location.href = 'pages/promotions.html';
+                // Use consistent redirect logic
+                let redirectUrl;
+                const currentPath = window.location.pathname;
+                const isInFrontendFolder = currentPath.includes('/frontend/');
+
+                if (isInFrontendFolder) {
+                    redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                } else {
+                    redirectUrl = window.location.origin + '/pages/dashboard.html';
+                }
+
+                console.log('Skip to dashboard redirecting to:', redirectUrl);
+                window.location.href = redirectUrl;
             }, 1000);
         }
         
@@ -207,7 +219,19 @@
                 showStatus('✅ Login successful! Redirecting to dashboard...', 'success');
                 
                 setTimeout(() => {
-                    window.location.href = 'pages/dashboard.html';
+                    // Use consistent redirect logic
+                    let dashboardUrl;
+                    const currentPath = window.location.pathname;
+                    const isInFrontendFolder = currentPath.includes('/frontend/');
+
+                    if (isInFrontendFolder) {
+                        dashboardUrl = window.location.origin + '/frontend/pages/dashboard.html';
+                    } else {
+                        dashboardUrl = window.location.origin + '/pages/dashboard.html';
+                    }
+
+                    console.log('Diagnostic login redirecting to:', dashboardUrl);
+                    window.location.href = dashboardUrl;
                 }, 1500);
             }, 1000);
         });

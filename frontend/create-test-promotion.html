@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Test Promotion</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .log { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; }
+        .success { border-left: 4px solid #28a745; }
+        .error { border-left: 4px solid #dc3545; }
+        .info { border-left: 4px solid #17a2b8; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-success { background: #28a745; }
+        .btn-warning { background: #ffc107; color: black; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Create Test Promotion</h1>
+        <p>This will create a test promotion to ensure the promotions page has data to display.</p>
+        
+        <button onclick="createTestPromotion()" class="btn-success">🎉 Create Test Promotion</button>
+        <button onclick="checkExistingPromotions()" class="btn-warning">🔍 Check Existing Promotions</button>
+        <button onclick="clearOutput()">🗑️ Clear Output</button>
+        
+        <div id="output"></div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js?v=10"></script>
+    <script src="../data-service.js?v=10"></script>
+
+    <script>
+        let outputEl;
+
+        function log(message, type = 'info') {
+            if (!outputEl) outputEl = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            outputEl.appendChild(logEntry);
+            console.log(`[CREATE] ${message}`);
+        }
+
+        function clearOutput() {
+            if (outputEl) outputEl.innerHTML = '';
+        }
+
+        async function checkExistingPromotions() {
+            log('🔍 Checking existing promotions...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+
+                await window.dataService.initialize();
+                const existing = await window.dataService.getPlatformDiscounts();
+                
+                log(`Found ${existing.length} existing platform discounts`, 'success');
+                
+                if (existing.length > 0) {
+                    log('Sample promotion:', 'info');
+                    log(`<pre>${JSON.stringify(existing[0], null, 2)}</pre>`, 'info');
+                } else {
+                    log('No existing promotions found. Create one to test the display!', 'info');
+                }
+
+            } catch (error) {
+                log(`❌ Error checking promotions: ${error.message}`, 'error');
+            }
+        }
+
+        async function createTestPromotion() {
+            log('🚀 Creating test promotion...', 'info');
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('DataService not available');
+                }
+
+                log('⏳ Initializing DataService...', 'info');
+                await window.dataService.initialize();
+                
+                const testPromotion = {
+                    discountId: 'test_promotion_' + Date.now(),
+                    title: 'Test WizzCentral Promotion',
+                    name: 'Test WizzCentral Promotion',
+                    description: 'This is a test promotion created to verify the promotions display functionality',
+                    type: 'percentage',
+                    value: 15,
+                    code: 'TEST15',
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+                    isActive: true,
+                    usage: 0,
+                    currentUsage: 0,
+                    limit: 100,
+                    usageLimit: 100,
+                    minOrderValue: 25,
+                    minOrderAmount: 25,
+                    discountSource: 'platform',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                log(`Creating promotion: ${testPromotion.title} (${testPromotion.code})`, 'info');
+                
+                const result = await window.dataService.createPlatformDiscount(testPromotion);
+                
+                if (result.success) {
+                    log(`✅ <strong>SUCCESS!</strong> Test promotion created: ${result.discountId}`, 'success');
+                    log(`
+                        <strong>Promotion Details:</strong><br>
+                        • Title: ${testPromotion.title}<br>
+                        • Code: ${testPromotion.code}<br>
+                        • Discount: ${testPromotion.value}% off<br>
+                        • Min Order: $${testPromotion.minOrderValue}<br>
+                        • Usage Limit: ${testPromotion.limit}<br>
+                        • Valid until: ${new Date(testPromotion.endDate).toLocaleDateString()}
+                    `, 'success');
+                    
+                    log('🎯 <strong>Now go to the promotions page to see it displayed!</strong>', 'success');
+                    log('<a href="/frontend/pages/promotions.html" target="_blank">👉 Open Promotions Page</a>', 'info');
+                } else {
+                    throw new Error('Failed to create promotion - no success flag');
+                }
+
+            } catch (error) {
+                log(`❌ <strong>Failed to create test promotion:</strong> ${error.message}`, 'error');
+                log(`Stack trace: <pre>${error.stack}</pre>`, 'error');
+            }
+        }
+
+        // Auto-check existing promotions when page loads
+        window.addEventListener('DOMContentLoaded', function() {
+            log('🎯 Test promotion creator loaded', 'info');
+            setTimeout(checkExistingPromotions, 1000);
+        });
+    </script>
+</body>
+</html>

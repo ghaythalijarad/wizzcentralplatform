@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Platform - Support (Live Chat)</title>
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link rel="stylesheet" href="../enhanced-amazon-connect-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles/platform-theme.css">
+    <style>
+        .page-content { 
+            padding: 1.5rem; 
+            background: #f8fafc; 
+            min-height: calc(100vh - 120px); 
+        }
+        
+        .tab-content { 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+            border: 1px solid #e5e7eb; 
+            min-height: 600px; 
+            padding: 0; 
+            overflow: hidden; 
+            display: block; 
+        }
+        
+        .connection-status-banner {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .connection-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f59e0b;
+        }
+        
+        .status-indicator.connected { background: #10b981; }
+        .status-indicator.disconnected { background: #ef4444; }
+        .status-indicator.connecting { background: #f59e0b; }
+        
+        .connection-text {
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .refresh-btn {
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            color: #374151;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .refresh-btn:hover {
+            background: #f9fafb;
+        }
+        
+        #agent-chat-container {
+            min-height: 600px;
+            display: flex;
+            height: 600px;
+        }
+        
+        /* Live Chat Interface Styles */
+        .chat-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .chat-sessions-panel {
+            width: 300px;
+            border-right: 1px solid #e5e7eb;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sessions-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        .sessions-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .active-sessions-count {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        .sessions-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .session-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .session-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .session-item.active {
+            background: #dbeafe;
+            border-right: 3px solid #3b82f6;
+        }
+        
+        .session-customer {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.25rem;
+        }
+        
+        .session-last-message {
+            font-size: 0.875rem;
+            color: #6b7280;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .session-time {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        .chat-main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-customer-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .customer-avatar {
+            width: 40px;
+            height: 40px;
+            background: #3b82f6;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .customer-details h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .customer-details p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .chat-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            background: #f9fafb;
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        .message.customer {
+            justify-content: flex-start;
+        }
+        
+        .message.agent {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        
+        .message.customer .message-bubble {
+            background: white;
+            color: #374151;
+            border-bottom-left-radius: 0.25rem;
+        }
+        
+        .message.agent .message-bubble {
+            background: #3b82f6;
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
+        }
+        
+        .chat-input-panel {
+            padding: 1rem;
+            border-top: 1px solid #e5e7eb;
+            background: white;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-end;
+        }
+        
+        .chat-input {
+            flex: 1;
+            min-height: 40px;
+            max-height: 120px;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 1rem;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .send-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .send-btn:hover:not(:disabled) {
+            background: #2563eb;
+        }
+        
+        .send-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .empty-chat-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #6b7280;
+        }
+        
+        .empty-chat-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .empty-chat-state h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+        
+        .empty-chat-state p {
+            margin: 0;
+            font-size: 0.875rem;
+        }
+        
+        .no-sessions-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #6b7280;
+            padding: 2rem;
+        }
+        
+        .no-sessions-state i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+    </style>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+</head>
+
+<body data-page="support">
+    <!-- Sidebar include placeholder -->
+    <div id="sidebar-placeholder"></div>
+
+    <!-- Main content area -->
+    <div class="main-content" id="mainContent">
+        <div class="page-header">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="page-title">Support Center</h1>
+                    <p class="page-subtitle">Live Chat Management</p>
+                </div>
+                <button class="btn btn-ghost btn-sm" id="menuToggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="page-content">
+            <div class="tab-content">
+                <!-- Connection Status Banner -->
+                <div class="connection-status-banner">
+                    <div class="connection-info">
+                        <div class="status-indicator connecting" id="connectionIndicator"></div>
+                        <span class="connection-text" id="connectionText">Live chat system ready</span>
+                    </div>
+                    <button class="refresh-btn" onclick="reconnectWebSocket()">
+                        <i class="fas fa-sync-alt"></i>
+                        Reconnect
+                    </button>
+                </div>
+
+                <!-- Agent Chat Interface Container -->
+                <div id="agent-chat-container">
+                    <div class="chat-layout">
+                        <!-- Chat Sessions Panel -->
+                        <div class="chat-sessions-panel">
+                            <div class="sessions-header">
+                                <h3>Live Chat Support</h3>
+                                <div class="active-sessions-count">
+                                    <span class="connection-text">Support Agent</span>
+                                </div>
+                                <div class="connection-info" style="margin-top: 0.5rem;">
+                                    <div class="status-indicator connecting" id="status-indicator"></div>
+                                    <span class="connection-text" style="font-size: 0.75rem;" id="connection-status">Connecting...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="sessions-list" id="chatSessionsList">
+                                <div class="no-sessions-state">
+                                    <i class="fas fa-comments"></i>
+                                    <h4>Active Sessions</h4>
+                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">0</p>
+                                    <p style="font-size: 0.75rem; margin-top: 1rem;">No active chat sessions<br>Sessions will appear here when customers start live chat</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chat Main Panel -->
+                        <div class="chat-main-panel" id="chatMainPanel">
+                            <div class="empty-chat-state">
+                                <i class="fas fa-comment-dots"></i>
+                                <h3>Select a chat session</h3>
+                                <p>Choose a session from the left to start chatting with customers</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+
+    <!-- Configuration -->
+    <script src="../config.js?v=20250917"></script>
+
+    <!-- Centralized utilities -->
+    <script src="../assets/js/auth-utils.js?v=20250917"></script>
+    <script src="../assets/js/aws-utils.js?v=20250917"></script>
+
+    <!-- Data service (depends on aws-utils) -->
+    <script src="../data-service.js?v=20250917"></script>
+
+    <!-- Page-specific scripts -->
+    <script src="../assets/js/sidebar.js?v=20250917"></script>
+    <script src="../assets/js/navigation.js?v=20250917"></script>
+    
+    <!-- WebSocket Infrastructure -->
+    <script src="../assets/js/websocket-manager.js?v=20250917"></script>
+    <script src="../assets/js/live-chat-manager.js?v=20250917"></script>
+    
+    <!-- Support page script -->
+    <script src="../support.js?v=20250917"></script>
+
+    <!-- Live Chat Integration Script -->
+    <script>
+        // Global variables for live chat
+        let wsManager = null;
+        let liveChatManager = null;
+        let activeChatSessions = new Map();
+        let currentSessionId = null;
+
+        (function(){
+            const build = 'support.html#2025-09-17T'+new Date().toISOString().slice(11,19);
+            document.documentElement.setAttribute('data-build', build);
+            console.log('Support page build:', build);
+            
+            // Initialize support page when DOM is ready
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('🚀 Support page initializing...');
+                initializeRealLiveChatSystem();
+            });
+            
+            // Initialize real WebSocket live chat system
+            async function initializeRealLiveChatSystem() {
+                console.log('💬 Initializing real live chat system...');
+                
+                try {
+                    updateConnectionStatus('connecting', 'Connecting to live chat...');
+                    
+                    // Initialize WebSocket Manager
+                    if (window.WebSocketManager) {
+                        wsManager = new WebSocketManager();
+                        
+                        // Setup event handlers
+                        wsManager.on('connected', onWebSocketConnected);
+                        wsManager.on('disconnected', onWebSocketDisconnected);
+                        wsManager.on('error', onWebSocketError);
+                        wsManager.on('message', onWebSocketMessage);
+                        
+                        // Connect with business ID
+                        const businessId = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+                        const connected = await wsManager.connect(businessId);
+                        
+                        if (connected) {
+                            console.log('✅ WebSocket connected successfully');
+                        } else {
+                            throw new Error('Failed to connect to WebSocket');
+                        }
+                        
+                    } else {
+                        throw new Error('WebSocketManager not available - check if websocket-manager.js is loaded');
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Failed to initialize live chat system:', error);
+                    updateConnectionStatus('disconnected', 'Connection failed: ' + error.message);
+                    // Fall back to mock system for demo
+                    setTimeout(initializeMockChatSystem, 2000);
+                }
+            }
+            
+            // WebSocket event handlers
+            function onWebSocketConnected() {
+                console.log('✅ WebSocket connected for live chat');
+                updateConnectionStatus('connected', 'Connected to live chat');
+                
+                // Register as support agent
+                if (wsManager) {
+                    const agentMessage = {
+                        action: 'agent_connect',
+                        type: 'AGENT_REGISTER',
+                        payload: {
+                            agentId: 'support_agent_' + Date.now(),
+                            agentName: 'Support Agent',
+                            status: 'available'
+                        }
+                    };
+                    
+                    wsManager.send(agentMessage);
+                    console.log('📤 Sent agent registration message');
+                }
+                
+                loadActiveChatSessions();
+            }
+            
+            function onWebSocketDisconnected() {
+                console.log('❌ WebSocket disconnected');
+                updateConnectionStatus('disconnected', 'Disconnected from live chat');
+            }
+            
+            function onWebSocketError(error) {
+                console.error('❌ WebSocket error:', error);
+                updateConnectionStatus('disconnected', 'Connection error');
+            }
+            
+            function onWebSocketMessage(message) {
+                console.log('📨 Received WebSocket message:', message);
+                handleIncomingChatMessage(message);
+            }
+            
+            // Handle incoming chat messages
+            function handleIncomingChatMessage(message) {
+                try {
+                    const data = typeof message === 'string' ? JSON.parse(message) : message;
+                    
+                    switch (data.type) {
+                        case 'CHAT_INIT':
+                            handleNewChatSession(data);
+                            break;
+                        case 'CHAT_MESSAGE':
+                            handleChatMessage(data);
+                            break;
+                        case 'CHAT_END':
+                            handleChatSessionEnd(data);
+                            break;
+                        case 'AGENT_SESSIONS':
+                            handleAgentSessions(data);
+                            break;
+                        default:
+                            console.log('📨 Unhandled message type:', data.type);
+                    }
+                } catch (error) {
+                    console.error('❌ Error handling chat message:', error);
+                }
+            }
+            
+            // Handle new chat session
+            function handleNewChatSession(data) {
+                const sessionId = data.sessionId || data.payload?.sessionId || 'session_' + Date.now();
+                const session = {
+                    id: sessionId,
+                    customer: data.payload?.userDisplayName || data.payload?.userId || 'Customer',
+                    lastMessage: 'New chat session started',
+                    time: 'Just now',
+                    unread: true,
+                    messages: []
+                };
+                
+                activeChatSessions.set(sessionId, session);
+                updateSessionsList();
+                
+                console.log('📱 New chat session:', session);
+            }
+            
+            // Handle chat message
+            function handleChatMessage(data) {
+                const sessionId = data.sessionId || data.payload?.sessionId;
+                const session = activeChatSessions.get(sessionId);
+                
+                if (session) {
+                    const message = {
+                        id: Date.now(),
+                        text: data.payload?.text || data.text || 'Empty message',
+                        sender: data.payload?.userType || 'customer',
+                        timestamp: new Date(),
+                        senderName: data.payload?.userDisplayName || 'Customer'
+                    };
+                    
+                    session.messages.push(message);
+                    session.lastMessage = message.text;
+                    session.time = 'Just now';
+                    session.unread = true;
+                    
+                    updateSessionsList();
+                    
+                    // If this session is currently active, update the chat view
+                    if (currentSessionId === sessionId) {
+                        updateChatView(session);
+                    }
+                    
+                    console.log('💬 New message in session:', sessionId, message);
+                }
+            }
+            
+            // Handle agent sessions response
+            function handleAgentSessions(data) {
+                if (data.payload && data.payload.sessions) {
+                    data.payload.sessions.forEach(sessionData => {
+                        const session = {
+                            id: sessionData.sessionId,
+                            customer: sessionData.customerName || sessionData.userId,
+                            lastMessage: sessionData.lastMessage || 'Active session',
+                            time: sessionData.lastMessageTime || 'Active',
+                            unread: sessionData.unread || false,
+                            messages: sessionData.messages || []
+                        };
+                        
+                        activeChatSessions.set(session.id, session);
+                    });
+                    
+                    updateSessionsList();
+                    console.log('📋 Loaded agent sessions:', data.payload.sessions.length);
+                }
+            }
+            
+            // Load active chat sessions
+            function loadActiveChatSessions() {
+                if (wsManager) {
+                    const requestMessage = {
+                        action: 'get_active_sessions',
+                        type: 'GET_SESSIONS',
+                        payload: {
+                            agentId: 'support_agent_' + Date.now()
+                        }
+                    };
+                    
+                    wsManager.send(requestMessage);
+                    console.log('📤 Requested active sessions');
+                }
+            }
+            
+            // Update sessions list UI
+            function updateSessionsList() {
+                const sessionsList = document.getElementById('chatSessionsList');
+                if (!sessionsList) return;
+                
+                if (activeChatSessions.size === 0) {
+                    sessionsList.innerHTML = `
+                        <div class="no-sessions-state">
+                            <i class="fas fa-comments"></i>
+                            <h4>Active Sessions</h4>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.875rem;">0</p>
+                            <p style="font-size: 0.75rem; margin-top: 1rem;">No active chat sessions<br>Sessions will appear here when customers start live chat</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                sessionsList.innerHTML = '';
+                
+                Array.from(activeChatSessions.values()).forEach((session, index) => {
+                    const sessionElement = document.createElement('div');
+                    sessionElement.className = `session-item ${session.id === currentSessionId ? 'active' : ''}`;
+                    sessionElement.dataset.sessionId = session.id;
+                    sessionElement.onclick = () => selectChatSession(session);
+                    
+                    sessionElement.innerHTML = `
+                        <div class="session-customer">${session.customer} ${session.unread ? '<span style="color: #3b82f6;">●</span>' : ''}</div>
+                        <div class="session-last-message">${session.lastMessage}</div>
+                        <div class="session-time">${session.time}</div>
+                    `;
+                    
+                    sessionsList.appendChild(sessionElement);
+                });
+                
+                // Auto-select first session if none selected
+                if (activeChatSessions.size > 0 && !currentSessionId) {
+                    const firstSession = Array.from(activeChatSessions.values())[0];
+                    selectChatSession(firstSession);
+                }
+            }
+            
+            // Select a chat session
+            function selectChatSession(session) {
+                console.log('📱 Selecting chat session:', session.customer);
+                
+                currentSessionId = session.id;
+                
+                // Update active session UI
+                document.querySelectorAll('.session-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
+                if (sessionElement) {
+                    sessionElement.classList.add('active');
+                }
+                
+                // Mark as read
+                session.unread = false;
+                
+                // Update chat view
+                updateChatView(session);
+            }
+            
+            // Update chat view
+            function updateChatView(session) {
+                const mainPanel = document.getElementById('chatMainPanel');
+                if (!mainPanel) return;
+                
+                mainPanel.innerHTML = `
+                    <div class="chat-header">
+                        <div class="chat-customer-info">
+                            <div class="customer-avatar">${session.customer.charAt(0).toUpperCase()}</div>
+                            <div class="customer-details">
+                                <h4>${session.customer}</h4>
+                                <p>Customer • Online</p>
+                            </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button class="btn btn-ghost btn-sm">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="btn btn-ghost btn-sm">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        ${session.messages.map(msg => `
+                            <div class="message ${msg.sender === 'customer' ? 'customer' : 'agent'}">
+                                <div class="message-bubble">
+                                    ${msg.text}
+                                    <div class="message-time">${msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : 'Just now'}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="chat-input-panel">
+                        <div class="chat-input-container">
+                            <textarea class="chat-input" placeholder="Type your message..." id="messageInput" rows="1"></textarea>
+                            <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Setup input handlers
+                const messageInput = document.getElementById('messageInput');
+                if (messageInput) {
+                    messageInput.addEventListener('keypress', function(e) {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendMessage();
+                        }
+                    });
+                    
+                    messageInput.addEventListener('input', function() {
+                        this.style.height = 'auto';
+                        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                    });
+                }
+                
+                // Scroll to bottom
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            }
+            
+            // Send message function
+            window.sendMessage = function() {
+                const messageInput = document.getElementById('messageInput');
+                const chatMessages = document.getElementById('chatMessages');
+                
+                if (!messageInput || !chatMessages || !currentSessionId) return;
+                
+                const message = messageInput.value.trim();
+                if (!message) return;
+                
+                const session = activeChatSessions.get(currentSessionId);
+                if (!session) return;
+                
+                // Add message to local session
+                const messageObj = {
+                    id: Date.now(),
+                    text: message,
+                    sender: 'agent',
+                    timestamp: new Date(),
+                    senderName: 'Support Agent'
+                };
+                
+                session.messages.push(messageObj);
+                session.lastMessage = message;
+                session.time = 'Just now';
+                
+                // Send via WebSocket
+                if (wsManager) {
+                    const chatMessage = {
+                        action: 'chat_message',
+                        type: 'CHAT_MESSAGE',
+                        sessionId: currentSessionId,
+                        payload: {
+                            text: message,
+                            userType: 'agent',
+                            userDisplayName: 'Support Agent',
+                            timestamp: Date.now()
+                        }
+                    };
+                    
+                    wsManager.send(chatMessage);
+                    console.log('📤 Sent chat message:', chatMessage);
+                }
+                
+                // Update UI
+                updateChatView(session);
+                updateSessionsList();
+                
+                // Clear input
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+            };
+            
+            // Reconnect function
+            window.reconnectWebSocket = function() {
+                console.log('🔄 Reconnecting WebSocket...');
+                if (wsManager) {
+                    wsManager.disconnect();
+                    setTimeout(() => {
+                        initializeRealLiveChatSystem();
+                    }, 1000);
+                } else {
+                    window.location.reload();
+                }
+            };
+            
+            // Update connection status
+            function updateConnectionStatus(status, message) {
+                const statusIndicator = document.getElementById('status-indicator');
+                const connectionStatus = document.getElementById('connection-status');
+                
+                if (statusIndicator) {
+                    statusIndicator.className = `status-indicator ${status}`;
+                }
+                
+                if (connectionStatus) {
+                    connectionStatus.textContent = message;
+                }
+            }
+            
+            // Fallback mock system for demo purposes
+            function initializeMockChatSystem() {
+                console.log('🎭 Initializing mock chat system for demo...');
+                updateConnectionStatus('connected', 'Demo mode - Mock data');
+                
+                const mockSessions = [
+                    {
+                        id: 'session1',
+                        customer: 'John Doe',
+                        lastMessage: 'Hi, I need help with my order',
+                        time: '2 min ago',
+                        unread: true,
+                        messages: [{
+                            id: 1,
+                            text: 'Hi, I need help with my order',
+                            sender: 'customer',
+                            timestamp: new Date(Date.now() - 120000),
+                            senderName: 'John Doe'
+                        }]
+                    },
+                    {
+                        id: 'session2', 
+                        customer: 'Sarah Wilson',
+                        lastMessage: 'Thank you for your help!',
+                        time: '5 min ago',
+                        unread: false,
+                        messages: [{
+                            id: 2,
+                            text: 'Thank you for your help!',
+                            sender: 'customer',
+                            timestamp: new Date(Date.now() - 300000),
+                            senderName: 'Sarah Wilson'
+                        }]
+                    }
+                ];
+                
+                mockSessions.forEach(session => {
+                    activeChatSessions.set(session.id, session);
+                });
+                
+                updateSessionsList();
+            }
+            
+        })();
+    </script>
+</body>
+
+</html>

@@ -21,9 +21,20 @@
         
         if (hasValidSession) {
           console.log('✅ Valid session found, redirecting to dashboard...');
-          // Simple redirect to dashboard
+          // Use proper redirect logic
           setTimeout(() => {
-            window.location.href = 'pages/dashboard.html';
+            let dashboardUrl;
+            if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+              dashboardUrl = window.Auth.getPostLoginRedirectUrl();
+              console.log('📍 Using Auth redirect:', dashboardUrl);
+            } else {
+              // Simple fallback - we know we're in frontend folder
+              dashboardUrl = window.location.origin + '/frontend/pages/dashboard.html';
+              console.log('📍 Using simple fallback:', dashboardUrl);
+            }
+
+            console.log('🚀 Redirecting to:', dashboardUrl);
+            window.location.href = dashboardUrl;
           }, 1000);
         }
       } catch (e) { 
@@ -233,17 +244,46 @@
             let redirectUrl;
             if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
               redirectUrl = window.Auth.getPostLoginRedirectUrl();
+              console.log('📍 Using Auth.getPostLoginRedirectUrl():', redirectUrl);
             } else {
+              // Fallback logic with better path handling
               const cfg = window.WIZZCENTRAL_CONFIG || {};
-              const path = window.location.pathname || '';
-              const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
-              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
-              const normalized = basePrefix ? defaultPage : defaultPage.replace(/^\/frontend/, '');
-              redirectUrl = window.location.origin + normalized;
+              const currentPath = window.location.pathname;
+              console.log('📍 Current path:', currentPath);
+
+              // Determine base prefix more reliably
+              const isInFrontendFolder = currentPath.includes('/frontend/');
+              const basePrefix = isInFrontendFolder ? '/frontend' : '';
+
+              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || '/pages/dashboard.html';
+              console.log('📍 Default page from config:', defaultPage);
+
+              // Construct redirect URL
+              if (isInFrontendFolder) {
+                // We're in /frontend/ folder structure
+                redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
+              } else {
+                // We're at web root
+                redirectUrl = window.location.origin + '/pages/dashboard.html';
+              }
+              console.log('📍 Using fallback redirect logic:', redirectUrl);
             }
 
-            console.log('🚀 Redirecting to:', redirectUrl);
-            window.location.href = redirectUrl;
+            console.log('🚀 Final redirect URL:', redirectUrl);
+            console.log('🚀 Redirecting in 1.5 seconds...');
+
+            // Validate URL before redirecting
+            try {
+              const url = new URL(redirectUrl);
+              console.log('✅ URL validation passed');
+              window.location.href = redirectUrl;
+            } catch (urlError) {
+              console.error('❌ Invalid redirect URL:', redirectUrl, urlError);
+              // Safe fallback
+              const fallbackUrl = window.location.origin + '/frontend/pages/dashboard.html';
+              console.log('🔄 Using safe fallback:', fallbackUrl);
+              window.location.href = fallbackUrl;
+            }
           }, 1500);
 
         } else {

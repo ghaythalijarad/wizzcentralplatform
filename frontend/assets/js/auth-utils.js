@@ -333,21 +333,31 @@ window.Auth = {
 
     // Get the post-login redirect URL (return URL or default dashboard)
     getPostLoginRedirectUrl() {
+        console.log('🎯 getPostLoginRedirectUrl() called');
+        
         let returnUrl = this.getAndClearReturnUrl();
+        console.log('🔍 Return URL from session:', returnUrl);
+        
         try {
             const basePrefix = this._getBasePrefix();
+            console.log('🔍 Detected base prefix:', basePrefix);
+            
             if (returnUrl) {
                 // Avoid redirecting back to login
                 if (/\/index\.html(\?|$)/.test(returnUrl)) {
+                    console.log('⚠️ Return URL is login page, clearing it');
                     returnUrl = '';
                 }
                 if (returnUrl) {
                     // Support absolute and relative returnUrl values
                     if (/^https?:\/\//i.test(returnUrl)) {
+                        console.log('✅ Using absolute return URL:', returnUrl);
                         return returnUrl; // already absolute
                     }
                     const normalizedPath = this._withBasePrefix(returnUrl);
-                    return window.location.origin + normalizedPath;
+                    const fullUrl = window.location.origin + normalizedPath;
+                    console.log('✅ Using normalized return URL:', fullUrl);
+                    return fullUrl;
                 }
             }
         } catch (e) {
@@ -358,13 +368,23 @@ window.Auth = {
         try {
             const cfg = window.WIZZCENTRAL_CONFIG || {};
             const basePrefix = this._getBasePrefix();
+            console.log('🔍 Config:', cfg);
+            console.log('🔍 Base prefix for default:', basePrefix);
+            
             let defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || basePrefix + '/pages/dashboard.html';
+            console.log('🔍 Default page from config:', defaultPage);
+            
             // Ensure it is normalized against the detected base
             defaultPage = this._withBasePrefix(defaultPage);
-            return window.location.origin + defaultPage;
+            const fullUrl = window.location.origin + defaultPage;
+            console.log('✅ Using default redirect URL:', fullUrl);
+            return fullUrl;
         } catch (e) {
+            console.warn('Failed to build default URL, using fallback:', e);
             const fallback = this._withBasePrefix('/pages/dashboard.html');
-            return window.location.origin + fallback;
+            const fallbackUrl = window.location.origin + fallback;
+            console.log('✅ Using fallback redirect URL:', fallbackUrl);
+            return fallbackUrl;
         }
     }
 };

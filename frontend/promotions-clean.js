@@ -44,7 +44,18 @@ function initializePromotionsPage() {
     setupPromotionFilters();
     
     // Initialize data loading
-    loadAllData();
+    loadAllData().then(() => {
+        console.log('INFO: Data loading completed in initializePromotionsPage');
+        
+        // If no promotions exist, offer to create a sample one for testing
+        if (promotions.length === 0) {
+            console.log('INFO: No promotions found. To test the display, you can create a sample promotion.');
+            // Show helpful message in console for development
+            console.log('💡 Run this in console to create a test promotion: window.createTestPromotion()');
+        }
+    }).catch(error => {
+        console.error('ERROR: Data loading failed:', error);
+    });
 }
 
 // Inject a lightweight banner to guide users when unauth debug mode is active
@@ -109,16 +120,30 @@ function setupPromotionFilters() {
 async function loadAllData() {
     console.log('INFO: Loading all promotion data (optimized)...');
     
-    // Load platform discounts first (fastest), then others in parallel
+    // Load platform discounts first (fastest) and display immediately
     await loadPlatformDiscountsData();
+    console.log('INFO: Platform discounts loaded, table should now show data');
     
     // Load backend promotions and merchant discounts in parallel
+    // These will merge with platform discounts without overwriting them
     const [backendPromise, merchantPromise] = [
         loadPromotionsData(),
         loadMerchantDiscountsData()
     ];
     
-    await Promise.allSettled([backendPromise, merchantPromise]);
+    const results = await Promise.allSettled([backendPromise, merchantPromise]);
+    
+    // Log results for debugging
+    results.forEach((result, index) => {
+        const name = index === 0 ? 'backend promotions' : 'merchant discounts';
+        if (result.status === 'fulfilled') {
+            console.log(`✅ Successfully loaded ${name}`);
+        } else {
+            console.log(`⚠️ ${name} loading failed: ${result.reason?.message || 'Unknown error'}`);
+        }
+    });
+    
+    console.log(`INFO: Data loading complete. Total promotions: ${promotions.length}`);
 }
 
 // Load promotions data from backend API
@@ -170,11 +195,15 @@ async function loadPromotionsData() {
         
     } catch (error) {
         console.error('Error loading promotions from backend:', error);
-        const tbody = document.getElementById('promotionsTableBody');
-        if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading promotions: ' + error.message + '</td></tr>';
-        }
-        return;
+        console.log('INFO: Backend API not available, continuing with platform discounts only');
+        
+        // Don't show error in table, just log it and continue with platform discounts
+        // Keep any existing platform promotions
+        const existing = Array.isArray(promotions) ? promotions : [];
+        const platformOnly = existing.filter(p => p.source === 'platform');
+        promotions = platformOnly;
+        
+        console.log('INFO: Using platform discounts only - total promotions: ' + promotions.length);
     }
     
     updatePromotionsTable();
@@ -404,17 +433,26 @@ function getFilteredPromotions() {
 
 // Update promotions table display
 function updatePromotionsTable() {
+    console.log(`INFO: updatePromotionsTable called with ${promotions.length} promotions`);
+    
     const tbody = document.getElementById('promotionsTableBody');
-    if (!tbody) return;
+    if (!tbody) {
+        console.warn('WARNING: promotionsTableBody element not found');
+        return;
+    }
     
     // New: apply filters
     const list = getFilteredPromotions();
+    console.log(`INFO: After filtering: ${list.length} promotions to display`);
     
     if (!list || list.length === 0) {
         const emptyMsg = promotions.length === 0 ? 'No promotions found' : 'No promotions match current filters';
         tbody.innerHTML = '<tr><td colspan="8" class="text-center">' + emptyMsg + '</td></tr>';
+        console.log(`INFO: Displaying empty message: ${emptyMsg}`);
         return;
     }
+    
+    console.log('INFO: Rendering promotions table with data:', list.map(p => ({ id: p.id, title: p.title, source: p.source })));
     
     tbody.innerHTML = list.map(promo => {
         const statusClass = promo.status === 'active' ? 'success' : 
@@ -438,6 +476,8 @@ function updatePromotionsTable() {
             '</td>' +
         '</tr>';
     }).join('');
+    
+    console.log('✅ Promotions table updated successfully');
 }
 
 // Update merchant discounts table display
@@ -834,6 +874,53 @@ async function testAWSConnection() {
 }
 // ensure accessible from onclick
 window.testAWSConnection = testAWSConnection;
+
+// Helper function to create a test promotion for debugging
+window.createTestPromotion = async function() {
+    console.log('🎯 Creating test promotion...');
+    
+    try {
+        await waitForDataService();
+        
+        const testPromotion = {
+            discountId: 'test_debug_' + Date.now(),
+            title: 'Debug Test Promotion',
+            name: 'Debug Test Promotion',
+            description: 'Test promotion created for debugging the display issue',
+            type: 'percentage',
+            value: 10,
+            code: 'DEBUG10',
+            startDate: new Date().toISOString(),
+            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            isActive: true,
+            usage: 0,
+            currentUsage: 0,
+            limit: 100,
+            usageLimit: 100,
+            minOrderValue: 20,
+            minOrderAmount: 20,
+            discountSource: 'platform',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        const result = await window.dataService.createPlatformDiscount(testPromotion);
+        
+        if (result.success) {
+            console.log('✅ Test promotion created successfully!');
+            
+            // Reload data to display the new promotion
+            await loadAllData();
+            
+            console.log('🎉 Test promotion should now be visible in the table');
+        } else {
+            console.error('❌ Failed to create test promotion');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error creating test promotion:', error);
+    }
+};
 
 // Initialize promotions page when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {

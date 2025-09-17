@@ -8,6 +8,7 @@
         businesses: 'WhizzMerchants_Businesses',
         discounts: 'WhizzMerchants_Discounts',
         platformDiscounts: 'WizzCentral_Platform_Discounts', // Platform-wide discounts managed by central platform
+        campaigns: 'WizzCentral_Campaigns', // Special campaigns (first order, new customer, etc.)
         drivers: 'WhizzDrivers_dev',
         orders: 'WizzUser_transactions_dev', // Using transactions as proxy for orders
         customers: 'WizzUser_users_dev',
@@ -506,6 +507,223 @@
         }
     }
 
+    // Campaign Management Functions
+    async function getCampaigns() {
+        console.log('INFO: Getting all campaigns from unified platform discounts table...');
+        try {
+            const client = await getClientSafe();
+            if (!client) {
+                console.warn('No DynamoDB client available for campaigns');
+                return [];
+            }
+
+            // Scan the unified platform discounts table and filter for campaigns
+            const params = {
+                TableName: TABLES.platformDiscounts,
+                FilterExpression: 'discountSource = :source',
+                ExpressionAttributeValues: {
+                    ':source': 'campaign'
+                }
+            };
+
+            const result = await client.scan(params).promise();
+            console.log(`✅ Retrieved ${result.Items?.length || 0} campaigns from unified table`);
+            
+            return (result.Items || []).map(item => ({
+                id: item.campaignId || item.discountId,
+                campaignId: item.campaignId || item.discountId,
+                title: item.title || item.name,
+                code: item.code || '',
+                type: item.campaignType || item.type || '',
+                discountType: item.discountType || 'percentage',
+                discountValue: item.discountValue || item.value || 0,
+                target: item.target || '',
+                targetRestaurants: item.targetRestaurants || [],
+                targetSegments: item.targetSegments || [],
+                occasions: item.occasions || [],
+                status: item.status || 'draft',
+                isActive: item.isActive || false,
+                usage: item.usage || item.currentUsage || 0,
+                usageLimit: item.usageLimit || item.limit || 0,
+                minOrderValue: item.minOrderValue || item.minOrderAmount || 0,
+                startDate: item.startDate || '',
+                endDate: item.endDate || '',
+                validFrom: item.validFrom || '',
+                validTo: item.validTo || '',
+                description: item.description || '',
+                autoActivate: item.autoActivate || false,
+                singleUse: item.singleUse || false,
+                stackable: item.stackable || false,
+                createdAt: item.createdAt || new Date().toISOString(),
+                updatedAt: item.updatedAt || new Date().toISOString()
+            }));
+        } catch (error) {
+            console.error('Error getting campaigns:', error);
+            if (_shouldFallbackPlatformTable(error)) {
+                console.warn('Using fallback data for campaigns');
+                return [];
+            }
+            throw error;
+        }
+    }
+
+    async function getCampaignById(campaignId) {
+        console.log(`INFO: Getting campaign ${campaignId} from unified platform discounts table...`);
+        try {
+            const client = await getClientSafe();
+            if (!client) {
+                console.warn('No DynamoDB client available for campaign lookup');
+                return null;
+            }
+
+            // Use discountId as the primary key since campaigns are stored with discountId
+            const params = {
+                TableName: TABLES.platformDiscounts,
+                Key: { discountId: campaignId }
+            };
+
+            const result = await client.get(params).promise();
+            const item = result.Item;
+            
+            // Verify this is actually a campaign
+            if (item && item.discountSource === 'campaign') {
+                return item;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error(`Error getting campaign ${campaignId}:`, error);
+            return null;
+        }
+    }
+
+    async function createCampaign(campaignData) {
+        console.log('INFO: Creating new campaign in unified platform discounts table...');
+        try {
+            const client = await getClientSafe();
+            if (!client) {
+                console.warn('No DynamoDB client available for campaign creation');
+                return null;
+            }
+
+            const campaignId = `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const timestamp = new Date().toISOString();
+            
+            // Create campaign as a special type of platform discount
+            const campaign = {
+                discountId: campaignId, // Use discountId as primary key for unified table
+                campaignId, // Keep original campaignId for backwards compatibility
+                title: campaignData.title || '',
+                name: campaignData.title || '', // Also set name field for consistency
+                code: campaignData.code || '',
+                type: campaignData.discountType || 'percentage', // Use discountType as the main type
+                campaignType: campaignData.type || '', // Store campaign type separately
+                value: parseFloat(campaignData.discountValue) || 0,
+                discountValue: parseFloat(campaignData.discountValue) || 0, // Keep both for compatibility
+                discountType: campaignData.discountType || 'percentage',
+                discountSource: 'campaign', // Mark this as campaign-originated
+                target: campaignData.target || '',
+                targetRestaurants: campaignData.targetRestaurants || [],
+                targetSegments: campaignData.targetSegments || [],
+                occasions: campaignData.occasions || [],
+                status: campaignData.status || 'draft',
+                isActive: campaignData.autoActivate || false,
+                usage: 0,
+                currentUsage: 0, // For compatibility with discount structure
+                usageLimit: parseInt(campaignData.usageLimit) || 0,
+                limit: parseInt(campaignData.usageLimit) || 0, // Keep both for compatibility
+                minOrderValue: parseFloat(campaignData.minOrderValue) || 0,
+                minOrderAmount: parseFloat(campaignData.minOrderValue) || 0, // Keep both for compatibility
+                startDate: campaignData.startDate || '',
+                endDate: campaignData.endDate || '',
+                validFrom: campaignData.validFrom || '',
+                validTo: campaignData.validTo || '',
+                description: campaignData.description || '',
+                autoActivate: campaignData.autoActivate || false,
+                singleUse: campaignData.singleUse || false,
+                stackable: campaignData.stackable || false,
+                createdAt: timestamp,
+                updatedAt: timestamp
+            };
+
+            const params = {
+                TableName: TABLES.platformDiscounts, // Use unified platform discounts table
+                Item: campaign
+            };
+
+            await client.put(params).promise();
+            console.log(`✅ Campaign created successfully in unified table: ${campaignId}`);
+            return campaign;
+        } catch (error) {
+            console.error('Error creating campaign:', error);
+            throw error;
+        }
+    }
+
+    async function updateCampaign(campaignId, updateData) {
+        console.log(`INFO: Updating campaign ${campaignId} in unified platform discounts table...`);
+        try {
+            const client = await getClientSafe();
+            if (!client) {
+                console.warn('No DynamoDB client available for campaign update');
+                return null;
+            }
+
+            const timestamp = new Date().toISOString();
+            updateData.updatedAt = timestamp;
+
+            // Build update expression dynamically
+            const updateExpression = [];
+            const expressionAttributeNames = {};
+            const expressionAttributeValues = {};
+
+            Object.keys(updateData).forEach(key => {
+                updateExpression.push(`#${key} = :${key}`);
+                expressionAttributeNames[`#${key}`] = key;
+                expressionAttributeValues[`:${key}`] = updateData[key];
+            });
+
+            const params = {
+                TableName: TABLES.platformDiscounts,
+                Key: { discountId: campaignId }, // Use discountId as primary key
+                UpdateExpression: `SET ${updateExpression.join(', ')}`,
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues,
+                ReturnValues: 'ALL_NEW'
+            };
+
+            const result = await client.update(params).promise();
+            console.log(`✅ Campaign updated successfully: ${campaignId}`);
+            return result.Attributes;
+        } catch (error) {
+            console.error(`Error updating campaign ${campaignId}:`, error);
+            throw error;
+        }
+    }
+
+    async function deleteCampaign(campaignId) {
+        console.log(`INFO: Deleting campaign ${campaignId} from unified platform discounts table...`);
+        try {
+            const client = await getClientSafe();
+            if (!client) {
+                console.warn('No DynamoDB client available for campaign deletion');
+                return false;
+            }
+
+            const params = {
+                TableName: TABLES.platformDiscounts,
+                Key: { discountId: campaignId } // Use discountId as primary key
+            };
+
+            await client.delete(params).promise();
+            console.log(`✅ Campaign deleted successfully: ${campaignId}`);
+            return true;
+        } catch (error) {
+            console.error(`Error deleting campaign ${campaignId}:`, error);
+            throw error;
+        }
+    }
+
     window.dataService = {
         initialize: async () => {
             // Do not redirect here; rely on AWSUtils behavior
@@ -529,6 +747,12 @@
         getCustomers,
         getSupportTickets,
         createSupportTicket,
+        // Campaign management functions
+        getCampaigns,
+        createCampaign,
+        updateCampaign,
+        deleteCampaign,
+        getCampaignById,
         listTables,
         // Debug helper passthrough
         getDynamoDBClient: async () => {

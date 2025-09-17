@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral WebSocket Test</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: #f8fafc;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1f2937;
+            margin-bottom: 1rem;
+        }
+        .test-section {
+            margin: 1.5rem 0;
+            padding: 1.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            margin: 0 0 1rem 0;
+            color: #374151;
+        }
+        .status {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 0.5rem 0;
+        }
+        .status.success { background: #d1fae5; color: #065f46; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .status.info { background: #dbeafe; color: #1e40af; }
+        .status.warning { background: #fef3c7; color: #92400e; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .log {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .log-entry {
+            margin: 0.25rem 0;
+        }
+        .log-entry.error { color: #dc2626; }
+        .log-entry.success { color: #059669; }
+        .log-entry.info { color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WizzCentral WebSocket Connectivity Test</h1>
+        <p>Testing WebSocket connection to the live chat backend and support dashboard integration.</p>
+
+        <div class="test-section">
+            <h3>Connection Status</h3>
+            <div id="connectionStatus" class="status info">Not connected</div>
+            <button onclick="testConnection()">Test WebSocket Connection</button>
+            <button onclick="testSupportAgent()">Test Support Agent Registration</button>
+            <button onclick="testChatMessage()">Send Test Chat Message</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="test-section">
+            <h3>WebSocket Configuration</h3>
+            <div id="configInfo"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Test Log</h3>
+            <div id="testLog" class="log"></div>
+        </div>
+    </div>
+
+    <script src="frontend/config.js"></script>
+    <script>
+        let ws = null;
+        let connectionAttempts = 0;
+        const maxAttempts = 3;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            
+            const testLog = document.getElementById('testLog');
+            testLog.appendChild(logEntry);
+            testLog.scrollTop = testLog.scrollHeight;
+            
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        function displayConfig() {
+            const config = window.WIZZCENTRAL_CONFIG || {};
+            const configEl = document.getElementById('configInfo');
+            
+            configEl.innerHTML = `
+                <p><strong>WebSocket URL:</strong> ${config.WEBSOCKET?.LIVE_CHAT_URL || 'Not configured'}</p>
+                <p><strong>Protocols:</strong> ${JSON.stringify(config.WEBSOCKET?.PROTOCOLS || [])}</p>
+                <p><strong>Heartbeat Interval:</strong> ${config.WEBSOCKET?.HEARTBEAT_INTERVAL || 'Not set'}ms</p>
+                <p><strong>Max Reconnect Attempts:</strong> ${config.WEBSOCKET?.MAX_RECONNECT_ATTEMPTS || 'Not set'}</p>
+            `;
+        }
+
+        async function testConnection() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Closing existing connection...', 'info');
+                ws.close();
+            }
+
+            connectionAttempts++;
+            const config = window.WIZZCENTRAL_CONFIG || {};
+            const wsUrl = config.WEBSOCKET?.LIVE_CHAT_URL || 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
+            
+            // Build connection URL with parameters
+            const businessId = '7ccf646c-9594-48d4-8f63-c366d89257e5';
+            const agentId = 'test-agent-' + Date.now();
+            const connectionUrl = `${wsUrl}?businessId=${businessId}&userType=agent_dashboard&agentId=${agentId}&platform=web&appVersion=1.0.0`;
+            
+            log(`Attempt ${connectionAttempts}: Connecting to ${connectionUrl}`, 'info');
+            updateStatus('Connecting...', 'warning');
+
+            try {
+                ws = new WebSocket(connectionUrl);
+
+                ws.onopen = function(event) {
+                    log('✅ WebSocket connection opened successfully!', 'success');
+                    updateStatus('Connected', 'success');
+                    
+                    // Send agent registration message
+                    const agentMessage = {
+                        type: 'chat_agent_connect',
+                        agentId: agentId,
+                        agentName: 'Test Support Agent',
+                        businessId: businessId,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    ws.send(JSON.stringify(agentMessage));
+                    log('📤 Sent agent registration message', 'info');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        log(`📨 Received: ${event.data}`, 'success');
+                        
+                        if (data.type === 'connection_confirmed') {
+                            log('✅ Agent registration confirmed by server', 'success');
+                        } else if (data.type === 'active_sessions') {
+                            log(`📋 Received active sessions: ${data.sessions ? data.sessions.length : 0} sessions`, 'info');
+                        }
+                    } catch (e) {
+                        log(`📨 Received (raw): ${event.data}`, 'info');
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    log(`❌ WebSocket error: ${error}`, 'error');
+                    updateStatus('Connection Error', 'error');
+                };
+
+                ws.onclose = function(event) {
+                    log(`🔌 WebSocket closed: Code ${event.code}, Reason: ${event.reason || 'No reason provided'}`, 'info');
+                    updateStatus('Disconnected', 'error');
+                    
+                    if (event.code === 1006 && connectionAttempts < maxAttempts) {
+                        log(`⚠️ Abnormal closure detected. Retrying in 2 seconds...`, 'warning');
+                        setTimeout(testConnection, 2000);
+                    }
+                };
+
+                // Connection timeout
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.CONNECTING) {
+                        log('⏰ Connection timeout', 'error');
+                        ws.close();
+                        updateStatus('Connection Timeout', 'error');
+                    }
+                }, 10000);
+
+            } catch (error) {
+                log(`❌ Failed to create WebSocket: ${error.message}`, 'error');
+                updateStatus('Failed to Connect', 'error');
+            }
+        }
+
+        function testSupportAgent() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ No active WebSocket connection. Connect first.', 'error');
+                return;
+            }
+
+            const agentMessage = {
+                type: 'agent_status_update',
+                agentId: 'test-agent-' + Date.now(),
+                status: 'available',
+                timestamp: new Date().toISOString()
+            };
+
+            ws.send(JSON.stringify(agentMessage));
+            log('📤 Sent agent status update', 'info');
+        }
+
+        function testChatMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ No active WebSocket connection. Connect first.', 'error');
+                return;
+            }
+
+            const testMessage = {
+                type: 'chat_message',
+                sessionId: 'test-session-' + Date.now(),
+                messageText: 'Hello! This is a test message from the support dashboard.',
+                senderType: 'agent',
+                agentId: 'test-agent',
+                agentName: 'Test Support Agent',
+                timestamp: new Date().toISOString()
+            };
+
+            ws.send(JSON.stringify(testMessage));
+            log('📤 Sent test chat message', 'info');
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').innerHTML = '';
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            displayConfig();
+            log('🚀 WebSocket test page loaded', 'info');
+            log('Click "Test WebSocket Connection" to begin testing', 'info');
+        });
+    </script>
+</body>
+</html>

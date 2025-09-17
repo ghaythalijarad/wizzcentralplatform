@@ -132,6 +132,167 @@
             appearance: auto !important;
             display: block !important;
         }
+
+        /* Enhanced date input styling for consistent calendar icons */
+        .enhanced-date-input {
+            position: relative;
+            padding: 12px 40px 12px 12px !important;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 40px;
+        }
+
+        .enhanced-date-input::-webkit-calendar-picker-indicator {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #666;
+            font-size: 16px;
+            opacity: 1 !important;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+        }
+
+        .enhanced-date-input:hover::-webkit-calendar-picker-indicator {
+            color: #007bff;
+        }
+
+        .enhanced-date-input:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+            outline: none;
+        }
+
+        /* Date input wrapper for fallback icons */
+        .date-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .date-input-wrapper::after {
+            content: '\f073';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #666;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        /* Show fallback icon if native picker is not visible */
+        .enhanced-date-input:not([type="date"]):invalid + .date-input-wrapper::after,
+        .enhanced-date-input[value=""]:not(:focus) + .date-input-wrapper::after {
+            opacity: 1;
+        }
+
+        /* Campaign card hover effects */
+        .campaign-type-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .campaign-type-card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Campaign status badges */
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+
+        .status-badge.status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.status-inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.status-scheduled {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        /* Campaign type badges */
+        .campaign-type-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: white;
+        }
+
+        .campaign-type-badge.campaign-type-first-order {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .campaign-type-badge.campaign-type-restaurant-first {
+            background: linear-gradient(135deg, #f093fb, #f5576c);
+        }
+
+        .campaign-type-badge.campaign-type-new-customer {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+        }
+
+        .campaign-type-badge.campaign-type-special-occasion {
+            background: linear-gradient(135deg, #43e97b, #38f9d7);
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-sm:hover {
+            opacity: 0.8;
+        }
     </style>
 </head>
 
@@ -166,53 +327,6 @@
 
         <!-- Page Content -->
         <div class="page-content">
-            <!-- Promotion Stats -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon active">
-                        <i class="fas fa-tags"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="activePromotionsCount">0</h3>
-                        <p>Active Promotions</p>
-                        <span class="stat-change positive">Loading...</span>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon orders">
-                        <i class="fas fa-shopping-cart"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="promotionOrdersCount">0</h3>
-                        <p>Orders with Promos</p>
-                        <span class="stat-change positive">Loading...</span>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon revenue">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="discountValueToday">$0</h3>
-                        <p>Discount Value Today</p>
-                        <span class="stat-change positive">Loading...</span>
-                    </div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="stat-icon conversion">
-                        <i class="fas fa-percentage"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="conversionRate">0%</h3>
-                        <p>Conversion Rate</p>
-                        <span class="stat-change positive">Loading...</span>
-                    </div>
-                </div>
-            </div>
-
             <!-- Button to open Create Promotion modal -->
             <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
                 <button id="openAddPromotionModalBtn" class="btn-primary">
@@ -298,6 +412,165 @@
                 </div>
             </div>
 
+            <!-- Create Campaign Modal Dialog -->
+            <div id="createCampaignModal" class="modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <button id="closeCampaignModalBtn" class="modal-close">&times;</button>
+                    <h2 style="margin-top: 0;"><i class="fas fa-rocket"></i> Create Special Campaign</h2>
+                    <form id="createCampaignForm">
+                        <!-- Campaign Type Selection -->
+                        <div class="form-group">
+                            <label for="campaignType">Campaign Type *</label>
+                            <select id="campaignType" name="campaignType" required onchange="updateCampaignFields()">
+                                <option value="">Select Campaign Type</option>
+                                <option value="first-order">First Order Discount</option>
+                                <option value="restaurant-first">Restaurant First Order</option>
+                                <option value="new-customer">New Customer Welcome</option>
+                                <option value="special-occasion">Special Occasion</option>
+                            </select>
+                        </div>
+            
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="campaignTitle">Campaign Title *</label>
+                                <input type="text" id="campaignTitle" name="campaignTitle" required
+                                    placeholder="e.g., First Order Welcome">
+                            </div>
+                            <div class="form-group">
+                                <label for="campaignCode">Campaign Code *</label>
+                                <input type="text" id="campaignCode" name="campaignCode" required placeholder="e.g., FIRST25"
+                                    style="text-transform: uppercase;">
+                            </div>
+                        </div>
+            
+                        <!-- Campaign Description -->
+                        <div class="form-group">
+                            <label for="campaignDescription">Description *</label>
+                            <textarea id="campaignDescription" name="campaignDescription" required
+                                placeholder="Brief description of the campaign"></textarea>
+                        </div>
+            
+                        <!-- Discount Configuration -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="campaignDiscountType">Discount Type *</label>
+                                <select id="campaignDiscountType" name="campaignDiscountType" required>
+                                    <option value="">Select Type</option>
+                                    <option value="percentage">Percentage Off</option>
+                                    <option value="fixed_amount">Fixed Amount Off</option>
+                                    <option value="free_delivery">Free Delivery</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="campaignDiscountValue">Discount Value *</label>
+                                <input type="number" id="campaignDiscountValue" name="campaignDiscountValue" required min="0"
+                                    step="0.01" placeholder="e.g., 25 or 10.50">
+                            </div>
+                        </div>
+            
+                        <!-- Campaign Targeting -->
+                        <div id="campaignTargeting" style="display: none;">
+                            <div class="form-group" id="restaurantSelectionGroup" style="display: none;">
+                                <label for="targetRestaurants">Target Restaurants</label>
+                                <select id="targetRestaurants" name="targetRestaurants" multiple style="height: 120px;">
+                                    <!-- Will be populated dynamically -->
+                                </select>
+                                <small class="form-text">Hold Ctrl/Cmd to select multiple restaurants</small>
+                            </div>
+            
+                            <div class="form-group" id="customerSegmentGroup" style="display: none;">
+                                <label for="customerSegment">Customer Segment</label>
+                                <select id="customerSegment" name="customerSegment">
+                                    <option value="all">All Customers</option>
+                                    <option value="new">New Customers Only</option>
+                                    <option value="returning">Returning Customers</option>
+                                    <option value="vip">VIP Customers</option>
+                                </select>
+                            </div>
+            
+                            <div class="form-group" id="occasionGroup" style="display: none;">
+                                <label for="occasionType">Occasion Type</label>
+                                <select id="occasionType" name="occasionType">
+                                    <option value="holiday">Holiday</option>
+                                    <option value="weekend">Weekend Special</option>
+                                    <option value="seasonal">Seasonal</option>
+                                    <option value="custom">Custom Event</option>
+                                </select>
+                            </div>
+                        </div>
+            
+                        <!-- Advanced Condition Configuration -->
+                        <div class="form-group">
+                            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                                <h4 style="margin: 0;">Advanced Targeting</h4>
+                                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="useAdvancedConditions" onchange="toggleAdvancedConditions()">
+                                    <span>Use sophisticated condition engine</span>
+                                </label>
+                            </div>
+                            <div id="campaignConditions" style="display: none;">
+                                <!-- Condition configuration UI will be rendered here -->
+                            </div>
+                        </div>
+            
+                        <!-- Campaign Validity -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="campaignStartDate">Start Date *</label>
+                                <div class="date-input-wrapper">
+                                    <input type="date" id="campaignStartDate" name="campaignStartDate" required
+                                        class="enhanced-date-input">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="campaignEndDate">End Date *</label>
+                                <div class="date-input-wrapper">
+                                    <input type="date" id="campaignEndDate" name="campaignEndDate" required
+                                        class="enhanced-date-input">
+                                </div>
+                            </div>
+                        </div>
+            
+                        <!-- Campaign Limits -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="campaignUsageLimit">Usage Limit</label>
+                                <input type="number" id="campaignUsageLimit" name="campaignUsageLimit" min="1"
+                                    placeholder="e.g., 1000">
+                            </div>
+                            <div class="form-group">
+                                <label for="campaignMinOrder">Min Order Value</label>
+                                <input type="number" id="campaignMinOrder" name="campaignMinOrder" min="0" step="0.01"
+                                    placeholder="e.g., 50.00">
+                            </div>
+                        </div>
+            
+                        <!-- Advanced Settings -->
+                        <div class="form-group">
+                            <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="campaignAutoActivate" name="campaignAutoActivate" checked>
+                                    Auto-activate campaign
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="campaignSingleUse" name="campaignSingleUse">
+                                    Single use per customer
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="campaignStackable" name="campaignStackable">
+                                    Stackable with other offers
+                                </label>
+                            </div>
+                        </div>
+            
+                        <div class="form-actions">
+                            <button type="reset" class="btn-secondary">Clear Form</button>
+                            <button type="submit" class="btn-primary">Create Campaign</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- Merchant Discounts Section -->
             <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
                 <div class="section-header"
@@ -343,6 +616,88 @@
                                     <i class="fas fa-spinner fa-spin"
                                         style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
                                     <div>Loading merchant discounts...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Special Campaigns Section -->
+            <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
+                <div class="section-header"
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+                    <h2 style="margin: 0; color: #2c3e50;">
+                        <i class="fas fa-rocket" style="margin-right: 0.5rem; color: #ffc107;"></i>
+                        Special Campaigns
+                    </h2>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div class="campaign-stats" style="display: flex; gap: 1rem;">
+                            <span class="stat-item"
+                                style="padding: 0.25rem 0.75rem; background: #fff3cd; border-radius: 20px; font-size: 0.9rem;">
+                                Active: <strong id="activeCampaigns" style="color: #856404;">0</strong>
+                            </span>
+                            <span class="stat-item"
+                                style="padding: 0.25rem 0.75rem; background: #d1ecf1; border-radius: 20px; font-size: 0.9rem;">
+                                Total: <strong id="totalCampaigns" style="color: #0c5460;">0</strong>
+                            </span>
+                        </div>
+                        <button onclick="openCreateCampaignModal()" class="btn-primary"
+                            style="padding: 0.5rem 1rem; font-size: 0.9rem;">
+                            <i class="fas fa-plus"></i> Create Campaign
+                        </button>
+                    </div>
+                </div>
+            
+                <!-- Campaign Types Quick Actions -->
+                <div class="campaign-types-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="campaign-type-card" onclick="createCampaignType('first-order')"
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        <i class="fas fa-star" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <h4 style="margin: 0; margin-bottom: 0.5rem;">First Order</h4>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Welcome new customers with special discounts</p>
+                    </div>
+                    <div class="campaign-type-card" onclick="createCampaignType('restaurant-first')"
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        <i class="fas fa-utensils" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <h4 style="margin: 0; margin-bottom: 0.5rem;">Restaurant First Order</h4>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">First order from specific restaurants</p>
+                    </div>
+                    <div class="campaign-type-card" onclick="createCampaignType('new-customer')"
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        <i class="fas fa-user-plus" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <h4 style="margin: 0; margin-bottom: 0.5rem;">New Customer</h4>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Exclusive offers for newly registered users</p>
+                    </div>
+                    <div class="campaign-type-card" onclick="createCampaignType('special-occasion')"
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #43e97b, #38f9d7); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        <i class="fas fa-calendar-alt" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+                        <h4 style="margin: 0; margin-bottom: 0.5rem;">Special Occasions</h4>
+                        <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Holiday and event-based campaigns</p>
+                    </div>
+                </div>
+            
+                <!-- Campaigns Table -->
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campaign</th>
+                                <th>Type</th>
+                                <th>Target</th>
+                                <th>Discount</th>
+                                <th>Status</th>
+                                <th>Usage</th>
+                                <th>Valid Period</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="campaignsTableBody">
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                    <i class="fas fa-rocket" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                                    <div>Loading campaigns...</div>
                                 </td>
                             </tr>
                         </tbody>
@@ -430,6 +785,10 @@
     <script src="../assets/js/navigation.js"></script>
     <!-- Include centralized ModalManager for modals/toasts -->
     <script src="../js/core/ModalManager.js"></script>
+    <!-- Condition Engine and UI -->
+    <link rel="stylesheet" href="../condition-config.css">
+    <script src="../condition-engine.js"></script>
+    <script src="../condition-config-ui.js"></script>
     <script src="../promotions-clean.js?v=10"></script>
 
     <!-- Modal script -->
@@ -477,6 +836,33 @@
                 ensureEndAfterStart();
             }
 
+            // Toggle advanced conditions interface
+            window.toggleAdvancedConditions = function () {
+                const checkbox = document.getElementById('useAdvancedConditions');
+                const conditionsContainer = document.getElementById('campaignConditions');
+                const basicTargeting = document.getElementById('campaignTargeting');
+
+                if (checkbox.checked) {
+                    conditionsContainer.style.display = 'block';
+                    if (basicTargeting) basicTargeting.style.display = 'none';
+
+                    // Initialize condition UI if not already done
+                    if (window.CampaignConditionEngine && window.ConditionConfigUI && !window.conditionUI) {
+                        const engine = new window.CampaignConditionEngine();
+                        window.conditionUI = new window.ConditionConfigUI('campaignConditions', engine);
+                        console.log('✅ Advanced condition engine initialized');
+                    }
+                } else {
+                    conditionsContainer.style.display = 'none';
+                    if (basicTargeting) basicTargeting.style.display = 'block';
+
+                    // Clear conditions
+                    if (window.conditionUI) {
+                        window.conditionUI.clearConditions();
+                    }
+                }
+            };
+
             document.addEventListener('DOMContentLoaded', () => {
                 const modal = document.getElementById('addPromotionModal');
                 const openBtn = document.getElementById('openAddPromotionModalBtn');
@@ -504,6 +890,8 @@
             });
         })();
     </script>
+    <!-- Campaign Management Script -->
+    <script src="../campaign-manager.js"></script>
 </body>
 
 </html>

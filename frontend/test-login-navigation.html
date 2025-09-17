@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Navigation Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .test-section { 
+            border: 1px solid #ddd; 
+            margin: 10px 0; 
+            padding: 15px; 
+            border-radius: 5px; 
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { 
+            padding: 10px 15px; 
+            margin: 5px; 
+            border: none; 
+            border-radius: 3px; 
+            cursor: pointer; 
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Login Navigation Diagnostic Tool</h1>
+    
+    <div class="test-section info">
+        <h3>Current Session Status</h3>
+        <div id="currentStatus"></div>
+        <button class="btn-warning" onclick="refreshStatus()">🔄 Refresh Status</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Quick Login Test</h3>
+        <p>Test login with known working credentials and check navigation:</p>
+        <input type="email" id="testEmail" value="g87_a@yahoo.com" placeholder="Email">
+        <input type="password" id="testPassword" value="Gha@551987" placeholder="Password">
+        <button class="btn-primary" onclick="testLogin()">🚀 Test Login</button>
+        <button class="btn-danger" onclick="clearSession()">🧹 Clear Session</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Navigation Functions Test</h3>
+        <button class="btn-success" onclick="testRedirectLogic()">🧪 Test Redirect Logic</button>
+        <button class="btn-warning" onclick="testAuthUtils()">🔧 Test Auth Utils</button>
+        <button class="btn-primary" onclick="manualNavigate()">🎯 Manual Navigate</button>
+    </div>
+
+    <div class="test-section">
+        <h3>Debug Output</h3>
+        <div id="debugOutput"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="auth-service.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+
+    <script>
+        let debugLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.push({ timestamp, message, type });
+            updateDebugOutput();
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function updateDebugOutput() {
+            const output = document.getElementById('debugOutput');
+            output.innerHTML = debugLog.map(entry => 
+                `<div class="${entry.type}"><strong>${entry.timestamp}:</strong> ${entry.message}</div>`
+            ).join('');
+        }
+
+        function refreshStatus() {
+            const statusDiv = document.getElementById('currentStatus');
+            
+            const session = {
+                isAuthenticated: sessionStorage.getItem('isAuthenticated'),
+                userEmail: sessionStorage.getItem('userEmail'),
+                userId: sessionStorage.getItem('userId'),
+                hasIdToken: !!sessionStorage.getItem('idToken'),
+                hasAccessToken: !!sessionStorage.getItem('accessToken'),
+                returnUrl: sessionStorage.getItem('returnUrl'),
+                currentPath: window.location.pathname,
+                authUtilsLoaded: !!window.Auth,
+                authServiceLoaded: !!window.AuthService,
+                configLoaded: !!window.WIZZCENTRAL_CONFIG
+            };
+
+            statusDiv.innerHTML = `<pre>${JSON.stringify(session, null, 2)}</pre>`;
+            log('Session status refreshed', 'info');
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('testEmail').value.trim();
+            const password = document.getElementById('testPassword').value.trim();
+
+            if (!email || !password) {
+                log('❌ Please fill in email and password', 'error');
+                return;
+            }
+
+            log('🔐 Starting test login...', 'info');
+
+            try {
+                // Wait for AuthService
+                if (!window.AuthService) {
+                    log('⏳ Waiting for AuthService to load...', 'warning');
+                    let retries = 0;
+                    while (!window.AuthService && retries < 30) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        retries++;
+                    }
+                }
+
+                if (!window.AuthService) {
+                    log('❌ AuthService not available after waiting', 'error');
+                    return;
+                }
+
+                log('🔧 Initializing AuthService...', 'info');
+                await window.AuthService.initialize();
+
+                log('🚀 Attempting login...', 'info');
+                const result = await window.AuthService.login(email, password);
+
+                if (result.success) {
+                    log('✅ Login successful!', 'success');
+                    
+                    // Store session data like the real login does
+                    sessionStorage.setItem('userEmail', email);
+                    sessionStorage.setItem('isAuthenticated', 'true');
+                    
+                    log('📦 Session data stored', 'success');
+                    
+                    // Test navigation logic
+                    setTimeout(() => {
+                        testNavigationAfterLogin();
+                    }, 1000);
+                    
+                } else {
+                    log(`❌ Login failed: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        function testNavigationAfterLogin() {
+            log('🧪 Testing post-login navigation...', 'info');
+
+            try {
+                // Test Auth.getPostLoginRedirectUrl function
+                if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
+                    const redirectUrl = window.Auth.getPostLoginRedirectUrl();
+                    log(`🎯 Auth.getPostLoginRedirectUrl() returned: ${redirectUrl}`, 'success');
+                    
+                    // Test if the redirect would work
+                    log('🔄 Testing redirect (will navigate in 3 seconds)...', 'warning');
+                    
+                    setTimeout(() => {
+                        log(`🚀 Navigating to: ${redirectUrl}`, 'info');
+                        window.location.href = redirectUrl;
+                    }, 3000);
+                    
+                } else {
+                    log('❌ Auth.getPostLoginRedirectUrl not available', 'error');
+                    
+                    // Fallback logic from index.html
+                    const cfg = window.WIZZCENTRAL_CONFIG || {};
+                    const path = window.location.pathname || '';
+                    const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+                    const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || (basePrefix + '/pages/dashboard.html');
+                    const redirectUrl = window.location.origin + defaultPage;
+                    
+                    log(`🔄 Using fallback redirect: ${redirectUrl}`, 'warning');
+                    
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 3000);
+                }
+                
+            } catch (error) {
+                log(`❌ Navigation test error: ${error.message}`, 'error');
+            }
+        }
+
+        function testRedirectLogic() {
+            log('🔧 Testing redirect logic components...', 'info');
+
+            // Test configuration
+            const config = window.WIZZCENTRAL_CONFIG;
+            if (config) {
+                log(`✅ Config loaded. DEFAULT_POST_LOGIN_PAGE: ${config.DEFAULT_POST_LOGIN_PAGE}`, 'success');
+            } else {
+                log('❌ Config not loaded', 'error');
+            }
+
+            // Test Auth utilities
+            if (window.Auth) {
+                log('✅ Auth utilities loaded', 'success');
+                
+                if (window.Auth.getPostLoginRedirectUrl) {
+                    try {
+                        const testUrl = window.Auth.getPostLoginRedirectUrl();
+                        log(`✅ getPostLoginRedirectUrl() works: ${testUrl}`, 'success');
+                    } catch (error) {
+                        log(`❌ getPostLoginRedirectUrl() error: ${error.message}`, 'error');
+                    }
+                } else {
+                    log('❌ getPostLoginRedirectUrl function not found', 'error');
+                }
+            } else {
+                log('❌ Auth utilities not loaded', 'error');
+            }
+        }
+
+        function testAuthUtils() {
+            log('🔧 Testing Auth utilities...', 'info');
+
+            if (window.Auth) {
+                const methods = Object.keys(window.Auth);
+                log(`✅ Available Auth methods: ${methods.join(', ')}`, 'success');
+                
+                // Test authentication check
+                try {
+                    const isAuth = window.Auth.requireAuthentication();
+                    log(`🔐 requireAuthentication() result: ${isAuth}`, isAuth ? 'success' : 'warning');
+                } catch (error) {
+                    log(`❌ requireAuthentication() error: ${error.message}`, 'error');
+                }
+            } else {
+                log('❌ Auth object not available', 'error');
+            }
+        }
+
+        function manualNavigate() {
+            log('🎯 Testing manual navigation...', 'info');
+            
+            const dashboardUrl = '/Users/ghaythallaheebi/wizzcentralplatform/frontend/pages/dashboard.html';
+            log(`🚀 Attempting to navigate to: ${dashboardUrl}`, 'info');
+            
+            setTimeout(() => {
+                window.location.href = 'pages/dashboard.html';
+            }, 2000);
+        }
+
+        function clearSession() {
+            sessionStorage.clear();
+            localStorage.clear();
+            log('🧹 Session cleared', 'success');
+            refreshStatus();
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            log('🚀 Login Navigation Test initialized', 'info');
+            refreshStatus();
+        });
+    </script>
+</body>
+</html>

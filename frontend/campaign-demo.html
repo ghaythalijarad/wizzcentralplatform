@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign System Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background: #f8f9fa;
+        }
+        .demo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .demo-header {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        .demo-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0.5rem;
+            transition: background 0.3s;
+        }
+        .demo-button:hover {
+            background: #2980b9;
+        }
+        .demo-button.success {
+            background: #27ae60;
+        }
+        .demo-button.warning {
+            background: #f39c12;
+        }
+        .demo-button.danger {
+            background: #e74c3c;
+        }
+        .result-area {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0.25rem;
+        }
+        .status-badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-badge.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-card">
+        <h1 class="demo-header">🚀 WizzCentral Campaign System Demo</h1>
+        <p>This demo validates that the campaign creation system is working correctly. Click the buttons below to test different aspects of the system.</p>
+        
+        <div class="demo-actions">
+            <button class="demo-button" onclick="testCampaignAccess()">🔍 Test Campaign Access</button>
+            <button class="demo-button success" onclick="createTestCampaign()">🎯 Create Test Campaign</button>
+            <button class="demo-button warning" onclick="openMainPromotionsPage()">📋 Open Promotions Page</button>
+            <button class="demo-button danger" onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+        
+        <div class="status-area">
+            <h3>System Status:</h3>
+            <div id="statusBadges"></div>
+        </div>
+        
+        <div class="result-area" id="resultArea">
+🎉 Campaign System Demo Ready!
+
+Click the buttons above to test different parts of the campaign system:
+
+• "Test Campaign Access" - Verifies API and data service availability
+• "Create Test Campaign" - Creates a sample campaign end-to-end  
+• "Open Promotions Page" - Opens the main promotions management page
+• "Clear Results" - Clears this output area
+
+Waiting for your input...
+        </div>
+    </div>
+
+    <script>
+        const resultArea = document.getElementById('resultArea');
+        const statusBadges = document.getElementById('statusBadges');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            resultArea.textContent += `\n[${timestamp}] ${message}`;
+            resultArea.scrollTop = resultArea.scrollHeight;
+        }
+
+        function updateStatus(component, status, message) {
+            let badge = document.getElementById(`badge-${component}`);
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.id = `badge-${component}`;
+                badge.className = 'status-badge';
+                statusBadges.appendChild(badge);
+            }
+            
+            badge.className = `status-badge ${status}`;
+            badge.textContent = `${component}: ${message}`;
+        }
+
+        function clearResults() {
+            resultArea.textContent = '🗑️ Results cleared. Ready for new tests...\n';
+            statusBadges.innerHTML = '';
+        }
+
+        async function testCampaignAccess() {
+            log('🔍 Testing Campaign System Access...');
+            log('=' .repeat(40));
+            
+            try {
+                // Test data service
+                if (window.dataService) {
+                    updateStatus('DataService', 'success', 'Available');
+                    log('✅ Data service available');
+                    
+                    // Test campaign functions
+                    if (window.dataService.createCampaign) {
+                        updateStatus('CampaignAPI', 'success', 'Ready');
+                        log('✅ Campaign API methods available');
+                    } else {
+                        updateStatus('CampaignAPI', 'error', 'Missing');
+                        log('❌ Campaign API methods missing');
+                    }
+                } else {
+                    updateStatus('DataService', 'error', 'Not Available');
+                    log('❌ Data service not available');
+                }
+
+                // Test AWS services
+                if (window.AWS) {
+                    updateStatus('AWS', 'success', 'SDK Loaded');
+                    log('✅ AWS SDK loaded');
+                } else {
+                    updateStatus('AWS', 'error', 'SDK Missing');
+                    log('❌ AWS SDK not loaded');
+                }
+
+                // Test configuration
+                if (window.WIZZCENTRAL_CONFIG) {
+                    updateStatus('Config', 'success', 'Loaded');
+                    log('✅ Configuration loaded');
+                } else {
+                    updateStatus('Config', 'error', 'Missing');
+                    log('❌ Configuration missing');
+                }
+
+                log('\n📊 Campaign Access Test Complete');
+                
+            } catch (error) {
+                updateStatus('Test', 'error', 'Failed');
+                log(`❌ Test failed: ${error.message}`);
+            }
+        }
+
+        async function createTestCampaign() {
+            log('🎯 Creating Test Campaign...');
+            log('=' .repeat(40));
+            
+            try {
+                if (!window.dataService) {
+                    throw new Error('Data service not available');
+                }
+
+                updateStatus('Campaign', 'info', 'Creating...');
+                
+                const testCampaign = {
+                    title: 'Demo Test Campaign',
+                    code: 'DEMO' + Date.now(),
+                    type: 'special-occasion',
+                    description: 'Test campaign created via demo system',
+                    discountType: 'percentage',
+                    discountValue: 15,
+                    minOrderValue: 25,
+                    usageLimit: 50,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                    autoActivate: true,
+                    singleUse: false,
+                    stackable: false
+                };
+
+                log(`📝 Campaign data prepared: ${testCampaign.title}`);
+                log(`📋 Campaign code: ${testCampaign.code}`);
+
+                // Initialize data service if needed
+                await window.dataService.initialize();
+                log('✅ Data service initialized');
+
+                // Create the campaign
+                const result = await window.dataService.createCampaign(testCampaign);
+                
+                if (result) {
+                    updateStatus('Campaign', 'success', 'Created');
+                    log('✅ Campaign created successfully!');
+                    log(`📄 Campaign ID: ${result.campaignId || result.discountId}`);
+                    
+                    // Verify it exists
+                    const campaigns = await window.dataService.getCampaigns();
+                    const found = campaigns.find(c => c.code === testCampaign.code);
+                    
+                    if (found) {
+                        log('✅ Campaign verified in database');
+                        log(`📊 Total campaigns: ${campaigns.length}`);
+                        
+                        // Clean up - delete the test campaign
+                        await window.dataService.deleteCampaign(found.id);
+                        log('🗑️ Test campaign cleaned up');
+                        
+                        updateStatus('Test', 'success', 'Complete');
+                        log('\n🎉 Campaign creation test successful!');
+                    } else {
+                        updateStatus('Test', 'error', 'Verification Failed');
+                        log('❌ Campaign not found after creation');
+                    }
+                } else {
+                    updateStatus('Campaign', 'error', 'Creation Failed');
+                    log('❌ Campaign creation failed');
+                }
+                
+            } catch (error) {
+                updateStatus('Campaign', 'error', error.message);
+                log(`❌ Campaign creation failed: ${error.message}`);
+            }
+        }
+
+        function openMainPromotionsPage() {
+            log('📋 Opening Promotions Management Page...');
+            log('🌐 Navigating to http://localhost:5173/pages/promotions.html');
+            window.open('http://localhost:5173/pages/promotions.html', '_blank');
+            updateStatus('Navigation', 'success', 'Opened');
+        }
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            log('🚀 Campaign System Demo Initialized');
+            log('💡 Click the buttons above to test the system');
+            updateStatus('Demo', 'success', 'Ready');
+        });
+    </script>
+</body>
+</html>
