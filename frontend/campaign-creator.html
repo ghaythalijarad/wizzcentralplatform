@@ -76,8 +76,22 @@
             <div class="form-row">
                 <div>
                     <label>Campaign Title:</label>
-                    <input type="text" id="title" value="Flash Sale 2025" required>
+                    <input type="text" id="title" value="Marketing Campaign 2025" required>
                 </div>
+                <div>
+                    <label>Campaign Type:</label>
+                    <select id="campaignType">
+                        <option value="marketing">Marketing Campaign</option>
+                        <option value="loyalty">Loyalty Campaign</option>
+                        <option value="seasonal">Seasonal Campaign</option>
+                        <option value="acquisition">Customer Acquisition</option>
+                        <option value="retention">Customer Retention</option>
+                        <option value="flash">Flash Sale</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
                 <div>
                     <label>Discount Type:</label>
                     <select id="type">
@@ -85,43 +99,47 @@
                         <option value="fixed">Fixed Amount</option>
                     </select>
                 </div>
-            </div>
-            
-            <div class="form-row">
                 <div>
                     <label>Discount Value:</label>
                     <input type="number" id="value" value="25" min="1" required>
                 </div>
-                <div>
-                    <label>Promo Code:</label>
-                    <input type="text" id="code" value="FLASH25" required>
-                </div>
             </div>
             
             <div class="form-row">
+                <div>
+                    <label>Promo Code:</label>
+                    <input type="text" id="code" value="SAVE25" required>
+                </div>
                 <div>
                     <label>Min Order Value:</label>
                     <input type="number" id="minOrder" value="50" min="0">
                 </div>
+            </div>
+            
+            <div class="form-row">
                 <div>
                     <label>Usage Limit:</label>
                     <input type="number" id="limit" value="100" min="1">
                 </div>
-            </div>
-            
-            <label>Description:</label>
-            <textarea id="description" rows="3">Limited time flash sale campaign</textarea>
-            
-            <div class="form-row">
                 <div>
                     <label>Start Date:</label>
                     <input type="date" id="startDate" required>
                 </div>
+            </div>
+            
+            <div class="form-row">
                 <div>
                     <label>End Date:</label>
                     <input type="date" id="endDate" required>
                 </div>
+                <div>
+                    <label style="visibility: hidden;">Spacer</label>
+                    <div style="padding: 8px;"></div>
+                </div>
             </div>
+            
+            <label>Description:</label>
+            <textarea id="description" rows="3">Promotional campaign to drive customer engagement and sales</textarea>
             
             <button type="submit" class="create-btn">🚀 Create Campaign</button>
         </form>
@@ -184,7 +202,32 @@
             document.getElementById('startDate').value = today;
             document.getElementById('endDate').value = endDate;
             
+            // Add campaign type change handler
+            document.getElementById('campaignType').addEventListener('change', updateCampaignDefaults);
+            
             log('Form initialized with default values');
+        }
+
+        // Update campaign title and code based on type
+        function updateCampaignDefaults() {
+            const campaignType = document.getElementById('campaignType').value;
+            const titleElement = document.getElementById('title');
+            const codeElement = document.getElementById('code');
+            
+            const defaults = {
+                marketing: { title: 'Marketing Campaign 2025', code: 'SAVE25' },
+                loyalty: { title: 'Loyalty Rewards 2025', code: 'LOYAL25' },
+                seasonal: { title: 'Seasonal Special 2025', code: 'SEASON25' },
+                acquisition: { title: 'New Customer Welcome 2025', code: 'WELCOME25' },
+                retention: { title: 'Customer Retention 2025', code: 'STAY25' },
+                flash: { title: 'Flash Sale 2025', code: 'FLASH25' }
+            };
+            
+            if (defaults[campaignType]) {
+                titleElement.value = defaults[campaignType].title;
+                codeElement.value = defaults[campaignType].code;
+                log(`Updated defaults for ${campaignType} campaign`);
+            }
         }
 
         // Check system status
@@ -263,6 +306,7 @@
                     description: formData.get('description'),
                     type: formData.get('type'),
                     discountType: formData.get('type'),
+                    campaignType: formData.get('campaignType') || 'marketing', // Campaign classification
                     value: Number(formData.get('value')),
                     discountValue: Number(formData.get('value')),
                     code: formData.get('code').toUpperCase(),
@@ -276,13 +320,12 @@
                     limit: Number(formData.get('limit')),
                     usageLimit: Number(formData.get('limit')),
                     discountSource: 'campaign',
-                    campaignType: 'marketing',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     createdBy: 'campaign-creator'
                 };
                 
-                log(`Campaign details: ${campaign.title} (${campaign.code}) - ${campaign.value}${campaign.type === 'percentage' ? '%' : '$'} off`);
+                log(`Campaign details: ${campaign.title} (${campaign.code}) - ${campaign.value}${campaign.type === 'percentage' ? '%' : '$'} off - Type: ${campaign.campaignType}`);
                 
                 // Use unified createCampaign function
                 const startTime = Date.now();
@@ -295,6 +338,7 @@
                         🎉 <strong>Campaign created successfully!</strong><br><br>
                         📝 <strong>Details:</strong><br>
                         • Title: ${campaign.title}<br>
+                        • Type: ${campaign.campaignType}<br>
                         • Code: ${campaign.code}<br>
                         • Discount: ${campaign.value}${campaign.type === 'percentage' ? '%' : '$'} off<br>
                         • Min Order: $${campaign.minOrderValue}<br>
