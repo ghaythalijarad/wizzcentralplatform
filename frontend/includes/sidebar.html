@@ -1,51 +1,51 @@
-<!-- Shared sidebar navigation with modern flat design -->
-<div class="sidebar bg-gradient-primary text-white shadow-xl" id="sidebar">
-    <div class="sidebar-header p-6 border-b border-white/20">
-        <div class="logo flex items-center gap-3 text-xl font-bold">
-            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-rocket text-white"></i>
+<!-- Material 3 Sidebar Navigation -->
+<div class="md-navigation-drawer md-surface-container-low" id="sidebar">
+    <div class="sidebar-header md-padding-large" style="border-bottom: 1px solid var(--md-sys-color-outline-variant); background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));">
+        <div class="logo md-flex md-gap-medium md-typescale-title-large" style="color: var(--md-sys-color-on-primary);">
+            <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: var(--md-sys-shape-corner-medium); display: flex; align-items: center; justify-content: center;">
+                <i class="fas fa-rocket" style="color: var(--md-sys-color-on-primary);"></i>
             </div>
-            <span class="text-white">WizzCentral</span>
+            <span style="color: var(--md-sys-color-on-primary);">WizzCentral</span>
         </div>
-        <button class="sidebar-toggle btn btn-ghost btn-sm text-white hover:bg-white/20" id="sidebarToggle" aria-label="Toggle sidebar">
+        <button class="md-button md-button--text sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" style="color: var(--md-sys-color-on-primary); background: rgba(255,255,255,0.1);">
             <i class="fas fa-bars"></i>
         </button>
     </div>
-    <nav class="sidebar-nav flex-1 py-4">
-        <ul class="space-y-1">
+    <nav class="sidebar-nav" style="flex: 1; padding: 16px 0;">
+        <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px;">
             <li class="nav-item" data-page="dashboard">
-                <a href="/frontend/pages/dashboard.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-tachometer-alt w-5"></i>
+                <a href="/frontend/pages/dashboard.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-tachometer-alt md-navigation-item__icon"></i>
                     <span>Dashboard</span>
                 </a>
             </li>
             <li class="nav-item" data-page="drivers">
-                <a href="/frontend/pages/drivers.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-motorcycle w-5"></i>
+                <a href="/frontend/pages/drivers.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-motorcycle md-navigation-item__icon"></i>
                     <span>Drivers</span>
                 </a>
             </li>
             <li class="nav-item" data-page="customers">
-                <a href="/frontend/pages/customers.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-users w-5"></i>
+                <a href="/frontend/pages/customers.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-users md-navigation-item__icon"></i>
                     <span>Customers</span>
                 </a>
             </li>
             <li class="nav-item" data-page="merchants">
-                <a href="/frontend/pages/merchants.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-store w-5"></i>
+                <a href="/frontend/pages/merchants.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-store md-navigation-item__icon"></i>
                     <span>Merchants</span>
                 </a>
             </li>
             <li class="nav-item" data-page="orders">
-                <a href="/frontend/pages/orders.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-shopping-bag w-5"></i>
+                <a href="/frontend/pages/orders.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-shopping-bag md-navigation-item__icon"></i>
                     <span>Orders</span>
                 </a>
             </li>
             <li class="nav-item" data-page="promotions">
-                <a href="/frontend/pages/promotions.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-tags w-5"></i>
+                <a href="/frontend/pages/promotions.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-tags md-navigation-item__icon"></i>
                     <span>Promotions</span>
                 </a>
             </li>
