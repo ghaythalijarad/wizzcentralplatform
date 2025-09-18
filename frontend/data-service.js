@@ -254,74 +254,7 @@
         return Array.isArray(fallback.Items) ? fallback.Items : [];
     }
 
-    async function createPlatformDiscount(discountData) {
-        console.log('DEBUG: createPlatformDiscount started');
-        const startTime = Date.now();
-
-        const discountId = discountData.discountId || `platform_${Date.now()}`;
-
-        // Normalize type
-        const normalizedType = (discountData.type === 'fixed_amount') ? 'fixed' : discountData.type;
-
-        // Build minimal item for DocumentClient (remove optional fields that are undefined)
-        const nowIso = new Date().toISOString();
-        const item = {
-            discountId,
-            id: discountId, // compatibility for tables keyed by 'id'
-            title: discountData.title || discountData.name || '',
-            name: discountData.name || discountData.title || '',
-            description: discountData.description || '',
-            type: normalizedType,
-            value: typeof discountData.value === 'number' ? discountData.value : Number(discountData.value || 0),
-            code: discountData.code || '',
-            startDate: discountData.startDate || '',
-            endDate: discountData.endDate || '',
-            isActive: discountData.isActive !== false,
-            usage: typeof discountData.usage === 'number' ? discountData.usage : 0,
-            limit: discountData.limit ? Number(discountData.limit) : 0,
-            minOrderValue: discountData.minOrderValue != null ? Number(discountData.minOrderValue) : 0,
-            currentUsage: typeof discountData.currentUsage === 'number' ? discountData.currentUsage : 0,
-            discountSource: 'platform',
-            createdAt: discountData.createdAt || nowIso,
-            updatedAt: nowIso,
-            createdBy: discountData.createdBy || 'central-platform',
-            applicableToAll: discountData.applicableToAll !== false,
-            customerSegments: Array.isArray(discountData.customerSegments) && discountData.customerSegments.length ? discountData.customerSegments : ['all']
-        };
-
-        // Add optional fields only if they have meaningful values
-        if (discountData.usageLimit != null && discountData.usageLimit > 0) {
-            item.usageLimit = Number(discountData.usageLimit);
-        }
-        if (discountData.minOrderAmount != null && discountData.minOrderAmount > 0) {
-            item.minOrderAmount = Number(discountData.minOrderAmount);
-        }
-
-        try {
-            await putDocumentItem(TABLES.platformDiscounts, item);
-            const duration = Date.now() - startTime;
-            console.log(`SUCCESS: createPlatformDiscount completed in ${duration}ms (primary table)`);
-            return { success: true, discountId };
-        } catch (e) {
-            // Fallback to merchant discounts table if platform table is missing or blocked
-            if (_shouldFallbackPlatformTable(e)) {
-                console.warn('WARN: Primary platform discounts table unavailable. Falling back to merchant discounts table for platform entries.');
-                try {
-                    await putDocumentItem(TABLES.discounts, item);
-                    const duration = Date.now() - startTime;
-                    console.log(`SUCCESS: createPlatformDiscount completed in ${duration}ms (fallback table)`);
-                    return { success: true, discountId };
-                } catch (e2) {
-                    const duration = Date.now() - startTime;
-                    console.error(`ERROR: createPlatformDiscount fallback failed after ${duration}ms:`, e2?.message || e2);
-                    throw new Error(`Create platform discount failed (fallback): ${e2?.message || e2}`);
-                }
-            }
-            const duration = Date.now() - startTime;
-            console.error(`ERROR: createPlatformDiscount failed after ${duration}ms:`, e?.message || e);
-            throw new Error(`Create platform discount failed: ${e?.message || e}`);
-        }
-    }
+    // REMOVED: createPlatformDiscount function - use createCampaign instead for unified functionality
 
     async function updatePlatformDiscount(discountId, updates) {
         // Try to find in primary platform table first
@@ -598,52 +531,82 @@
     }
 
     async function createCampaign(campaignData) {
-        console.log('INFO: Creating new campaign in unified platform discounts table...');
+        console.log('INFO: Creating new campaign/discount in unified platform discounts table...');
+        const startTime = Date.now();
+        
         try {
             const client = await getClientSafe();
             if (!client) {
                 console.warn('No DynamoDB client available for campaign creation');
-                return null;
+                return { success: false, error: 'No DynamoDB client available' };
             }
 
-            const campaignId = `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const campaignId = campaignData.discountId || campaignData.campaignId || `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             const timestamp = new Date().toISOString();
             
-            // Create campaign as a special type of platform discount
+            // Normalize discount type
+            const normalizedType = (campaignData.type === 'fixed_amount' || campaignData.discountType === 'fixed_amount') ? 'fixed' : 
+                                   (campaignData.discountType || campaignData.type || 'percentage');
+            
+            // Create unified campaign/discount object that works for both use cases
             const campaign = {
+                // Primary identifiers
                 discountId: campaignId, // Use discountId as primary key for unified table
                 campaignId, // Keep original campaignId for backwards compatibility
-                title: campaignData.title || '',
-                name: campaignData.title || '', // Also set name field for consistency
+                id: campaignId, // compatibility for tables keyed by 'id'
+                
+                // Basic info (unified field naming)
+                title: campaignData.title || campaignData.name || '',
+                name: campaignData.title || campaignData.name || '', // Also set name field for consistency
+                description: campaignData.description || '',
                 code: campaignData.code || '',
-                type: campaignData.discountType || 'percentage', // Use discountType as the main type
-                campaignType: campaignData.type || '', // Store campaign type separately
-                value: parseFloat(campaignData.discountValue) || 0,
-                discountValue: parseFloat(campaignData.discountValue) || 0, // Keep both for compatibility
-                discountType: campaignData.discountType || 'percentage',
-                discountSource: 'campaign', // Mark this as campaign-originated
+                
+                // Discount details
+                type: normalizedType, // Main type field
+                discountType: normalizedType, // Also store as discountType for compatibility
+                campaignType: campaignData.campaignType || campaignData.type || '', // Store original campaign type separately
+                value: parseFloat(campaignData.value || campaignData.discountValue) || 0,
+                discountValue: parseFloat(campaignData.value || campaignData.discountValue) || 0, // Keep both for compatibility
+                
+                // Source and targeting
+                discountSource: campaignData.discountSource || 'campaign', // Mark as campaign-originated by default
                 target: campaignData.target || '',
                 targetRestaurants: campaignData.targetRestaurants || [],
                 targetSegments: campaignData.targetSegments || [],
                 occasions: campaignData.occasions || [],
-                status: campaignData.status || 'draft',
-                isActive: campaignData.autoActivate || false,
+                customerSegments: Array.isArray(campaignData.customerSegments) && campaignData.customerSegments.length ? 
+                                  campaignData.customerSegments : ['all'],
+                
+                // Status and activation
+                status: campaignData.status || 'active',
+                isActive: campaignData.isActive !== false && campaignData.autoActivate !== false,
+                autoActivate: campaignData.autoActivate !== false,
+                
+                // Usage tracking (unified field naming)
                 usage: 0,
                 currentUsage: 0, // For compatibility with discount structure
-                usageLimit: parseInt(campaignData.usageLimit) || 0,
-                limit: parseInt(campaignData.usageLimit) || 0, // Keep both for compatibility
-                minOrderValue: parseFloat(campaignData.minOrderValue) || 0,
-                minOrderAmount: parseFloat(campaignData.minOrderValue) || 0, // Keep both for compatibility
+                usageLimit: parseInt(campaignData.usageLimit || campaignData.limit) || 0,
+                limit: parseInt(campaignData.usageLimit || campaignData.limit) || 0, // Keep both for compatibility
+                
+                // Order requirements (unified field naming)
+                minOrderValue: parseFloat(campaignData.minOrderValue || campaignData.minOrderAmount) || 0,
+                minOrderAmount: parseFloat(campaignData.minOrderValue || campaignData.minOrderAmount) || 0, // Keep both for compatibility
+                
+                // Date ranges (unified field naming)
                 startDate: campaignData.startDate || '',
                 endDate: campaignData.endDate || '',
-                validFrom: campaignData.validFrom || '',
-                validTo: campaignData.validTo || '',
-                description: campaignData.description || '',
-                autoActivate: campaignData.autoActivate || false,
+                validFrom: campaignData.validFrom || campaignData.startDate || '',
+                validTo: campaignData.validTo || campaignData.endDate || '',
+                
+                // Campaign-specific features
                 singleUse: campaignData.singleUse || false,
                 stackable: campaignData.stackable || false,
-                createdAt: timestamp,
-                updatedAt: timestamp
+                applicableToAll: campaignData.applicableToAll !== false,
+                
+                // Timestamps and metadata
+                createdAt: campaignData.createdAt || timestamp,
+                updatedAt: timestamp,
+                createdBy: campaignData.createdBy || 'central-platform'
             };
 
             const params = {
@@ -652,11 +615,54 @@
             };
 
             await client.put(params).promise();
-            console.log(`✅ Campaign created successfully in unified table: ${campaignId}`);
-            return campaign;
+            const duration = Date.now() - startTime;
+            console.log(`✅ Campaign/discount created successfully in unified table: ${campaignId} (${duration}ms)`);
+            return { success: true, discountId: campaignId, campaignId };
+            
         } catch (error) {
-            console.error('Error creating campaign:', error);
-            throw error;
+            // Fallback to merchant discounts table if platform table is missing or blocked
+            if (_shouldFallbackPlatformTable(error)) {
+                console.warn('WARN: Primary platform discounts table unavailable. Falling back to merchant discounts table.');
+                try {
+                    const campaignId = campaignData.discountId || campaignData.campaignId || `campaign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    const timestamp = new Date().toISOString();
+                    const normalizedType = (campaignData.type === 'fixed_amount' || campaignData.discountType === 'fixed_amount') ? 'fixed' : 
+                                           (campaignData.discountType || campaignData.type || 'percentage');
+                    
+                    const fallbackCampaign = {
+                        discountId: campaignId,
+                        campaignId,
+                        id: campaignId,
+                        title: campaignData.title || campaignData.name || '',
+                        name: campaignData.title || campaignData.name || '',
+                        description: campaignData.description || '',
+                        code: campaignData.code || '',
+                        type: normalizedType,
+                        value: parseFloat(campaignData.value || campaignData.discountValue) || 0,
+                        discountSource: campaignData.discountSource || 'campaign',
+                        isActive: campaignData.isActive !== false,
+                        usage: 0,
+                        limit: parseInt(campaignData.usageLimit || campaignData.limit) || 0,
+                        minOrderValue: parseFloat(campaignData.minOrderValue || campaignData.minOrderAmount) || 0,
+                        startDate: campaignData.startDate || '',
+                        endDate: campaignData.endDate || '',
+                        createdAt: timestamp,
+                        updatedAt: timestamp
+                    };
+                    
+                    await putDocumentItem(TABLES.discounts, fallbackCampaign);
+                    const duration = Date.now() - startTime;
+                    console.log(`✅ Campaign/discount created successfully in fallback table: ${campaignId} (${duration}ms)`);
+                    return { success: true, discountId: campaignId, campaignId };
+                } catch (fallbackError) {
+                    const duration = Date.now() - startTime;
+                    console.error(`ERROR: Campaign creation fallback failed after ${duration}ms:`, fallbackError?.message || fallbackError);
+                    return { success: false, error: `Create campaign failed (fallback): ${fallbackError?.message || fallbackError}` };
+                }
+            }
+            const duration = Date.now() - startTime;
+            console.error(`ERROR: Campaign creation failed after ${duration}ms:`, error?.message || error);
+            return { success: false, error: `Create campaign failed: ${error?.message || error}` };
         }
     }
 
@@ -737,7 +743,10 @@
         // Back-compat alias
         getAllBusinesses: getBusinesses,
         getPlatformDiscounts,
-        createPlatformDiscount,
+        // UNIFIED: Use createCampaign for all campaign/discount creation
+        createCampaign,
+        // Legacy alias for backward compatibility - redirects to createCampaign
+        createPlatformDiscount: createCampaign,
         updatePlatformDiscount,
         deletePlatformDiscount,
         updateMerchantDiscount,
@@ -749,7 +758,6 @@
         createSupportTicket,
         // Campaign management functions
         getCampaigns,
-        createCampaign,
         updateCampaign,
         deleteCampaign,
         getCampaignById,

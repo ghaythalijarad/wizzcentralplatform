@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Campaign Function</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+        .debug-container { background: white; padding: 30px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .result { margin: 10px 0; padding: 15px; border-radius: 4px; font-family: monospace; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; background: #007bff; color: white; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🐛 Debug Campaign Function</h1>
+        <p>This page checks if the createCampaign function is properly loaded and available.</p>
+        
+        <button onclick="debugDataService()">Debug DataService</button>
+        <button onclick="testCreateCampaign()">Test Create Campaign</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <!-- Load required scripts in correct order -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js"></script>
+    <script src="data-service.js"></script>
+
+    <script>
+        function addResult(type, title, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const result = document.createElement('div');
+            result.className = `result ${type}`;
+            result.innerHTML = `
+                <strong>[${timestamp}] ${title}</strong><br>
+                <pre>${message}</pre>
+            `;
+            document.getElementById('results').appendChild(result);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function debugDataService() {
+            addResult('info', 'DataService Debug Started', 'Checking all aspects of dataService...');
+            
+            try {
+                // Check if dataService exists
+                if (typeof window.dataService === 'undefined') {
+                    addResult('error', 'DataService Missing', 'window.dataService is undefined');
+                    return;
+                }
+                
+                addResult('success', 'DataService Found', 'window.dataService exists');
+                
+                // List all available functions
+                const functions = [];
+                for (const key in window.dataService) {
+                    if (typeof window.dataService[key] === 'function') {
+                        functions.push(key);
+                    }
+                }
+                
+                addResult('info', 'Available Functions', functions.join(', '));
+                
+                // Specifically check for createCampaign
+                if (typeof window.dataService.createCampaign === 'function') {
+                    addResult('success', 'createCampaign Function Found', 'Function is available and callable');
+                } else {
+                    addResult('error', 'createCampaign Function Missing', 
+                        `Type: ${typeof window.dataService.createCampaign}`);
+                }
+                
+                // Check other campaign functions
+                const campaignFunctions = ['getCampaigns', 'updateCampaign', 'deleteCampaign', 'getCampaignById'];
+                campaignFunctions.forEach(func => {
+                    if (typeof window.dataService[func] === 'function') {
+                        addResult('success', `${func} Available`, 'Function exists');
+                    } else {
+                        addResult('error', `${func} Missing`, `Type: ${typeof window.dataService[func]}`);
+                    }
+                });
+                
+            } catch (error) {
+                addResult('error', 'Debug Error', error.message + '\n' + error.stack);
+            }
+        }
+
+        async function testCreateCampaign() {
+            addResult('info', 'Testing Campaign Creation', 'Attempting to create a test campaign...');
+            
+            try {
+                // Check if function exists
+                if (typeof window.dataService.createCampaign !== 'function') {
+                    addResult('error', 'Function Not Available', 'dataService.createCampaign is not a function');
+                    return;
+                }
+                
+                // Create test campaign data
+                const testCampaign = {
+                    title: 'Debug Test Campaign',
+                    description: 'Campaign created for debugging purposes',
+                    type: 'first-order',
+                    discountType: 'percentage',
+                    discountValue: 15,
+                    minOrderValue: 25,
+                    usageLimit: 100,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7*24*60*60*1000).toISOString().split('T')[0],
+                    autoActivate: true,
+                    singleUse: false,
+                    stackable: false,
+                    targetRestaurants: [],
+                    targetSegments: ['all'],
+                    occasions: []
+                };
+                
+                addResult('info', 'Campaign Data', JSON.stringify(testCampaign, null, 2));
+                
+                // Call the function
+                const result = await window.dataService.createCampaign(testCampaign);
+                
+                if (result) {
+                    addResult('success', 'Campaign Created Successfully', JSON.stringify(result, null, 2));
+                } else {
+                    addResult('error', 'Campaign Creation Failed', 'Function returned null or undefined');
+                }
+                
+            } catch (error) {
+                addResult('error', 'Campaign Creation Error', error.message + '\n' + error.stack);
+            }
+        }
+
+        // Wait for page load and scripts
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                addResult('info', 'Page Loaded', 'Debug page ready. Click "Debug DataService" to check function availability.');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

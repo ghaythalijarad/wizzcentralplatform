@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Unified Campaign Creation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .test-btn { background: #28a745; }
+        .test-btn:hover { background: #1e7e34; }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Unified Campaign Creation Test</h1>
+    <p>Testing the unified createCampaign function that replaces both createPlatformDiscount and createCampaign.</p>
+
+    <!-- Status Card -->
+    <div id="statusCard" class="card info">
+        <h3>📊 Test Status</h3>
+        <div id="statusText">Ready to test...</div>
+    </div>
+
+    <!-- Test Actions -->
+    <div class="card">
+        <h3>🧪 Test Actions</h3>
+        <button onclick="testBasicCampaign()" class="test-btn">Test Basic Campaign</button>
+        <button onclick="testDiscountCompatibility()" class="test-btn">Test Discount Compatibility</button>
+        <button onclick="testAdvancedCampaign()" class="test-btn">Test Advanced Campaign</button>
+        <button onclick="clearLog()">🗑️ Clear Log</button>
+    </div>
+
+    <!-- Results -->
+    <div id="resultCard" class="card" style="display: none;">
+        <h3>✅ Test Results</h3>
+        <div id="resultText"></div>
+        <button onclick="window.open('/pages/promotions.html', '_blank')">📋 View Promotions Page</button>
+    </div>
+
+    <!-- Debug Log -->
+    <div class="card">
+        <h3>🐛 Debug Log</h3>
+        <div id="debugLog" class="log">Unified campaign test page loaded...\n</div>
+    </div>
+
+    <script>
+        // Simple logging
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('debugLog');
+            logEl.textContent += `[${time}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[UnifiedCampaignTest] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('debugLog').textContent = 'Log cleared.\n';
+        }
+
+        function setStatus(message, type = 'info') {
+            const card = document.getElementById('statusCard');
+            const text = document.getElementById('statusText');
+            card.className = `card ${type}`;
+            text.innerHTML = message;
+        }
+
+        function showResult(message, type = 'success') {
+            const card = document.getElementById('resultCard');
+            const text = document.getElementById('resultText');
+            card.style.display = 'block';
+            card.className = `card ${type}`;
+            text.innerHTML = message;
+        }
+
+        async function waitForDataService() {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 20;
+                
+                const check = () => {
+                    attempts++;
+                    if (window.dataService && window.dataService.createCampaign) {
+                        log('✅ DataService with createCampaign is available');
+                        resolve();
+                    } else if (attempts >= maxAttempts) {
+                        reject(new Error('DataService failed to load after 20 attempts'));
+                    } else {
+                        setTimeout(check, 500);
+                    }
+                };
+                
+                check();
+            });
+        }
+
+        // Test basic campaign creation
+        async function testBasicCampaign() {
+            log('🧪 Testing basic campaign creation...');
+            setStatus('⏳ Testing basic campaign...', 'info');
+            
+            try {
+                await waitForDataService();
+                
+                const campaign = {
+                    title: 'Test Basic Campaign',
+                    description: 'Basic campaign test from unified function',
+                    type: 'percentage',
+                    value: 15,
+                    code: `BASIC${Date.now().toString().slice(-4)}`,
+                    minOrderValue: 30,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: '2025-12-31',
+                    usageLimit: 100
+                };
+                
+                log(`Creating campaign: ${campaign.title} (${campaign.code})`);
+                
+                const startTime = Date.now();
+                const result = await window.dataService.createCampaign(campaign);
+                const duration = Date.now() - startTime;
+                
+                if (result.success) {
+                    log(`✅ Basic campaign created successfully in ${duration}ms`);
+                    setStatus(`✅ Basic campaign test passed in ${duration}ms`, 'success');
+                    showResult(`
+                        🎉 <strong>Basic Campaign Test PASSED!</strong><br><br>
+                        📝 <strong>Details:</strong><br>
+                        • Title: ${campaign.title}<br>
+                        • Code: ${campaign.code}<br>
+                        • Discount: ${campaign.value}% off<br>
+                        • Campaign ID: ${result.discountId}<br>
+                        • Duration: ${duration}ms
+                    `);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+                
+            } catch (error) {
+                log(`❌ Basic campaign test failed: ${error.message}`);
+                setStatus(`❌ Basic campaign test failed`, 'error');
+                showResult(`❌ <strong>Basic Campaign Test FAILED:</strong><br>${error.message}`, 'error');
+            }
+        }
+
+        // Test discount-style creation (backward compatibility)
+        async function testDiscountCompatibility() {
+            log('🧪 Testing discount compatibility...');
+            setStatus('⏳ Testing discount compatibility...', 'info');
+            
+            try {
+                await waitForDataService();
+                
+                // Create using old discount-style parameters
+                const discountData = {
+                    discountId: `compat_test_${Date.now()}`,
+                    title: 'Compatibility Test Discount',
+                    description: 'Testing backward compatibility with old discount format',
+                    type: 'fixed',
+                    value: 10,
+                    code: `COMPAT${Date.now().toString().slice(-4)}`,
+                    minOrderValue: 50,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: '2025-12-31',
+                    limit: 50,
+                    isActive: true,
+                    discountSource: 'platform'
+                };
+                
+                log(`Creating discount-style campaign: ${discountData.title} (${discountData.code})`);
+                
+                const startTime = Date.now();
+                const result = await window.dataService.createCampaign(discountData);
+                const duration = Date.now() - startTime;
+                
+                if (result.success) {
+                    log(`✅ Discount compatibility test passed in ${duration}ms`);
+                    setStatus(`✅ Discount compatibility test passed in ${duration}ms`, 'success');
+                    showResult(`
+                        🎉 <strong>Discount Compatibility Test PASSED!</strong><br><br>
+                        📝 <strong>Details:</strong><br>
+                        • Title: ${discountData.title}<br>
+                        • Code: ${discountData.code}<br>
+                        • Discount: $${discountData.value} off<br>
+                        • Campaign ID: ${result.discountId}<br>
+                        • Duration: ${duration}ms<br><br>
+                        ✅ Old discount format still works!
+                    `);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+                
+            } catch (error) {
+                log(`❌ Discount compatibility test failed: ${error.message}`);
+                setStatus(`❌ Discount compatibility test failed`, 'error');
+                showResult(`❌ <strong>Discount Compatibility Test FAILED:</strong><br>${error.message}`, 'error');
+            }
+        }
+
+        // Test advanced campaign features
+        async function testAdvancedCampaign() {
+            log('🧪 Testing advanced campaign features...');
+            setStatus('⏳ Testing advanced campaign...', 'info');
+            
+            try {
+                await waitForDataService();
+                
+                const advancedCampaign = {
+                    title: 'Advanced Marketing Campaign',
+                    description: 'Testing advanced campaign features with targeting',
+                    campaignType: 'seasonal',
+                    discountType: 'percentage',
+                    discountValue: 25,
+                    code: `ADV${Date.now().toString().slice(-4)}`,
+                    minOrderValue: 75,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: '2025-12-31',
+                    usageLimit: 200,
+                    target: 'new_customers',
+                    targetSegments: ['premium', 'loyal'],
+                    occasions: ['weekend', 'holiday'],
+                    singleUse: false,
+                    stackable: true,
+                    autoActivate: true
+                };
+                
+                log(`Creating advanced campaign: ${advancedCampaign.title} (${advancedCampaign.code})`);
+                
+                const startTime = Date.now();
+                const result = await window.dataService.createCampaign(advancedCampaign);
+                const duration = Date.now() - startTime;
+                
+                if (result.success) {
+                    log(`✅ Advanced campaign created successfully in ${duration}ms`);
+                    setStatus(`✅ Advanced campaign test passed in ${duration}ms`, 'success');
+                    showResult(`
+                        🎉 <strong>Advanced Campaign Test PASSED!</strong><br><br>
+                        📝 <strong>Details:</strong><br>
+                        • Title: ${advancedCampaign.title}<br>
+                        • Code: ${advancedCampaign.code}<br>
+                        • Type: ${advancedCampaign.campaignType}<br>
+                        • Discount: ${advancedCampaign.discountValue}% off<br>
+                        • Target: ${advancedCampaign.target}<br>
+                        • Segments: ${advancedCampaign.targetSegments.join(', ')}<br>
+                        • Campaign ID: ${result.discountId}<br>
+                        • Duration: ${duration}ms<br><br>
+                        ✅ All advanced features working!
+                    `);
+                } else {
+                    throw new Error(result.error || 'Unknown error');
+                }
+                
+            } catch (error) {
+                log(`❌ Advanced campaign test failed: ${error.message}`);
+                setStatus(`❌ Advanced campaign test failed`, 'error');
+                showResult(`❌ <strong>Advanced Campaign Test FAILED:</strong><br>${error.message}`, 'error');
+            }
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            log('Unified campaign test page loaded');
+            log('Testing unified createCampaign function...');
+            
+            // Check if dataService is available
+            setTimeout(() => {
+                if (window.dataService) {
+                    log('✅ DataService detected');
+                    if (window.dataService.createCampaign) {
+                        log('✅ createCampaign function available');
+                        setStatus('✅ Ready to test unified campaign creation', 'success');
+                    } else {
+                        log('❌ createCampaign function not found');
+                        setStatus('❌ createCampaign function not available', 'error');
+                    }
+                } else {
+                    log('❌ DataService not detected');
+                    setStatus('❌ DataService not available', 'error');
+                }
+            }, 2000);
+        });
+    </script>
+
+    <!-- Load dependencies -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js?v=6"></script>
+    <script src="data-service.js?v=7"></script>
+</body>
+</html>

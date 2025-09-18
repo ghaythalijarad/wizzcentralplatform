@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Platform Discount Creator</title>
+    <title>Campaign Creator</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -59,8 +59,8 @@
     </style>
 </head>
 <body>
-    <h1>🎯 Platform Discount Creator</h1>
-    <p>Simple tool to create platform-wide discounts for WizzCentral.</p>
+    <h1>🎯 Campaign Creator</h1>
+    <p>Simple tool to create marketing campaigns and discounts for WizzCentral.</p>
 
     <!-- Status Card -->
     <div id="statusCard" class="card info">
@@ -71,11 +71,11 @@
 
     <!-- Quick Create Form -->
     <div class="card">
-        <h3>🆕 Create Platform Discount</h3>
+        <h3>🆕 Create Campaign</h3>
         <form id="discountForm">
             <div class="form-row">
                 <div>
-                    <label>Title:</label>
+                    <label>Campaign Title:</label>
                     <input type="text" id="title" value="Flash Sale 2025" required>
                 </div>
                 <div>
@@ -89,11 +89,11 @@
             
             <div class="form-row">
                 <div>
-                    <label>Value:</label>
+                    <label>Discount Value:</label>
                     <input type="number" id="value" value="25" min="1" required>
                 </div>
                 <div>
-                    <label>Code:</label>
+                    <label>Promo Code:</label>
                     <input type="text" id="code" value="FLASH25" required>
                 </div>
             </div>
@@ -110,7 +110,7 @@
             </div>
             
             <label>Description:</label>
-            <textarea id="description" rows="3">Limited time flash sale discount</textarea>
+            <textarea id="description" rows="3">Limited time flash sale campaign</textarea>
             
             <div class="form-row">
                 <div>
@@ -123,7 +123,7 @@
                 </div>
             </div>
             
-            <button type="submit" class="create-btn">🚀 Create Platform Discount</button>
+            <button type="submit" class="create-btn">🚀 Create Campaign</button>
         </form>
     </div>
 
@@ -245,9 +245,9 @@
             });
         }
 
-        // Create platform discount
-        async function createPlatformDiscount(formData) {
-            log('Creating platform discount...');
+        // Create campaign using unified function
+        async function createCampaign(formData) {
+            log('Creating campaign...');
             
             try {
                 // Ensure dataService is available
@@ -255,44 +255,50 @@
                     await waitForDataService();
                 }
                 
-                // Build discount object
-                const discount = {
-                    discountId: `platform_${Date.now()}`,
+                // Build campaign object with unified field naming
+                const campaign = {
+                    discountId: `campaign_${Date.now()}`,
                     title: formData.get('title'),
                     name: formData.get('title'),
                     description: formData.get('description'),
                     type: formData.get('type'),
+                    discountType: formData.get('type'),
                     value: Number(formData.get('value')),
+                    discountValue: Number(formData.get('value')),
                     code: formData.get('code').toUpperCase(),
                     minOrderValue: Number(formData.get('minOrder')),
+                    minOrderAmount: Number(formData.get('minOrder')),
                     startDate: formData.get('startDate'),
                     endDate: formData.get('endDate'),
                     isActive: true,
+                    autoActivate: true,
                     usage: 0,
                     limit: Number(formData.get('limit')),
-                    discountSource: 'platform',
+                    usageLimit: Number(formData.get('limit')),
+                    discountSource: 'campaign',
+                    campaignType: 'marketing',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
-                    createdBy: 'platform-creator'
+                    createdBy: 'campaign-creator'
                 };
                 
-                log(`Discount details: ${discount.title} (${discount.code}) - ${discount.value}${discount.type === 'percentage' ? '%' : '$'} off`);
+                log(`Campaign details: ${campaign.title} (${campaign.code}) - ${campaign.value}${campaign.type === 'percentage' ? '%' : '$'} off`);
                 
-                // Save to DynamoDB
+                // Use unified createCampaign function
                 const startTime = Date.now();
-                const result = await window.dataService.createPlatformDiscount(discount);
+                const result = await window.dataService.createCampaign(campaign);
                 const duration = Date.now() - startTime;
                 
                 if (result.success) {
-                    log(`✅ Discount created successfully in ${duration}ms`);
+                    log(`✅ Campaign created successfully in ${duration}ms`);
                     showResult(`
-                        🎉 <strong>Platform discount created successfully!</strong><br><br>
+                        🎉 <strong>Campaign created successfully!</strong><br><br>
                         📝 <strong>Details:</strong><br>
-                        • Title: ${discount.title}<br>
-                        • Code: ${discount.code}<br>
-                        • Value: ${discount.value}${discount.type === 'percentage' ? '%' : '$'} off<br>
-                        • Min Order: $${discount.minOrderValue}<br>
-                        • Usage Limit: ${discount.limit}<br>
+                        • Title: ${campaign.title}<br>
+                        • Code: ${campaign.code}<br>
+                        • Discount: ${campaign.value}${campaign.type === 'percentage' ? '%' : '$'} off<br>
+                        • Min Order: $${campaign.minOrderValue}<br>
+                        • Usage Limit: ${campaign.limit}<br>
                         • ID: ${result.discountId}<br><br>
                         ⚡ Created in ${duration}ms
                     `);
@@ -302,12 +308,12 @@
                     initForm();
                     
                 } else {
-                    throw new Error('Failed to save to DynamoDB');
+                    throw new Error(result.error || 'Failed to save to DynamoDB');
                 }
                 
             } catch (error) {
                 log(`❌ Creation failed: ${error.message}`);
-                showResult(`❌ <strong>Failed to create discount:</strong><br>${error.message}`, 'error');
+                showResult(`❌ <strong>Failed to create campaign:</strong><br>${error.message}`, 'error');
             }
         }
 
@@ -317,12 +323,12 @@
             log('Form submitted');
             
             const formData = new FormData(e.target);
-            await createPlatformDiscount(formData);
+            await createCampaign(formData);
         });
 
         // Initialize on page load
         window.addEventListener('load', () => {
-            log('Platform Discount Creator loaded');
+            log('Campaign Creator loaded');
             initForm();
             setTimeout(checkSystemStatus, 1000);
         });
