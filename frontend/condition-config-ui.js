@@ -45,7 +45,7 @@ class ConditionConfigUI {
                     <div id="selectedConditionsList" class="selected-conditions-list">
                         ${this.renderSelectedConditions()}
                     </div>
-                    <button class="btn-secondary add-condition-btn" onclick="conditionUI.showConditionModal()">
+                    <button type="button" class="btn-secondary add-condition-btn" onclick="conditionUI.showConditionModal()">
                         <i class="fas fa-plus"></i> Add Condition
                     </button>
                 </div>
@@ -77,7 +77,7 @@ class ConditionConfigUI {
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3>Add Condition</h3>
-                        <button class="modal-close" onclick="conditionUI.hideConditionModal()">&times;</button>
+                        <button type="button" class="modal-close" onclick="conditionUI.hideConditionModal()">&times;</button>
                     </div>
                     <div class="modal-body" id="conditionModalBody">
                         <!-- Dynamic content -->
@@ -89,8 +89,7 @@ class ConditionConfigUI {
 
     renderCategoryTabs() {
         const categories = ['customer', 'order', 'location', 'time', 'business', 'behavior'];
-        return categories.map(category => `
-            <button class="category-tab ${category === 'customer' ? 'active' : ''}" 
+        return categories.map(category => `                    <button type="button" class="category-tab ${category === 'customer' ? 'active' : ''}" 
                     data-category="${category}" 
                     onclick="conditionUI.switchCategory('${category}')">
                 <i class="fas fa-${this.getCategoryIcon(category)}"></i>
@@ -117,7 +116,7 @@ class ConditionConfigUI {
             <div class="condition-card" data-condition-id="${condition.id}">
                 <div class="condition-header">
                     <h5>${condition.name}</h5>
-                    <button class="add-btn" onclick="conditionUI.selectCondition('${condition.id}')">
+                    <button type="button" class="add-btn" onclick="conditionUI.selectCondition('${condition.id}')">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
@@ -150,10 +149,10 @@ class ConditionConfigUI {
                         ${this.renderParameterSummary(condition.parameters)}
                     </div>
                     <div class="condition-actions">
-                        <button class="btn-edit" onclick="conditionUI.editCondition(${index})">
+                        <button type="button" class="btn-edit" onclick="conditionUI.editCondition(${index})">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn-remove" onclick="conditionUI.removeCondition(${index})">
+                        <button type="button" class="btn-remove" onclick="conditionUI.removeCondition(${index})">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -178,7 +177,15 @@ class ConditionConfigUI {
         return `<div class="parameter-summary">${summaryItems.join(', ')}</div>`;
     }
 
-    switchCategory(category) {
+    switchCategory(category, event) {
+        console.log('[ConditionConfigUI] switchCategory called:', category);
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         // Update active tab
         document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
         document.querySelector(`[data-category="${category}"]`).classList.add('active');
@@ -187,9 +194,20 @@ class ConditionConfigUI {
         document.getElementById('conditionsGrid').innerHTML = this.renderConditionsGrid(category);
     }
 
-    selectCondition(conditionId) {
+    selectCondition(conditionId, event) {
+        console.log('[ConditionConfigUI] selectCondition called:', conditionId);
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         const conditionDef = this.conditionEngine.getAvailableConditions().find(c => c.id === conditionId);
-        if (!conditionDef) return;
+        if (!conditionDef) {
+            console.warn('[ConditionConfigUI] Condition not found:', conditionId);
+            return;
+        }
 
         this.showConditionParameterModal(conditionDef);
     }
@@ -296,8 +314,50 @@ class ConditionConfigUI {
         }
     }
 
-    renderRestaurantSelector(inputId, paramName) {
-        // This would be populated with actual restaurant data
+    async renderRestaurantSelector(inputId, paramName) {
+        try {
+            // Try to get real restaurant data
+            if (window.dataService) {
+                await window.dataService.initialize();
+                const businesses = await window.dataService.getBusinesses();
+                
+                // Filter for restaurants and food businesses
+                const restaurants = businesses.filter(b => {
+                    const businessType = (b.businessType || '').toLowerCase();
+                    const category = (b.category || '').toLowerCase();
+                    
+                    return businessType.includes('restaurant') || 
+                           businessType.includes('cafe') || 
+                           businessType.includes('food') ||
+                           category.includes('restaurant') ||
+                           category.includes('cafe') ||
+                           category.includes('food') ||
+                           businessType === 'restaurant' ||
+                           category === 'restaurant';
+                });
+                
+                if (restaurants.length > 0) {
+                    const options = restaurants.map(restaurant => {
+                        const id = restaurant.businessId || restaurant.id;
+                        const name = restaurant.businessName || restaurant.name || 'Unknown Business';
+                        const type = restaurant.businessType || restaurant.category || '';
+                        const displayName = name + (type ? ' (' + type + ')' : '');
+                        return '<option value="' + id + '">' + displayName + '</option>';
+                    }).join('');
+                    
+                    return `
+                        <select id="${inputId}" name="${paramName}" multiple size="5">
+                            ${options}
+                        </select>
+                        <small class="help-text">Hold Ctrl/Cmd to select multiple restaurants</small>
+                    `;
+                }
+            }
+        } catch (error) {
+            console.warn('Could not load real restaurant data, using fallback:', error);
+        }
+        
+        // Fallback to mock data if real data is not available
         return `
             <select id="${inputId}" name="${paramName}" multiple size="5">
                 <option value="rest_001">Pizza Palace</option>
@@ -426,7 +486,15 @@ class ConditionConfigUI {
         this.updateUI();
     }
 
-    editCondition(index) {
+    editCondition(index, event) {
+        console.log('[ConditionConfigUI] editCondition called:', index);
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         const condition = this.selectedConditions[index];
         if (!condition) return;
 
@@ -463,14 +531,30 @@ class ConditionConfigUI {
         }, 100);
     }
 
-    removeCondition(index) {
+    removeCondition(index, event) {
+        console.log('[ConditionConfigUI] removeCondition called:', index);
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         if (confirm('Are you sure you want to remove this condition?')) {
             this.selectedConditions.splice(index, 1);
             this.updateUI();
         }
     }
 
-    showConditionModal() {
+    showConditionModal(event) {
+        console.log('[ConditionConfigUI] showConditionModal called');
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         // Show category-based selection
         const modal = document.getElementById('conditionModal');
         const modalBody = document.getElementById('conditionModalBody');
@@ -508,7 +592,15 @@ class ConditionConfigUI {
         }).join('');
     }
 
-    hideConditionModal() {
+    hideConditionModal(event) {
+        console.log('[ConditionConfigUI] hideConditionModal called');
+        
+        // Prevent any form submission or event bubbling
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        
         document.getElementById('conditionModal').style.display = 'none';
         this.editingIndex = null;
     }
@@ -555,6 +647,8 @@ class ConditionConfigUI {
     }
 
     bindEvents() {
+        console.log('[ConditionConfigUI] bindEvents called');
+        
         // Logic selector change
         document.addEventListener('change', (e) => {
             if (e.target.name === 'conditionLogic') {
@@ -574,6 +668,39 @@ class ConditionConfigUI {
                 e.target.style.transform = 'translateY(0)';
             }
         });
+        
+        // Add comprehensive click protection for condition UI elements
+        document.addEventListener('click', (e) => {
+            // Check if the click is within a condition UI container
+            const isInConditionUI = e.target.closest('.condition-builder') || 
+                                  e.target.closest('.condition-modal') ||
+                                  e.target.closest('#campaignConditions');
+                                  
+            if (isInConditionUI) {
+                // Check if it's a button or clickable element without explicit type
+                const isButton = e.target.tagName === 'BUTTON';
+                const isClickableDiv = e.target.matches('.condition-option') || 
+                                     e.target.closest('.condition-option');
+                
+                if (isButton || isClickableDiv) {
+                    console.log('[ConditionConfigUI] Preventing potential form submission from:', e.target);
+                    
+                    // Only prevent if it's a button without explicit type="submit"
+                    if (isButton && !e.target.type) {
+                        e.target.type = 'button'; // Set type to prevent submission
+                    }
+                    
+                    // Always prevent propagation for condition UI interactions
+                    e.stopPropagation();
+                    
+                    // Mark that we've recently interacted with condition UI
+                    this.container.setAttribute('data-recent-interaction', 'true');
+                    setTimeout(() => {
+                        this.container.removeAttribute('data-recent-interaction');
+                    }, 1000);
+                }
+            }
+        }, true); // Use capture phase to catch events early
     }
 
     // Public methods for integration

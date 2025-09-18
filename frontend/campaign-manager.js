@@ -104,6 +104,14 @@ function updateCampaignStats() {
 // Format campaign type for display
 function formatCampaignType(type) {
     const typeMap = {
+        // Business Campaign Types
+        'marketing': 'Marketing Campaign',
+        'loyalty': 'Loyalty Campaign',
+        'retention': 'Customer Retention',
+        'seasonal': 'Seasonal Campaign',
+        'acquisition': 'Customer Acquisition',
+        'flash': 'Flash Sale',
+        // Customer Journey Types
         'first-order': 'First Order',
         'restaurant-first': 'Restaurant First',
         'new-customer': 'New Customer',
@@ -115,6 +123,32 @@ function formatCampaignType(type) {
 // Format campaign target for display
 function formatCampaignTarget(campaign) {
     switch (campaign.type) {
+        // Business Campaign Types
+        case 'marketing':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'All customers';
+        case 'loyalty':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'Loyalty members';
+        case 'retention':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'At-risk customers';
+        case 'seasonal':
+            return campaign.occasions && campaign.occasions.length > 0 
+                ? campaign.occasions.join(', ') 
+                : 'Seasonal shoppers';
+        case 'acquisition':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'New prospects';
+        case 'flash':
+            return campaign.occasions && campaign.occasions.length > 0 
+                ? campaign.occasions.join(', ') 
+                : 'All customers';
+        // Customer Journey Types
         case 'restaurant-first':
             return campaign.targetRestaurants && campaign.targetRestaurants.length > 0 
                 ? campaign.targetRestaurants.length + ' restaurant(s)' 
@@ -218,6 +252,18 @@ function updateCampaignFormFields() {
     
     // Show relevant sections based on campaign type
     switch (type) {
+        // Business Campaign Types - Show segment targeting for most business campaigns
+        case 'marketing':
+        case 'loyalty':
+        case 'retention':
+        case 'acquisition':
+            if (segmentSection) segmentSection.style.display = 'block';
+            break;
+        case 'seasonal':
+        case 'flash':
+            if (occasionSection) occasionSection.style.display = 'block';
+            break;
+        // Customer Journey Types - Original logic
         case 'restaurant-first':
             if (restaurantSection) restaurantSection.style.display = 'block';
             break;
@@ -238,14 +284,70 @@ function updateCampaignFields() {
 // Load restaurants for selection
 async function loadRestaurantsForSelection() {
     try {
-        const businesses = await dataService.getBusinesses();
-        const restaurants = businesses.filter(b => b.businessType === 'restaurant' || b.category === 'restaurant');
+        console.log('Loading restaurants for campaign targeting...');
+        
+        // Initialize data service if needed
+        if (!window.dataService) {
+            console.warn('Data service not available');
+            return;
+        }
+        
+        await window.dataService.initialize();
+        const businesses = await window.dataService.getBusinesses();
+        console.log('Found ' + businesses.length + ' total businesses from WhizzMerchants_Businesses table');
+        
+        // Log first business for debugging
+        if (businesses.length > 0) {
+            console.log('Sample business data:', businesses[0]);
+        }
+        
+        // Filter for restaurants - be more inclusive with business types
+        const restaurants = businesses.filter(b => {
+            const businessType = (b.businessType || '').toLowerCase();
+            const category = (b.category || '').toLowerCase();
+            
+            // Include restaurants, cafes, and food-related businesses
+            return businessType.includes('restaurant') || 
+                   businessType.includes('cafe') || 
+                   businessType.includes('food') ||
+                   category.includes('restaurant') ||
+                   category.includes('cafe') ||
+                   category.includes('food') ||
+                   businessType === 'restaurant' ||
+                   category === 'restaurant';
+        });
+        
+        console.log('Filtered ' + restaurants.length + ' restaurants/food businesses');
         
         const select = document.getElementById('targetRestaurants');
-        if (select && restaurants.length > 0) {
-            select.innerHTML = restaurants.map(restaurant => 
-                '<option value="' + restaurant.businessId + '">' + restaurant.businessName + '</option>'
-            ).join('');
+        if (select) {
+            if (restaurants.length > 0) {
+                // Use the correct field names from the real data structure
+                select.innerHTML = restaurants.map(restaurant => {
+                    const id = restaurant.businessId || restaurant.id;
+                    const name = restaurant.businessName || restaurant.name || 'Unknown Business';
+                    const type = restaurant.businessType || restaurant.category || '';
+                    const displayName = name + (type ? ' (' + type + ')' : '');
+                    
+                    console.log('Adding restaurant option: ' + displayName + ' (ID: ' + id + ')');
+                    return '<option value="' + id + '">' + displayName + '</option>';
+                }).join('');
+                
+                console.log('Successfully populated restaurant dropdown with ' + restaurants.length + ' options');
+            } else {
+                // Show all businesses if no restaurants found (fallback)
+                console.log('No restaurants found, showing all businesses as fallback');
+                select.innerHTML = businesses.map(business => {
+                    const id = business.businessId || business.id;
+                    const name = business.businessName || business.name || 'Unknown Business';
+                    const type = business.businessType || business.category || 'Business';
+                    return '<option value="' + id + '">' + name + ' (' + type + ')</option>';
+                }).join('');
+                
+                console.log('Populated with ' + businesses.length + ' total businesses as fallback');
+            }
+        } else {
+            console.error('Could not find targetRestaurants select element');
         }
     } catch (error) {
         console.error('Error loading restaurants:', error);
@@ -255,6 +357,58 @@ async function loadRestaurantsForSelection() {
 // Handle campaign form submission
 async function handleCampaignSubmit(event) {
     event.preventDefault();
+    
+    console.log('🔍 Campaign form submission attempt detected');
+    console.log('📊 Submitter element:', event.submitter?.tagName, event.submitter?.id, event.submitter?.type);
+    
+    // Additional checks to prevent unwanted form submissions
+    if (event.submitter && event.submitter.id === 'useAdvancedConditions') {
+        console.log('🛑 Form submission prevented - triggered by advanced conditions checkbox');
+        return;
+    }
+    
+    // Check if any protected element is currently focused
+    const focusedElement = document.querySelector('[data-currently-focused="true"]');
+    if (focusedElement) {
+        console.log('🛑 Form submission prevented - protected element is focused:', focusedElement);
+        return;
+    }
+    
+    // Check if the advanced conditions checkbox was recently interacted with
+    const advancedCheckbox = document.getElementById('useAdvancedConditions');
+    if (advancedCheckbox && advancedCheckbox.hasAttribute('data-recently-changed')) {
+        console.log('🛑 Form submission prevented - advanced conditions recently changed');
+        advancedCheckbox.removeAttribute('data-recently-changed');
+        return;
+    }
+    
+    // Check if condition UI was recently interacted with
+    const conditionContainer = document.getElementById('campaignConditions');
+    if (conditionContainer && conditionContainer.hasAttribute('data-recent-interaction')) {
+        console.log('🛑 Form submission prevented - recent condition UI interaction detected');
+        return;
+    }
+    
+    // Check if the submitter is a button without explicit type or a condition UI button
+    if (event.submitter) {
+        const isInConditionUI = event.submitter.closest('.condition-builder') || 
+                              event.submitter.closest('.condition-modal') ||
+                              event.submitter.closest('#campaignConditions');
+        
+        if (isInConditionUI) {
+            console.log('🛑 Form submission prevented - submitter is within condition UI');
+            return;
+        }
+        
+        // Ensure it's an actual submit button
+        if (event.submitter.type !== 'submit' && !event.submitter.hasAttribute('data-submit')) {
+            console.log('🛑 Form submission prevented - submitter is not a submit button');
+            return;
+        }
+    }
+    
+    console.log('✅ Form submission allowed - proceeding with campaign creation');
+    console.log('📝 Processing campaign form submission...');
     
     const form = document.getElementById('createCampaignForm');
     const formData = new FormData(form);
@@ -397,6 +551,37 @@ function buildCampaignData(formData) {
         usage: 0
     };
 
+    // Enhanced Targeting Data Collection
+    if (window.enhancedTargeting) {
+        const targetingData = window.enhancedTargeting.collectTargetingData();
+        
+        // Add enhanced targeting data to campaign
+        baseData.targetingData = targetingData;
+        
+        // Update legacy fields for backward compatibility
+        if (targetingData.restaurantTargeting?.enabled) {
+            switch (targetingData.restaurantTargeting.mode) {
+                case 'specific':
+                    baseData.targetRestaurants = targetingData.restaurantTargeting.restaurants || [];
+                    break;
+                case 'category':
+                    baseData.targetCategories = targetingData.restaurantTargeting.categories || [];
+                    break;
+            }
+        }
+        
+        if (targetingData.customerSegments?.enabled) {
+            baseData.customerSegmentCriteria = targetingData.customerSegments.criteria || [];
+            baseData.customerSegmentLogic = targetingData.customerSegments.logic || 'OR';
+        }
+        
+        if (targetingData.occasionTargeting?.enabled) {
+            baseData.occasions = targetingData.occasionTargeting.occasions || [];
+            baseData.timeConstraints = targetingData.occasionTargeting.timeConstraints || [];
+            baseData.recurringSchedules = targetingData.occasionTargeting.recurringSchedules || [];
+        }
+    }
+
     // Add sophisticated conditions if condition UI is available
     if (conditionUI) {
         const conditionData = conditionUI.getConditions();
@@ -445,6 +630,25 @@ function validateCampaignData(campaignData) {
     if (campaignData.startDate && campaignData.endDate && 
         new Date(campaignData.startDate) >= new Date(campaignData.endDate)) {
         errors.push('End date must be after start date');
+    }
+
+    // Enhanced Targeting Validation
+    if (campaignData.targetingData && window.CampaignTargetingValidator) {
+        try {
+            const validator = new window.CampaignTargetingValidator();
+            const targetingValidation = validator.validateTargetingConfiguration(campaignData.targetingData);
+            
+            if (!targetingValidation.isValid) {
+                errors.push(...targetingValidation.errors);
+            }
+            
+            // Log warnings if any
+            if (targetingValidation.warnings && targetingValidation.warnings.length > 0) {
+                console.warn('Campaign targeting warnings:', targetingValidation.warnings);
+            }
+        } catch (validationError) {
+            errors.push('Targeting validation failed: ' + validationError.message);
+        }
     }
     
     // Validate condition parameters if using advanced conditions
@@ -506,6 +710,61 @@ function formatCampaignTargetEnhanced(campaign) {
         const conditionCount = campaign.conditions.length;
         const logic = campaign.conditionLogic || 'AND';
         return `${conditionCount} condition${conditionCount > 1 ? 's' : ''} (${logic})`;
+    }
+    
+    // Check for enhanced targeting data
+    if (campaign.enhancedTargeting) {
+        const targeting = campaign.enhancedTargeting;
+        const targetingParts = [];
+        
+        // Customer segments
+        if (targeting.customerSegments && targeting.customerSegments.enabled) {
+            const segments = targeting.customerSegments;
+            if (segments.predefinedSegments && segments.predefinedSegments.length > 0) {
+                targetingParts.push(`${segments.predefinedSegments.length} segment(s)`);
+            }
+            if (segments.customCriteria && segments.customCriteria.length > 0) {
+                targetingParts.push(`${segments.customCriteria.length} custom criteria`);
+            }
+        }
+        
+        // Restaurant targeting
+        if (targeting.restaurantTargeting && targeting.restaurantTargeting.enabled) {
+            const restaurants = targeting.restaurantTargeting;
+            switch (restaurants.mode) {
+                case 'specific':
+                    if (restaurants.specificRestaurants && restaurants.specificRestaurants.length > 0) {
+                        targetingParts.push(`${restaurants.specificRestaurants.length} restaurant(s)`);
+                    }
+                    break;
+                case 'category':
+                    if (restaurants.categories && restaurants.categories.length > 0) {
+                        targetingParts.push(`${restaurants.categories.length} category/ies`);
+                    }
+                    break;
+                case 'location':
+                    if (restaurants.locations && restaurants.locations.length > 0) {
+                        targetingParts.push(`${restaurants.locations.length} location(s)`);
+                    }
+                    break;
+                case 'rating':
+                    targetingParts.push('Rating-based');
+                    break;
+            }
+        }
+        
+        // Occasions
+        if (targeting.occasions && targeting.occasions.enabled) {
+            const occasions = targeting.occasions;
+            const occasionCount = (occasions.specialEvents || []).length + 
+                                (occasions.recurringSchedules || []).length + 
+                                (occasions.religiousOccasions || []).length;
+            if (occasionCount > 0) {
+                targetingParts.push(`${occasionCount} occasion(s)`);
+            }
+        }
+        
+        return targetingParts.length > 0 ? targetingParts.join(', ') : 'Enhanced targeting';
     }
     
     // Fallback to legacy formatting
@@ -570,21 +829,39 @@ function generateConditionSummary(campaign) {
 
 // Initialize campaign functionality when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Add event listeners
+    // Add event listeners for campaign form
     const campaignForm = document.getElementById('createCampaignForm');
     if (campaignForm) {
         campaignForm.addEventListener('submit', handleCampaignSubmit);
+        
+        // Add additional protection against unwanted form submissions
+        campaignForm.addEventListener('submit', function(e) {
+            // Check if any checkbox with data-no-submit attribute is being interacted with
+            const activeElement = document.activeElement;
+            if (activeElement && activeElement.hasAttribute('data-no-submit')) {
+                console.log('🛑 Form submission blocked - interaction with protected element');
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            }
+        }, true); // Use capture phase to catch it early
+        
+        console.log('✅ Campaign form submit handler attached to createCampaignForm');
+    } else {
+        console.warn('⚠️ Campaign form (createCampaignForm) not found');
     }
 
     const campaignTypeSelect = document.getElementById('campaignType');
     if (campaignTypeSelect) {
         campaignTypeSelect.addEventListener('change', updateCampaignFormFields);
+        console.log('✅ Campaign type change handler attached');
     }
 
     // Add close modal button listener
     const closeCampaignBtn = document.getElementById('closeCampaignModalBtn');
     if (closeCampaignBtn) {
         closeCampaignBtn.addEventListener('click', closeCampaignModal);
+        console.log('✅ Campaign modal close handler attached');
     }
 
     // Load campaigns data if data service is available

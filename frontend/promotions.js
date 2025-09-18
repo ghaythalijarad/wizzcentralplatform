@@ -284,10 +284,7 @@ function setupEventListeners() {
     // Set default dates for new promotion
     setDefaultDates();
 
-    // Modal open/close handlers for Create Promotion
-    document.getElementById('openAddPromotionModalBtn').addEventListener('click', () => {
-        document.getElementById('addPromotionModal').style.display = 'flex';
-    });
+    // Modal close handler for Create Promotion
     document.getElementById('closeAddPromotionModalBtn').addEventListener('click', () => {
         document.getElementById('addPromotionModal').style.display = 'none';
         closeAddPromotionModal();
@@ -1285,6 +1282,14 @@ function updateCampaignStats() {
 // Format campaign type for display
 function formatCampaignType(type) {
     const typeMap = {
+        // Business Campaign Types
+        'marketing': 'Marketing Campaign',
+        'loyalty': 'Loyalty Campaign',
+        'retention': 'Customer Retention',
+        'seasonal': 'Seasonal Campaign',
+        'acquisition': 'Customer Acquisition',
+        'flash': 'Flash Sale',
+        // Customer Journey Types
         'first-order': 'First Order',
         'restaurant-first': 'Restaurant First',
         'new-customer': 'New Customer',
@@ -1296,16 +1301,42 @@ function formatCampaignType(type) {
 // Format campaign target for display
 function formatCampaignTarget(campaign) {
     switch (campaign.type) {
+        // Business Campaign Types
+        case 'marketing':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'All customers';
+        case 'loyalty':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'Loyalty members';
+        case 'retention':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'At-risk customers';
+        case 'seasonal':
+            return campaign.occasions && campaign.occasions.length > 0 
+                ? campaign.occasions.join(', ') 
+                : 'Seasonal shoppers';
+        case 'acquisition':
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
+                ? campaign.targetSegments.join(', ') 
+                : 'New prospects';
+        case 'flash':
+            return campaign.occasions && campaign.occasions.length > 0 
+                ? campaign.occasions.join(', ') 
+                : 'All customers';
+        // Customer Journey Types
         case 'restaurant-first':
-            return campaign.targetRestaurants.length > 0 
+            return campaign.targetRestaurants && campaign.targetRestaurants.length > 0 
                 ? `${campaign.targetRestaurants.length} restaurant(s)` 
                 : 'All restaurants';
         case 'new-customer':
-            return campaign.targetSegments.length > 0 
+            return campaign.targetSegments && campaign.targetSegments.length > 0 
                 ? campaign.targetSegments.join(', ') 
                 : 'All new customers';
         case 'special-occasion':
-            return campaign.occasions.length > 0 
+            return campaign.occasions && campaign.occasions.length > 0 
                 ? campaign.occasions.join(', ') 
                 : 'All occasions';
         default:
@@ -1380,14 +1411,70 @@ function updateCampaignFormFields() {
 // Load restaurants for selection
 async function loadRestaurantsForSelection() {
     try {
-        const businesses = await dataService.getBusinesses();
-        restaurantsList = businesses.filter(b => b.businessType === 'restaurant' || b.category === 'restaurant');
+        console.log('Loading restaurants for campaign targeting...');
+        
+        // Initialize data service if needed
+        if (!window.dataService) {
+            console.warn('Data service not available');
+            return;
+        }
+        
+        await window.dataService.initialize();
+        const businesses = await window.dataService.getBusinesses();
+        console.log('Found ' + businesses.length + ' total businesses from WhizzMerchants_Businesses table');
+        
+        // Log first business for debugging
+        if (businesses.length > 0) {
+            console.log('Sample business data:', businesses[0]);
+        }
+        
+        // Filter for restaurants - be more inclusive with business types
+        restaurantsList = businesses.filter(b => {
+            const businessType = (b.businessType || '').toLowerCase();
+            const category = (b.category || '').toLowerCase();
+            
+            // Include restaurants, cafes, and food-related businesses
+            return businessType.includes('restaurant') || 
+                   businessType.includes('cafe') || 
+                   businessType.includes('food') ||
+                   category.includes('restaurant') ||
+                   category.includes('cafe') ||
+                   category.includes('food') ||
+                   businessType === 'restaurant' ||
+                   category === 'restaurant';
+        });
+        
+        console.log('Filtered ' + restaurantsList.length + ' restaurants/food businesses');
         
         const select = document.getElementById('targetRestaurants');
-        if (select && restaurantsList.length > 0) {
-            select.innerHTML = restaurantsList.map(restaurant => 
-                `<option value="${restaurant.businessId}">${restaurant.businessName}</option>`
-            ).join('');
+        if (select) {
+            if (restaurantsList.length > 0) {
+                // Use the correct field names from the real data structure
+                select.innerHTML = restaurantsList.map(restaurant => {
+                    const id = restaurant.businessId || restaurant.id;
+                    const name = restaurant.businessName || restaurant.name || 'Unknown Business';
+                    const type = restaurant.businessType || restaurant.category || '';
+                    const displayName = name + (type ? ' (' + type + ')' : '');
+                    
+                    console.log('Adding restaurant option: ' + displayName + ' (ID: ' + id + ')');
+                    return '<option value="' + id + '">' + displayName + '</option>';
+                }).join('');
+                
+                console.log('Successfully populated restaurant dropdown with ' + restaurantsList.length + ' options');
+            } else {
+                // Show all businesses if no restaurants found (fallback)
+                console.log('No restaurants found, showing all businesses as fallback');
+                select.innerHTML = businesses.map(business => {
+                    const id = business.businessId || business.id;
+                    const name = business.businessName || business.name || 'Unknown Business';
+                    const type = business.businessType || business.category || 'Business';
+                    return '<option value="' + id + '">' + name + ' (' + type + ')</option>';
+                }).join('');
+                
+                console.log('Populated with ' + businesses.length + ' total businesses as fallback');
+            }
+        } else {
+            console.error('Could not find targetRestaurants select element');
         }
     } catch (error) {
         console.error('Error loading restaurants:', error);

@@ -128,6 +128,7 @@ const TRANSACTIONS_TABLE = 'WizzUser_transactions_dev';
 const BUSINESSES_TABLE = 'WhizzMerchants_Businesses';
 const CONDITIONS_TABLE = 'WizzCentral_Campaign_Conditions';
 const CAMPAIGNS_TABLE = 'WizzCentral_Campaigns';
+const ORDERS_TABLE = 'WizzOrders_dev';
 
 // Real DynamoDB helper functions (updated for AWS SDK v3)
 const getUserFromDynamoDB = async (userId) => {
@@ -192,6 +193,43 @@ const getBusinessFromDynamoDB = async (businessId) => {
         return result.Item || null;
     } catch (error) {
         console.error('❌ Error fetching business from DynamoDB:', error);
+        return null;
+    }
+};
+
+const getOrdersFromDynamoDB = async (limit = 50) => {
+    try {
+        const command = new ScanCommand({
+            TableName: ORDERS_TABLE,
+            Limit: limit
+        });
+        
+        const result = await dynamoDB.send(command);
+        return result.Items || [];
+    } catch (error) {
+        console.error('❌ Error fetching orders from DynamoDB:', error);
+        return [];
+    }
+};
+
+const getOrderFromDynamoDB = async (orderId) => {
+    try {
+        // Orders in WizzOrders_dev use PK as the primary key and SK as sort key
+        const command = new GetCommand({
+            TableName: ORDERS_TABLE,
+            Key: { 
+                PK: orderId,
+                SK: 'META'  // Based on your table structure
+            }
+        });
+        
+        console.log(`🔍 Looking up order with PK: ${orderId}, SK: META`);
+        const result = await dynamoDB.send(command);
+        console.log(`📊 Order lookup result:`, result.Item ? 'Found' : 'Not found');
+        
+        return result.Item || null;
+    } catch (error) {
+        console.error('❌ Error fetching order from DynamoDB:', error);
         return null;
     }
 };
@@ -356,6 +394,89 @@ app.post('/campaigns', async (req, res) => {
         console.error('❌ Error creating campaign in DynamoDB:', error);
         res.status(500).json({
             error: 'Failed to create campaign',
+            message: error.message
+        });
+    }
+});
+
+// Orders endpoints - Real data from DynamoDB
+app.get('/orders', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 50;
+        const orders = await getOrdersFromDynamoDB(limit);
+        
+        // Transform data to include computed fields
+        const transformedOrders = orders.map(order => ({
+            ...order,
+            orderId: order.PK,
+            // Extract order ID from PK (ORDER#uuid format)
+            cleanOrderId: order.PK ? order.PK.replace('ORDER#', '') : 'unknown',
+            // Format dates
+            createdAtFormatted: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
+            confirmedAtFormatted: order.confirmedAt ? new Date(order.confirmedAt).toLocaleDateString() : 'N/A',
+            // Status determination
+            status: order.canceledAt ? 'cancelled' : 
+                   order.confirmedAt ? 'confirmed' : 
+                   'pending',
+            // Customer info
+            customer: {
+                name: order.customerName || 'Unknown Customer',
+                email: order.customerEmail || 'No email'
+            }
+        }));
+
+        res.json({
+            success: true,
+            orders: transformedOrders,
+            count: transformedOrders.length,
+            source: 'real-dynamodb',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ Error fetching orders from DynamoDB:', error);
+        res.status(500).json({
+            error: 'Failed to fetch orders',
+            message: error.message
+        });
+    }
+});
+
+app.get('/orders/:orderId', async (req, res) => {
+    try {
+        const orderId = req.params.orderId;
+        // Add ORDER# prefix if not present
+        const fullOrderId = orderId.startsWith('ORDER#') ? orderId : `ORDER#${orderId}`;
+        
+        const order = await getOrderFromDynamoDB(fullOrderId);
+        
+        if (!order) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found',
+                orderId: orderId
+            });
+        }
+
+        // Transform the order data
+        const transformedOrder = {
+            ...order,
+            orderId: order.PK,
+            cleanOrderId: order.PK ? order.PK.replace('ORDER#', '') : 'unknown',
+            createdAtFormatted: order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A',
+            status: order.canceledAt ? 'cancelled' : 
+                   order.confirmedAt ? 'confirmed' : 
+                   'pending'
+        };
+
+        res.json({
+            success: true,
+            order: transformedOrder,
+            source: 'real-dynamodb'
+        });
+    } catch (error) {
+        console.error('❌ Error fetching order:', error);
+        res.status(500).json({
+            error: 'Failed to fetch order',
             message: error.message
         });
     }
@@ -623,7 +744,9 @@ app.get('/api-docs', (req, res) => {
                 'GET /analytics': 'Analytics dashboard data',
                 'POST /analytics': 'Record analytics event',
                 'GET /campaigns': 'List campaigns',
-                'POST /campaigns': 'Create campaign'
+                'POST /campaigns': 'Create campaign',
+                'GET /orders': 'List orders from WizzOrders_dev',
+                'GET /orders/:orderId': 'Get specific order details'
             },
             development: {
                 'GET /dev/users/:userId': 'Get real user data from DynamoDB',
@@ -691,6 +814,7 @@ app.listen(PORT, () => {
     console.log(`   GET  http://localhost:${PORT}/public`);
     console.log(`   GET  http://localhost:${PORT}/analytics`);
     console.log(`   GET  http://localhost:${PORT}/campaigns`);
+    console.log(`   GET  http://localhost:${PORT}/orders`);
     console.log('');
     console.log('📚 Documentation:');
     console.log(`   GET  http://localhost:${PORT}/`);

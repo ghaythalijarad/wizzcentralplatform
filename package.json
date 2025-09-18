@@ -1,12 +1,14 @@
 {
   "name": "wizzcentralplatform-gen2",
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "dev": "ampx sandbox",
-    "start": "vite frontend",
+    "start": "node local-dev-server.js",
+    "start:frontend": "vite frontend",
+    "start:backend": "cd backend && npm run dev",
     "build": "vite build frontend",
-    "preview": "vite preview frontend"
+    "preview": "vite preview frontend",
+    "local": "node local-dev-server.js"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",
@@ -17,7 +19,9 @@
     "@aws-sdk/client-cognito-identity-provider": "^3.888.0",
     "aws-amplify": "^6.0.0",
     "aws-sdk": "^2.1692.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.1",
+    "express": "^4.21.2",
     "node-fetch": "^2.6.7",
     "ws": "^8.18.3"
   }
