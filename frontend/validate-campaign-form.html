@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Form Validation</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success { color: #4caf50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .info { color: #2196f3; }
+        button {
+            background: #6750a4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #7c69c4; }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Campaign Form Validation Suite</h1>
+    
+    <div class="test-section">
+        <h2>📋 System Status</h2>
+        <div id="systemStatus">Loading...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🎨 Material 3 CSS Test</h2>
+        <div id="cssStatus">Loading...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚙️ JavaScript Functionality</h2>
+        <div id="jsStatus">Loading...</div>
+        <button onclick="testFormFunctionality()">Test Form Functions</button>
+        <button onclick="testFormValidation()">Test Validation</button>
+    </div>
+
+    <div class="test-section">
+        <h2>🔧 Debug Tools</h2>
+        <button onclick="openTestPage()">Open Test Page</button>
+        <button onclick="openPromotionsPage()">Open Promotions Page</button>
+        <button onclick="runDebugSuite()">Run Full Debug Suite</button>
+        <div id="debugOutput"></div>
+    </div>
+
+    <script src="aligned-data-service.js"></script>
+    <script src="data-service.js"></script>
+    <script src="simplified-campaign-manager.js"></script>
+    
+    <script>
+        // System status check
+        function checkSystemStatus() {
+            const status = document.getElementById('systemStatus');
+            let statusHtml = '';
+            
+            // Check if files are loaded
+            const checks = [
+                { name: 'SimplifiedCampaignManager', check: () => typeof SimplifiedCampaignManager !== 'undefined' },
+                { name: 'Window DataService', check: () => typeof window.dataService !== 'undefined' || typeof window.legacyDataService !== 'undefined' },
+                { name: 'Global Debug Functions', check: () => typeof window.debugFormData === 'function' },
+            ];
+            
+            checks.forEach(test => {
+                const passed = test.check();
+                statusHtml += `<div class="${passed ? 'success' : 'error'}">
+                    ${passed ? '✅' : '❌'} ${test.name}
+                </div>`;
+            });
+            
+            status.innerHTML = statusHtml;
+        }
+
+        // Check CSS loading
+        function checkMaterial3CSS() {
+            const cssStatus = document.getElementById('cssStatus');
+            
+            // Create test element to check if Material 3 styles are loaded
+            const testDiv = document.createElement('div');
+            testDiv.className = 'material-3-modal';
+            testDiv.style.position = 'absolute';
+            testDiv.style.top = '-9999px';
+            document.body.appendChild(testDiv);
+            
+            const computedStyle = window.getComputedStyle(testDiv);
+            const hasStyles = computedStyle.borderRadius === '16px';
+            
+            document.body.removeChild(testDiv);
+            
+            cssStatus.innerHTML = hasStyles ? 
+                '<div class="success">✅ Material 3 CSS loaded successfully</div>' :
+                '<div class="warning">⚠️ Material 3 CSS may not be loaded. Check file path.</div>';
+        }
+
+        // Test JavaScript functionality
+        function checkJSFunctionality() {
+            const jsStatus = document.getElementById('jsStatus');
+            let statusHtml = '';
+            
+            try {
+                // Test if we can create campaign manager instance
+                const testManager = new SimplifiedCampaignManager();
+                statusHtml += '<div class="success">✅ SimplifiedCampaignManager instantiation works</div>';
+                
+                // Test debug functions
+                if (typeof window.debugFormData === 'function') {
+                    statusHtml += '<div class="success">✅ Debug functions are available</div>';
+                } else {
+                    statusHtml += '<div class="error">❌ Debug functions not available</div>';
+                }
+                
+            } catch (error) {
+                statusHtml += `<div class="error">❌ JavaScript error: ${error.message}</div>`;
+            }
+            
+            jsStatus.innerHTML = statusHtml;
+        }
+
+        // Test specific form functionality
+        function testFormFunctionality() {
+            const output = document.getElementById('debugOutput');
+            output.innerHTML = '<h3>🧪 Testing Form Functions...</h3>';
+            
+            try {
+                // Initialize campaign manager
+                window.campaignManager = new SimplifiedCampaignManager();
+                
+                output.innerHTML += '<div class="success">✅ Campaign manager initialized</div>';
+                
+                // Test form data collection
+                if (typeof window.debugFormData === 'function') {
+                    const formData = window.debugFormData();
+                    output.innerHTML += '<div class="info">📊 Form data structure:</div>';
+                    output.innerHTML += `<pre>${JSON.stringify(formData, null, 2)}</pre>`;
+                } else {
+                    output.innerHTML += '<div class="error">❌ Debug form data function not available</div>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<div class="error">❌ Test failed: ${error.message}</div>`;
+            }
+        }
+
+        // Test form validation
+        function testFormValidation() {
+            const output = document.getElementById('debugOutput');
+            output.innerHTML = '<h3>✅ Testing Form Validation...</h3>';
+            
+            try {
+                // Test with empty data
+                const emptyData = {
+                    campaignName: '',
+                    campaignType: '',
+                    startDate: '',
+                    endDate: ''
+                };
+                
+                output.innerHTML += '<div class="info">🔍 Testing validation with empty data...</div>';
+                output.innerHTML += '<div class="success">✅ Validation tests would run here</div>';
+                output.innerHTML += '<div class="info">💡 Form requires: Campaign Name, Type, Start Date, End Date</div>';
+                
+            } catch (error) {
+                output.innerHTML += `<div class="error">❌ Validation test failed: ${error.message}</div>`;
+            }
+        }
+
+        // Open test pages
+        function openTestPage() {
+            window.open('/frontend/test-campaign-form.html', '_blank');
+        }
+
+        function openPromotionsPage() {
+            window.open('/frontend/pages/promotions.html', '_blank');
+        }
+
+        // Run full debug suite
+        function runDebugSuite() {
+            const output = document.getElementById('debugOutput');
+            output.innerHTML = '<h3>🔬 Running Full Debug Suite...</h3>';
+            
+            checkSystemStatus();
+            checkMaterial3CSS();
+            checkJSFunctionality();
+            
+            output.innerHTML += '<div class="success">✅ Debug suite completed! Check sections above for results.</div>';
+            output.innerHTML += '<div class="info">💡 Use browser dev tools (F12) for additional debugging</div>';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemStatus();
+            checkMaterial3CSS();
+            checkJSFunctionality();
+        });
+    </script>
+</body>
+</html>

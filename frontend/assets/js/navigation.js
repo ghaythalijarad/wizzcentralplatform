@@ -143,6 +143,12 @@ class NavigationManager {
             navLinks.forEach(link => {
                 link.addEventListener('click', (e) => this.handleNavigation(e));
             });
+            
+            // Ensure sidebar is visible on desktop by default
+            if (!this.isMobile()) {
+                this.sidebar.classList.add('md-navigation-drawer--open');
+                this.sidebar.style.transform = 'translateX(0)';
+            }
         }
 
         // Setup responsive behavior
@@ -401,6 +407,7 @@ class NavigationManager {
         if (this.isMobile()) {
             // Mobile: Remove desktop classes, close sidebar
             this.sidebar.classList.remove('collapsed');
+            this.sidebar.classList.remove('md-navigation-drawer--open');
             if (this.mainContent) {
                 this.mainContent.classList.remove('collapsed-sidebar');
             }
@@ -408,6 +415,8 @@ class NavigationManager {
         } else {
             // Desktop: Remove mobile classes, restore collapsed state
             this.sidebar.classList.remove('active');
+            this.sidebar.classList.add('md-navigation-drawer--open');
+            this.sidebar.style.transform = 'translateX(0)';
             this.removeBackdrop();
             document.body.style.overflow = '';
 
@@ -418,6 +427,7 @@ class NavigationManager {
                 if (this.mainContent) {
                     this.mainContent.classList.add('collapsed-sidebar');
                 }
+            }
             }
         }
     }

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Form Test</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .test-button {
+            background: #6750a4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        
+        .test-button:hover {
+            background: #5d3f98;
+        }
+        
+        .result-area {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-flask"></i> Campaign Form Test</h1>
+        <p>This page tests the simplified campaign form functionality and data collection.</p>
+        
+        <div class="test-controls">
+            <button class="test-button" onclick="openCampaignModal()">
+                <i class="fas fa-plus"></i> Open Campaign Form
+            </button>
+            <button class="test-button" onclick="testFormDataCollection()">
+                <i class="fas fa-check"></i> Test Form Data
+            </button>
+            <button class="test-button" onclick="fillTestData()">
+                <i class="fas fa-edit"></i> Fill Test Data
+            </button>
+            <button class="test-button" onclick="clearResults()">
+                <i class="fas fa-trash"></i> Clear Results
+            </button>
+        </div>
+        
+        <div id="results" class="result-area">
+🧪 Campaign Form Test Ready!
+
+Click the buttons above to:
+• "Open Campaign Form" - Opens the campaign creation modal
+• "Test Form Data" - Checks if form data can be collected properly
+• "Fill Test Data" - Automatically fills the form with sample data
+• "Clear Results" - Clears this output area
+
+Waiting for your input...
+        </div>
+    </div>
+
+    <!-- Load the required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js?v=10"></script>
+    <script src="data-service.js?v=10"></script>
+    <script src="aligned-data-service.js"></script>
+    <script src="simplified-campaign-manager.js"></script>
+
+    <script>
+        const resultArea = document.getElementById('results');
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            resultArea.textContent += `[${timestamp}] ${message}\n`;
+            resultArea.scrollTop = resultArea.scrollHeight;
+            console.log(`[FormTest] ${message}`);
+        }
+
+        function clearResults() {
+            resultArea.textContent = 'Results cleared.\n';
+        }
+
+        function openCampaignModal() {
+            log('Opening campaign modal...');
+            
+            if (window.campaignManager) {
+                window.campaignManager.openCampaignModal();
+                log('✅ Campaign modal opened via campaignManager');
+            } else if (window.openCreateCampaignModal) {
+                window.openCreateCampaignModal();
+                log('✅ Campaign modal opened via legacy function');
+            } else {
+                log('❌ No campaign modal function available');
+            }
+        }
+
+        function testFormDataCollection() {
+            log('Testing form data collection...');
+            
+            const form = document.getElementById('simplifiedCampaignForm');
+            if (!form) {
+                log('❌ Form not found - modal may not be open');
+                return;
+            }
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Collect all form data
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            log('📋 Form data collected:');
+            log(JSON.stringify(data, null, 2));
+            
+            // Check for required fields
+            const requiredFields = ['title', 'code', 'type', 'discountType', 'discountValue', 'startDate', 'endDate'];
+            const missingFields = requiredFields.filter(field => !data[field]);
+            
+            if (missingFields.length > 0) {
+                log(`⚠️ Missing required fields: ${missingFields.join(', ')}`);
+            } else {
+                log('✅ All required fields are filled');
+            }
+        }
+
+        function fillTestData() {
+            log('Filling form with test data...');
+            
+            const form = document.getElementById('simplifiedCampaignForm');
+            if (!form) {
+                log('❌ Form not found - please open modal first');
+                return;
+            }
+            
+            // Fill form fields
+            const fields = {
+                'title': 'Test Campaign 2025',
+                'code': 'TEST25',
+                'type': 'promotional',
+                'description': 'Test campaign for form validation',
+                'discountType': 'percentage',
+                'discountValue': '25',
+                'minOrderValue': '50',
+                'usageLimit': '100',
+                'startDate': '2025-01-20',
+                'endDate': '2025-02-20',
+                'customerSegment': 'new',
+                'targetLocation': 'Dubai'
+            };
+            
+            let filledCount = 0;
+            for (const [fieldName, value] of Object.entries(fields)) {
+                const element = form.querySelector(`[name="${fieldName}"]`);
+                if (element) {
+                    element.value = value;
+                    filledCount++;
+                    
+                    // Trigger change event for Material 3 styling
+                    element.dispatchEvent(new Event('input'));
+                    element.dispatchEvent(new Event('change'));
+                }
+            }
+            
+            // Set checkboxes
+            const isActiveCheckbox = form.querySelector('[name="isActive"]');
+            if (isActiveCheckbox) {
+                isActiveCheckbox.checked = true;
+                filledCount++;
+            }
+            
+            log(`✅ Filled ${filledCount} form fields with test data`);
+            log('📝 You can now test form submission or data collection');
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', function() {
+            log('🚀 Campaign Form Test initialized');
+            log('💡 Ready to test campaign form functionality');
+            
+            // Wait for campaign manager to initialize
+            setTimeout(() => {
+                if (window.campaignManager) {
+                    log('✅ Campaign manager is available');
+                } else {
+                    log('⚠️ Campaign manager not found - checking in 2 seconds...');
+                    setTimeout(() => {
+                        if (window.campaignManager) {
+                            log('✅ Campaign manager loaded');
+                        } else {
+                            log('❌ Campaign manager failed to load');
+                        }
+                    }, 2000);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

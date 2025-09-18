@@ -210,3 +210,20 @@ if (typeof window !== 'undefined') {
 - WizzTheme.generateCSS() // Get current theme as CSS
   `);
 }
+
+// Global logout function for sidebar
+window.logout = function() {
+  // Clear all session data
+  sessionStorage.clear();
+  localStorage.clear();
+  
+  // Show logout message
+  if (window.showNotification) {
+    window.showNotification('Logged out successfully', 'success');
+  }
+  
+  // Redirect to login page
+  setTimeout(() => {
+    window.location.href = 'login.html';
+  }, 1000);
+};

@@ -1,0 +1,11 @@
+{
+  "Variables": {
+    "CONDITIONS_TABLE": "WizzCentral_Campaign_Conditions",
+    "USERS_TABLE": "WizzUser_users_dev",
+    "TRANSACTIONS_TABLE": "WizzUser_transactions_dev",
+    "BUSINESSES_TABLE": "WhizzMerchants_Businesses",
+    "CAMPAIGNS_TABLE": "WizzCentral_Campaigns",
+    "USAGE_TABLE": "WizzCentral_Campaign_Usage",
+    "ANALYTICS_TABLE": "WizzCentral_Campaign_Analytics"
+  }
+}

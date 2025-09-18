@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Form Debug</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .debug-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+        .info { background: #d1ecf1; border-color: #bee5eb; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="debug-container">
+        <h1>🐛 Campaign Form Debug</h1>
+        <p>Testing campaign form submission and data saving.</p>
+        
+        <button onclick="testFormSubmission()">Test Form Submission</button>
+        <button onclick="testDataService()">Test Data Service</button>
+        <button onclick="clearResults()">Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <!-- Simple form for testing -->
+    <div class="debug-container">
+        <h2>Test Campaign Form</h2>
+        <form id="testCampaignForm">
+            <div class="form-group">
+                <label for="title">Campaign Title *</label>
+                <input type="text" name="title" id="title" required value="Debug Test Campaign">
+            </div>
+            <div class="form-group">
+                <label for="code">Campaign Code *</label>
+                <input type="text" name="code" id="code" required value="DEBUG2025">
+            </div>
+            <div class="form-group">
+                <label for="type">Campaign Type *</label>
+                <select name="type" id="type" required>
+                    <option value="first-order">First Order Discount</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="discountType">Discount Type *</label>
+                <select name="discountType" id="discountType" required>
+                    <option value="percentage">Percentage Off</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="discountValue">Discount Value *</label>
+                <input type="number" name="discountValue" id="discountValue" required value="15">
+            </div>
+            <div class="form-group">
+                <label for="startDate">Start Date *</label>
+                <input type="date" name="startDate" id="startDate" required>
+            </div>
+            <div class="form-group">
+                <label for="endDate">End Date *</label>
+                <input type="date" name="endDate" required>
+            </div>
+            <button type="submit">Create Test Campaign</button>
+        </form>
+    </div>
+
+    <!-- Load dependencies -->
+    <script src="../config.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    <script src="../data-service.js"></script>
+    <script src="../aligned-data-service.js"></script>
+    <script src="../simplified-campaign-manager.js"></script>
+
+    <script>
+        function addResult(type, title, message, data = null) {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = `debug-container ${type}`;
+            div.innerHTML = `
+                <h3>[${timestamp}] ${title}</h3>
+                <p>${message}</p>
+                ${data ? `<pre>${data}</pre>` : ''}
+            `;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testDataService() {
+            addResult('info', 'Testing Data Service', 'Checking if data service is available...');
+            
+            try {
+                if (window.dataService) {
+                    addResult('success', 'Data Service Found', 'window.dataService is available');
+                    
+                    if (typeof window.dataService.getCampaigns === 'function') {
+                        addResult('success', 'getCampaigns Available', 'getCampaigns function exists');
+                        
+                        const campaigns = await window.dataService.getCampaigns();
+                        addResult('success', 'Campaigns Loaded', `Found ${campaigns.length} campaigns`, 
+                                JSON.stringify(campaigns.slice(0, 3), null, 2));
+                    } else {
+                        addResult('error', 'getCampaigns Missing', 'getCampaigns function not found');
+                    }
+                    
+                    if (typeof window.dataService.createCampaign === 'function') {
+                        addResult('success', 'createCampaign Available', 'createCampaign function exists');
+                    } else {
+                        addResult('error', 'createCampaign Missing', 'createCampaign function not found');
+                    }
+                } else {
+                    addResult('error', 'Data Service Missing', 'window.dataService is not available');
+                }
+                
+                if (window.campaignManager) {
+                    addResult('success', 'Campaign Manager Found', 'window.campaignManager is available');
+                } else {
+                    addResult('error', 'Campaign Manager Missing', 'window.campaignManager is not available');
+                }
+                
+            } catch (error) {
+                addResult('error', 'Data Service Test Failed', error.message, error.stack);
+            }
+        }
+
+        async function testFormSubmission() {
+            addResult('info', 'Testing Form Submission', 'Attempting to submit test campaign form...');
+            
+            try {
+                const form = document.getElementById('testCampaignForm');
+                const formData = new FormData(form);
+                
+                // Log form data
+                const formDataObj = {};
+                for (let [key, value] of formData.entries()) {
+                    formDataObj[key] = value;
+                }
+                addResult('info', 'Form Data Captured', 'Form data extracted successfully', 
+                        JSON.stringify(formDataObj, null, 2));
+                
+                // Test campaign manager creation
+                if (window.campaignManager && typeof window.campaignManager.createCampaign === 'function') {
+                    addResult('info', 'Using Campaign Manager', 'Calling campaignManager.createCampaign...');
+                    const result = await window.campaignManager.createCampaign(formData);
+                    addResult('success', 'Campaign Created via Manager', 'Campaign created successfully!', 
+                            JSON.stringify(result, null, 2));
+                } else if (window.dataService && typeof window.dataService.createCampaign === 'function') {
+                    addResult('info', 'Using Data Service', 'Calling dataService.createCampaign...');
+                    
+                    const campaignData = {
+                        title: formData.get('title'),
+                        code: formData.get('code'),
+                        type: formData.get('type'),
+                        discountType: formData.get('discountType'),
+                        discountValue: parseFloat(formData.get('discountValue')),
+                        startDate: formData.get('startDate'),
+                        endDate: formData.get('endDate'),
+                        discountSource: 'campaign'
+                    };
+                    
+                    const result = await window.dataService.createCampaign(campaignData);
+                    addResult('success', 'Campaign Created via Data Service', 'Campaign created successfully!', 
+                            JSON.stringify(result, null, 2));
+                } else {
+                    addResult('error', 'No Creation Method', 'Neither campaign manager nor data service available');
+                }
+                
+            } catch (error) {
+                addResult('error', 'Form Submission Failed', error.message, error.stack);
+            }
+        }
+
+        // Set default dates
+        window.addEventListener('load', () => {
+            const today = new Date().toISOString().split('T')[0];
+            const futureDate = new Date();
+            futureDate.setDate(futureDate.getDate() + 30);
+            const future = futureDate.toISOString().split('T')[0];
+            
+            document.getElementById('startDate').value = today;
+            document.querySelector('[name="endDate"]').value = future;
+            
+            addResult('info', 'Debug Page Loaded', 'Test form initialized with default dates');
+        });
+
+        // Test form submission when form is submitted
+        document.getElementById('testCampaignForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await testFormSubmission();
+        });
+    </script>
+</body>
+</html>

@@ -1,13 +1,13 @@
 <!-- Material 3 Sidebar Navigation -->
-<div class="md-navigation-drawer md-surface-container-low" id="sidebar">
-    <div class="sidebar-header md-padding-large" style="border-bottom: 1px solid var(--md-sys-color-outline-variant); background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));">
-        <div class="logo md-flex md-gap-medium md-typescale-title-large" style="color: var(--md-sys-color-on-primary);">
+<div class="md-navigation-drawer" id="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
             <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: var(--md-sys-shape-corner-medium); display: flex; align-items: center; justify-content: center;">
                 <i class="fas fa-rocket" style="color: var(--md-sys-color-on-primary);"></i>
             </div>
-            <span style="color: var(--md-sys-color-on-primary);">WizzCentral</span>
+            <span>WizzCentral</span>
         </div>
-        <button class="md-button md-button--text sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" style="color: var(--md-sys-color-on-primary); background: rgba(255,255,255,0.1);">
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
             <i class="fas fa-bars"></i>
         </button>
     </div>
@@ -50,24 +50,24 @@
                 </a>
             </li>
             <li class="nav-item" data-page="support">
-                <a href="/frontend/pages/support.html" class="nav-link flex items-center gap-3 px-6 py-3 text-white/80 hover:text-white hover:bg-white/20 transition-all rounded-none border-l-0 hover:border-l-4 hover:border-white" data-nav="page" rel="noopener">
-                    <i class="fas fa-headset w-5"></i>
+                <a href="/frontend/pages/support.html" class="md-navigation-item" data-nav="page" rel="noopener">
+                    <i class="fas fa-headset md-navigation-item__icon"></i>
                     <span>Support</span>
                 </a>
             </li>
         </ul>
     </nav>
-    <div class="sidebar-footer p-6 border-t border-white/20 bg-white/10">
-        <div class="user-profile flex items-center gap-3 mb-4">
-            <div class="user-avatar w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <i class="fas fa-user text-white"></i>
+    <div class="sidebar-footer">
+        <div class="user-profile">
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
             </div>
-            <div class="user-info flex-1">
-                <span class="user-name block text-sm font-medium text-white">Admin User</span>
-                <span class="user-role block text-xs text-white/70">Administrator</span>
+            <div class="user-info">
+                <span class="user-name">Admin User</span>
+                <span class="user-role">Administrator</span>
             </div>
         </div>
-        <button class="logout-btn btn btn-secondary btn-sm w-full justify-start" onclick="logout()">
+        <button class="logout-btn" onclick="logout()">
             <i class="fas fa-sign-out-alt"></i>
             <span>Logout</span>
         </button>
