@@ -16,8 +16,8 @@
 }
 
 .business-avatar {
-    width: 32px;
-    height: 32px;
+    width: 32px !important;
+        height: 32px !important;
     border-radius: 8px;
     object-fit: cover;
     border: 2px solid #f1f3f4;
@@ -26,9 +26,16 @@
 }
 
 .business-avatar:hover {
-    border-color: #667eea;
+    border-color: #00c2e8;
 }
 
+/* Additional specificity for business avatar in business info context */
+.business-info .business-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+}
 .business-details h4 {
     font-weight: 600;
     margin: 0;
@@ -114,9 +121,9 @@
 }
 
 .status-badge.under-review {
-    background-color: #dbeafe;
-    color: #1e40af;
-    border-color: #bfdbfe;
+    background-color: #e6f9fe;
+        color: #00748a;
+        border-color: #99e5fb;
 }
 
 /* Enhanced modal styling */
@@ -149,8 +156,8 @@
 #editMerchantForm select:focus,
 #editMerchantForm textarea:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #00c2e8;
+        box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.1);
 }
 
 #editMerchantForm input:invalid {
@@ -257,7 +264,7 @@
 #editMerchantForm input:focus-visible,
 #editMerchantForm select:focus-visible,
 #editMerchantForm textarea:focus-visible {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid #00c2e8;
     outline-offset: 2px;
 }
 
@@ -379,9 +386,9 @@
 }
 
 .status-badge.under-review {
-    background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
-    color: #1e40af;
-    border: 1px solid #3b82f6;
+    background: linear-gradient(135deg, #e6f9fe 0%, #99e5fb 100%);
+        color: #00748a;
+        border: 1px solid #00c2e8;
 }
 
 .status-badge.suspended {

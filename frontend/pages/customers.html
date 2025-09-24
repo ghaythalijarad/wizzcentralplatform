@@ -9,6 +9,483 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <style>
+        /* Material 3 Customers Page Enhancement */
+        .customers-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+    
+        .customer-stat-card {
+            background-color: var(--md-sys-color-surface-container-low);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 24px;
+            box-shadow: var(--md-sys-elevation-level1);
+            border: none;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+            position: relative;
+            overflow: hidden;
+        }
+    
+        .customer-stat-card:hover {
+            box-shadow: var(--md-sys-elevation-level2);
+            transform: translateY(-2px);
+        }
+    
+        .customer-stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--md-sys-color-primary);
+        }
+    
+        .customer-stat-card.total::before {
+            background: var(--md-sys-color-primary);
+        }
+    
+        .customer-stat-card.active::before {
+            background: var(--md-sys-color-secondary);
+        }
+    
+        .customer-stat-card.vip::before {
+            background: var(--md-sys-color-tertiary);
+        }
+    
+        .customer-stat-card.revenue::before {
+            background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
+        }
+    
+        .customer-stat-card.points::before {
+            background: var(--md-sys-color-secondary);
+        }
+    
+        .btn-primary {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            padding: 12px 20px;
+            border-radius: var(--md-sys-shape-corner-medium);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    
+        .btn-primary:hover {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            box-shadow: var(--md-sys-elevation-level2);
+        }
+    
+        .btn-secondary {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+            border: 1px solid var(--md-sys-color-outline);
+            padding: 12px 20px;
+            border-radius: var(--md-sys-shape-corner-medium);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    
+        .btn-secondary:hover {
+            background: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-on-secondary);
+            box-shadow: var(--md-sys-elevation-level1);
+        }
+    
+        .points-display {
+            text-align: center;
+        }
+    
+        .points-value {
+            font-weight: 600;
+            color: var(--md-sys-color-secondary);
+            font-size: 0.875rem;
+        }
+    
+        .contact-info {
+            min-width: 140px;
+        }
+    
+        .stat-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+    
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--md-sys-shape-corner-medium);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--md-sys-color-on-primary);
+            font-size: 24px;
+        }
+    
+        .customer-stat-card.total .stat-icon {
+            background: var(--md-sys-color-primary);
+        }
+    
+        .customer-stat-card.active .stat-icon {
+            background: var(--md-sys-color-secondary);
+        }
+    
+        .customer-stat-card.vip .stat-icon {
+            background: var(--md-sys-color-tertiary);
+        }
+    
+        .customer-stat-card.revenue .stat-icon {
+            background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
+        }
+    
+        .stat-info h3 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+            line-height: 1.2;
+        }
+    
+        .stat-info p {
+            margin: 4px 0 0 0;
+            font-size: 0.875rem;
+            color: var(--md-sys-color-on-surface-variant);
+        }
+    
+        .controls-section {
+            background: var(--md-sys-color-surface-container-low);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 24px;
+            margin-bottom: 2rem;
+            box-shadow: var(--md-sys-elevation-level1);
+        }
+    
+        .table-controls {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 1rem;
+            align-items: center;
+        }
+    
+        .search-container {
+            position: relative;
+            max-width: 400px;
+        }
+    
+        .search-container i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--md-sys-color-on-surface-variant);
+            z-index: 1;
+        }
+    
+        .search-container input {
+            width: 100%;
+            padding: 16px 16px 16px 48px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-medium);
+            background: var(--md-sys-color-surface-container-highest);
+            color: var(--md-sys-color-on-surface);
+            font-size: 1rem;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+        }
+    
+        .search-container input:focus {
+            outline: none;
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 2px var(--md-sys-color-primary-container);
+        }
+    
+        .filter-container {
+            display: flex;
+            gap: 1rem;
+        }
+    
+        .filter-container select {
+            padding: 12px 16px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-medium);
+            background: var(--md-sys-color-surface-container-highest);
+            color: var(--md-sys-color-on-surface);
+            font-size: 0.875rem;
+            min-width: 140px;
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+        }
+    
+        .filter-container select:focus {
+            outline: none;
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 2px var(--md-sys-color-primary-container);
+        }
+    
+        .table-container {
+            background: var(--md-sys-color-surface-container-low);
+            border-radius: var(--md-sys-shape-corner-large);
+            box-shadow: var(--md-sys-elevation-level1);
+            overflow: hidden;
+        }
+    
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+        }
+    
+        .data-table thead {
+            background: var(--md-sys-color-surface-container-high);
+        }
+    
+        .data-table th {
+            padding: 20px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+    
+        .data-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            color: var(--md-sys-color-on-surface);
+            font-size: 0.875rem;
+            vertical-align: middle;
+        }
+    
+        .data-table tbody tr {
+            transition: background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+        }
+    
+        .data-table tbody tr:hover {
+            background-color: var(--md-sys-color-surface-container);
+        }
+    
+        .customer-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--md-sys-color-primary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--md-sys-color-on-primary-container);
+            font-weight: 600;
+            font-size: 1rem;
+            margin-right: 12px;
+        }
+    
+        .customer-info {
+            display: flex;
+            align-items: center;
+        }
+    
+        .customer-details h4 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+            font-size: 0.875rem;
+        }
+    
+        .customer-details p {
+            margin: 2px 0 0 0;
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 0.75rem;
+        }
+    
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: var(--md-sys-shape-corner-full);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1rem;
+            display: inline-block;
+        }
+    
+        .status-badge.active {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+    
+        .status-badge.inactive {
+            background: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface-variant);
+        }
+    
+        .status-badge.blocked {
+            background: var(--md-sys-color-error-container);
+            color: var(--md-sys-color-on-error-container);
+        }
+    
+        .segment-badge {
+            padding: 4px 8px;
+            border-radius: var(--md-sys-shape-corner-small);
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+    
+        .segment-badge.vip {
+            background: var(--md-sys-color-tertiary-container);
+            color: var(--md-sys-color-on-tertiary-container);
+        }
+    
+        .segment-badge.regular {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+        }
+    
+        .segment-badge.new {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+    
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+    
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: var(--md-sys-shape-corner-medium);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+            font-size: 14px;
+        }
+    
+        .action-btn.view {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+        }
+    
+        .action-btn.edit {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+    
+        .action-btn.block {
+            background: var(--md-sys-color-error-container);
+            color: var(--md-sys-color-on-error-container);
+        }
+    
+        .action-btn:hover {
+            box-shadow: var(--md-sys-elevation-level1);
+            transform: translateY(-1px);
+        }
+    
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding: 1rem;
+        }
+    
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-medium);
+            background: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+        }
+    
+        .pagination button:hover:not(:disabled) {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+        }
+    
+        .pagination button.active {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border-color: var (--md-sys-color-primary);
+        }
+    
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .customers-stats-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+    
+            .table-controls {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+    
+            .filter-container {
+                justify-content: stretch;
+            }
+    
+            .filter-container select {
+                min-width: unset;
+                flex: 1;
+            }
+    
+            .data-table {
+                font-size: 0.75rem;
+            }
+    
+            .data-table th,
+            .data-table td {
+                padding: 12px 8px;
+            }
+    
+            .customer-avatar {
+                width: 32px;
+                height: 32px;
+                font-size: 0.875rem;
+            }
+    
+            .action-buttons {
+                flex-direction: column;
+                gap: 4px;
+            }
+    
+            .action-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 12px;
+            }
+        }
+    </style>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 </head>
 
 <body data-page="customers">
@@ -17,54 +494,109 @@
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="top-bar-left">
-                <button class="menu-toggle" id="menuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1 class="page-title">Customers Management</h1>
-            </div>
-            <div class="top-bar-right">
-                <button class="btn-primary" onclick="exportCustomers()">
-                    <i class="fas fa-download"></i>
-                    Export Data
-                </button>
-                <div class="notifications">
-                    <button class="notification-btn">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
-                    </button>
-                </div>
-                <div class="user-menu">
-                    <button class="user-menu-btn">
-                        <i class="fas fa-user-circle"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Page Content -->
         <div class="page-content">
-            <!-- Filters and Search -->
-            <div class="table-controls">
-                <div class="search-container">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search customers..." id="searchInput">
+            <!-- Statistics Cards -->
+            <div class="customers-stats-grid">
+                <div class="customer-stat-card total">
+                    <div class="stat-content">
+                        <div class="stat-info">
+                            <h3 id="totalCustomers">-</h3>
+                            <p>Total Customers</p>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                    </div>
                 </div>
-                <div class="filter-container">
-                    <select id="statusFilter">
-                        <option value="">All Status</option>
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="blocked">Blocked</option>
-                    </select>
-                    <select id="segmentFilter">
-                        <option value="">All Segments</option>
-                        <option value="vip">VIP</option>
-                        <option value="regular">Regular</option>
-                        <option value="new">New</option>
-                    </select>
+                <div class="customer-stat-card active">
+                    <div class="stat-content">
+                        <div class="stat-info">
+                            <h3 id="activeCustomers">-</h3>
+                            <p>Active Customers</p>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="customer-stat-card vip">
+                    <div class="stat-content">
+                        <div class="stat-info">
+                            <h3 id="vipCustomers">-</h3>
+                            <p>VIP Customers</p>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="customer-stat-card revenue">
+                    <div class="stat-content">
+                        <div class="stat-info">
+                            <h3 id="totalRevenue">-</h3>
+                            <p>Total Revenue</p>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="customer-stat-card points">
+                    <div class="stat-content">
+                        <div class="stat-info">
+                            <h3 id="totalPointsEarned">-</h3>
+                            <p>Total Points Earned</p>
+                        </div>
+                        <div class="stat-icon">
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+            </div>
+<!-- Data Source Information Banner -->
+<div id="dataSourceBanner"
+    style="display: none; background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border: 1px solid #2196f3; border-radius: 8px; padding: 16px; margin-bottom: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <i class="fas fa-info-circle" style="color: #1976d2; font-size: 1.2rem;"></i>
+        <div>
+            <h4 style="margin: 0; color: #1976d2; font-size: 1rem;">Data Source Information</h4>
+            <p id="dataSourceMessage" style="margin: 4px 0 0 0; color: #424242; font-size: 0.9rem;">
+                This system is now configured to fetch real customer order data from the database instead of using mock
+                data.
+            </p>
+        </div>
+    </div>
+</div>
+
+            <!-- Filters and Search -->
+            <div class="controls-section">
+                <div class="table-controls">
+                    <div class="search-container">
+                        <i class="fas fa-search"></i>
+                        <input type="text" placeholder="Search customers by name, email, or phone..." id="searchInput">
+                        </div>
+                        <div class="filter-container">
+                            <select id="statusFilter">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="blocked">Blocked</option>
+                            </select>
+                            <select id="segmentFilter">
+                                <option value="">All Segments</option>
+                                <option value="vip">VIP</option>
+                                <option value="regular">Regular</option>
+                                <option value="new">New</option>
+                            </select>
+                    </div>
+                    <button class="btn-secondary" onclick="refreshCustomerPoints()" title="Refresh customer points from latest order data">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh Points
+                    </button>
+                    <button class="btn-primary" onclick="exportCustomers()">
+                        <i class="fas fa-download"></i>
+                        Export
+                    </button>
                 </div>
             </div>
 
@@ -74,11 +606,11 @@
                     <thead>
                         <tr>
                             <th>Customer</th>
-                            <th>Email</th>
-                            <th>Phone</th>
+                            <th>Contact</th>
                             <th>Status</th>
                             <th>Total Orders</th>
                             <th>Total Spent</th>
+                            <th>Points</th>
                             <th>Last Order</th>
                             <th>Segment</th>
                             <th>Actions</th>
@@ -86,8 +618,18 @@
                     </thead>
                     <tbody id="customersTableBody">
                         <!-- Rows will be populated dynamically by customers.js -->
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 40px; color: var(--md-sys-color-on-surface-variant);">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 12px;"></i>
+                                <div>Loading customers...</div>
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Pagination -->
+            <div class="pagination" id="pagination">
+                <!-- Pagination will be populated by JavaScript -->
             </div>
         </div>
     </div>
@@ -104,7 +646,44 @@
 
     <!-- Page-specific scripts -->
     <script src="../assets/js/navigation.js"></script>
+    <script src="../customer-points-service.js"></script>
+    <script src="../assets/js/fixed-customer-points-service.js"></script>
     <script src="../customers.js"></script>
+    <!-- Sidebar Loading Script -->
+    <script>
+        // Load sidebar content
+        async function loadSidebar() {
+            try {
+                const response = await fetch('/includes/sidebar.html');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const html = await response.text();
+
+                const placeholder = document.getElementById('sidebar-placeholder');
+                if (placeholder) {
+                    placeholder.innerHTML = html;
+                    console.log('✅ Sidebar loaded successfully');
+
+                    // Set active state for customers page
+                    const customersNavItem = document.querySelector('.nav-item[data-page="customers"]');
+                    if (customersNavItem) {
+                        // Remove any existing active states
+                        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                        // Add active to customers
+                        customersNavItem.classList.add('active');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Failed to load sidebar:', error);
+            }
+        }
+
+        // Load sidebar when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadSidebar);
+        } else {
+            loadSidebar();
+        }
+    </script>
 </body>
 
 </html>

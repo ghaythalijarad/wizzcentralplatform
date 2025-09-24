@@ -9,6 +9,9 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
     <style>
         /* Material 3 Orders Management Styles */
         .orders-stats {
@@ -143,7 +146,7 @@
         }
     
         .view-details-btn {
-            background: #3b82f6;
+            background: #00c2e8;
             color: white;
             border: none;
             padding: 0.5rem 1rem;
@@ -154,7 +157,7 @@
         }
     
         .view-details-btn:hover {
-            background: #2563eb;
+            background: #009bb8;
         }
     
         .loading-spinner {
@@ -162,7 +165,7 @@
             width: 20px;
             height: 20px;
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #3b82f6;
+            border-top: 3px solid #00c2e8;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -316,7 +319,7 @@
         .total-row {
             margin-top: 0.5rem;
             padding-top: 0.75rem;
-            border-top: 2px solid #3b82f6;
+            border-top: 2px solid #00c2e8;
             font-size: 16px;
         }
     
@@ -331,6 +334,9 @@
             }
         }
     </style>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 </head>
 
 <body data-page="orders">
@@ -339,25 +345,12 @@
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <div class="top-bar">
-            <button class="menu-toggle" id="menuToggle">
-                <i class="fas fa-bars"></i>
-            </button>
-            <h1 class="page-title">Orders Management</h1>
-            <div class="top-bar-actions">
-                <button class="btn-primary" onclick="loadOrders()">
-                    <i class="fas fa-sync"></i>
-                    Refresh
-                </button>
-            </div>
-        </div>
-
         <!-- Page Content -->
         <div class="page-content">
             <!-- Orders Statistics -->
             <div class="orders-stats">
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(45deg, #3b82f6, #1d4ed8);">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #00c2e8, #009bb8);">
                         <i class="fas fa-shopping-bag"></i>
                     </div>
                     <div class="stat-info">
@@ -737,6 +730,41 @@
     document.addEventListener('DOMContentLoaded', function () {
         loadOrders();
     });
+</script>
+<!-- Sidebar Loading Script -->
+<script>
+    // Load sidebar content
+    async function loadSidebar() {
+        try {
+            const response = await fetch('/includes/sidebar.html');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const html = await response.text();
+
+            const placeholder = document.getElementById('sidebar-placeholder');
+            if (placeholder) {
+                placeholder.innerHTML = html;
+                console.log('✅ Sidebar loaded successfully');
+
+                // Set active state for orders page
+                const ordersNavItem = document.querySelector('.nav-item[data-page="orders"]');
+                if (ordersNavItem) {
+                    // Remove any existing active states
+                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                    // Add active to orders
+                    ordersNavItem.classList.add('active');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Failed to load sidebar:', error);
+        }
+    }
+
+    // Load sidebar when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadSidebar);
+    } else {
+        loadSidebar();
+    }
 </script>
 </body>
 

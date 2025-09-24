@@ -14,7 +14,7 @@
 
 .material-3-header {
     padding: 24px 24px 16px 24px;
-    background: linear-gradient(135deg, #6750a4, #7c69c4);
+    background: linear-gradient(135deg, #00c2e8, #33cceb);
     color: white;
     border-radius: 16px 16px 0 0;
     margin: 0;
@@ -64,7 +64,7 @@
     background: #f8f5ff;
     border-radius: 12px;
     padding: 20px;
-    border-left: 4px solid #6750a4;
+    border-left: 4px solid #00c2e8;
 }
 
 .section-title {
@@ -78,7 +78,7 @@
 }
 
 .section-title i {
-    color: #6750a4;
+    color: #00c2e8;
 }
 
 .form-row {
@@ -116,7 +116,7 @@
 .material-3-input:focus,
 .material-3-select:focus,
 .material-3-textarea:focus {
-    border-color: #6750a4;
+    border-color: #00c2e8;
     box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.1);
 }
 
@@ -139,7 +139,7 @@
 .material-3-textarea:not(:placeholder-shown) + .material-3-label {
     top: -8px;
     font-size: 12px;
-    color: #6750a4;
+    color: #00c2e8;
     font-weight: 500;
 }
 
@@ -147,7 +147,7 @@
 .material-3-select:not([value=""]) + .material-3-label {
     top: -8px;
     font-size: 12px;
-    color: #6750a4;
+    color: #00c2e8;
     font-weight: 500;
 }
 
@@ -157,7 +157,7 @@
     left: 0;
     width: 100%;
     height: 2px;
-    background: #6750a4;
+    background: #00c2e8;
     transform: scaleX(0);
     transition: transform 0.2s ease;
 }
@@ -205,8 +205,8 @@
 }
 
 .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark {
-    background: #6750a4;
-    border-color: #6750a4;
+    background: #00c2e8;
+        border-color: #00c2e8;
 }
 
 .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark::after {
@@ -249,7 +249,7 @@
 }
 
 .material-3-btn-primary {
-    background: #6750a4;
+    background: #00c2e8;
     color: white;
     border: none;
     box-shadow: 0 2px 8px rgba(103, 80, 164, 0.3);
@@ -262,7 +262,7 @@
 
 .material-3-btn-secondary {
     background: transparent;
-    color: #6750a4;
+    color: #00c2e8;
     border: 1px solid #79747e;
 }
 
@@ -284,7 +284,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: #6750a4;
+    color: #00c2e8;
     font-weight: 500;
 }
 

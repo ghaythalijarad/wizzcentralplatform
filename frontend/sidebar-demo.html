@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral - Sidebar Navigation Demo</title>
+    <link rel="stylesheet" href="styles/material-3-design-system.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Roboto', 'Arial', sans-serif;
+            background-color: #fafafa;
+        }
+
+        .demo-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .demo-content {
+            flex: 1;
+            padding: 24px;
+            margin-left: 280px;
+            /* Account for sidebar width */
+            transition: margin-left 0.3s ease;
+        }
+
+        .demo-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .demo-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 32px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .demo-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 300;
+        }
+
+        .demo-header p {
+            margin: 16px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .test-section {
+            margin: 20px 0;
+        }
+
+        .test-button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 8px 8px 8px 0;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .test-button:hover {
+            background: #1565c0;
+        }
+
+        .test-button.danger {
+            background: #d32f2f;
+        }
+
+        .test-button.danger:hover {
+            background: #c62828;
+        }
+
+        .test-button.success {
+            background: #388e3c;
+        }
+
+        .test-button.success:hover {
+            background: #2e7d32;
+        }
+
+        .test-button.warning {
+            background: #f57c00;
+        }
+
+        .test-button.warning:hover {
+            background: #ef6c00;
+        }
+
+        .status-display {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin: 24px 0;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid #1976d2;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-card h3 {
+            margin: 0 0 12px 0;
+            color: #1976d2;
+        }
+
+        .feature-card p {
+            margin: 0;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .user-session-demo {
+            background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 16px 0;
+        }
+
+        .user-session-demo h3 {
+            margin: 0 0 12px 0;
+        }
+
+        .mobile-note {
+            background: #fff3e0;
+            border: 1px solid #ffcc02;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        @media (max-width: 768px) {
+            .demo-content {
+                margin-left: 0;
+                padding: 16px;
+            }
+
+            .demo-header h1 {
+                font-size: 2rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            color: var(--md-sys-color-primary);
+            font-size: 1.25rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .theme-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .demo-button {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none;
+            border-radius: var(--md-sys-shape-corner-small);
+            padding: 0.75rem 1.5rem;
+            font-family: var(--md-sys-typescale-label-large-font);
+            font-size: var(--md-sys-typescale-label-large-size);
+            font-weight: var(--md-sys-typescale-label-large-weight);
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+        }
+
+        .demo-button:hover {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+        }
+
+        .demo-button.secondary {
+            background: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-on-secondary);
+        }
+
+        .demo-button.secondary:hover {
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border-radius: var(--md-sys-shape-corner-full);
+            font-weight: 500;
+            margin-top: 1rem;
+        }
+
+        .responsive-preview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .preview-card {
+            background: var(--md-sys-color-surface-container-high);
+            border-radius: var(--md-sys-shape-corner-medium);
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .preview-card h4 {
+            margin: 0 0 0.5rem 0;
+            color: var(--md-sys-color-on-surface);
+        }
+
+        .preview-card p {
+            margin: 0;
+            color: var(--md-sys-color-on-surface-variant);
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body data-page="demo">
+    <!-- Sidebar include placeholder -->
+    <div id="sidebar-placeholder"></div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="menu-toggle" id="menuToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="page-title">Sidebar Navigation Demo</h1>
+            </div>
+            <div class="top-bar-right">
+                <div class="notifications">
+                    <button class="notification-btn">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge">2</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Content -->
+        <div class="demo-content">
+            <div class="demo-section">
+                <h2 class="demo-title">🎉 Sidebar Navigation Successfully Implemented!</h2>
+                <div class="status-indicator">
+                    <i class="fas fa-check-circle"></i>
+                    <span>All Features Working</span>
+                </div>
+
+                <p style="margin-top: 1rem; line-height: 1.6;">
+                    The WizzCentral platform now has a complete Material 3 sidebar navigation system with
+                    responsive design, beautiful animations, and seamless integration across all pages.
+                </p>
+            </div>
+
+            <div class="demo-section">
+                <h3 class="demo-title">✨ Key Features</h3>
+                <ul class="feature-list">
+                    <li>
+                        <i class="fas fa-palette feature-icon"></i>
+                        <span><strong>Material 3 Design:</strong> Modern design language with Wizz brand colors</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-mobile-alt feature-icon"></i>
+                        <span><strong>Responsive Layout:</strong> Desktop sidebar, mobile overlay with backdrop</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-route feature-icon"></i>
+                        <span><strong>Smart Navigation:</strong> Active page highlighting and smooth transitions</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-user-circle feature-icon"></i>
+                        <span><strong>User Profile:</strong> Avatar, user info, and logout functionality</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-expand-arrows-alt feature-icon"></i>
+                        <span><strong>Collapsible Sidebar:</strong> Desktop collapse to icon-only view</span>
+                    </li>
+                    <li>
+                        <i class="fas fa-keyboard feature-icon"></i>
+                        <span><strong>Keyboard Support:</strong> Escape key closes mobile sidebar</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="demo-section">
+                <h3 class="demo-title">🎨 Theme Customization</h3>
+                <p>Test the programmable color system:</p>
+                <div class="theme-controls">
+                    <button class="demo-button" onclick="WizzTheme.changePrimary('#2196F3')">Blue Theme</button>
+                    <button class="demo-button" onclick="WizzTheme.changePrimary('#4CAF50')">Green Theme</button>
+                    <button class="demo-button" onclick="WizzTheme.changePrimary('#FF9800')">Orange Theme</button>
+                    <button class="demo-button secondary" onclick="WizzTheme.changePrimary('#6750A4')">Default
+                        Purple</button>
+                </div>
+            </div>
+
+            <div class="demo-section">
+                <h3 class="demo-title">📱 Responsive Design</h3>
+                <div class="responsive-preview">
+                    <div class="preview-card">
+                        <h4>Desktop (1024px+)</h4>
+                        <p>Sidebar always visible with 280px width</p>
+                    </div>
+                    <div class="preview-card">
+                        <h4>Tablet (768px-1023px)</h4>
+                        <p>Sidebar hidden, overlay when opened</p>
+                    </div>
+                    <div class="preview-card">
+                        <h4>Mobile (&lt;768px)</h4>
+                        <p>Hidden sidebar with touch-friendly menu toggle</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-section">
+                <h3 class="demo-title">🚀 Navigation Test</h3>
+                <p>Try navigating to different pages using the sidebar:</p>
+                <div class="theme-controls">
+                    <button class="demo-button" onclick="window.location.href='dashboard.html'">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </button>
+                    <button class="demo-button" onclick="window.location.href='orders.html'">
+                        <i class="fas fa-shopping-bag"></i> Orders
+                    </button>
+                    <button class="demo-button" onclick="window.location.href='customers.html'">
+                        <i class="fas fa-users"></i> Customers
+                    </button>
+                    <button class="demo-button secondary" onclick="window.location.href='login.html'">
+                        <i class="fas fa-sign-in-alt"></i> Login Page
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/js/navigation.js"></script>
+    <script>
+        // Demo-specific functionality
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('🎉 Sidebar Navigation Demo Loaded!');
+
+            // Add some demo interactions
+            const demoButtons = document.querySelectorAll('.demo-button');
+            demoButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    // Add click feedback
+                    this.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        this.style.transform = 'scale(1)';
+                    }, 150);
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>

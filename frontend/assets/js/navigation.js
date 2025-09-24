@@ -9,17 +9,17 @@ class NavigationManager {
         this.menuToggle = null;
         this.sidebarToggle = null;
         this.isInitialized = false;
-
-        // Initialize when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.init());
-        } else {
-            this.init();
-        }
     }
 
     async init() {
+        if (this.isInitialized) {
+            console.log('🧭 NavigationManager: Already initialized, skipping...');
+            return;
+        }
+
         console.log('🧭 NavigationManager: Initializing...');
+        console.log('🔧 Current URL:', window.location.href);
+        console.log('🔧 Current pathname:', window.location.pathname);
 
         try {
             // Load sidebar HTML first
@@ -85,33 +85,38 @@ class NavigationManager {
             throw new Error('sidebar-placeholder element not found');
         }
 
+        console.log('🔄 NavigationManager: Loading sidebar...');
+
         const candidates = [
-            '/includes/sidebar.html',
             '../includes/sidebar.html',
-            'includes/sidebar.html',
-            '/frontend/includes/sidebar.html'
+            '/frontend/includes/sidebar.html',
+            '/includes/sidebar.html',
+            'includes/sidebar.html'
         ];
 
         let lastError = null;
         for (const url of candidates) {
             try {
+                console.log(`📋 Trying to load sidebar from: ${url}`);
                 const response = await fetch(url, { cache: 'no-cache' });
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
                 const html = await response.text();
                 container.innerHTML = html;
-                console.log('📋 NavigationManager: Sidebar HTML loaded from', url);
+                console.log('✅ NavigationManager: Sidebar HTML loaded from', url);
                 // Ensure links are valid for current base after injection
                 this.rewriteNavLinks(container);
+                // Initialize user profile after sidebar is loaded
+                setTimeout(() => this.initializeUserProfile(), 100);
                 return;
             } catch (err) {
                 lastError = err;
-                console.warn('Sidebar fetch failed from', url, err);
+                console.warn('❌ Sidebar fetch failed from', url, err);
             }
         }
 
-        console.error('❌ NavigationManager: Failed to load sidebar from all candidates:', lastError);
+        console.error('❌ NavigationManager: Failed to load sidebar from all candidates, using fallback:', lastError);
         // Fallback sidebar HTML
         container.innerHTML = this.getFallbackSidebar();
         // Normalize links in fallback sidebar as well
@@ -139,7 +144,7 @@ class NavigationManager {
     initializeNavigation() {
         // Add navigation click handlers
         if (this.sidebar) {
-            const navLinks = this.sidebar.querySelectorAll('.nav-link');
+            const navLinks = this.sidebar.querySelectorAll('.md-navigation-item');
             navLinks.forEach(link => {
                 link.addEventListener('click', (e) => this.handleNavigation(e));
             });
@@ -428,32 +433,90 @@ class NavigationManager {
                     this.mainContent.classList.add('collapsed-sidebar');
                 }
             }
-            }
         }
     }
 
     initializeUserProfile() {
-        const userNameEl = this.sidebar?.querySelector('.user-name');
-        const userRoleEl = this.sidebar?.querySelector('.user-role');
+        // Wait for sidebar to be loaded, then try multiple times
+        const maxRetries = 5;
+        let retryCount = 0;
+        
+        const updateUserProfile = () => {
+            const userNameEl = this.sidebar?.querySelector('.user-name') || document.querySelector('.user-name');
+            const userRoleEl = this.sidebar?.querySelector('.user-role') || document.querySelector('.user-role');
+            const userAvatarEl = this.sidebar?.querySelector('.user-avatar') || document.querySelector('.user-avatar');
 
-        if (userNameEl || userRoleEl) {
-            // Try to get user info from auth
-            try {
-                const token = sessionStorage.getItem('idToken');
-                if (token) {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-
+            if (userNameEl || userRoleEl) {
+                console.log('🔍 Updating user profile in sidebar...');
+                
+                // Try to get user info from multiple sources
+                let userName = 'Admin User';
+                let userRole = 'Administrator';
+                let userEmail = '';
+                
+                try {
+                    // First try: Get from sessionStorage directly
+                    userEmail = sessionStorage.getItem('userEmail') || '';
+                    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+                    
+                    if (userEmail) {
+                        userName = userEmail.split('@')[0]; // Use part before @
+                        console.log(`✅ Found user email in session: ${userEmail}`);
+                    }
+                    
+                    // Second try: Decode JWT token if available
+                    const token = sessionStorage.getItem('idToken');
+                    if (token) {
+                        try {
+                            const payload = JSON.parse(atob(token.split('.')[1]));
+                            
+                            if (payload.email) {
+                                userEmail = payload.email;
+                                userName = payload.name || payload.given_name || payload.email.split('@')[0];
+                            }
+                            
+                            if (payload['custom:role']) {
+                                userRole = payload['custom:role'];
+                            } else if (payload.username) {
+                                userName = payload.username;
+                            }
+                            
+                            console.log(`✅ Decoded user from token:`, { userName, userEmail, userRole });
+                        } catch (tokenError) {
+                            console.log('⚠️ Could not decode JWT token:', tokenError.message);
+                        }
+                    }
+                    
+                    // Update the UI elements
                     if (userNameEl) {
-                        userNameEl.textContent = payload.email || payload.username || 'Admin User';
+                        userNameEl.textContent = userName;
+                        console.log(`✅ Updated user name: ${userName}`);
                     }
                     if (userRoleEl) {
-                        userRoleEl.textContent = payload['custom:role'] || 'Administrator';
+                        userRoleEl.textContent = userRole;
+                        console.log(`✅ Updated user role: ${userRole}`);
                     }
+                    
+                    // Update avatar with user initials
+                    if (userAvatarEl && userName !== 'Admin User') {
+                        const initials = userName.split(' ').map(n => n[0]).join('').toUpperCase();
+                        userAvatarEl.innerHTML = `<span style="font-weight: bold; color: white;">${initials}</span>`;
+                    }
+                    
+                } catch (error) {
+                    console.log('⚠️ Could not get user info:', error.message);
+                    // Keep default values
                 }
-            } catch (error) {
-                console.log('Could not decode user info from token');
+            } else if (retryCount < maxRetries) {
+                // Retry if elements not found yet
+                retryCount++;
+                console.log(`🔄 User profile elements not found, retrying... (${retryCount}/${maxRetries})`);
+                setTimeout(updateUserProfile, 500);
             }
-        }
+        };
+        
+        // Start the update process
+        updateUserProfile();
     }
 
     isMobile() {
@@ -553,5 +616,55 @@ const navigationManager = new NavigationManager();
 // Export for global access
 window.NavigationManager = NavigationManager;
 window.navigationManager = navigationManager;
+
+// Global logout function for sidebar
+if (!window.logout) {
+    window.logout = function() {
+        console.log('🚪 Logout initiated from sidebar...');
+        
+        try {
+            // Clear all authentication data
+            sessionStorage.clear();
+            localStorage.clear();
+            
+            // Try to use Auth.logout if available
+            if (window.Auth && typeof window.Auth.logout === 'function') {
+                console.log('🔐 Using Auth.logout...');
+                window.Auth.logout();
+                return;
+            }
+            
+            // Fallback: Direct redirect to login
+            console.log('🔄 Fallback logout - redirecting to login...');
+            const currentPath = window.location.pathname;
+            const isInFrontendFolder = currentPath.includes('/frontend/');
+            
+            let loginUrl;
+            if (isInFrontendFolder) {
+                loginUrl = window.location.origin + '/frontend/index.html';
+            } else {
+                loginUrl = window.location.origin + '/index.html';
+            }
+            
+            window.location.href = loginUrl;
+            
+        } catch (error) {
+            console.error('❌ Logout error:', error);
+            // Emergency fallback
+            window.location.href = window.location.origin + '/index.html';
+        }
+    };
+}
+
+// Global function to refresh user profile (useful for testing and manual updates)
+window.refreshUserProfile = function() {
+    console.log('🔄 Manually refreshing user profile...');
+    if (window.navigationManager && typeof window.navigationManager.initializeUserProfile === 'function') {
+        window.navigationManager.initializeUserProfile();
+        console.log('✅ User profile refresh triggered');
+    } else {
+        console.error('❌ NavigationManager not available for profile refresh');
+    }
+};
 
 console.log('🧭 Navigation system loaded');

@@ -589,7 +589,7 @@ body {
 }
 
 .stat-icon.orders {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
 }
 
 .stat-icon.drivers {
@@ -605,7 +605,7 @@ body {
 }
 
 .stat-icon.total {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
 }
 
 .stat-icon.rating {
@@ -613,7 +613,7 @@ body {
 }
 
 .stat-icon.customers {
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
 }
 
 .stat-icon.active {
@@ -708,7 +708,7 @@ body {
 }
 
 .view-all {
-    color: #667eea;
+    color: #00c2e8;
     text-decoration: none;
     font-weight: 500;
     font-size: var(--text-sm);
@@ -809,8 +809,8 @@ body {
 }
 
 .order-status.in-progress {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 /* Customer and Merchant specific styles */
@@ -863,8 +863,8 @@ body {
 }
 
 .segment-badge.regular {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 .segment-badge.new {
@@ -907,7 +907,7 @@ body {
 }
 
 .view-all {
-    color: #667eea;
+    color: #00c2e8;
     text-decoration: none;
     font-weight: 500;
     font-size: 0.9rem;
@@ -1008,8 +1008,8 @@ body {
 }
 
 .order-status.in-progress {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 /* Merchant List */
@@ -1111,7 +1111,7 @@ body {
 
 /* Button Styles */
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
     color: white;
     border: none;
     padding: var(--space-sm) var(--space-lg);
@@ -1126,7 +1126,7 @@ body {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 25px rgba(0, 194, 232, 0.3);
 }
 
 .btn-secondary {
@@ -1236,7 +1236,7 @@ body {
 
 .filter-container select:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #00c2e8;
 }
 
 /* Table Styles */
@@ -1321,8 +1321,8 @@ body {
 }
 
 .status-badge.delivering {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 .status-badge.suspended {
@@ -1590,9 +1590,9 @@ body {
 }
 
 .table-status-info {
-    background: #dbeafe;
-    color: #1e40af;
-    border: 1px solid #93c5fd;
+    background: #e6f9fe;
+        color: #00748a;
+        border: 1px solid #99e5fb;
 }
 
 /* Real-time update animations */
@@ -1602,7 +1602,7 @@ body {
 
 @keyframes highlightRow {
     0% {
-        background-color: #dbeafe;
+        background-color: #e6f9fe;
     }
 
     100% {
@@ -1612,8 +1612,8 @@ body {
 
 /* Enhanced Order Status Badges */
 .status-badge.confirmed {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 .status-badge.preparing {
@@ -1700,9 +1700,9 @@ body {
 }
 
 .table-status-info {
-    background: #dbeafe;
-    color: #1e40af;
-    border: 1px solid #93c5fd;
+    background: #e6f9fe;
+        color: #00748a;
+        border: 1px solid #99e5fb;
 }
 
 /* Real-time update animations */
@@ -1712,7 +1712,7 @@ body {
 
 @keyframes highlightRow {
     0% {
-        background-color: #dbeafe;
+        background-color: #e6f9fe;
     }
 
     100% {
@@ -1722,8 +1722,8 @@ body {
 
 /* Enhanced Order Status Badges */
 .status-badge.confirmed {
-    background: #dbeafe;
-    color: #1e40af;
+    background: #e6f9fe;
+        color: #00748a;
 }
 
 .status-badge.preparing {
@@ -1874,9 +1874,9 @@ body {
 }
 
 .action-btn.view:hover {
-    background: #dbeafe;
-    color: #1e40af;
-    border-color: #93c5fd;
+    background: #e6f9fe;
+        color: #00748a;
+        border-color: #99e5fb;
 }
 
 .action-btn.edit:hover {
@@ -1996,8 +1996,8 @@ body {
 
 .form-control:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #00c2e8;
+        box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.1);
 }
 
 .form-control textarea {
@@ -2065,7 +2065,7 @@ body {
 
 /* Chat Header */
 .chat-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
     color: white;
     padding: var(--space-lg);
     display: flex;
@@ -2492,9 +2492,9 @@ body {
 }
 
 .quick-response-btn:hover {
-    background: #667eea;
+    background: #00c2e8;
     color: white;
-    border-color: #667eea;
+    border-color: #00c2e8;
 }
 
 /* Message Input */
@@ -2566,7 +2566,7 @@ body {
 }
 
 .btn-send {
-    background: #667eea;
+    background: #00c2e8;
     color: white;
 }
 

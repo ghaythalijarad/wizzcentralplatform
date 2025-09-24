@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Promotions Data Loading - WizzCentral Platform</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .btn {
+            background: #00c2e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #009bb8;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .status.loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        .status.success {
+            background: #d1edff;
+            border: 1px solid #0084ff;
+        }
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 Fix Promotions Data Loading</h1>
+            <p>This tool fixes the "Loading merchant discounts..." and "Loading campaigns..." issue on the WizzCentral Platform promotions page.</p>
+        </div>
+        
+        <div style="text-align: center;">
+            <button class="btn" onclick="runFix()">🚀 Run Fix Script</button>
+            <button class="btn btn-secondary" onclick="openPromotionsPage()">📊 Open Promotions Page</button>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+        <div id="console" class="console-output" style="display: none;"></div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1596.0.min.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js"></script>
+    <script src="data-service.js"></script>
+
+    <script>
+        let consoleDiv;
+        let statusDiv;
+        let originalConsoleLog;
+        
+        function initializeConsole() {
+            consoleDiv = document.getElementById('console');
+            statusDiv = document.getElementById('status');
+            
+            // Capture console.log output
+            originalConsoleLog = console.log;
+            console.log = function(...args) {
+                originalConsoleLog.apply(console, args);
+                if (consoleDiv) {
+                    const message = args.map(arg => 
+                        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                    ).join(' ');
+                    consoleDiv.innerHTML += message + '\n';
+                    consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                }
+            };
+        }
+        
+        function showStatus(message, type = 'loading') {
+            if (statusDiv) {
+                statusDiv.textContent = message;
+                statusDiv.className = `status ${type}`;
+                statusDiv.style.display = 'block';
+            }
+        }
+        
+        function showConsole() {
+            if (consoleDiv) {
+                consoleDiv.style.display = 'block';
+                consoleDiv.innerHTML = '';
+            }
+        }
+        
+        async function runFix() {
+            initializeConsole();
+            showStatus('🔧 Running fix script...', 'loading');
+            showConsole();
+            
+            try {
+                // Wait a moment for scripts to load
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Execute the fix script
+                ${await require('fs').promises.readFile('/Users/ghaythallaheebi/wizzcentralplatform/frontend/fix-promotions-data-loading.js', 'utf8')}
+                
+                showStatus('✅ Fix completed successfully!', 'success');
+            } catch (error) {
+                console.error('❌ Fix failed:', error);
+                showStatus(`❌ Fix failed: ${error.message}`, 'error');
+            }
+        }
+        
+        function openPromotionsPage() {
+            window.open('/pages/promotions.html', '_blank');
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            console.log('Fix tool loaded. Click "Run Fix Script" to begin.');
+        });
+    </script>
+</body>
+</html>

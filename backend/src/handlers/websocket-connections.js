@@ -8,9 +8,12 @@ const dynamoDBClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDB = DynamoDBDocumentClient.from(dynamoDBClient);
 
 // Table names
-const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || 'websocket-connections-dev';
+const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || 'WizzUser_websocket_connections_dev';
+const WEBSOCKET_SUBSCRIPTIONS_TABLE = process.env.WEBSOCKET_SUBSCRIPTIONS_TABLE || 'WizzUser_websocket_subscriptions_dev';
 const CHAT_SESSIONS_TABLE = process.env.CHAT_SESSIONS_TABLE || 'chat-sessions-dev';
 const CHAT_MESSAGES_TABLE = process.env.CHAT_MESSAGES_TABLE || 'chat-messages-dev';
+const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzUser_orders_dev';
+const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WizzUser_drivers_dev';
 
 const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'YOUR_USER_POOL_ID';
 const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || 'YOUR_APP_CLIENT_ID';
@@ -122,6 +125,18 @@ const handler = async (event) => {
                     return await handleGetSessionMessages(connectionId, message, apiGatewayClient);
                 case 'ack':
                     return await handleAck(connectionId, message, apiGatewayClient);
+                case 'driver_assignment_response':
+                    console.log(`🎯 Driver assignment response from ${connectionId}`);
+                    return await handleDriverAssignmentResponse(connectionId, message, apiGatewayClient);
+                case 'driver_location_update':
+                    console.log(`📍 Driver location update from ${connectionId}`);
+                    return await handleDriverLocationUpdate(connectionId, message, apiGatewayClient);
+                case 'driver_status_update':
+                    console.log(`🔄 Driver status update from ${connectionId}`);
+                    return await handleDriverStatusUpdate(connectionId, message, apiGatewayClient);
+                case 'order_status_update':
+                    console.log(`📦 Order status update from ${connectionId}`);
+                    return await handleOrderStatusUpdate(connectionId, message, apiGatewayClient);
                 default:
                     console.log(`Unknown message type: ${messageType}`);
                     return await sendToConnection(connectionId, { type: 'error', message: `Unknown message type: ${messageType}` }, apiGatewayClient);
@@ -908,8 +923,531 @@ async function getBusinessConnections(businessId) {
         
         return result.Items || [];
     } catch (error) {
-        console.error('Error getting business connections:', error);
+        console.error('❌ Error getting business connections:', error);
         return [];
+    }
+}
+
+// ==============================================
+// DRIVER ASSIGNMENT HANDLERS
+// ==============================================
+
+/**
+ * Handle driver assignment response (accept/decline)
+ */
+async function handleDriverAssignmentResponse(connectionId, message, apiGatewayClient) {
+    console.log(`📞 Driver assignment response received from ${connectionId}`);
+    
+    try {
+        const { orderId, assignmentId, response, reason, estimatedPickupTime } = message;
+        
+        if (!orderId || !assignmentId || !response) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Missing required fields: orderId, assignmentId, response'
+            }, apiGatewayClient);
+        }
+
+        // Get driver info from connection
+        const connection = await getConnection(connectionId);
+        if (!connection) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Driver connection not found'
+            }, apiGatewayClient);
+        }
+
+        const driverId = connection.userId;
+        console.log(`📋 Processing ${response} response from driver ${driverId} for order ${orderId}`);
+
+        if (response === 'accept') {
+            await handleDriverAcceptance(orderId, driverId, estimatedPickupTime, apiGatewayClient);
+        } else if (response === 'decline') {
+            await handleDriverDecline(orderId, driverId, reason, apiGatewayClient);
+        } else {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Invalid response. Must be "accept" or "decline"'
+            }, apiGatewayClient);
+        }
+
+        // Notify the assignment service about the driver response
+        const { handleDriverResponse } = require('../services/driver-assignment-service');
+        handleDriverResponse(orderId, driverId, response, reason, estimatedPickupTime);
+
+        // Send confirmation to driver
+        await sendToConnection(connectionId, {
+            type: 'assignment_response_confirmed',
+            orderId,
+            assignmentId,
+            response,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+
+    } catch (error) {
+        console.error('❌ Error handling assignment response:', error);
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to process assignment response'
+        }, apiGatewayClient);
+    }
+}
+
+/**
+ * Handle driver acceptance of assignment
+ */
+async function handleDriverAcceptance(orderId, driverId, estimatedPickupTime, apiGatewayClient) {
+    console.log(`✅ Driver ${driverId} accepted order ${orderId}`);
+    
+    try {
+        // Update order with driver assignment
+        await dynamoDB.send(new UpdateCommand({
+            TableName: ORDERS_TABLE,
+            Key: {
+                PK: `ORDER#${orderId}`,
+                SK: `ORDER#${orderId}`
+            },
+            UpdateExpression: `
+                SET driverId = :driverId, 
+                    #status = :status, 
+                    assignedAt = :assignedAt,
+                    estimatedPickupTime = :estimatedPickupTime,
+                    updatedAt = :updatedAt
+            `,
+            ConditionExpression: 'attribute_exists(PK) AND attribute_not_exists(driverId)',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':driverId': driverId,
+                ':status': 'assigned_to_driver',
+                ':assignedAt': new Date().toISOString(),
+                ':estimatedPickupTime': estimatedPickupTime || new Date(Date.now() + 15 * 60000).toISOString(),
+                ':updatedAt': new Date().toISOString()
+            }
+        }));
+
+        // Update driver status to busy
+        await dynamoDB.send(new UpdateCommand({
+            TableName: DRIVERS_TABLE,
+            Key: {
+                PK: `DRIVER#${driverId}`,
+                SK: `DRIVER#${driverId}`
+            },
+            UpdateExpression: 'SET #status = :status, currentOrderId = :orderId, updatedAt = :updatedAt',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':status': 'busy',
+                ':orderId': orderId,
+                ':updatedAt': new Date().toISOString()
+            }
+        }));
+
+        // Notify all relevant parties
+        await notifyOrderStatusChange(orderId, 'assigned_to_driver', { driverId, estimatedPickupTime }, apiGatewayClient);
+
+        console.log(`✅ Order ${orderId} successfully assigned to driver ${driverId}`);
+    } catch (error) {
+        console.error(`❌ Error processing driver acceptance:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Handle driver decline of assignment
+ */
+async function handleDriverDecline(orderId, driverId, reason, apiGatewayClient) {
+    console.log(`❌ Driver ${driverId} declined order ${orderId}, reason: ${reason}`);
+    
+    try {
+        // Log the decline for analytics
+        console.log(`📊 Assignment declined - Order: ${orderId}, Driver: ${driverId}, Reason: ${reason}`);
+
+        // Note: The assignDriverToOrder will be called through handleDriverResponse
+        // No need to call it here to avoid double assignment attempts
+    } catch (error) {
+        console.error(`❌ Error processing driver decline:`, error);
+        throw error;
+    }
+}
+
+/**
+ * Handle driver location updates
+ */
+async function handleDriverLocationUpdate(connectionId, message, apiGatewayClient) {
+    try {
+        const { latitude, longitude, heading, speed } = message;
+        
+        if (!latitude || !longitude) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Missing required location data: latitude, longitude'
+            }, apiGatewayClient);
+        }
+
+        const connection = await getConnection(connectionId);
+        if (!connection) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Driver connection not found'
+            }, apiGatewayClient);
+        }
+
+        const driverId = connection.userId;
+
+        // Update driver location in database
+        await dynamoDB.send(new UpdateCommand({
+            TableName: DRIVERS_TABLE,
+            Key: {
+                PK: `DRIVER#${driverId}`,
+                SK: `DRIVER#${driverId}`
+            },
+            UpdateExpression: `
+                SET latitude = :latitude, 
+                    longitude = :longitude, 
+                    heading = :heading, 
+                    speed = :speed,
+                    lastLocationUpdate = :timestamp,
+                    updatedAt = :updatedAt
+            `,
+            ExpressionAttributeValues: {
+                ':latitude': latitude,
+                ':longitude': longitude,
+                ':heading': heading || 0,
+                ':speed': speed || 0,
+                ':timestamp': new Date().toISOString(),
+                ':updatedAt': new Date().toISOString()
+            }
+        }));
+
+        // If driver has an active order, notify customer of location update
+        const driver = await getDriverInfo(driverId);
+        if (driver && driver.currentOrderId) {
+            await notifyCustomerOfDriverLocation(driver.currentOrderId, {
+                latitude,
+                longitude,
+                heading,
+                speed,
+                driverId
+            }, apiGatewayClient);
+        }
+
+        // Send confirmation to driver
+        await sendToConnection(connectionId, {
+            type: 'location_update_confirmed',
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+
+    } catch (error) {
+        console.error('❌ Error handling location update:', error);
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to update location'
+        }, apiGatewayClient);
+    }
+}
+
+/**
+ * Handle driver status updates (online, offline, busy, break)
+ */
+async function handleDriverStatusUpdate(connectionId, message, apiGatewayClient) {
+    try {
+        const { status } = message;
+        const validStatuses = ['online', 'offline', 'busy', 'break'];
+        
+        if (!status || !validStatuses.includes(status)) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
+            }, apiGatewayClient);
+        }
+
+        const connection = await getConnection(connectionId);
+        if (!connection) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Driver connection not found'
+            }, apiGatewayClient);
+        }
+
+        const driverId = connection.userId;
+
+        // Update driver status
+        await dynamoDB.send(new UpdateCommand({
+            TableName: DRIVERS_TABLE,
+            Key: {
+                PK: `DRIVER#${driverId}`,
+                SK: `DRIVER#${driverId}`
+            },
+            UpdateExpression: 'SET #status = :status, lastStatusUpdate = :timestamp, updatedAt = :updatedAt',
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ':status': status,
+                ':timestamp': new Date().toISOString(),
+                ':updatedAt': new Date().toISOString()
+            }
+        }));
+
+        console.log(`🔄 Driver ${driverId} status updated to: ${status}`);
+
+        // Send confirmation to driver
+        await sendToConnection(connectionId, {
+            type: 'status_update_confirmed',
+            status,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+
+    } catch (error) {
+        console.error('❌ Error handling status update:', error);
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to update status'
+        }, apiGatewayClient);
+    }
+}
+
+/**
+ * Handle order status updates from drivers
+ */
+async function handleOrderStatusUpdate(connectionId, message, apiGatewayClient) {
+    try {
+        const { orderId, status, location } = message;
+        const validStatuses = ['picked_up', 'on_the_way', 'delivered', 'cancelled'];
+        
+        if (!orderId || !status || !validStatuses.includes(status)) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: `Missing or invalid data. Status must be one of: ${validStatuses.join(', ')}`
+            }, apiGatewayClient);
+        }
+
+        const connection = await getConnection(connectionId);
+        if (!connection) {
+            return await sendToConnection(connectionId, {
+                type: 'error',
+                message: 'Driver connection not found'
+            }, apiGatewayClient);
+        }
+
+        const driverId = connection.userId;
+
+        // Update order status
+        const updateExpression = 'SET #status = :status, updatedAt = :updatedAt';
+        const expressionAttributeValues = {
+            ':status': status,
+            ':updatedAt': new Date().toISOString()
+        };
+
+        // Add specific fields based on status
+        let updateExpr = updateExpression;
+        if (status === 'picked_up') {
+            updateExpr += ', pickedUpAt = :pickedUpAt';
+            expressionAttributeValues[':pickedUpAt'] = new Date().toISOString();
+        } else if (status === 'delivered') {
+            updateExpr += ', deliveredAt = :deliveredAt';
+            expressionAttributeValues[':deliveredAt'] = new Date().toISOString();
+            
+            // Also update driver status back to online
+            await dynamoDB.send(new UpdateCommand({
+                TableName: DRIVERS_TABLE,
+                Key: {
+                    PK: `DRIVER#${driverId}`,
+                    SK: `DRIVER#${driverId}`
+                },
+                UpdateExpression: 'REMOVE currentOrderId SET #status = :status, updatedAt = :updatedAt',
+                ExpressionAttributeNames: {
+                    '#status': 'status'
+                },
+                ExpressionAttributeValues: {
+                    ':status': 'online',
+                    ':updatedAt': new Date().toISOString()
+                }
+            }));
+        }
+
+        await dynamoDB.send(new UpdateCommand({
+            TableName: ORDERS_TABLE,
+            Key: {
+                PK: `ORDER#${orderId}`,
+                SK: `ORDER#${orderId}`
+            },
+            UpdateExpression: updateExpr,
+            ExpressionAttributeNames: {
+                '#status': 'status'
+            },
+            ExpressionAttributeValues: {
+                ...expressionAttributeValues,
+                ':driverId': driverId
+            },
+            ConditionExpression: 'driverId = :driverId'
+        }));
+
+        // Notify all relevant parties of the status change
+        await notifyOrderStatusChange(orderId, status, { driverId, location }, apiGatewayClient);
+
+        console.log(`📦 Order ${orderId} status updated to: ${status} by driver ${driverId}`);
+
+        // Send confirmation to driver
+        await sendToConnection(connectionId, {
+            type: 'order_status_update_confirmed',
+            orderId,
+            status,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+
+    } catch (error) {
+        console.error('❌ Error handling order status update:', error);
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to update order status'
+        }, apiGatewayClient);
+    }
+}
+
+// ==============================================
+// HELPER FUNCTIONS FOR DRIVER ASSIGNMENT
+// ==============================================
+
+async function getConnection(connectionId) {
+    try {
+        const result = await dynamoDB.send(new GetCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            Key: { connectionId }
+        }));
+        return result.Item;
+    } catch (error) {
+        console.error('Error getting connection:', error);
+        return null;
+    }
+}
+
+async function getDriverInfo(driverId) {
+    try {
+        const result = await dynamoDB.send(new GetCommand({
+            TableName: DRIVERS_TABLE,
+            Key: {
+                PK: `DRIVER#${driverId}`,
+                SK: `DRIVER#${driverId}`
+            }
+        }));
+        return result.Item;
+    } catch (error) {
+        console.error('Error getting driver info:', error);
+        return null;
+    }
+}
+
+async function notifyOrderStatusChange(orderId, status, data, apiGatewayClient) {
+    try {
+        // Get order details to find customer and restaurant
+        const orderResult = await dynamoDB.send(new GetCommand({
+            TableName: ORDERS_TABLE,
+            Key: {
+                PK: `ORDER#${orderId}`,
+                SK: `ORDER#${orderId}`
+            }
+        }));
+
+        if (!orderResult.Item) return;
+
+        const order = orderResult.Item;
+        const message = {
+            type: 'order_status_change',
+            orderId,
+            status,
+            timestamp: new Date().toISOString(),
+            ...data
+        };
+
+        // Notify customer
+        if (order.customerId) {
+            await notifyUser(order.customerId, message, apiGatewayClient);
+        }
+
+        // Notify restaurant
+        if (order.restaurantId) {
+            await notifyUser(order.restaurantId, message, apiGatewayClient);
+        }
+
+        // Notify admin/support
+        await notifyUsersByType('agent', message, apiGatewayClient);
+
+    } catch (error) {
+        console.error('Error notifying order status change:', error);
+    }
+}
+
+async function notifyCustomerOfDriverLocation(orderId, locationData, apiGatewayClient) {
+    try {
+        // Get order to find customer
+        const orderResult = await dynamoDB.send(new GetCommand({
+            TableName: ORDERS_TABLE,
+            Key: {
+                PK: `ORDER#${orderId}`,
+                SK: `ORDER#${orderId}`
+            }
+        }));
+
+        if (!orderResult.Item) return;
+
+        const message = {
+            type: 'driver_location_update',
+            orderId,
+            ...locationData,
+            timestamp: new Date().toISOString()
+        };
+
+        // Notify customer
+        if (orderResult.Item.customerId) {
+            await notifyUser(orderResult.Item.customerId, message, apiGatewayClient);
+        }
+
+    } catch (error) {
+        console.error('Error notifying customer of driver location:', error);
+    }
+}
+
+async function notifyUser(userId, message, apiGatewayClient) {
+    try {
+        // Find user connections
+        const result = await dynamoDB.send(new ScanCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            FilterExpression: 'userId = :userId',
+            ExpressionAttributeValues: {
+                ':userId': userId
+            }
+        }));
+
+        // Send message to all user connections
+        for (const connection of result.Items || []) {
+            await sendToConnection(connection.connectionId, message, apiGatewayClient);
+        }
+    } catch (error) {
+        console.error(`Error notifying user ${userId}:`, error);
+    }
+}
+
+async function notifyUsersByType(userType, message, apiGatewayClient) {
+    try {
+        // Find connections by user type
+        const result = await dynamoDB.send(new ScanCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            FilterExpression: 'userType = :userType',
+            ExpressionAttributeValues: {
+                ':userType': userType
+            }
+        }));
+
+        // Send message to all matching connections
+        for (const connection of result.Items || []) {
+            await sendToConnection(connection.connectionId, message, apiGatewayClient);
+        }
+    } catch (error) {
+        console.error(`Error notifying users of type ${userType}:`, error);
     }
 }
 

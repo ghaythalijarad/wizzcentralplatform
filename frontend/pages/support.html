@@ -8,6 +8,9 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -108,8 +111,8 @@
         }
         
         .session-card.active {
-            background: #1d4ed8;
-            border-color: #3b82f6;
+            background: #009bb8;
+            border-color: #00c2e8;
         }
         
         .session-info {
@@ -216,12 +219,12 @@
         }
         
         .btn-primary {
-            background: #3b82f6;
+            background: #00c2e8;
             color: white;
         }
         
         .btn-primary:hover {
-            background: #2563eb;
+            background: #009bb8;
         }
         
         .btn-secondary {
@@ -266,7 +269,7 @@
         }
         
         .message.agent .message-avatar {
-            background: #3b82f6;
+            background: #00c2e8;
         }
         
         .message-content {
@@ -281,7 +284,7 @@
         }
         
         .message.agent .message-bubble {
-            background: #3b82f6;
+            background: #00c2e8;
             color: white;
         }
         
@@ -321,12 +324,12 @@
         
         .message-input:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 1px #3b82f6;
+            border-color: #00c2e8;
+            box-shadow: 0 0 0 1px #00c2e8;
         }
         
         .send-button {
-            background: #3b82f6;
+            background: #00c2e8;
             color: white;
             border: none;
             border-radius: 0.5rem;
@@ -336,7 +339,7 @@
         }
         
         .send-button:hover {
-            background: #2563eb;
+            background: #009bb8;
         }
         
         .send-button:disabled {

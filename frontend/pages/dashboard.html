@@ -376,9 +376,56 @@
             }
         }
 
-        /* Lightweight debug panel (shown with ?debug=1) */
-        #dashboard-debug-panel { display:none;background:#fff7ed;border:1px solid #fdba74;color:#7c2d12;padding:8px 12px;border-radius:8px;margin:8px 8px 0;font:12px/1.4 system-ui,-apple-system,Segoe UI,Roboto; }
-        #dashboard-debug-panel code { background:rgba(0,0,0,0.05);padding:1px 4px;border-radius:4px; }
+        /* Data Source Indicator Styles */
+        .data-source-indicator {
+            background-color: var(--md-sys-color-surface-container);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--md-sys-shape-corner-medium);
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: var(--md-sys-typescale-body-small-font-size);
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+        }
+        
+        .data-source-indicator.demo {
+            background-color: #fff7ed;
+            border-color: #fdba74;
+            color: #7c2d12;
+        }
+        
+        .data-source-indicator.real {
+            background-color: #f0fdf4;
+            border-color: #86efac;
+            color: #166534;
+        }
+        
+        .data-source-indicator.failed {
+            background-color: #fef2f2;
+            border-color: #fca5a5;
+            color: #dc2626;
+        }
+        
+        .data-source-indicator .indicator-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .data-source-indicator .indicator-icon {
+            font-size: 16px;
+        }
+        
+        .data-source-indicator .indicator-text {
+            font-weight: 500;
+        }
+        
+        .data-source-indicator .indicator-details {
+            font-size: var(--md-sys-typescale-body-small-font-size);
+            opacity: 0.8;
+        }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -388,34 +435,21 @@
 <body data-page="dashboard">
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
-
+    
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="top-bar-left">
-                <button class="menu-toggle" id="menuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1 class="page-title">Dashboard</h1>
-            </div>
-            <div class="top-bar-right">
-                <div class="notifications">
-                    <button class="notification-btn">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
-                    </button>
-                </div>
-                <div class="user-menu">
-                    <button class="user-menu-btn">
-                        <i class="fas fa-user-circle"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-        
         <!-- Dashboard Content -->
         <div class="container mx-auto px-6">
+            <!-- Data Source Indicator -->
+            <div id="dataSourceIndicator" class="data-source-indicator" style="display: none;">
+                <div class="indicator-content">
+                    <i id="dataSourceIcon" class="indicator-icon fas fa-circle-info"></i>
+                    <div>
+                        <div id="dataSourceText" class="indicator-text">Loading data...</div>
+                        <div id="dataSourceDetails" class="indicator-details"></div>
+                    </div>
+                </div>
+            </div>
             <!-- Stats Grid -->
             <div class="stats-grid">
                 <div class="stat-card customers">
@@ -655,7 +689,7 @@
                                 <p class="text-sm text-gray-600">Monitor order status and delivery</p>
                             </div>
                             </a>
-                        <a href="support.html" class="quick-action-btn">
+                        <a href="support-fixed.html" class="quick-action-btn">
                             <div class="quick-action-icon">
                                 <i class="fas fa-headset"></i>
                             </div>
@@ -748,23 +782,29 @@
     <script src="../data-service.js?v=20250906"></script>
 
     <!-- Page-specific scripts -->
-    <script src="../assets/js/sidebar.js?v=20250906"></script>
     <script src="../assets/js/navigation.js?v=20250906"></script>
+    <script>
+        // Initialize navigation manager
+        document.addEventListener('DOMContentLoaded', async function () {
+            console.log('🔧 Dashboard: Initializing navigation...');
+
+            try {
+                const navigationManager = new NavigationManager();
+                await navigationManager.init();
+                console.log('✅ Dashboard: Navigation initialized successfully');
+            } catch (error) {
+                console.error('❌ Dashboard: Navigation initialization failed:', error);
+            }
+        });
+    </script>
     <script src="../dashboard.js?v=20250906"></script>
 
-    <!-- Inline build stamp for debugging -->
+    <!-- Inline build stamp -->
     <script>
         (function(){
-            const build = 'dashboard.html#2025-09-06T'+new Date().toISOString().slice(11,19);
+            const build = 'dashboard.html#2025-09-23T' + new Date().toISOString().slice(11, 19);
             document.documentElement.setAttribute('data-build', build);
             console.log('Dashboard page build:', build);
-            const p = new URLSearchParams(location.search);
-            if (p.get('debug') === '1') {
-                const el = document.getElementById('dashboard-debug-panel');
-                if (el) el.style.display = 'inline-block';
-                const s = Array.from(document.scripts).find(x => (x.src||'').includes('/frontend/dashboard.js'));
-                // values filled by dashboard.js helpers
-            }
         })();
     </script>
 </body>

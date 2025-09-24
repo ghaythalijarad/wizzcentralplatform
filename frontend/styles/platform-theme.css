@@ -1,7 +1,7 @@
 :root {
-  --color-primary: #2563eb;
-  --color-primaryHover: #1d4ed8;
-  --color-primaryMuted: #eff6ff;
+  --color-primary: #00c2e8;
+    --color-primaryHover: #009bb8;
+    --color-primaryMuted: #e6f9fe;
   --color-danger: #dc2626;
   --color-dangerHover: #b91c1c;
   --color-warning: #f59e0b;

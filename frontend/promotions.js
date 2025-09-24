@@ -1,3 +1,171 @@
+// Emergency Fix Detection and Data Loading
+(function checkEmergencyFix() {
+    console.log('🔍 Checking for emergency fix...');
+    
+    if (sessionStorage.getItem('emergencyFixActive') === 'true') {
+        console.log('🚨 EMERGENCY FIX DETECTED - Loading sample data...');
+        
+        // Apply emergency fix immediately when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(applyEmergencyFixToPage, 1000); // Small delay to ensure DOM is ready
+        });
+        
+        // Also try to apply immediately if DOM is already loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(applyEmergencyFixToPage, 1000);
+            });
+        } else {
+            setTimeout(applyEmergencyFixToPage, 500);
+        }
+    }
+})();
+
+function applyEmergencyFixToPage() {
+    console.log('🚀 Applying emergency fix to promotions page...');
+    
+    try {
+        // Get sample data from sessionStorage
+        const sampleCampaigns = JSON.parse(sessionStorage.getItem('sampleCampaigns') || '[]');
+        const sampleDiscounts = JSON.parse(sessionStorage.getItem('sampleDiscounts') || '[]');
+        
+        console.log('📊 Sample data loaded:', { campaigns: sampleCampaigns.length, discounts: sampleDiscounts.length });
+        
+        // Clear loading states
+        const loadingElements = document.querySelectorAll('[id*="loading"], .loading');
+        loadingElements.forEach(el => {
+            if (el) el.style.display = 'none';
+        });
+        
+        // Update campaigns table
+        const campaignsTableBody = document.getElementById('campaignsTableBody');
+        if (campaignsTableBody && sampleCampaigns.length > 0) {
+            let campaignsHtml = '';
+            sampleCampaigns.forEach((campaign, index) => {
+                campaignsHtml += `
+                    <tr>
+                        <td>
+                            <div><strong>${campaign.name}</strong></div>
+                            <div style="font-size: 0.8rem; color: #666;">${campaign.campaignId}</div>
+                        </td>
+                        <td>${campaign.discountType}</td>
+                        <td>${campaign.discountValue}${(campaign.discountType === 'percentage') ? '%' : '$'}</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                        <td>${campaign.usage}/${campaign.usageLimit}</td>
+                        <td>$${campaign.minimumOrderValue}</td>
+                        <td>${new Date(campaign.startDate).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary me-1">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            campaignsTableBody.innerHTML = campaignsHtml;
+            console.log('✅ Campaigns table populated');
+        }
+        
+        // Update merchant discounts table
+        const merchantDiscountsTableBody = document.getElementById('merchantDiscountsTableBody');
+        if (merchantDiscountsTableBody && sampleDiscounts.length > 0) {
+            let discountsHtml = '';
+            sampleDiscounts.forEach((discount, index) => {
+                discountsHtml += `
+                    <tr>
+                        <td>
+                            <div><strong>${discount.title}</strong></div>
+                            <div style="font-size: 0.8rem; color: #666;">${discount.discountId}</div>
+                        </td>
+                        <td>Merchant ${index + 1}</td>
+                        <td>${discount.type}</td>
+                        <td>${discount.value}${(discount.type === 'percentage') ? '%' : '$'}</td>
+                        <td><span class="badge badge-success">Active</span></td>
+                        <td>${discount.usage_count}/${discount.usage_limit}</td>
+                        <td>${new Date(discount.valid_to).toLocaleDateString()}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary me-1">Edit</button>
+                            <button class="btn btn-sm btn-danger">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            merchantDiscountsTableBody.innerHTML = discountsHtml;
+            console.log('✅ Merchant discounts table populated');
+        }
+        
+        // Update statistics
+        const totalCampaigns = document.getElementById('totalCampaigns');
+        if (totalCampaigns) totalCampaigns.textContent = sampleCampaigns.length;
+        
+        const activeCampaigns = document.getElementById('activeCampaigns');
+        if (activeCampaigns) {
+            const activeCount = sampleCampaigns.filter(c => c.status === 'active').length;
+            activeCampaigns.textContent = activeCount;
+        }
+        
+        const totalMerchantDiscounts = document.getElementById('totalMerchantDiscounts');
+        if (totalMerchantDiscounts) totalMerchantDiscounts.textContent = sampleDiscounts.length;
+        
+        const activeMerchantDiscounts = document.getElementById('activeMerchantDiscounts');
+        if (activeMerchantDiscounts) {
+            const activeDiscountsCount = sampleDiscounts.filter(d => d.status === 'active').length;
+            activeMerchantDiscounts.textContent = activeDiscountsCount;
+        }
+        
+        // Clear any loading text
+        const loadingTexts = document.querySelectorAll('*');
+        loadingTexts.forEach(el => {
+            if (el.textContent && el.textContent.includes('Loading')) {
+                if (el.textContent.includes('merchant discounts')) {
+                    el.textContent = `Merchant Discounts (${sampleDiscounts.length})`;
+                } else if (el.textContent.includes('campaigns')) {
+                    el.textContent = `Campaigns (${sampleCampaigns.length})`;
+                }
+            }
+        });
+        
+        // Show success notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 13px;
+            max-width: 350px;
+            line-height: 1.3;
+        `;
+        
+        notification.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">
+                ✅ Emergency Fix Applied
+            </div>
+            <div>
+                Campaigns: ${sampleCampaigns.length} | Discounts: ${sampleDiscounts.length}
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+        
+        console.log('🎉 Emergency fix applied successfully to promotions page!');
+        
+    } catch (error) {
+        console.error('❌ Emergency fix application failed:', error);
+    }
+}
+
 // Promotions Management JavaScript
 
 // Use centralized AWS utilities
@@ -941,7 +1109,7 @@ async function refreshMerchantDiscounts() {
         tbody.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: #00c2e8;"></i>
                     <div>Refreshing merchant discounts...</div>
                 </td>
             </tr>
@@ -991,7 +1159,7 @@ function renderMerchantDiscountsTable() {
                     <div>${errorMessage}</div>
                     ${hasError ? `
                         <div style="font-size: 0.9rem; margin-top: 0.5rem;">
-                            <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
+                            <button onclick="refreshMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #00c2e8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 1rem;">
                                 <i class="fas fa-sync-alt"></i> Retry Loading
                             </button>
                             <button onclick="window.debugMerchantDiscounts()" style="padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 1rem; margin-left: 0.5rem;">

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidebar Test</title>
+    <link rel="stylesheet" href="styles/material-3-design-system.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Test styles */
+        body {
+            margin: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+        .debug-box {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid red;
+            padding: 10px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body data-page="dashboard">
+    <div class="debug-box">
+        <h2>Sidebar Test Page</h2>
+        <p>This page will test sidebar loading...</p>
+    </div>
+
+    <!-- Sidebar include placeholder -->
+    <div id="sidebar-placeholder" class="debug-box">
+        <p>Sidebar will load here...</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content debug-box" id="mainContent">
+        <h1>Main Content</h1>
+        <p>This is the main content area.</p>
+        <button class="menu-toggle" id="menuToggle">
+            <i class="fas fa-bars"></i> Toggle Menu
+        </button>
+    </div>
+
+    <script>
+        // Simple test script
+        console.log('🔧 Sidebar test page loaded');
+        console.log('📋 Sidebar placeholder:', document.getElementById('sidebar-placeholder'));
+        console.log('📄 Main content:', document.getElementById('mainContent'));
+        console.log('🔘 Menu toggle:', document.getElementById('menuToggle'));
+    </script>
+    
+    <!-- Load navigation system -->
+    <script src="assets/js/navigation.js"></script>
+</body>
+</html>

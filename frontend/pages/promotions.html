@@ -9,6 +9,9 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
     <style>
         /* Modal dialog styles */
         .modal {
@@ -76,7 +79,7 @@
 
         .material-3-header {
             padding: 24px 24px 16px 24px;
-            background: linear-gradient(135deg, #6750a4, #7c69c4);
+            background: linear-gradient(135deg, #00c2e8, #33cceb);
             color: white;
             border-radius: 16px 16px 0 0;
             margin: 0;
@@ -126,7 +129,7 @@
             background: #f8f5ff;
             border-radius: 12px;
             padding: 20px;
-            border-left: 4px solid #6750a4;
+            border-left: 4px solid #00c2e8;
         }
 
         .section-title {
@@ -140,7 +143,7 @@
         }
 
         .section-title i {
-            color: #6750a4;
+            color: #00c2e8;
         }
 
         .form-row {
@@ -178,8 +181,8 @@
         .material-3-input:focus,
         .material-3-select:focus,
         .material-3-textarea:focus {
-            border-color: #6750a4;
-            box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.1);
+            border-color: #00c2e8;
+            box-shadow: 0 0 0 2px rgba(0, 194, 232, 0.1);
         }
 
         .material-3-input:not(:placeholder-shown),
@@ -209,7 +212,7 @@
         .material-3-textarea:not(:placeholder-shown) + .material-3-label {
             top: -8px;
             font-size: 12px;
-            color: #6750a4;
+            color: #00c2e8;
             font-weight: 500;
         }
 
@@ -219,7 +222,7 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background: #6750a4;
+            background: #00c2e8;
             transform: scaleX(0);
             transition: transform 0.2s ease;
         }
@@ -267,8 +270,8 @@
         }
 
         .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark {
-            background: #6750a4;
-            border-color: #6750a4;
+            background: #00c2e8;
+            border-color: #00c2e8;
         }
 
         .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark::after {
@@ -311,25 +314,25 @@
         }
 
         .material-3-btn-primary {
-            background: #6750a4;
+            background: #00c2e8;
             color: white;
             border: none;
-            box-shadow: 0 2px 8px rgba(103, 80, 164, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 194, 232, 0.3);
         }
 
         .material-3-btn-primary:hover {
-            background: #5d3f98;
-            box-shadow: 0 4px 12px rgba(103, 80, 164, 0.4);
+            background: #009bb8;
+            box-shadow: 0 4px 12px rgba(0, 194, 232, 0.4);
         }
 
         .material-3-btn-secondary {
             background: transparent;
-            color: #6750a4;
+            color: #00c2e8;
             border: 1px solid #79747e;
         }
 
         .material-3-btn-secondary:hover {
-            background: rgba(103, 80, 164, 0.1);
+            background: rgba(0, 194, 232, 0.1);
         }
 
         .material-3-loader {
@@ -346,7 +349,7 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            color: #6750a4;
+            color: #00c2e8;
             font-weight: 500;
         }
 
@@ -393,6 +396,9 @@
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
     </style>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 </head>
 
 <body data-page="promotions">
@@ -401,29 +407,6 @@
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="top-bar-left">
-                <button class="menu-toggle" id="menuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1 class="page-title">Promotions Management</h1>
-            </div>
-            <div class="top-bar-right">
-                <div class="notifications">
-                    <button class="notification-btn">
-                        <i class="fas fa-bell"></i>
-                        <span class="notification-badge">3</span>
-                    </button>
-                </div>
-                <div class="user-menu">
-                    <button class="user-menu-btn">
-                        <i class="fas fa-user-circle"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Page Content -->
         <div class="page-content">
             <!-- Create Promotion Modal Dialog -->
@@ -692,16 +675,16 @@
             <!-- Merchant Discounts Section -->
             <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
                 <div class="section-header"
-                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007cba;">
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #00c2e8;">
                     <h2 style="margin: 0; color: #2c3e50;">
-                        <i class="fas fa-store" style="margin-right: 0.5rem; color: #007cba;"></i>
+                        <i class="fas fa-store" style="margin-right: 0.5rem; color: #00c2e8;"></i>
                         Merchant Discounts
                     </h2>
                     <div style="display: flex; align-items: center; gap: 1rem;">
                         <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
                             <span class="stat-item"
-                                style="padding: 0.25rem 0.75rem; background: #e3f2fd; border-radius: 20px; font-size: 0.9rem;">
-                                Total: <strong id="totalMerchantDiscounts" style="color: #1976d2;">0</strong>
+                                style="padding: 0.25rem 0.75rem; background: #e6f9fe; border-radius: 20px; font-size: 0.9rem;">
+                                Total: <strong id="totalMerchantDiscounts" style="color: #00c2e8;">0</strong>
                             </span>
                             <span class="stat-item"
                                 style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
@@ -732,7 +715,7 @@
                             <tr>
                                 <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
                                     <i class="fas fa-spinner fa-spin"
-                                        style="font-size: 3rem; margin-bottom: 1rem; color: #007cba;"></i>
+                                        style="font-size: 3rem; margin-bottom: 1rem; color: #00c2e8;"></i>
                                     <div>Loading merchant discounts...</div>
                                 </td>
                             </tr>
@@ -772,7 +755,7 @@
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                     <div class="campaign-type-card"
                         onclick="window.campaignManager && window.campaignManager.createCampaignType('first-order')"
-                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #00c2e8, #009bb8); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-star" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">First Order</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Welcome new customers with special discounts</p>
@@ -856,6 +839,8 @@
     <script src="../campaign-save-debug.js"></script>
     <script src="../campaign-button-debug.js"></script>
     
+    <!-- Emergency Fix Auto-Loader -->
+    <script src="../auto-emergency-fix.js"></script>
     <!-- Fallback Campaign Manager - Fix for "Campaign manager not available" -->
     <script>
         // Define SimplifiedCampaignManager inline as fallback
@@ -1156,7 +1141,7 @@
                     if (input.value || input.type === 'date') {
                         label.style.top = '-8px';
                         label.style.fontSize = '12px';
-                        label.style.color = '#6750a4';
+                        label.style.color = '#00c2e8';
                         label.style.fontWeight = '500';
                     } else {
                         label.style.top = '16px';
@@ -1276,6 +1261,41 @@
                 setupModalClose();
             }, 1000);
         })();
+</script>
+<!-- Sidebar Loading Script -->
+<script>
+    // Load sidebar content
+    async function loadSidebar() {
+        try {
+            const response = await fetch('/includes/sidebar.html');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const html = await response.text();
+
+            const placeholder = document.getElementById('sidebar-placeholder');
+            if (placeholder) {
+                placeholder.innerHTML = html;
+                console.log('✅ Sidebar loaded successfully');
+
+                // Set active state for promotions page
+                const promotionsNavItem = document.querySelector('.nav-item[data-page="promotions"]');
+                if (promotionsNavItem) {
+                    // Remove any existing active states
+                    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                    // Add active to promotions
+                    promotionsNavItem.classList.add('active');
+                }
+            }
+        } catch (error) {
+            console.error('❌ Failed to load sidebar:', error);
+        }
+    }
+
+    // Load sidebar when page loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadSidebar);
+    } else {
+        loadSidebar();
+    }
 </script>
 </body>
 

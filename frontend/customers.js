@@ -6,6 +6,169 @@ let filteredCustomers = [];
 let currentPage = 1;
 const ITEMS_PER_PAGE = 10;
 
+// Points system configuration
+const POINTS_CONFIG = {
+    POINTS_PER_1000_IQD: 100,
+    IQD_THRESHOLD: 1000
+};
+
+// Calculate points earned from total spent amount
+function calculateCustomerPoints(totalSpentIQD) {
+    if (!totalSpentIQD || totalSpentIQD <= 0) {
+        return 0;
+    }
+    
+    // Calculate points: 100 points for every 1000 IQD spent
+    const pointsEarned = Math.floor(totalSpentIQD / POINTS_CONFIG.IQD_THRESHOLD) * POINTS_CONFIG.POINTS_PER_1000_IQD;
+    return pointsEarned;
+}
+
+// Load customer order data and calculate points
+async function loadCustomerOrderData(customerId) {
+    try {
+        console.log(`📊 Loading real points data for customer: ${customerId}`);
+        
+        // Use the CustomerPointsService to get real data from backend API
+        const pointsData = await CustomerPointsService.getCustomerPoints(customerId);
+        
+        if (pointsData && pointsData.success) {
+            const dataSource = pointsData.dataSource || 'real-api';
+            
+            if (dataSource === 'real-api-attempted') {
+                console.log(`🔄 Real API attempted for ${customerId} but AWS not configured - showing zeros instead of mock data`);
+            } else {
+                console.log(`✅ Real points data loaded for ${customerId}:`, pointsData);
+            }
+            
+            return {
+                totalSpent: pointsData.totalSpentIQD || 0, // Use real spending data
+                totalOrders: pointsData.totalOrders || 0, // Use real order count
+                points: pointsData.pointsEarned || 0,     // Use real points earned
+                vipStatus: pointsData.vipStatus || false, // VIP status based on real spending
+                tierLevel: pointsData.tierLevel || 'regular', // Tier based on real spending
+                dataSource: dataSource, // Track data source for debugging
+                note: pointsData.note // Include any notes about data source
+            };
+        } else {
+            console.warn(`⚠️ Failed to load real points data for ${customerId}:`, pointsData?.error || 'Unknown error');
+            
+            // Return zero values instead of mock data to indicate no real data available
+            return {
+                totalSpent: 0,
+                totalOrders: 0,
+                points: 0,
+                vipStatus: false,
+                tierLevel: 'regular',
+                dataSource: 'api-failed'
+            };
+        }
+        
+    } catch (error) {
+        console.error('Error loading customer order data:', error);
+        
+        // Return zero values instead of mock data when there's an error
+        return {
+            totalSpent: 0,
+            totalOrders: 0,
+            points: 0,
+            vipStatus: false,
+            tierLevel: 'regular',
+            dataSource: 'error'
+        };
+    }
+}
+
+// Load order data and calculate points for all customers
+async function loadOrderDataForCustomers() {
+    try {
+        console.log('Loading order data for customers to calculate points...');
+        
+        // Process customers in parallel for better performance
+        const customerPromises = customers.map(async (customer) => {
+            const orderData = await loadCustomerOrderData(customer.id);
+            
+            // Update customer with order data and points
+            customer.totalSpent = orderData.totalSpent;
+            customer.totalOrders = orderData.totalOrders;
+            customer.points = orderData.points;
+            customer.vipStatus = orderData.vipStatus;
+            customer.tierLevel = orderData.tierLevel;
+            
+            // Update segment based on actual spending and VIP status
+            if (orderData.vipStatus) {
+                customer.segment = 'vip';
+            } else {
+                customer.segment = determineCustomerSegment(customer.totalSpent, customer.totalOrders);
+            }
+            
+            return customer;
+        });
+        
+        await Promise.all(customerPromises);
+        console.log('✅ Order data loaded and points calculated for all customers');
+        
+        // Update data source banner
+        updateDataSourceBanner();
+        
+    } catch (error) {
+        console.error('❌ Error loading order data for customers:', error);
+        // Continue with default values if order data fails to load
+        updateDataSourceBanner(); // Update banner even on error
+    }
+}
+
+// Update data source banner based on customer data sources
+function updateDataSourceBanner() {
+    const banner = document.getElementById('dataSourceBanner');
+    const message = document.getElementById('dataSourceMessage');
+    
+    if (!banner || !message) return;
+    
+    // Analyze data sources from customers
+    const dataSources = customers.map(c => c.dataSource).filter(Boolean);
+    const realApiCount = dataSources.filter(ds => ds === 'real-api').length;
+    const realApiAttemptedCount = dataSources.filter(ds => ds === 'real-api-attempted').length;
+    const apiFailedCount = dataSources.filter(ds => ds === 'api-failed' || ds === 'error').length;
+    
+    let bannerType = 'info';
+    let messageText = '';
+    let iconClass = 'fas fa-info-circle';
+    let bannerColor = '#e3f2fd';
+    
+    if (realApiCount > 0) {
+        // Some real data available
+        bannerType = 'success';
+        messageText = `✅ Successfully loading real customer order data from database (${realApiCount}/${customers.length} customers). No more mock data!`;
+        iconClass = 'fas fa-check-circle';
+        bannerColor = '#e8f5e8';
+    } else if (realApiAttemptedCount > 0) {
+        // API attempted but AWS not configured
+        bannerType = 'warning';
+        messageText = `⚠️ Real API configured but AWS credentials pending (${realApiAttemptedCount}/${customers.length} customers). Showing zeros instead of mock data until AWS is configured.`;
+        iconClass = 'fas fa-exclamation-triangle';
+        bannerColor = '#fff3e0';
+    } else if (apiFailedCount > 0) {
+        // API completely failed
+        bannerType = 'error';
+        messageText = `❌ Unable to connect to real data API (${apiFailedCount}/${customers.length} customers). Showing zeros instead of mock data.`;
+        iconClass = 'fas fa-exclamation-circle';
+        bannerColor = '#ffebee';
+    } else {
+        // Default informational message
+        messageText = '🔄 System configured to fetch real customer order data from database instead of using mock data.';
+    }
+    
+    // Update banner appearance
+    banner.style.background = `linear-gradient(135deg, ${bannerColor}, #f3e5f5)`;
+    banner.querySelector('i').className = iconClass;
+    message.textContent = messageText;
+    
+    // Show the banner
+    banner.style.display = 'block';
+    
+    console.log(`📊 Data source summary: Real=${realApiCount}, Attempted=${realApiAttemptedCount}, Failed=${apiFailedCount}`);
+}
+
 // Initialize customers page
 async function initializeCustomersPage() {
     console.log('Initializing customers page...');
@@ -23,6 +186,7 @@ async function initializeCustomersPage() {
         renderCustomersTable();
         updateStatCards();
         updatePagination();
+        updateDataSourceBanner();
 
         console.log('Customers page initialization complete');
     } catch (error) {
@@ -97,6 +261,7 @@ async function loadCustomersData() {
                 status: user.isActive ? 'active' : 'inactive',
                 totalOrders: 0, // Will be populated from orders table if available
                 totalSpent: 0,  // Will be populated from orders table if available
+                points: 0, // Will be calculated based on totalSpent
                 lastOrder: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never',
                 segment: segment,
                 joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown',
@@ -123,6 +288,9 @@ async function loadCustomersData() {
             console.log(`✅ Mapped customer ${index + 1} for UI:`, customer);
             return customer;
         });
+
+        // Load order data and calculate points for all customers
+        await loadOrderDataForCustomers();
 
         filteredCustomers = [...customers];
         console.log('🎯 Final customers array ready for UI:', customers);
@@ -266,15 +434,41 @@ function renderCustomersTable() {
                     </div>
                 </div>
             </td>
-            <td>${customer.email}</td>
-            <td>${customer.phone}</td>
+            <td>
+                <div class="contact-info">
+                    <div>${customer.email}</div>
+                    <small style="color: #666;">${customer.phone}</small>
+                </div>
+            </td>
             <td>
                 <span class="status-badge ${customer.status}">
                     ${customer.status.charAt(0).toUpperCase() + customer.status.slice(1)}
                 </span>
             </td>
-            <td>${customer.totalOrders}</td>
-            <td>$${customer.totalSpent.toFixed(2)}</td>
+            <td>
+                <div class="points-display">
+                    <span class="points-value">${customer.totalOrders}</span>
+                    ${customer.dataSource === 'real-api-attempted' ? '<small style="color: #ff9800; display: block;">Real API (AWS pending)</small>' : ''}
+                    ${customer.dataSource === 'real-api' ? '<small style="color: #4caf50; display: block;">Real data</small>' : ''}
+                    ${customer.dataSource === 'api-failed' || customer.dataSource === 'error' ? '<small style="color: #f44336; display: block;">API unavailable</small>' : ''}
+                </div>
+            </td>
+            <td>
+                <div class="points-display">
+                    <span class="points-value">${customer.totalSpent.toLocaleString()} IQD</span>
+                    ${customer.dataSource === 'real-api-attempted' ? '<small style="color: #ff9800; display: block;">Real API (AWS pending)</small>' : ''}
+                    ${customer.dataSource === 'real-api' ? '<small style="color: #4caf50; display: block;">Real data</small>' : ''}
+                    ${customer.dataSource === 'api-failed' || customer.dataSource === 'error' ? '<small style="color: #f44336; display: block;">API unavailable</small>' : ''}
+                </div>
+            </td>
+            <td>
+                <div class="points-display">
+                    <span class="points-value">${customer.points.toLocaleString()}</span>
+                    <small style="color: #666; display: block;">points</small>
+                    ${customer.vipStatus ? '<div class="vip-badge" style="background: gold; color: black; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-top: 2px;">VIP</div>' : ''}
+                    ${customer.tierLevel && customer.tierLevel !== 'regular' ? `<div class="tier-badge" style="background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-top: 2px;">${customer.tierLevel.toUpperCase()}</div>` : ''}
+                </div>
+            </td>
             <td>${formatDate(customer.lastOrder)}</td>
             <td>
                 <span class="segment-badge ${customer.segment}">
@@ -300,9 +494,11 @@ function renderCustomersTable() {
 
 // Update statistics cards
 function updateStatCards() {
-    const totalCustomersEl = document.querySelector('.stat-card h3');
-    const activeCustomersEl = document.querySelectorAll('.stat-card h3')[1];
-    const avgOrderValueEl = document.querySelectorAll('.stat-card h3')[2];
+    const totalCustomersEl = document.getElementById('totalCustomers');
+    const activeCustomersEl = document.getElementById('activeCustomers');
+    const vipCustomersEl = document.getElementById('vipCustomers');
+    const totalRevenueEl = document.getElementById('totalRevenue');
+    const totalPointsEarnedEl = document.getElementById('totalPointsEarned');
 
     if (totalCustomersEl) {
         totalCustomersEl.textContent = customers.length.toString();
@@ -313,11 +509,19 @@ function updateStatCards() {
         activeCustomersEl.textContent = activeCount.toString();
     }
 
-    if (avgOrderValueEl && customers.length > 0) {
-        const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
-        const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0);
-        const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-        avgOrderValueEl.textContent = `$${avgOrderValue.toFixed(2)}`;
+    if (vipCustomersEl) {
+        const vipCount = customers.filter(c => c.segment === 'vip').length;
+        vipCustomersEl.textContent = vipCount.toString();
+    }
+
+    if (totalRevenueEl) {
+        const totalRevenue = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+        totalRevenueEl.textContent = `${totalRevenue.toLocaleString()} IQD`;
+    }
+
+    if (totalPointsEarnedEl) {
+        const totalPoints = customers.reduce((sum, c) => sum + (c.points || 0), 0);
+        totalPointsEarnedEl.textContent = totalPoints.toLocaleString();
     }
 }
 
@@ -398,9 +602,24 @@ function viewCustomer(customerId) {
                     <div class="detail-group">
                         <h3 style="color: #34495e; margin-bottom: 0.5rem;">Activity & Orders</h3>
                         <p><strong>Total Orders:</strong> ${customer.totalOrders}</p>
-                        <p><strong>Total Spent:</strong> $${customer.totalSpent.toFixed(2)}</p>
+                        <p><strong>Total Spent:</strong> ${customer.totalSpent.toLocaleString()} IQD</p>
                         <p><strong>Addresses:</strong> ${customer.addresses.length} saved</p>
                         <p><strong>Payment Methods:</strong> ${customer.paymentMethods.length} saved</p>
+                    </div>
+                    
+                    <div class="detail-group">
+                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Points & Rewards</h3>
+                        <p><strong>Total Points:</strong> <span style="color: #e74c3c; font-weight: bold;">${customer.points.toLocaleString()}</span></p>
+                        <p><strong>VIP Status:</strong> ${customer.vipStatus ? '⭐ VIP Member' : '👤 Regular'}</p>
+                        <p><strong>Tier Level:</strong> <span style="color: #f39c12;">${customer.tierLevel ? customer.tierLevel.toUpperCase() : 'REGULAR'}</span></p>
+                        <div style="margin-top: 0.5rem;">
+                            <button onclick="viewCustomerPointsHistory('${customer.id}')" style="background: #3498db; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
+                                <i class="fas fa-history"></i> Points History
+                            </button>
+                            <button onclick="showRedeemPointsModal('${customer.id}')" style="background: #e74c3c; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer;">
+                                <i class="fas fa-gift"></i> Redeem Points
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -526,41 +745,214 @@ function exportCustomers() {
 // Make export function globally available
 window.exportCustomers = exportCustomers;
 
-// Initialize page when DOM is ready
-document.addEventListener('DOMContentLoaded', async function () {
-    console.log('DOM loaded, checking authentication...');
-
-    const debugMode = sessionStorage.getItem('debugMode') === 'true';
-
-    // Ensure Auth utility is loaded
-    if (typeof Auth === 'undefined') {
-        console.error('❌ Auth utility not loaded! Checking script loading...');
-        console.log('Available global objects:', Object.keys(window));
-        return;
-    }
-
-    console.log('✅ Auth utility loaded, proceeding with authentication check...');
-
-    // Check authentication using centralized utility (allow bypass in debug mode)
-    if (!debugMode && !Auth.requireAuthentication()) {
-        return;
-    }
-    if (debugMode) {
-        console.warn('🧪 Debug mode enabled: skipping strict authentication for customers page');
-    }
-
-    console.log('Authentication valid (or bypassed for debug), initializing customers page...');
-
+// Refresh customer points data
+async function refreshCustomerPoints() {
     try {
-        // Initialize AWS utilities
-        await AWSUtils.initialize();
-
-        // Initialize customers page
-        await initializeCustomersPage();
+        console.log('🔄 Refreshing customer points data...');
+        
+        // Show loading indicator
+        const totalPointsEl = document.getElementById('totalPointsEarned');
+        if (totalPointsEl) {
+            totalPointsEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+        
+        // Get system statistics to verify service is working
+        const stats = await CustomerPointsService.getSystemStatistics();
+        if (stats && stats.success) {
+            console.log('📊 Points system statistics:', stats);
+        }
+        
+        // Reload order data for all customers using new service
+        await loadOrderDataForCustomers();
+        
+        // Update UI
+        renderCustomersTable();
+        updateStatCards();
+        updatePagination();
+        updateDataSourceBanner();
+        
+        console.log('✅ Customer points data refreshed successfully');
+        
+        // Show success message
+        showMessage('Customer points data refreshed successfully', 'success');
+        
     } catch (error) {
-        console.error('Failed to initialize customers page:', error);
+        console.error('❌ Error refreshing customer points:', error);
+        showMessage('Failed to refresh customer points data', 'error');
     }
-});
+}
 
-console.log('Customers management script loaded');
+// Show message helper function
+function showMessage(message, type = 'info') {
+    // Create a simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 6px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        max-width: 400px;
+        background-color: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#00c2e8'};
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    // Add animation keyframes
+    if (!document.querySelector('#toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'toast-styles';
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Customer points management functions
+async function viewCustomerPointsHistory(customerId) {
+    try {
+        console.log(`📊 Loading points history for customer: ${customerId}`);
+        
+        // Get points transaction history
+        const history = await CustomerPointsService.getPointsHistory(customerId);
+        
+        if (history && history.success) {
+            const transactions = history.transactions || [];
+            
+            // Create points history modal
+            const historyHtml = `
+                <div class="modal-overlay" id="pointsHistoryModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; display: flex; align-items: center; justify-content: center;">
+                    <div class="modal-content" style="background: white; border-radius: 8px; padding: 2rem; max-width: 700px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h2 style="margin: 0; color: #2c3e50;">Points Transaction History</h2>
+                            <button onclick="closePointsHistoryModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                        </div>
+                        
+                        <div class="points-summary" style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; text-align: center;">
+                                <div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #27ae60;">${history.totalPoints || 0}</div>
+                                    <div style="color: #666; font-size: 0.9rem;">Total Points</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #3498db;">${history.lifetimePointsEarned || 0}</div>
+                                    <div style="color: #666; font-size: 0.9rem;">Lifetime Earned</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${history.lifetimePointsRedeemed || 0}</div>
+                                    <div style="color: #666; font-size: 0.9rem;">Lifetime Redeemed</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="transactions-list">
+                            ${transactions.length > 0 ? `
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="background: #f1f2f6;">
+                                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #ddd;">Date</th>
+                                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #ddd;">Type</th>
+                                            <th style="padding: 0.8rem; text-align: right; border-bottom: 1px solid #ddd;">Points</th>
+                                            <th style="padding: 0.8rem; text-align: left; border-bottom: 1px solid #ddd;">Order</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${transactions.map(transaction => `
+                                            <tr>
+                                                <td style="padding: 0.8rem; border-bottom: 1px solid #eee;">${new Date(transaction.timestamp).toLocaleDateString()}</td>
+                                                <td style="padding: 0.8rem; border-bottom: 1px solid #eee;">
+                                                    <span style="background: ${transaction.transactionType === 'earned' ? '#e8f5e8' : '#ffeaea'}; color: ${transaction.transactionType === 'earned' ? '#27ae60' : '#e74c3c'}; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+                                                        ${transaction.transactionType === 'earned' ? '+ Earned' : '- Redeemed'}
+                                                    </span>
+                                                </td>
+                                                <td style="padding: 0.8rem; border-bottom: 1px solid #eee; text-align: right; font-weight: bold; color: ${transaction.transactionType === 'earned' ? '#27ae60' : '#e74c3c'};">
+                                                    ${transaction.transactionType === 'earned' ? '+' : '-'}${Math.abs(transaction.pointsAmount)}
+                                                </td>
+                                                <td style="padding: 0.8rem; border-bottom: 1px solid #eee;">${transaction.orderId || 'N/A'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            ` : `
+                                <div style="text-align: center; padding: 2rem; color: #666;">
+                                    <i class="fas fa-history" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                                    <br>
+                                    No transaction history found
+                                </div>
+                            `}
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem; text-align: right;">
+                            <button onclick="closePointsHistoryModal()" style="background: #95a5a6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', historyHtml);
+        } else {
+            alert('Failed to load points history');
+        }
+        
+    } catch (error) {
+        console.error('Error loading points history:', error);
+        alert('Failed to load points history');
+    }
+}
+
+function closePointsHistoryModal() {
+    const modal = document.getElementById('pointsHistoryModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function showRedeemPointsModal(customerId) {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+    
+    // Create redeem points modal
+    const redeemHtml = `
+        <div class="modal-overlay" id="redeemPointsModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; display: flex; align-items: center; justify-content: center;">
+            <div class="modal-content" style="background: white; border-radius: 8px; padding: 2rem; max-width: 500px; width: 90%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0; color: #2c3e50;">Redeem Points</h2>
+                    <button onclick="closeRedeemPointsModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+                </div>
+                
+                <div class="customer-info" style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                    <div><strong>Customer:</strong> ${customer.name}</div>
+                    <div><strong>Available Points:</strong> <span style="color: #e74c3c; font-weight: bold;">${customer.points.toLocaleString()}</span></div>
+                    <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">1 point = 1 IQD discount</div>
+                </div>
+                
+                <div class="redeem-form">
+                    <div style="margin-bottom: 
 

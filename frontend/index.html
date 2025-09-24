@@ -28,9 +28,9 @@
               dashboardUrl = window.Auth.getPostLoginRedirectUrl();
               console.log('📍 Using Auth redirect:', dashboardUrl);
             } else {
-              // Simple fallback - we know we're in frontend folder
-              dashboardUrl = window.location.origin + '/frontend/pages/dashboard.html';
-              console.log('📍 Using simple fallback:', dashboardUrl);
+              // Correct URL for dashboard (server serves from frontend directory)
+              dashboardUrl = window.location.origin + '/pages/dashboard.html';
+              console.log('📍 Using corrected fallback:', dashboardUrl);
             }
 
             console.log('🚀 Redirecting to:', dashboardUrl);
@@ -124,7 +124,7 @@
 
       <!-- Status Message -->
       <div id="statusMessage"
-        style="display: none; margin-top: 20px; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; background: #f8f9fa;">
+        style="display: none; margin-top: 20px; padding: 15px; border-radius: 8px; border-left: 4px solid #00c2e8; background: #f8f9fa;">
         <div id="statusText"></div>
       </div>
     </div>

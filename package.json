@@ -17,12 +17,14 @@
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.888.0",
+    "@aws-sdk/client-dynamodb": "^3.895.0",
+    "@aws-sdk/lib-dynamodb": "^3.895.0",
     "aws-amplify": "^6.0.0",
     "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
-    "node-fetch": "^2.6.7",
+    "node-fetch": "^2.7.0",
     "ws": "^8.18.3"
   }
 }

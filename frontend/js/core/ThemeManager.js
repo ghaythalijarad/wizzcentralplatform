@@ -11,9 +11,9 @@
     _buildLightTokens() {
       return {
         color: {
-          primary: '#2563eb',
-          primaryHover: '#1d4ed8',
-          primaryMuted: '#eff6ff',
+          primary: '#00c2e8',
+          primaryHover: '#009bb8',
+          primaryMuted: '#e6f9fe',
           danger: '#dc2626',
           dangerHover: '#b91c1c',
           warning: '#f59e0b',
@@ -47,9 +47,9 @@
     _buildDarkTokens() {
       return {
         color: {
-          primary: '#3b82f6',
-          primaryHover: '#2563eb',
-          primaryMuted: '#1e293b',
+          primary: '#33cceb',
+          primaryHover: '#00c2e8',
+          primaryMuted: '#003440',
           danger: '#ef4444',
           dangerHover: '#dc2626',
           warning: '#f59e0b',

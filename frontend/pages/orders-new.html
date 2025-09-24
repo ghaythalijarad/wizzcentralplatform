@@ -4,10 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WizzCentral Platform - Orders Management</title>
-    <link rel="stylesheet" href="../styles/dashboard.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>WizzCentral Platform - New Order</title>
+    <link rel="stylesheet" href="../styles/material-3-design-system.css">
+    <script src="../styles/wizz-theme-config.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
     <style>
         .orders-table {
             width: 100%;
@@ -57,8 +61,8 @@
         }
 
         .status-confirmed {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #e6f9fe;
+            color: #00748a;
         }
 
         .status-cancelled {
@@ -105,12 +109,12 @@
         }
 
         .btn-view {
-            background: #3b82f6;
+            background: #00c2e8;
             color: white;
         }
 
         .btn-view:hover {
-            background: #2563eb;
+            background: #009bb8;
         }
 
         .loading-state {
@@ -202,6 +206,9 @@
             color: #111827;
         }
     </style>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
 </head>
 
 <body data-page="orders">
@@ -210,25 +217,12 @@
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <div class="top-bar">
-            <button class="menu-toggle" id="menuToggle">
-                <i class="fas fa-bars"></i>
-            </button>
-            <h1 class="page-title">Orders Management</h1>
-            <div class="top-bar-actions">
-                <button class="btn-primary" onclick="loadOrders()">
-                    <i class="fas fa-sync"></i>
-                    Refresh
-                </button>
-            </div>
-        </div>
-
         <!-- Page Content -->
         <div class="page-content">
             <!-- Orders Statistics -->
             <div class="orders-stats">
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(45deg, #3b82f6, #1d4ed8);">
+                    <div class="stat-icon" style="background: linear-gradient(45deg, #00c2e8, #009bb8);">
                         <i class="fas fa-shopping-cart"></i>
                     </div>
                     <div class="stat-info">

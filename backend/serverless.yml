@@ -15,6 +15,11 @@ provider:
     WEBSOCKET_CONNECTIONS_TABLE_OLD: websocket-connections-${self:provider.stage}
     CHAT_SESSIONS_TABLE_OLD: chat-sessions-${self:provider.stage}
     WEBSOCKET_API_ENDPOINT: wss://lwk0wf6rpl.execute-api.us-east-1.amazonaws.com/dev
+    # Driver Assignment System Environment Variables
+    ORDERS_TABLE: WizzOrders_dev
+    DRIVERS_TABLE: WhizzDrivers_dev
+    WEBSOCKET_CONNECTIONS_TABLE_DRIVERS: WizzUser_websocket_connections_dev
+    WEBSOCKET_ENDPOINT: https://lwk0wf6rpl.execute-api.us-east-1.amazonaws.com/dev
   
   iamRoleStatements:
     # New unified chat tables
@@ -33,6 +38,27 @@ provider:
         - arn:aws:dynamodb:${self:provider.region}:*:table/ChatMessages/index/*
         - arn:aws:dynamodb:${self:provider.region}:*:table/WebSocketConnections
         - arn:aws:dynamodb:${self:provider.region}:*:table/WebSocketConnections/index/*
+    # Driver Assignment System Tables
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:DescribeStream
+        - dynamodb:GetRecords
+        - dynamodb:GetShardIterator
+        - dynamodb:ListStreams
+      Resource:
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WizzOrders_dev
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WizzOrders_dev/index/*
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WizzOrders_dev/stream/*
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WhizzDrivers_dev
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WhizzDrivers_dev/index/*
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WizzUser_websocket_connections_dev
+        - arn:aws:dynamodb:${self:provider.region}:*:table/WizzUser_websocket_connections_dev/index/*
     # Legacy tables for backward compatibility
     - Effect: Allow
       Action:
@@ -67,6 +93,23 @@ package:
     - 'node_modules/tslib/**'
 
 functions:
+  # Order Stream Processor for Driver Assignment
+  orderStreamProcessor:
+    handler: src/handlers/order-stream-processor.handler
+    description: "Monitors order status changes and automatically assigns drivers"
+    timeout: 60
+    memorySize: 512
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt:
+              - WizzOrdersTable
+              - StreamArn
+          batchSize: 10
+          startingPosition: LATEST
+          maximumBatchingWindowInSeconds: 5
+
   # Unified WebSocket Chat Handler
   chatWebSocket:
     handler: src/handlers/chat-websocket-handler.handler
@@ -178,6 +221,13 @@ resources:
             - ${self:provider.region}
             - ".amazonaws.com/"
             - ${self:provider.stage}
+    
+    OrderStreamProcessorArn:
+      Description: "ARN of the Order Stream Processor Lambda function"
+      Value:
+        Ref: OrderStreamProcessorLambdaFunction
+      Export:
+        Name: ${self:service}-${self:provider.stage}-OrderStreamProcessor
 
 plugins:
   - serverless-offline

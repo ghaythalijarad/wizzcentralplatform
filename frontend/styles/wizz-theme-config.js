@@ -6,9 +6,9 @@
 // Main brand color palette - Change these to update the entire platform
 const WIZZ_THEME_CONFIG = {
   // Primary brand colors
-  primary: '#6750A4',        // Main purple - used for primary buttons, links, focus states
-  primaryLight: '#7F67BE',   // Lighter variant for hover states
-  primaryDark: '#4F378A',    // Darker variant for active states
+  primary: '#00C2E8',        // Main cyan - used for primary buttons, links, focus states
+  primaryLight: '#33CCEB',   // Lighter variant for hover states
+  primaryDark: '#009BB8',    // Darker variant for active states
   
   // Secondary brand colors  
   secondary: '#625B71',      // Secondary purple-gray
@@ -91,7 +91,7 @@ function changeWizzAccentColors(newAccentColors) {
 // Predefined color schemes for easy switching
 const WIZZ_COLOR_SCHEMES = {
   default: {
-    primary: '#6750A4',
+    primary: '#00C2E8',
     accent: {
       orange: '#FF6B35',
       green: '#00C851', 

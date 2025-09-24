@@ -58,6 +58,8 @@ exports.handler = async (event) => {
                 return await handlePing(connectionId, apiGatewayClient);
             case 'driver_status_update':
                 return await handleDriverStatusUpdate(connectionId, message, apiGatewayClient);
+            case 'driver_assigned':
+                return await handleDriverAssigned(connectionId, message, apiGatewayClient);
             
             // Agent connection actions
             case 'chat_agent_connect':
@@ -411,6 +413,89 @@ async function handleDriverStatusUpdate(connectionId, message, apiGatewayClient)
         return { statusCode: 200 };
     } catch (error) {
         console.error('❌ Status update error:', error);
+        return { statusCode: 500 };
+    }
+}
+
+/**
+ * Handle driver assignment notification
+ */
+async function handleDriverAssigned(connectionId, message, apiGatewayClient) {
+    console.log('🚗 Driver assignment notification:', JSON.stringify(message, null, 2));
+    
+    try {
+        const { orderId, driverId, driverName, orderDetails, businessId } = message;
+        
+        // Find the specific driver connection by driverId
+        let targetConnectionId = null;
+        
+        if (driverId) {
+            try {
+                const result = await dynamoDB.send(new QueryCommand({
+                    TableName: WEBSOCKET_CONNECTIONS_TABLE,
+                    IndexName: 'UserIdIndex',
+                    KeyConditionExpression: 'userId = :userId',
+                    ExpressionAttributeValues: {
+                        ':userId': driverId
+                    }
+                }));
+                
+                const driverConnection = result.Items?.find(item => 
+                    item.userType === 'driver' && item.status === 'connected'
+                );
+                
+                if (driverConnection) {
+                    targetConnectionId = driverConnection.connectionId;
+                }
+            } catch (error) {
+                console.warn('⚠️ Could not find driver connection, using sender connection');
+            }
+        }
+        
+        // Use the sender's connection if no specific driver found
+        if (!targetConnectionId) {
+            targetConnectionId = connectionId;
+        }
+        
+        // Create notification message for the driver
+        const notification = {
+            action: 'order_assigned',
+            type: 'order_assignment',
+            orderId,
+            driverId,
+            driverName,
+            orderDetails,
+            businessId,
+            message: `New order ${orderId} assigned to you`,
+            timestamp: new Date().toISOString()
+        };
+        
+        console.log(`📨 Sending order assignment to connection: ${targetConnectionId}`);
+        
+        // Send the notification to the driver
+        await sendToConnection(targetConnectionId, notification, apiGatewayClient);
+        
+        // Send confirmation back to the sender
+        await sendToConnection(connectionId, {
+            action: 'assignment_sent',
+            orderId,
+            driverId,
+            targetConnection: targetConnectionId,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+        
+        return { statusCode: 200 };
+    } catch (error) {
+        console.error('❌ Driver assignment error:', error);
+        
+        // Send error response to sender
+        await sendToConnection(connectionId, {
+            action: 'assignment_error',
+            message: 'Failed to assign order to driver',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+        
         return { statusCode: 500 };
     }
 }

@@ -9,19 +9,6 @@ let lastUpdateTime = new Date();
 function checkDashboardAuthentication() {
     console.log('🔐 Checking authentication for dashboard access...');
 
-    // Check if this is a test/debug mode (bypass auth for testing)
-    const isTestMode = window.location.search.includes('test=true') ||
-        window.location.search.includes('bypass=true') ||
-        window.location.search.includes('debug=true') ||
-        sessionStorage.getItem('debugMode') === 'true';
-
-    if (isTestMode) {
-        console.log('🧪 Test mode detected, bypassing authentication');
-        sessionStorage.setItem('debugMode', 'true');
-        initializeDashboard();
-        return;
-    }
-
     if (window.Auth && window.Auth.requireAuthentication) {
         // Check authentication before initializing dashboard
         try {
@@ -97,87 +84,192 @@ async function loadDashboardStats() {
     console.log('🔢 Loading dashboard stats from all tables...');
 
     try {
-        // Prefer data-service for safe fallbacks (avoids per-table AccessDenied showing "Error")
-        if (!window.dataService) throw new Error('dataService is not available');
-
-        // Ensure AWS/data layer is initialized
-        await window.dataService.initialize();
-
-        const tables = {
-            customersCount: 'WizzUser_users_dev',
-            merchantsCount: 'WhizzMerchants_Businesses',
-            driversCount: 'WhizzDrivers_dev',
-            ordersCount: 'WizzUser_transactions_dev',
-            promotionsCount: 'WhizzMerchants_Discounts',
-            ticketsCount: 'WizzUser_users_dev' // Using users table as fallback since no support tickets table exists
-        };
-
-        const counts = {};
-
-        // Update each stat card via data-service.scan with Select: COUNT (safe default 0 on error)
-        for (const [elementId, tableName] of Object.entries(tables)) {
+        // First try to load stats from real AWS data
+        if (window.dataService) {
             try {
-                // Special handling for promotions count - get actual active promotions
-                if (elementId === 'promotionsCount') {
-                    const platformDiscounts = await window.dataService.getPlatformDiscounts();
-                    const activePromotions = platformDiscounts.filter(promo => {
-                        const isActive = promo.isActive === true || promo.isActive === 'true';
-                        const now = new Date();
-                        const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                        const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                        const withinDateRange = (!startDate || now >= startDate) && (!endDate || now <= endDate);
-                        return isActive && withinDateRange;
-                    }).length;
-                    
-                    counts[elementId.replace('Count','')] = activePromotions;
-                    const el = document.getElementById(elementId);
-                    if (el) el.textContent = activePromotions.toString();
-                    console.log(`✅ ${elementId}: ${activePromotions} (active promotions)`);
-                    continue;
-                }
+                await window.dataService.initialize();
+                console.log('🔄 Attempting to load real data from AWS...');
                 
-                const res = await window.dataService.scan(tableName, { Select: 'COUNT' });
-                const count = res && typeof res.Count === 'number' ? res.Count : 0;
-                counts[
-                    elementId.replace('Count','') // keep raw too
-                ] = count;
-                const el = document.getElementById(elementId);
-                if (el) el.textContent = count.toLocaleString();
-                console.log(`✅ ${elementId}: ${count}`);
-            } catch (error) {
-                console.warn(`Count fallback for ${elementId}:`, error?.message || error);
-                const el = document.getElementById(elementId);
-                if (el) el.textContent = '0';
+                const tables = {
+                    customersCount: 'WizzUser_users_dev',
+                    merchantsCount: 'WhizzMerchants_Businesses',
+                    driversCount: 'WhizzDrivers_dev',
+                    ordersCount: 'WizzUser_transactions_dev',
+                    promotionsCount: 'WhizzMerchants_Discounts',
+                    ticketsCount: 'WizzUser_users_dev' 
+                };
+
+                const counts = {};
+                let awsSuccess = true;
+
+                // Try to get at least one table count to test AWS connectivity
+                try {
+                    const testRes = await window.dataService.scan('WizzUser_users_dev', { Select: 'COUNT' });
+                    const testCount = testRes && typeof testRes.Count === 'number' ? testRes.Count : 0;
+                    console.log(`✅ AWS Connection test successful - found ${testCount} customers`);
+                } catch (testError) {
+                    console.warn('⚠️ AWS connection failed, falling back to demo data:', testError.message);
+                    awsSuccess = false;
+                }
+
+                if (awsSuccess) {
+                    // Update each stat card via data-service.scan with Select: COUNT
+                    for (const [elementId, tableName] of Object.entries(tables)) {
+                        try {
+                            // Special handling for promotions count - get actual active promotions
+                            if (elementId === 'promotionsCount') {
+                                const platformDiscounts = await window.dataService.getPlatformDiscounts();
+                                const activePromotions = platformDiscounts.filter(promo => {
+                                    const isActive = promo.isActive === true || promo.isActive === 'true';
+                                    const now = new Date();
+                                    const startDate = promo.startDate ? new Date(promo.startDate) : null;
+                                    const endDate = promo.endDate ? new Date(promo.endDate) : null;
+                                    const withinDateRange = (!startDate || now >= startDate) && (!endDate || now <= endDate);
+                                    return isActive && withinDateRange;
+                                }).length;
+                                
+                                counts[elementId.replace('Count','')] = activePromotions;
+                                const el = document.getElementById(elementId);
+                                if (el) el.textContent = activePromotions.toString();
+                                console.log(`✅ ${elementId}: ${activePromotions} (active promotions)`);
+                                continue;
+                            }
+                            
+                            const res = await window.dataService.scan(tableName, { Select: 'COUNT' });
+                            const count = res && typeof res.Count === 'number' ? res.Count : 0;
+                            counts[elementId.replace('Count','')] = count;
+                            const el = document.getElementById(elementId);
+                            if (el) el.textContent = count.toLocaleString();
+                            console.log(`✅ ${elementId}: ${count} (real data)`);
+                        } catch (error) {
+                            console.warn(`Count fallback for ${elementId}:`, error?.message || error);
+                            const el = document.getElementById(elementId);
+                            if (el) el.textContent = '0';
+                        }
+                    }
+                    
+                    // Also load recent businesses list via dataService helper
+                    try {
+                        const recent = await window.dataService.getRecentBusinesses(5);
+                        counts.recentMerchants = Array.isArray(recent) ? recent.length : 0;
+                    } catch (_) { 
+                        counts.recentMerchants = 0;
+                    }
+
+                    // Show success indicator
+                    showDashboardDataSourceIndicator('real');
+                    
+                    console.log('✅ Dashboard stats loaded (real AWS data)');
+                    return; // Exit successfully
+                } else {
+                    throw new Error('AWS credentials not available');
+                }
+            } catch (awsError) {
+                console.warn('⚠️ AWS data loading failed, using demo endpoint:', awsError.message);
+                throw awsError; // Re-throw to trigger demo fallback
             }
+        } else {
+            throw new Error('dataService is not available');
         }
-
-        // Also load recent businesses list via dataService helper
-        try {
-            const recent = await window.dataService.getRecentBusinesses(5);
-            counts.recentMerchants = Array.isArray(recent) ? recent.length : 0;
-        } catch (_) { }
-
-        updateDashboardDebugPanel({
-            customers: counts.customers, // fixed from counts.customersCount
-            merchants: counts.merchants, // fixed from counts.merchantsCount
-            drivers: counts.drivers,     // fixed from counts.driversCount
-            orders: counts.orders,       // fixed from counts.ordersCount
-            promotions: counts.promotions, // fixed from counts.promotionsCount
-            tickets: counts.tickets,       // fixed from counts.ticketsCount
-            recentMerchants: counts.recentMerchants
-        });
-
-        console.log('✅ Dashboard stats loaded (data-service)');
-
     } catch (error) {
-        console.error('❌ Error loading dashboard stats:', error);
-        // Set fallback values in case of error
-        const statElements = ['customersCount', 'merchantsCount', 'driversCount', 'ordersCount', 'promotionsCount', 'ticketsCount'];
-        statElements.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) element.textContent = '0';
-        });
+        // Fallback to demo endpoint
+        console.log('🎭 Loading dashboard stats from demo endpoint...');
+        
+        try {
+            const response = await fetch('/dashboard/stats/demo');
+            if (!response.ok) {
+                throw new Error(`Demo endpoint failed: ${response.status}`);
+            }
+            
+            const demoData = await response.json();
+            console.log('✅ Demo dashboard stats loaded:', demoData);
+            
+            if (demoData.success && demoData.data) {
+                const stats = demoData.data;
+                const counts = {};
+                
+                // Update all stat cards with demo data
+                Object.entries(stats).forEach(([key, value]) => {
+                    const el = document.getElementById(key);
+                    if (el) {
+                        if (key.includes('revenue') || key.includes('Revenue')) {
+                            el.textContent = `${value.toLocaleString()} IQD`;
+                        } else if (key.includes('Rate')) {
+                            el.textContent = `${value}%`;
+                        } else if (key.includes('Time')) {
+                            el.textContent = `${value} min`;
+                        } else {
+                            el.textContent = value.toLocaleString();
+                        }
+                        console.log(`✅ ${key}: ${value} (demo data)`);
+                    }
+                    counts[key.replace('Count', '')] = value;
+                });
+                
+                // Show data source indicator
+                showDashboardDataSourceIndicator('demo');
+                
+                console.log('✅ Dashboard stats loaded (demo data)');
+                return; // Exit successfully
+            }
+        } catch (demoError) {
+            console.error('❌ Demo endpoint also failed:', demoError);
+            // Set all values to 0 as final fallback
+            const statElements = ['customersCount', 'merchantsCount', 'driversCount', 'ordersCount', 'promotionsCount', 'ticketsCount'];
+            statElements.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.textContent = '0';
+            });
+            
+            showDashboardDataSourceIndicator('failed');
+        }
     }
+}
+
+// Show data source indicator to inform users about the data source
+function showDashboardDataSourceIndicator(sourceType) {
+    const indicator = document.getElementById('dataSourceIndicator');
+    const icon = document.getElementById('dataSourceIcon');
+    const text = document.getElementById('dataSourceText');
+    const details = document.getElementById('dataSourceDetails');
+    
+    if (!indicator || !icon || !text || !details) {
+        console.warn('Data source indicator elements not found');
+        return;
+    }
+    
+    // Remove all existing classes
+    indicator.className = 'data-source-indicator';
+    
+    switch (sourceType) {
+        case 'real':
+            indicator.classList.add('real');
+            icon.className = 'indicator-icon fas fa-check-circle';
+            text.textContent = 'Live Data';
+            details.textContent = 'Displaying real-time data from AWS DynamoDB';
+            break;
+            
+        case 'demo':
+            indicator.classList.add('demo');
+            icon.className = 'indicator-icon fas fa-exclamation-triangle';
+            text.textContent = 'Demo Data';
+            details.textContent = 'AWS credentials unavailable. Showing realistic demo data including 3 customers.';
+            break;
+            
+        case 'failed':
+            indicator.classList.add('failed');
+            icon.className = 'indicator-icon fas fa-times-circle';
+            text.textContent = 'Data Unavailable';
+            details.textContent = 'Both AWS and demo endpoints failed. Showing zero values.';
+            break;
+            
+        default:
+            indicator.style.display = 'none';
+            return;
+    }
+    
+    indicator.style.display = 'flex';
+    console.log(`📊 Data source indicator updated: ${sourceType}`);
 }
 
 async function loadRecentBusinesses() {
@@ -203,7 +295,7 @@ async function loadRecentBusinesses() {
         });
 
         // Diagnostics
-        updateDashboardDebugPanel({ recentMerchants: recentBusinesses.length }); // fixed key name
+        console.log(`✅ Recent businesses loaded: ${recentBusinesses.length}`);
 
     } catch (e) {
         console.error('Error loading recent businesses:', e);
@@ -213,10 +305,6 @@ async function loadRecentBusinesses() {
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
     console.log('📄 DOM Content Loaded - Starting dashboard initialization...');
-    // Removed secondary Auth.requireAuthentication() call to prevent race/duplicate redirects
-
-    // Show diagnostics if enabled
-    showDashboardDebugPanel();
 
     // Get DOM elements
     sidebar = document.getElementById('sidebar');
@@ -257,9 +345,6 @@ document.addEventListener('DOMContentLoaded', function () {
         console.warn('Data service not available, loading fallback stats');
         showFallbackStats();
     }
-
-    // Ensure debug panel reflects base info
-    updateDashboardDebugPanel({});
 
     // Initialize dashboard-specific functionality
     initializeDashboard();
