@@ -2,7 +2,7 @@
 // Comprehensive regions management with governorates, districts, neighborhoods
 // Version redeploy marker: 2025-09-25T00:00:00Z force Amplify build
 
-const SCRIPT_VERSION = "20250925.2";
+const SCRIPT_VERSION = "20250925.3";
 
 class IraqRegionsManager {
     constructor() {
@@ -387,6 +387,7 @@ class IraqRegionsManager {
                     </td>
                 </tr>
             `;
+            this.updatePagination(0);
             return;
         }
 
@@ -419,6 +420,9 @@ class IraqRegionsManager {
         }).join('');
 
         tbody.innerHTML = rows;
+        
+        // Update pagination info
+        this.updatePagination(this.regionsData.length);
     }
 
     getNextLevel(currentLevel) {
@@ -817,6 +821,42 @@ class IraqRegionsManager {
         } catch (e) {
             console.warn('Header normalization failed:', e.message);
         }
+    }
+
+    updatePagination(totalItems) {
+        const showingStart = document.getElementById('showingStart');
+        const showingEnd = document.getElementById('showingEnd');
+        const totalCount = document.getElementById('totalCount');
+        const paginationInfo = document.getElementById('tablePagination');
+        
+        if (!showingStart || !showingEnd || !totalCount) return;
+        
+        if (totalItems === 0) {
+            showingStart.textContent = '0';
+            showingEnd.textContent = '0';
+            totalCount.textContent = '0';
+            if (paginationInfo) paginationInfo.style.display = 'none';
+            return;
+        }
+        
+        // For now, we show all items (no actual pagination implemented yet)
+        showingStart.textContent = '1';
+        showingEnd.textContent = totalItems.toString();
+        totalCount.textContent = totalItems.toString();
+        
+        if (paginationInfo) {
+            paginationInfo.style.display = 'flex';
+        }
+        
+        // Update pagination buttons (disable since we're showing all)
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        
+        // Clear page numbers since we're showing all
+        const pageNumbers = document.getElementById('pageNumbers');
+        if (pageNumbers) pageNumbers.innerHTML = '<button class="page-number active">1</button>';
     }
 }
 
