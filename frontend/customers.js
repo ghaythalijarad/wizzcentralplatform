@@ -23,6 +23,8 @@ function calculateCustomerPoints(totalSpentIQD) {
     return pointsEarned;
 }
 
+// Remove mock data - using only real DynamoDB data
+
 // Load customer order data and calculate points
 async function loadCustomerOrderData(customerId) {
     try {
@@ -52,7 +54,7 @@ async function loadCustomerOrderData(customerId) {
         } else {
             console.warn(`⚠️ Failed to load real points data for ${customerId}:`, pointsData?.error || 'Unknown error');
             
-            // Return zero values instead of mock data to indicate no real data available
+            // Return zero values when API fails - no mock data
             return {
                 totalSpent: 0,
                 totalOrders: 0,
@@ -66,7 +68,7 @@ async function loadCustomerOrderData(customerId) {
     } catch (error) {
         console.error('Error loading customer order data:', error);
         
-        // Return zero values instead of mock data when there's an error
+        // Return zero values when there's an error - no mock data
         return {
             totalSpent: 0,
             totalOrders: 0,
@@ -155,7 +157,7 @@ function updateDataSourceBanner() {
         bannerColor = '#ffebee';
     } else {
         // Default informational message
-        messageText = '🔄 System configured to fetch real customer order data from database instead of using mock data.';
+        messageText = '🔄 System configured to fetch customer data exclusively from DynamoDB. No mock data is used.';
     }
     
     // Update banner appearance
@@ -171,13 +173,27 @@ function updateDataSourceBanner() {
 
 // Initialize customers page
 async function initializeCustomersPage() {
-    console.log('Initializing customers page...');
+    console.log('🎯 Initializing customers page with DynamoDB-only data...');
+
+    // Show loading state
+    const tbody = document.querySelector('#customersTableBody');
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; padding: 40px; color: var(--md-sys-color-on-surface-variant);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 12px; color: var(--md-sys-color-primary);"></i>
+                    <div style="font-weight: 500; margin-bottom: 0.5rem;">Loading customers from DynamoDB...</div>
+                    <div style="font-size: 0.875rem; opacity: 0.8;">Fetching data from WizzUser_users_dev table</div>
+                </td>
+            </tr>
+        `;
+    }
 
     try {
         // Load customers data from DynamoDB
-        console.log('About to load customers data...');
+        console.log('🔄 Loading customers data from DynamoDB...');
         await loadCustomersData();
-        console.log('Customers data loaded successfully');
+        console.log('✅ Customers data loaded successfully from DynamoDB');
 
         // Setup event listeners
         setupEventListeners();
@@ -191,11 +207,30 @@ async function initializeCustomersPage() {
         console.log('Customers page initialization complete');
     } catch (error) {
         console.error('Error initializing customers page:', error);
-        // Show error in UI
-        const tbody = document.querySelector('#customersTable tbody');
+        
+        // Show error in UI when DynamoDB fails - no mock data fallback
+        const tbody = document.querySelector('#customersTableBody');
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: red;">Error loading customers: ${error.message}</td></tr>`;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px; color: var(--md-sys-color-error);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px; opacity: 0.7;"></i>
+                        <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Database Connection Error</div>
+                        <div style="font-size: 14px; opacity: 0.8;">Unable to load customer data from DynamoDB</div>
+                        <div style="font-size: 12px; margin-top: 8px; opacity: 0.6;">Error: ${error.message}</div>
+                        <button onclick="refreshCustomerData()" style="margin-top: 16px; padding: 8px 16px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border: none; border-radius: 4px; cursor: pointer;">
+                            <i class="fas fa-sync"></i> Retry
+                        </button>
+                    </td>
+                </tr>
+            `;
         }
+        
+        // Update stats cards to show error state
+        updateStatCardsWithError();
+        
+        // Setup event listeners even on error
+        setupEventListeners();
     }
 }
 
@@ -299,11 +334,13 @@ async function loadCustomersData() {
     } catch (error) {
         console.error('❌ Error loading customers data:', error);
         console.error('Error details:', error.code, error.message);
-
-        // Display error in UI and re-throw
+        
+        // Set empty arrays when DynamoDB fails - no mock data
         customers = [];
         filteredCustomers = [];
-        throw new Error(`Failed to load customers: ${error.message}`);
+        
+        throw error; // Re-throw to be handled by caller
+
     }
 }
 
@@ -413,10 +450,11 @@ function renderCustomersTable() {
     if (pageCustomers.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="text-center" style="padding: 2rem; color: #666;">
-                    <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                <td colspan="9" class="text-center" style="padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
+                    <i class="fas fa-database" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
                     <br>
-                    No customers found
+                    <div style="font-weight: 500; margin-bottom: 0.5rem;">No customers found in DynamoDB</div>
+                    <div style="font-size: 0.875rem; opacity: 0.8;">The WizzUser_users_dev table appears to be empty</div>
                 </td>
             </tr>
         `;
@@ -427,10 +465,10 @@ function renderCustomersTable() {
         <tr>
             <td>
                 <div class="customer-info">
-                    <img src="${customer.avatar}" alt="${customer.name}" class="customer-avatar">
-                    <div>
-                        <div class="customer-name">${customer.name}</div>
-                        <div class="customer-id">ID: ${customer.id}</div>
+                    <div class="customer-avatar">${customer.name.charAt(0)}</div>
+                    <div class="customer-details">
+                        <h4>${customer.name}</h4>
+                        <p>ID: ${customer.id}</p>
                     </div>
                 </div>
             </td>
@@ -446,27 +484,15 @@ function renderCustomersTable() {
                 </span>
             </td>
             <td>
-                <div class="points-display">
-                    <span class="points-value">${customer.totalOrders}</span>
-                    ${customer.dataSource === 'real-api-attempted' ? '<small style="color: #ff9800; display: block;">Real API (AWS pending)</small>' : ''}
-                    ${customer.dataSource === 'real-api' ? '<small style="color: #4caf50; display: block;">Real data</small>' : ''}
-                    ${customer.dataSource === 'api-failed' || customer.dataSource === 'error' ? '<small style="color: #f44336; display: block;">API unavailable</small>' : ''}
-                </div>
+                <div class="metric-value">${customer.totalOrders}</div>
             </td>
             <td>
-                <div class="points-display">
-                    <span class="points-value">${customer.totalSpent.toLocaleString()} IQD</span>
-                    ${customer.dataSource === 'real-api-attempted' ? '<small style="color: #ff9800; display: block;">Real API (AWS pending)</small>' : ''}
-                    ${customer.dataSource === 'real-api' ? '<small style="color: #4caf50; display: block;">Real data</small>' : ''}
-                    ${customer.dataSource === 'api-failed' || customer.dataSource === 'error' ? '<small style="color: #f44336; display: block;">API unavailable</small>' : ''}
-                </div>
+                <div class="currency-value">${customer.totalSpent.toLocaleString()} IQD</div>
             </td>
             <td>
                 <div class="points-display">
                     <span class="points-value">${customer.points.toLocaleString()}</span>
                     <small style="color: #666; display: block;">points</small>
-                    ${customer.vipStatus ? '<div class="vip-badge" style="background: gold; color: black; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-top: 2px;">VIP</div>' : ''}
-                    ${customer.tierLevel && customer.tierLevel !== 'regular' ? `<div class="tier-badge" style="background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 12px; font-size: 0.7rem; margin-top: 2px;">${customer.tierLevel.toUpperCase()}</div>` : ''}
                 </div>
             </td>
             <td>${formatDate(customer.lastOrder)}</td>
@@ -490,6 +516,25 @@ function renderCustomersTable() {
             </td>
         </tr>
     `).join('');
+}
+
+// Update statistics cards with error state
+function updateStatCardsWithError() {
+    const statElements = [
+        'totalCustomers',
+        'activeCustomers', 
+        'vipCustomers',
+        'totalRevenue',
+        'totalPointsEarned'
+    ];
+    
+    statElements.forEach(elementId => {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: var(--md-sys-color-error);"></i>';
+            element.title = 'Database connection error';
+        }
+    });
 }
 
 // Update statistics cards
@@ -559,140 +604,38 @@ function formatDate(dateString) {
 
 // Customer action functions
 function viewCustomer(customerId) {
+    console.log('👁️ View customer:', customerId);
     const customer = customers.find(c => c.id === customerId);
-    if (!customer) return;
-
-    // Create detailed customer info modal
-    const modalHtml = `
-        <div class="modal-overlay" id="customerModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
-            <div class="modal-content" style="background: white; border-radius: 8px; padding: 2rem; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h2 style="margin: 0; color: #2c3e50;">Customer Details</h2>
-                    <button onclick="closeCustomerModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
-                </div>
-                
-                <div class="customer-details" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="detail-group">
-                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Basic Information</h3>
-                        <p><strong>Name:</strong> ${customer.name}</p>
-                        <p><strong>Email:</strong> ${customer.email}</p>
-                        <p><strong>Phone:</strong> ${customer.phone}</p>
-                        <p><strong>Gender:</strong> ${customer.gender}</p>
-                        <p><strong>Birth Date:</strong> ${customer.birthDate}</p>
-                        <p><strong>Country Code:</strong> ${customer.countryCode}</p>
-                    </div>
-                    
-                    <div class="detail-group">
-                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Account Status</h3>
-                        <p><strong>Status:</strong> <span class="status-badge ${customer.status}">${customer.status}</span></p>
-                        <p><strong>Segment:</strong> <span class="segment-badge ${customer.segment}">${customer.segment.toUpperCase()}</span></p>
-                        <p><strong>Preferred Language:</strong> ${customer.preferredLanguage}</p>
-                        <p><strong>Join Date:</strong> ${customer.joinDate}</p>
-                        <p><strong>Last Login:</strong> ${customer.lastLoginAt ? new Date(customer.lastLoginAt).toLocaleDateString() : 'Never'}</p>
-                    </div>
-                    
-                    <div class="detail-group">
-                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Preferences & Consent</h3>
-                        <p><strong>Marketing Consent:</strong> ${customer.marketingConsent ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Newsletter:</strong> ${customer.newsletterSubscription ? '✅ Subscribed' : '❌ Not subscribed'}</p>
-                        <p><strong>Privacy Accepted:</strong> ${customer.privacyAccepted ? '✅ Yes' : '❌ No'}</p>
-                        <p><strong>Terms Accepted:</strong> ${customer.termsAccepted ? '✅ Yes' : '❌ No'}</p>
-                    </div>
-                    
-                    <div class="detail-group">
-                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Activity & Orders</h3>
-                        <p><strong>Total Orders:</strong> ${customer.totalOrders}</p>
-                        <p><strong>Total Spent:</strong> ${customer.totalSpent.toLocaleString()} IQD</p>
-                        <p><strong>Addresses:</strong> ${customer.addresses.length} saved</p>
-                        <p><strong>Payment Methods:</strong> ${customer.paymentMethods.length} saved</p>
-                    </div>
-                    
-                    <div class="detail-group">
-                        <h3 style="color: #34495e; margin-bottom: 0.5rem;">Points & Rewards</h3>
-                        <p><strong>Total Points:</strong> <span style="color: #e74c3c; font-weight: bold;">${customer.points.toLocaleString()}</span></p>
-                        <p><strong>VIP Status:</strong> ${customer.vipStatus ? '⭐ VIP Member' : '👤 Regular'}</p>
-                        <p><strong>Tier Level:</strong> <span style="color: #f39c12;">${customer.tierLevel ? customer.tierLevel.toUpperCase() : 'REGULAR'}</span></p>
-                        <div style="margin-top: 0.5rem;">
-                            <button onclick="viewCustomerPointsHistory('${customer.id}')" style="background: #3498db; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;">
-                                <i class="fas fa-history"></i> Points History
-                            </button>
-                            <button onclick="showRedeemPointsModal('${customer.id}')" style="background: #e74c3c; color: white; border: none; padding: 0.3rem 0.8rem; border-radius: 4px; cursor: pointer;">
-                                <i class="fas fa-gift"></i> Redeem Points
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="modal-actions" style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button onclick="editCustomer('${customer.id}')" class="btn-primary" style="padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        <i class="fas fa-edit"></i> Edit Customer
-                    </button>
-                    <button onclick="closeCustomerModal()" class="btn-secondary" style="padding: 0.5rem 1rem; background: #95a5a6; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-}
-
-function closeCustomerModal() {
-    const modal = document.getElementById('customerModal');
-    if (modal) {
-        modal.remove();
+    if (customer) {
+        alert(`Viewing customer: ${customer.name}\nEmail: ${customer.email}\nTotal Orders: ${customer.totalOrders}\nTotal Spent: ${customer.totalSpent.toLocaleString()} IQD\nPoints: ${customer.points.toLocaleString()}`);
     }
 }
 
 function editCustomer(customerId) {
+    console.log('✏️ Edit customer:', customerId);
     const customer = customers.find(c => c.id === customerId);
     if (customer) {
-        alert(`Edit functionality for ${customer.name} would open here. Customer ID: ${customerId}`);
+        alert(`Edit customer functionality would open here for: ${customer.name}`);
     }
 }
 
-async function toggleCustomerStatus(customerId) {
-    try {
-        const customer = customers.find(c => c.id === customerId);
-        if (!customer) return;
-
-        const newStatus = !customer.isActive;
-
-        // Update status in DynamoDB using centralized AWS utilities (ensures proper credentials)
-        const dynamoDB = await AWSUtils.getDynamoDBClient();
-
-        const updateParams = {
-            TableName: 'WizzUser_users_dev',
-            Key: { userId: customerId },
-            UpdateExpression: 'SET isActive = :status',
-            ExpressionAttributeValues: { ':status': newStatus },
-            ReturnValues: 'ALL_NEW'
-        };
-
-        await dynamoDB.update(updateParams).promise();
-
-        // Update local data
-        customer.status = newStatus ? 'active' : 'inactive';
-        customer.isActive = newStatus;
-
-        // Update filtered customers
-        const filteredIndex = filteredCustomers.findIndex(c => c.id === customerId);
-        if (filteredIndex >= 0) {
-            filteredCustomers[filteredIndex] = { ...customer };
-        }
-
-        // Re-render table
+function toggleCustomerStatus(customerId) {
+    console.log('🔄 Toggle customer status:', customerId);
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+        customer.status = customer.status === 'active' ? 'inactive' : 'active';
+        customer.isActive = customer.status === 'active';
         renderCustomersTable();
         updateStatCards();
-
-        console.log(`Customer ${customerId} status toggled to: ${newStatus ? 'active' : 'inactive'}`);
-
-    } catch (error) {
-        console.error('Error toggling customer status:', error);
-        alert('Failed to update customer status. Please try again.');
+        showMessage(`Customer ${customer.name} status changed to ${customer.status}`, 'success');
     }
 }
+
+// Make functions globally available
+window.viewCustomer = viewCustomer;
+window.editCustomer = editCustomer;
+window.toggleCustomerStatus = toggleCustomerStatus;
+window.refreshCustomerData = refreshCustomerData;
 
 // Export customers data
 function exportCustomers() {
@@ -740,6 +683,12 @@ function exportCustomers() {
         console.error('Error exporting customer data:', error);
         alert('Failed to export customer data. Please try again.');
     }
+}
+
+// Global functions for HTML onclick handlers
+function refreshCustomerData() {
+    console.log('🔄 Refreshing customer data...');
+    initializeCustomersPage();
 }
 
 // Make export function globally available
@@ -954,5 +903,108 @@ async function showRedeemPointsModal(customerId) {
                 </div>
                 
                 <div class="redeem-form">
-                    <div style="margin-bottom: 
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Points to Redeem:</label>
+                        <input type="number" id="redeemAmount" min="1" max="${customer.points}" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" placeholder="Enter points amount">
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">Reason (Optional):</label>
+                        <textarea id="redeemReason" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical;" rows="3" placeholder="e.g., Applied to order #12345"></textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button onclick="closeRedeemPointsModal()" style="background: #95a5a6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            Cancel
+                        </button>
+                        <button onclick="processPointsRedemption('${customerId}')" style="background: #e74c3c; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;">
+                            Redeem Points
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', redeemHtml);
+}
+
+function closeRedeemPointsModal() {
+    const modal = document.getElementById('redeemPointsModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+async function processPointsRedemption(customerId) {
+    try {
+        const redeemAmountEl = document.getElementById('redeemAmount');
+        const redeemReasonEl = document.getElementById('redeemReason');
+        
+        if (!redeemAmountEl) return;
+        
+        const pointsAmount = parseInt(redeemAmountEl.value);
+        const reason = redeemReasonEl ? redeemReasonEl.value : '';
+        
+        if (!pointsAmount || pointsAmount <= 0) {
+            alert('Please enter a valid points amount');
+            return;
+        }
+        
+        const customer = customers.find(c => c.id === customerId);
+        if (!customer) {
+            alert('Customer not found');
+            return;
+        }
+        
+        if (pointsAmount > customer.points) {
+            alert('Cannot redeem more points than available');
+            return;
+        }
+        
+        // Process redemption via CustomerPointsService
+        const result = await CustomerPointsService.redeemPoints(customerId, pointsAmount, reason);
+        
+        if (result && result.success) {
+            // Update customer points locally
+            customer.points -= pointsAmount;
+            
+            // Update UI
+            renderCustomersTable();
+            updateStatCards();
+            
+            // Close modal
+            closeRedeemPointsModal();
+            
+            // Show success message
+            showMessage(`Successfully redeemed ${pointsAmount} points for ${customer.name}`, 'success');
+        } else {
+            alert('Failed to redeem points: ' + (result?.error || 'Unknown error'));
+        }
+        
+    } catch (error) {
+        console.error('Error processing points redemption:', error);
+        alert('Failed to redeem points. Please try again.');
+    }
+}
+
+// Make functions globally available
+window.refreshCustomerPoints = refreshCustomerPoints;
+window.viewCustomerPointsHistory = viewCustomerPointsHistory;
+window.closePointsHistoryModal = closePointsHistoryModal;
+window.showRedeemPointsModal = showRedeemPointsModal;
+window.closeRedeemPointsModal = closeRedeemPointsModal;
+window.processPointsRedemption = processPointsRedemption;
+
+// Initialize the customers page when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 Customers page DOM loaded, initializing...');
+    
+    // Small delay to ensure all scripts are loaded
+    setTimeout(() => {
+        initializeCustomersPage().catch(error => {
+            console.error('❌ Failed to initialize customers page:', error);
+        });
+    }, 100);
+});
 
