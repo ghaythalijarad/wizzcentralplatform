@@ -20,6 +20,12 @@ class IraqRegionsManager {
             4: 'street'
         };
         
+        // Production configuration - detect if running on Amplify
+        this.isProduction = window.location.hostname.includes('amplifyapp.com') || 
+                           window.location.hostname.includes('d2f5oacwil9cbi.amplifyapp.com');
+        
+        console.log('🌍 Environment detected:', this.isProduction ? 'Production (Amplify)' : 'Development');
+        
         // Initialize event listeners
         this.initializeEventListeners();
     }
@@ -27,29 +33,43 @@ class IraqRegionsManager {
     async init() {
         console.log('🇮🇶 Iraq Regions Manager: Initializing...');
         
+        // Check if running in production (Amplify)
+        const isProduction = window.location.hostname.includes('amplifyapp.com') || 
+                           window.location.hostname.includes('d2f5oacwil9cbi.amplifyapp.com');
+        
         try {
             // Initialize map first
             await this.initializeMap();
             
-            // Load initial regions data (governorates)
-            await this.loadRegions();
-            
-            // Load statistics
-            await this.loadStatistics();
+            if (isProduction) {
+                // In production, always use sample data since local API won't be available
+                console.log('🌍 Production environment detected - using sample data');
+                this.loadSampleRegionsData('governorate', 'iraq');
+                this.showNotification('Regions management loaded successfully', 'success');
+            } else {
+                // In development, try API first, fallback to sample data
+                try {
+                    await this.loadRegions();
+                    await this.loadStatistics();
+                } catch (apiError) {
+                    console.log('🔄 API unavailable - falling back to sample data');
+                    this.loadSampleRegionsData('governorate', 'iraq');
+                    this.showNotification('Development mode: showing sample data', 'info');
+                }
+            }
             
             console.log('✅ Iraq Regions Manager: Initialized successfully');
         } catch (error) {
             console.error('❌ Iraq Regions Manager: Initialization failed:', error);
-            console.log('🔄 Attempting fallback initialization with sample data...');
             
-            // Fallback initialization with sample data
+            // Final fallback - always provide sample data
             try {
                 await this.initializeMap();
                 this.loadSampleRegionsData('governorate', 'iraq');
-                this.showError('API unavailable - showing sample data for demonstration');
-                console.log('✅ Iraq Regions Manager: Fallback initialization successful');
+                this.showError('Using offline sample data - some features may be limited');
+                console.log('✅ Iraq Regions Manager: Emergency fallback successful');
             } catch (fallbackError) {
-                console.error('❌ Fallback initialization also failed:', fallbackError);
+                console.error('❌ Complete initialization failure:', fallbackError);
                 this.showError('Failed to initialize regions management');
             }
         }
@@ -462,7 +482,7 @@ class IraqRegionsManager {
                 font-size: 0.875rem;
             .level-badge {tom: 1px solid var(--md-sys-color-outline-variant);
                 background: var(--md-sys-color-secondary-container);
-                color: var(--md-sys-color-on-secondary-container);
+                color: var (--md-sys-color-on-secondary-container);
                 padding: 0.25rem 0.5rem;
                 border-radius: var(--md-sys-shape-corner-small);
                 font-size: 0.75rem;solid var(--md-sys-color-outline-variant);
@@ -497,12 +517,6 @@ class IraqRegionsManager {
                 padding: 0.375rem 0.5rem;
                 border: none;
                 border-radius: var(--md-sys-shape-corner-small);
-                cursor: pointer;ar(--md-sys-shape-corner-full);
-                transition: all 0.2s ease;
-                font-size: 0.75rem;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
                 min-width: 32px;--md-sys-color-primary-container);
                 height: 32px;md-sys-color-on-primary-container);
             }
