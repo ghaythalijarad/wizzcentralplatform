@@ -605,7 +605,7 @@
         }
 
         .region-status.inactive {
-            background: var(--md-sys-color-error);
+            background: var (--md-sys-color-error);
             box-shadow: 0 0 0 2px var(--md-sys-color-error-container);
         }
 
@@ -898,6 +898,8 @@
                     <i class="fas fa-bars"></i>
                 </button>
                 <h1 class="page-title">Regions Management</h1>
+                <span id="version-badge"
+                    style="font-size: 0.7rem; background-color: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant); padding: 2px 6px; border-radius: 8px; margin-left: 10px; font-weight: 500;"></span>
             </div>
             <div class="top-bar-actions">
                 <button class="btn-primary" onclick="refreshRegionsData()">
@@ -1121,7 +1123,7 @@
     <script src="../config.js"></script>
     <script src="../assets/js/auth-utils.js"></script>
     <script src="../assets/js/aws-utils.js"></script>
-    <script src="../regions-management-iraq.js"></script>
+    <script src="../regions-management-iraq.js?v=20250925.2"></script>
     
     <script>
         // Initialize page with direct sidebar loading approach
