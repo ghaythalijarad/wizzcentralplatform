@@ -131,6 +131,7 @@ class IraqRegionsManager {
 
             console.log('📍 Loading regions with params:', params.toString());
             const response = await fetch(`${this.apiBase}/api/regions?${params}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
 
             console.log('📍 API Response:', result);
@@ -173,25 +174,36 @@ class IraqRegionsManager {
 
     async updateHierarchyPath() {
         try {
+            // If we already have a path (from drilldowns), keep it in sync with current parent
+            if (!this.hierarchyPath || this.hierarchyPath.length === 0) {
+                this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
+            }
+
             if (this.currentParent && this.currentParent !== 'iraq') {
-                // Only fetch region details if it's not the root 'iraq' identifier
-                const response = await fetch(`${this.apiBase}/api/regions/${this.currentParent}`);
-                const result = await response.json();
-                
-                if (result.success && result.data.fullPath) {
-                    this.hierarchyPath = result.data.fullPath;
-                } else {
-                    this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
+                // Try to fetch current parent for display if not already in path tail
+                const tail = this.hierarchyPath[this.hierarchyPath.length - 1];
+                if (!tail || tail.regionId !== this.currentParent) {
+                    const response = await fetch(`${this.apiBase}/api/regions/${this.currentParent}`);
+                    if (response.ok) {
+                        const result = await response.json();
+                        const r = result.data || {};
+                        this.hierarchyPath.push({
+                            regionName: r.name || 'Unknown',
+                            regionNameArabic: r.name_ar || 'غير معروف',
+                            regionId: r.id || this.currentParent,
+                            depth: this.hierarchyPath.length
+                        });
+                    }
                 }
             } else {
-                // For root 'iraq', set up the basic hierarchy
-                this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
+                // Reset to root when at top
+                this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
             }
             
             this.renderBreadcrumb();
         } catch (error) {
             console.error('Error updating hierarchy path:', error);
-            this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
+            this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
             this.renderBreadcrumb();
         }
     }
@@ -200,8 +212,7 @@ class IraqRegionsManager {
         try {
             console.log('🔍 Checking server status...');
             const response = await fetch(`${this.apiBase}/health`, { 
-                method: 'GET',
-                timeout: 5000 
+                method: 'GET'
             });
             
             if (response.ok) {
@@ -223,27 +234,25 @@ class IraqRegionsManager {
 
     renderBreadcrumb() {
         const container = document.getElementById('hierarchyBreadcrumb');
-        if (!container) {
-            // Create breadcrumb container if it doesn't exist
-            const header = document.querySelector('.regions-header');
-            if (header) {
-                const breadcrumbDiv = document.createElement('div');
-                breadcrumbDiv.id = 'hierarchyBreadcrumb';
-                breadcrumbDiv.className = 'hierarchy-breadcrumb';
-                header.appendChild(breadcrumbDiv);
-            } else {
-                return;
-            }
-        }
+        if (!container) return;
 
-        const finalContainer = document.getElementById('hierarchyBreadcrumb');
-        
-        finalContainer.innerHTML = `
+        const levelDisplay = (lvl) => {
+            switch (lvl) {
+                case 'country': return 'Country';
+                case 'governorate': return 'Governorate';
+                case 'district': return 'District';
+                case 'neighborhood': return 'Neighborhood';
+                case 'street': return 'Street';
+                default: return 'Unknown';
+            }
+        };
+
+        container.innerHTML = `
             <div class="breadcrumb-container">
                 <div class="breadcrumb-path">
                     ${this.hierarchyPath.map((item, index) => `
                         <button class="breadcrumb-item ${index === this.hierarchyPath.length - 1 ? 'active' : ''}"
-                                data-level="${item.level || index}" 
+                                data-level="${index}"
                                 data-region-id="${item.regionId}">
                             <i class="fas fa-map-marker-alt"></i>
                             <span>${item.regionName}</span>
@@ -253,7 +262,7 @@ class IraqRegionsManager {
                     `).join('')}
                 </div>
                 <div class="level-indicator">
-                    <span class="level-badge">Level ${this.currentLevel}: ${this.levelNames[this.currentLevel] || 'Unknown'}</span>
+                    <span class="level-badge">Level: ${levelDisplay(this.currentLevel)}</span>
                     <span class="region-count">${this.regionsData.length} regions</span>
                 </div>
             </div>
@@ -306,262 +315,81 @@ class IraqRegionsManager {
                 color: var(--md-sys-color-on-surface);
             }
 
-            .breadcrumb-item:hover {
-                background: var(--md-sys-color-surface-container-high);
-                border-color: var(--md-sys-color-primary);
-            }
-
-            .breadcrumb-item.active {
-                background: var(--md-sys-color-primary-container);
-                border-color: var(--md-sys-color-primary);
-                color: var(--md-sys-color-on-primary-container);
-                cursor: default;
-            }
-
-            .breadcrumb-item .arabic {
-                font-size: 0.75rem;
-                opacity: 0.7;
-            }
-
-            .breadcrumb-separator {
-                color: var(--md-sys-color-on-surface-variant);
-                font-size: 0.75rem;
-            }
-
-            .level-indicator {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-            }
-
-            .level-badge {
-                background: var(--md-sys-color-secondary-container);
-                color: var(--md-sys-color-on-secondary-container);
-                padding: 0.25rem 0.75rem;
-                border-radius: var(--md-sys-shape-corner-full);
-                font-size: 0.875rem;
-                font-weight: 500;
-            }
-
-            .region-count {
-                color: var(--md-sys-color-on-surface-variant);
-                font-size: 0.875rem;
-            }
-
-            .search-results-indicator {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                padding: 0.75rem;
-                background: var(--md-sys-color-tertiary-container);
-                color: var(--md-sys-color-on-tertiary-container);
-                border-radius: var(--md-sys-shape-corner-medium);
-            }
-
-            .btn-clear-search {
-                background: var(--md-sys-color-surface);
-                border: 1px solid var(--md-sys-color-outline);
-                border-radius: var(--md-sys-shape-corner-small);
-                padding: 0.25rem 0.5rem;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                color: var(--md-sys-color-on-surface);
-            }
-
-            .btn-clear-search:hover {
-                background: var(--md-sys-color-surface-container);
-            }
+            .breadcrumb-item:hover { background: var(--md-sys-color-surface-container-high); border-color: var(--md-sys-color-primary); }
+            .breadcrumb-item.active { background: var(--md-sys-color-primary-container); border-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary-container); cursor: default; }
+            .breadcrumb-item .arabic { font-size: 0.75rem; opacity: 0.7; }
+            .breadcrumb-separator { color: var(--md-sys-color-on-surface-variant); font-size: 0.75rem; }
+            .level-indicator { display: flex; align-items: center; gap: 1rem; }
+            .level-badge { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); padding: 0.25rem 0.75rem; border-radius: var(--md-sys-shape-corner-full); font-size: 0.875rem; font-weight: 500; }
+            .region-count { color: var(--md-sys-color-on-surface-variant); font-size: 0.875rem; }
         `;
         document.head.appendChild(styles);
     }
 
     renderRegions() {
-        const container = document.getElementById('regionsTableContainer');
-        if (!container) return;
+        // Populate the existing table body in regions.html
+        const tbody = document.getElementById('regionsTableBody');
+        if (!tbody) return;
 
-        if (this.regionsData.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-map"></i>
-                    <h3>No regions found</h3>
-                    <p>No regions available at this level</p>
-                    <button class="btn-primary" onclick="regionsManager.openAddRegionModal()">
-                        <i class="fas fa-plus"></i>
-                        Add First Region
-                    </button>
-                </div>
+        if (!Array.isArray(this.regionsData) || this.regionsData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="loading-cell">
+                        <div class="empty-state">
+                            <i class="fas fa-map"></i>
+                            <h3>No regions found</h3>
+                            <p>No regions available at this level</p>
+                        </div>
+                    </td>
+                </tr>
             `;
             return;
         }
 
-        // Create table rows for regions
-        const tableRows = this.regionsData.map(region => {
+        const rows = this.regionsData.map(region => {
             const nextLevel = this.getNextLevel(region.level);
+            const isActive = !!region.is_active;
+            const drivers = region.statistics?.active_drivers ?? 0;
+            const merchants = region.statistics?.active_merchants ?? 0;
+            const totalOrders = region.statistics?.total_orders ?? 0;
+            const governorate = region.governorate_id || (region.level === 'governorate' ? '-' : (region.parent_id || '-'));
+
             return `
-                <tr class="region-row ${region.is_active ? 'active' : 'inactive'}">
+                <tr class="region-row ${isActive ? 'active' : 'inactive'}">
                     <td>
                         <div class="region-name-cell">
-                            <strong>${region.name}</strong>
-                            <div class="region-name-arabic">${region.name_ar}</div>
+                            <span class="region-name-en">${region.name || 'Unknown'}</span>
+                            <span class="region-name-ar">${region.name_ar || ''}</span>
                         </div>
                     </td>
+                    <td>${governorate || '-'}</td>
                     <td>
-                        <span class="level-badge">${region.level}</span>
-                    </td>
-                    <td>
-                        <span class="status-badge ${region.is_active ? 'active' : 'inactive'}">
-                            ${region.is_active ? 'Active' : 'Inactive'}
+                        <span class="status-badge ${isActive ? 'active' : 'inactive'}">
+                            ${isActive ? 'Active' : 'Inactive'}
                         </span>
                     </td>
-                    <td>${region.statistics?.active_drivers || 0}</td>
-                    <td>${region.statistics?.active_merchants || 0}</td>
-                    <td>${region.statistics?.total_orders || 0}</td>
-                    <td>
-                        <div class="action-buttons">
-                            ${nextLevel ? `<button class="btn-small btn-primary region-drill-down" data-region-id="${region.id}" title="View sub-regions"><i class="fas fa-search-plus"></i></button>` : ''}
-                            <button class="btn-small btn-secondary" onclick="regionsManager.toggleRegionStatus('${region.id}')" title="Toggle status"><i class="fas fa-power-off"></i></button>
-                            <button class="btn-small btn-outline" onclick="regionsManager.editRegion('${region.id}')" title="Edit region"><i class="fas fa-edit"></i></button>
-                        </div>
+                    <td><span class="metric-value">${drivers}</span></td>
+                    <td><span class="metric-value">${merchants}</span></td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><span class="metric-value">${totalOrders}</span></td>
+                    <td class="actions-cell">
+                        ${nextLevel ? `<button class="action-btn view region-drill-down" data-region-id="${region.id}"><i class="fas fa-search-plus"></i> View</button>` : ''}
+                        <button class="action-btn edit" onclick="regionsManager.editRegion && regionsManager.editRegion('${region.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="action-btn toggle" onclick="regionsManager.toggleRegionStatus && regionsManager.toggleRegionStatus('${region.id}')"><i class="fas fa-power-off"></i> Toggle</button>
                     </td>
                 </tr>
             `;
         }).join('');
 
-        // Create the complete table
-        container.innerHTML = `
-        if (document.getElementById('regions-table-styles')) return;
-                <table class="regions-table">
-        const styles = document.createElement('style');
-        styles.id = 'regions-table-styles';
-        styles.textContent = `h>Region Name</th>
-            .table-responsive {>Level</th>
-                overflow-x: auto;tatus</th>
-                margin: 1rem 0;>Drivers</th>
-            }               <th>Merchants</th>
-                            <th>Orders</th>
-            .regions-table {<th>Actions</th>
-                width: 100%;>
-                border-collapse: collapse;
-                background: var(--md-sys-color-surface);
-                border-radius: var(--md-sys-shape-corner-medium);
-                overflow: hidden;
-                box-shadow: var(--md-sys-elevation-1);
-            }/div>
-        `;
-            .regions-table th {
-                background: var(--md-sys-color-surface-container);
-                color: var(--md-sys-color-on-surface);
-                padding: 1rem 0.75rem;
-                text-align: left;
-                font-weight: 500;
-                font-size: 0.875rem;'regions-table-styles')) return;
-                border-bottom: 1px solid var(--md-sys-color-outline-variant);
-            } styles = document.createElement('style');
-        styles.id = 'regions-table-styles';
-            .regions-table td {
-                padding: 0.75rem;
-                border-bottom: 1px solid var(--md-sys-color-outline-variant);
-                vertical-align: middle;
-            }
+        tbody.innerHTML = rows;
+    }
 
-            .region-row:hover {
-                background: var(--md-sys-color-surface-container-low);
-            }   border-collapse: collapse;
-                background: var(--md-sys-color-surface);
-            .region-name-cell strong {d-sys-shape-corner-medium);
-                display: block;n;
-                color: var(--md-sys-color-on-surface);
-                font-size: 0.875rem;
-            }
-            .regions-table th {
-            .region-name-arabic {-md-sys-color-surface-container);
-                font-size: 0.75rem;-color-on-surface);
-                color: var(--md-sys-color-on-surface-variant);
-                margin-top: 0.25rem;
-            }   font-weight: 500;
-                font-size: 0.875rem;
-            .level-badge {tom: 1px solid var(--md-sys-color-outline-variant);
-                background: var(--md-sys-color-secondary-container);
-                color: var (--md-sys-color-on-secondary-container);
-                padding: 0.25rem 0.5rem;
-                border-radius: var(--md-sys-shape-corner-small);
-                font-size: 0.75rem;solid var(--md-sys-color-outline-variant);
-                font-weight: 500;iddle;
-                text-transform: capitalize;
-            }
-            .region-row:hover {
-            .status-badge { var(--md-sys-color-surface-container-low);
-                padding: 0.25rem 0.75rem;
-                border-radius: var(--md-sys-shape-corner-full);
-                font-size: 0.75rem;g {
-                font-weight: 500;
-            }   color: var(--md-sys-color-on-surface);
-                font-size: 0.875rem;
-            .status-badge.active {
-                background: var(--md-sys-color-primary-container);
-                color: var(--md-sys-color-on-primary-container);
-            }   font-size: 0.75rem;
-                color: var(--md-sys-color-on-surface-variant);
-            .status-badge.inactive {
-                background: var(--md-sys-color-error-container);
-                color: var(--md-sys-color-on-error-container);
-            }level-badge {
-                background: var(--md-sys-color-secondary-container);
-            .action-buttons {md-sys-color-on-secondary-container);
-                display: flex;em 0.5rem;
-                gap: 0.5rem;s: var(--md-sys-shape-corner-small);
-                align-items: center;
-            }   font-weight: 500;
-                text-transform: capitalize;
-            .btn-small {
-                padding: 0.375rem 0.5rem;
-                border: none;
-                border-radius: var(--md-sys-shape-corner-small);
-                min-width: 32px;--md-sys-color-primary-container);
-                height: 32px;md-sys-color-on-primary-container);
-            }
-
-            .btn-small.btn-primary {
-                background: var(--md-sys-color-primary);tainer);
-                color: var(--md-sys-color-on-primary);tainer);
-            }
-
-            .btn-small.btn-primary:hover {
-                background: var(--md-sys-color-primary-container);
-                color: var(--md-sys-color-on-primary-container);
-            }   align-items: center;
-            }
-            .btn-small.btn-secondary {
-                background: var(--md-sys-color-secondary);
-                color: var(--md-sys-color-on-secondary);
-            }   border: none;
-                border-radius: var(--md-sys-shape-corner-small);
-            .btn-small.btn-secondary:hover {
-                background: var(--md-sys-color-secondary-container);
-                color: var(--md-sys-color-on-secondary-container);
-            }   display: inline-flex;
-                align-items: center;
-            .btn-small.btn-outline {ter;
-                background: transparent;
-                border: 1px solid var(--md-sys-color-outline);
-                color: var(--md-sys-color-on-surface);
-            }
-            .btn-small.btn-primary {
-            .btn-small.btn-outline:hover {olor-primary);
-                background: var(--md-sys-color-surface-container);
-            }
-        `;
-        document.head.appendChild(styles);
-    }           background: var(--md-sys-color-primary-container);
-                color: var(--md-sys-color-on-primary-container);
     getNextLevel(currentLevel) {
-        const levelSequence = ['country', 'governorate', 'district', 'neighborhood', 'street'];
-        const totalDriversEl = document.getElementById('totalDrivers');
-        if (totalDriversEl) totalDriversEl.textContent = stats.serviceStats.totalDrivers;
-
-        // Update total merchants
-        const totalMerchantsEl = document.getElementById('totalMerchants');
-        if (totalMerchantsEl) totalMerchantsEl.textContent = stats.serviceStats.totalMerchants;
+        const order = ['country', 'governorate', 'district', 'neighborhood', 'street'];
+        const idx = order.indexOf(currentLevel);
+        if (idx === -1 || idx === order.length - 1) return null;
+        return order[idx + 1];
     }
 
     async initializeMap() {
@@ -595,19 +423,18 @@ class IraqRegionsManager {
 
         // Add markers for current regions
         this.regionsData.forEach(region => {
-            if (region.coordinates && region.coordinates.center) {
-                const marker = L.marker([
-                    region.coordinates.center.lat,
-                    region.coordinates.center.lng
-                ]).addTo(this.map);
+            const coords = region.coordinates || {};
+            const center = coords.center || coords;
+            if (center && typeof center.lat === 'number' && typeof center.lng === 'number') {
+                const marker = L.marker([center.lat, center.lng]).addTo(this.map);
 
                 marker.bindPopup(`
                     <div>
-                        <h4>${region.regionName}</h4>
-                        <p>${region.regionNameArabic}</p>
-                        <p>Status: ${region.serviceConfig.isActive ? 'Active' : 'Inactive'}</p>
-                        <p>Drivers: ${region.statistics.activeDrivers}</p>
-                        <p>Merchants: ${region.statistics.activeMerchants}</p>
+                        <h4>${region.name || ''}</h4>
+                        <p>${region.name_ar || ''}</p>
+                        <p>Status: ${region.is_active ? 'Active' : 'Inactive'}</p>
+                        <p>Drivers: ${region.statistics?.active_drivers ?? 0}</p>
+                        <p>Merchants: ${region.statistics?.active_merchants ?? 0}</p>
                     </div>
                 `);
 
@@ -623,39 +450,82 @@ class IraqRegionsManager {
     }
 
     focusOnMap(regionId) {
-        const region = this.regionsData.find(r => r.regionId === regionId);
+        const region = this.regionsData.find(r => r.id === regionId);
         if (!region || !region.coordinates || !this.map) return;
 
-        this.map.setView([
-            region.coordinates.center.lat,
-            region.coordinates.center.lng
-        ], 12);
+        const coords = region.coordinates.center || region.coordinates;
+        if (!coords) return;
+
+        this.map.setView([coords.lat, coords.lng], 12);
 
         // Open popup for this region
         this.mapMarkers.forEach(marker => {
             const markerLatLng = marker.getLatLng();
-            if (markerLatLng.lat === region.coordinates.center.lat &&
-                markerLatLng.lng === region.coordinates.center.lng) {
+            if (markerLatLng.lat === coords.lat && markerLatLng.lng === coords.lng) {
                 marker.openPopup();
             }
         });
     }
 
+    // Navigation helpers
+    drillDownToRegion(regionId) {
+        const region = this.regionsData.find(r => r.id === regionId);
+        if (!region) return;
+        const nextLevel = this.getNextLevel(region.level);
+        if (!nextLevel) return;
+
+        // Extend breadcrumb path
+        this.hierarchyPath = this.hierarchyPath && this.hierarchyPath.length > 0 ? this.hierarchyPath : [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
+        this.hierarchyPath.push({
+            regionName: region.name,
+            regionNameArabic: region.name_ar,
+            regionId: region.id,
+            depth: this.hierarchyPath.length
+        });
+        this.renderBreadcrumb();
+
+        // Load children of selected region
+        this.loadRegions(nextLevel, region.id);
+    }
+
+    navigateToLevel(depthIndex, regionId) {
+        // depthIndex corresponds to breadcrumb index (0=root Iraq)
+        const levelByDepth = ['governorate', 'district', 'neighborhood', 'street'];
+        const targetLevel = levelByDepth[depthIndex] || 'governorate';
+        const targetParent = regionId || 'iraq';
+
+        // Trim path
+        this.hierarchyPath = (this.hierarchyPath || []).slice(0, depthIndex + 1);
+        if (this.hierarchyPath.length === 0) {
+            this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
+        }
+        this.renderBreadcrumb();
+
+        // Load target
+        this.loadRegions(targetLevel, targetParent);
+    }
+
+    searchRegions(term) {
+        // Server-side search via query param
+        const q = (term || '').trim();
+        this.loadRegions(this.currentLevel, this.currentParent, q);
+    }
+
     openAddRegionModal() {
         console.log('Opening add region modal for level:', this.currentLevel + 1);
-        // Implementation for add region modal
+        // No-op placeholder: Modal handled elsewhere
     }
 
     editRegion(regionId) {
         console.log('Editing region:', regionId);
-        // Implementation for edit region
+        // Implementation for edit region (out of scope)
     }
 
     async deleteRegion(regionId) {
-        const region = this.regionsData.find(r => r.regionId === regionId);
+        const region = this.regionsData.find(r => r.id === regionId);
         if (!region) return;
 
-        if (!confirm(`Are you sure you want to delete "${region.regionName}"?`)) {
+        if (!confirm(`Are you sure you want to delete "${region.name}"?`)) {
             return;
         }
 
@@ -683,6 +553,27 @@ class IraqRegionsManager {
         this.loadRegions(this.currentLevel, this.currentParent);
     }
 
+    async loadStatistics() {
+        try {
+            const res = await fetch(`${this.apiBase}/api/regions/statistics`);
+            if (!res.ok) return;
+            const body = await res.json();
+            const stats = body?.data;
+            if (!stats) return;
+            // Update any known stat elements if present
+            const totalDriversEl = document.getElementById('totalDrivers');
+            if (totalDriversEl && stats.serviceStats?.totalDrivers != null) {
+                totalDriversEl.textContent = stats.serviceStats.totalDrivers;
+            }
+            const totalMerchantsEl = document.getElementById('totalMerchants');
+            if (totalMerchantsEl && stats.serviceStats?.totalMerchants != null) {
+                totalMerchantsEl.textContent = stats.serviceStats.totalMerchants;
+            }
+        } catch (e) {
+            console.warn('Failed to load statistics:', e.message);
+        }
+    }
+
     // Utility functions
     debounce(func, wait) {
         let timeout;
@@ -697,20 +588,23 @@ class IraqRegionsManager {
     }
 
     showLoading() {
-        const container = document.getElementById('regionsTableContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="loading-spinner"></div>
-                    <h3>Loading regions...</h3>
-                    <p>Please wait while we load the regional data</p>
-                </div>
+        const tbody = document.getElementById('regionsTableBody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="loading-cell">
+                        <div class="loading-state">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            Loading regions data...
+                        </div>
+                    </td>
+                </tr>
             `;
         }
     }
 
     hideLoading() {
-        // Loading is hidden when renderRegions() is called
+        // Hidden when renderRegions() is called
     }
 
     showError(message) {
@@ -755,65 +649,13 @@ class IraqRegionsManager {
         const styles = document.createElement('style');
         styles.id = 'notification-styles';
         styles.textContent = `
-            .notification {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: var(--md-sys-color-surface);
-                border: 1px solid var(--md-sys-color-outline);
-                border-radius: var(--md-sys-shape-corner-medium);
-                padding: 1rem;
-                box-shadow: var(--md-sys-elevation-3);
-                z-index: 10000;
-                max-width: 400px;
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                animation: slideIn 0.3s ease-out;
-            }
-
-            .notification-error {
-                border-color: var(--md-sys-color-error);
-                background: var(--md-sys-color-error-container);
-                color: var(--md-sys-color-on-error-container);
-            }
-
-            .notification-success {
-                border-color: var(--md-sys-color-success);
-                background: var(--md-sys-color-success-container);
-                color: var(--md-sys-color-on-success-container);
-            }
-
-            .notification-content {
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-                flex: 1;
-            }
-
-            .notification-close {
-                background: none;
-                border: none;
-                cursor: pointer;
-                color: inherit;
-                opacity: 0.7;
-                transition: opacity 0.2s ease;
-            }
-
-            .notification-close:hover {
-                opacity: 1;
-            }
-
-            @keyframes slideIn {
-                from {
-                    transform: translateX(100%);
-                    opacity: 0;
-                }
-                to {
-                    transform: translateX(0);
-                    opacity: 1;
-                }
-            }
+            .notification { position: fixed; top: 20px; right: 20px; background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline); border-radius: var(--md-sys-shape-corner-medium); padding: 1rem; box-shadow: var(--md-sys-elevation-3); z-index: 10000; max-width: 400px; display: flex; align-items: center; gap: 1rem; animation: slideIn 0.3s ease-out; }
+            .notification-error { border-color: var(--md-sys-color-error); background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+            .notification-success { border-color: var(--md-sys-color-success); background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
+            .notification-content { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
+            .notification-close { background: none; border: none; cursor: pointer; color: inherit; opacity: 0.7; transition: opacity 0.2s ease; }
+            .notification-close:hover { opacity: 1; }
+            @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         `;
         document.head.appendChild(styles);
     }
@@ -825,7 +667,7 @@ class IraqRegionsManager {
         const sampleData = {
             governorate: [
                 {
-                    id: 'IQ-BA',
+                    id: 'baghdad',
                     name: 'Baghdad',
                     name_ar: 'بغداد',
                     level: 'governorate',
@@ -833,10 +675,10 @@ class IraqRegionsManager {
                     coordinates: { lat: 33.3152, lng: 44.3661 },
                     is_active: true,
                     service_config: { delivery: true, pickup: true },
-                    statistics: { population: 9500000, area_km2: 4555, total_orders: 15420, active_drivers: 234 }
+                    statistics: { population: 9500000, area_km2: 4555, total_orders: 15420, active_drivers: 234, active_merchants: 540 }
                 },
                 {
-                    id: 'IQ-BA2',
+                    id: 'basra',
                     name: 'Basra',
                     name_ar: 'البصرة',
                     level: 'governorate',
@@ -844,64 +686,42 @@ class IraqRegionsManager {
                     coordinates: { lat: 30.5085, lng: 47.7804 },
                     is_active: true,
                     service_config: { delivery: true, pickup: true },
-                    statistics: { population: 2750000, area_km2: 19070, total_orders: 8340, active_drivers: 89 }
+                    statistics: { population: 2750000, area_km2: 19070, total_orders: 8340, active_drivers: 89, active_merchants: 210 }
                 },
                 {
-                    id: 'IQ-AR',
+                    id: 'erbil',
                     name: 'Erbil',
                     name_ar: 'أربيل',
                     level: 'governorate',
                     parent_id: 'iraq',
                     coordinates: { lat: 36.1911, lng: 44.0092 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 1920000, area_km2: 15074, total_orders: 5670, active_drivers: 67 }
-                },
-                {
-                    id: 'IQ-NA',
-                    name: 'Najaf',
-                    name_ar: 'النجف',
-                    level: 'governorate',
-                    parent_id: 'iraq',
-                    coordinates: { lat: 31.9996, lng: 44.3267 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 1350000, area_km2: 28824, total_orders: 3240, active_drivers: 45 }
-                },
-                {
-                    id: 'IQ-SU',
-                    name: 'Sulaymaniyah',
-                    name_ar: 'السليمانية',
-                    level: 'governorate',
-                    parent_id: 'iraq',
-                    coordinates: { lat: 35.5495, lng: 45.4394 },
                     is_active: false,
                     service_config: { delivery: false, pickup: false },
-                    statistics: { population: 1970000, area_km2: 17023, total_orders: 0, active_drivers: 0 }
+                    statistics: { population: 1920000, area_km2: 15074, total_orders: 0, active_drivers: 0, active_merchants: 0 }
                 }
             ],
             district: [
                 {
-                    id: 'IQ-BA-KH',
-                    name: 'Karkh',
+                    id: 'al_karkh',
+                    name: 'Al-Karkh',
                     name_ar: 'الكرخ',
                     level: 'district',
-                    parent_id: 'IQ-BA',
+                    parent_id: 'baghdad',
                     coordinates: { lat: 33.3380, lng: 44.3440 },
                     is_active: true,
                     service_config: { delivery: true, pickup: true },
-                    statistics: { population: 2100000, area_km2: 860, total_orders: 4200, active_drivers: 67 }
+                    statistics: { population: 2100000, area_km2: 860, total_orders: 4200, active_drivers: 67, active_merchants: 150 }
                 },
                 {
-                    id: 'IQ-BA-RU',
-                    name: 'Rusafa',
+                    id: 'al_rusafa',
+                    name: 'Al-Rusafa',
                     name_ar: 'الرصافة',
                     level: 'district',
-                    parent_id: 'IQ-BA',
+                    parent_id: 'baghdad',
                     coordinates: { lat: 33.3250, lng: 44.3890 },
                     is_active: true,
                     service_config: { delivery: true, pickup: true },
-                    statistics: { population: 1850000, area_km2: 755, total_orders: 3890, active_drivers: 58 }
+                    statistics: { population: 1850000, area_km2: 755, total_orders: 3890, active_drivers: 58, active_merchants: 130 }
                 }
             ]
         };
@@ -912,7 +732,13 @@ class IraqRegionsManager {
         this.currentParent = parentId;
         
         // Update hierarchy path for sample data
-        this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
+        this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
+        if (parentId && parentId !== 'iraq') {
+            const parent = this.regionsData.find(r => r.id === parentId); // may be undefined; breadcrumb will still show Iraq
+            if (parent) {
+                this.hierarchyPath.push({ regionName: parent.name, regionNameArabic: parent.name_ar, regionId: parent.id, depth: 1 });
+            }
+        }
         
         // Render the data
         this.renderRegions();
@@ -935,7 +761,7 @@ function openAddRegionModal() {
 
 function closeRegionModal() {
     if (regionsManager) {
-        regionsManager.closeRegionModal();
+        regionsManager.closeRegionModal?.();
     }
 }
 
@@ -947,7 +773,7 @@ function refreshRegionsData() {
 
 function saveRegion() {
     if (regionsManager) {
-        regionsManager.saveRegion();
+        regionsManager.saveRegion?.();
     }
 }
 
