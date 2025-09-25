@@ -482,6 +482,65 @@
                 font-size: 12px;
             }
         }
+
+        /* Sidebar Styles */
+        .md-navigation-drawer.active {
+            transform: translateX(0) !important;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: none;
+            color: var(--md-sys-color-on-surface);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: var(--md-sys-shape-corner-small);
+            transition: all var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+        }
+
+        .menu-toggle:hover {
+            background: var(--md-sys-color-surface-container);
+        }
+
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: var(--md-sys-color-surface-container-low);
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            margin-bottom: 1.5rem;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .page-title {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .main-content {
+            margin-left: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: var(--md-sys-color-surface);
+        }
+
+        .page-content {
+            padding: 0 1.5rem 2rem;
+        }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -489,50 +548,8 @@
 </head>
 
 <body data-page="customers">
-    <!-- Sidebar placeholder -->
+    <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
-    
-    <!-- Simple Sidebar Navigation -->
-    <div class="md-navigation-drawer" id="sidebar"
-        style="width: 280px; height: 100vh; position: fixed; left: 0; top: 0; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); z-index: 1000; transform: translateX(-100%); transition: transform 0.3s ease;">
-        <div class="sidebar-header" style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-            <div class="logo" style="display: flex; align-items: center; gap: 12px;">
-                <div
-                    style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                    <i class="fas fa-rocket" style="color: white;"></i>
-                </div>
-                <span style="font-size: 1.25rem; font-weight: 600;">WizzCentral</span>
-            </div>
-        </div>
-        <nav style="padding: 20px 0;">
-            <ul style="list-style: none; margin: 0; padding: 0;">
-                <li><a href="dashboard.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                <li><a href="drivers.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-motorcycle"></i> Drivers</a></li>
-                <li><a href="customers.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; background: rgba(255,255,255,0.1); border-radius: 8px; margin: 0 12px;"><i
-                            class="fas fa-users"></i> Customers</a></li>
-                <li><a href="merchants.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-store"></i> Merchants</a></li>
-                <li><a href="orders.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-shopping-cart"></i> Orders</a></li>
-                <li><a href="promotions.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-tags"></i> Promotions</a></li>
-                <li><a href="regions.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-map"></i> Regions</a></li>
-                <li><a href="financial.html"
-                        style="display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: var(--md-sys-color-on-primary); text-decoration: none; opacity: 0.8;"><i
-                            class="fas fa-chart-line"></i> Financial</a></li>
-            </ul>
-        </nav>
-    </div>
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
@@ -580,38 +597,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="customer-stat-card vip">
-                    <div class="stat-content">
-                        <div class="stat-info">
-                            <h3 id="vipCustomers">-</h3>
-                            <p>VIP Customers</p>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-crown"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="customer-stat-card revenue">
-                    <div class="stat-content">
-                        <div class="stat-info">
-                            <h3 id="totalRevenue">-</h3>
-                            <p>Total Revenue</p>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="customer-stat-card points">
-                    <div class="stat-content">
-                        <div class="stat-info">
-                            <h3 id="totalPointsEarned">-</h3>
-                            <p>Total Points Earned</p>
-                        </div>
-                        <div class="stat-icon">
-                            <i class="fas fa-star"></i>
-                        </div>
-                    </div>
             </div>
 <!-- Data Source Information Banner -->
 <div id="dataSourceBanner"
@@ -707,44 +692,39 @@
     <script src="../assets/js/navigation.js"></script>
     <script src="../customer-points-service.js"></script>
     <script src="../customers.js"></script>
-    <!-- Initialize sidebar functionality -->
+    <!-- Sidebar Loading Script -->
     <script>
-              entListener('DOMContentLoade            ded, setting up functionality...');
-        
-            const sidebarg                tById('sidebar');
-            c                uToggle = document.getElementById('menuToggle');
-                               barToggle = document.getElementById('sidebarToggle');
-          C                    ument.getElementById('mainContent');
-            
-            // Menu toggle for mobile
-            if (menuToggle) {
-                menuToggle.addEventListener('click', function() {
-                    sidebar.classList.toggle('active');
-                    if (window<= 768) {
-                        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        // Load sidebar content
+        async function loadSidebar() {
+            try {
+                const response = await fetch('/includes/sidebar.html');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const html = await response.text();
+
+                const placeholder = document.getElementById('sidebar-placeholder');
+                if (placeholder) {
+                    placeholder.innerHTML = html;
+                    console.log('✅ Sidebar loaded successfully');
+
+                    // Set active state for customers page
+                    const customersNavItem = document.querySelector('.nav-item[data-page="customers"]');
+                    if (customersNavItem) {
+                        // Remove any existing active states
+                        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+                        // Add active to customers
+                        customersNavItem.classList.add('active');
                     }
-                });
+                }
+            } catch (error) {
+                console.error('❌ Failed to load sidebar:', error);
             }
-            
-            // Sidebar toggle for desktop
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', function() {
-                    sidebar.classList.toggle('collapsed');
-                 ontent) {
-                        mainContent.classList.toggle('collapsed-sidebar');
-                    }
-                });
-            } 
-            
-            console.log('✅ Sidebar functionality initialized');
-        });
-        
-        // Logout function
-        function logout() {
-            console.log('🔐 Logout clicked');
-            if (confirm('Are you s to logout?')) {
-                window.location.href = '../index.html';
-    }
+        }
+
+        // Load sidebar when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadSidebar);
+        } else {
+            loadSidebar();
         }
     </script>
 </body>

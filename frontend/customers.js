@@ -522,10 +522,7 @@ function renderCustomersTable() {
 function updateStatCardsWithError() {
     const statElements = [
         'totalCustomers',
-        'activeCustomers', 
-        'vipCustomers',
-        'totalRevenue',
-        'totalPointsEarned'
+        'activeCustomers'
     ];
     
     statElements.forEach(elementId => {
@@ -541,9 +538,6 @@ function updateStatCardsWithError() {
 function updateStatCards() {
     const totalCustomersEl = document.getElementById('totalCustomers');
     const activeCustomersEl = document.getElementById('activeCustomers');
-    const vipCustomersEl = document.getElementById('vipCustomers');
-    const totalRevenueEl = document.getElementById('totalRevenue');
-    const totalPointsEarnedEl = document.getElementById('totalPointsEarned');
 
     if (totalCustomersEl) {
         totalCustomersEl.textContent = customers.length.toString();
@@ -552,21 +546,6 @@ function updateStatCards() {
     if (activeCustomersEl) {
         const activeCount = customers.filter(c => c.status === 'active').length;
         activeCustomersEl.textContent = activeCount.toString();
-    }
-
-    if (vipCustomersEl) {
-        const vipCount = customers.filter(c => c.segment === 'vip').length;
-        vipCustomersEl.textContent = vipCount.toString();
-    }
-
-    if (totalRevenueEl) {
-        const totalRevenue = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
-        totalRevenueEl.textContent = `${totalRevenue.toLocaleString()} IQD`;
-    }
-
-    if (totalPointsEarnedEl) {
-        const totalPoints = customers.reduce((sum, c) => sum + (c.points || 0), 0);
-        totalPointsEarnedEl.textContent = totalPoints.toLocaleString();
     }
 }
 
@@ -636,6 +615,9 @@ window.viewCustomer = viewCustomer;
 window.editCustomer = editCustomer;
 window.toggleCustomerStatus = toggleCustomerStatus;
 window.refreshCustomerData = refreshCustomerData;
+// Added global exposure for initialization & data loading
+window.initializeCustomersPage = initializeCustomersPage;
+window.loadCustomersData = loadCustomersData;
 
 // Export customers data
 function exportCustomers() {
@@ -999,8 +981,6 @@ window.processPointsRedemption = processPointsRedemption;
 // Initialize the customers page when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🎯 Customers page DOM loaded, initializing...');
-    
-    // Small delay to ensure all scripts are loaded
     setTimeout(() => {
         initializeCustomersPage().catch(error => {
             console.error('❌ Failed to initialize customers page:', error);
