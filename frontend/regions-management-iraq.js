@@ -40,7 +40,18 @@ class IraqRegionsManager {
             console.log('✅ Iraq Regions Manager: Initialized successfully');
         } catch (error) {
             console.error('❌ Iraq Regions Manager: Initialization failed:', error);
-            this.showError('Failed to initialize regions management');
+            console.log('🔄 Attempting fallback initialization with sample data...');
+            
+            // Fallback initialization with sample data
+            try {
+                await this.initializeMap();
+                this.loadSampleRegionsData('governorate', 'iraq');
+                this.showError('API unavailable - showing sample data for demonstration');
+                console.log('✅ Iraq Regions Manager: Fallback initialization successful');
+            } catch (fallbackError) {
+                console.error('❌ Fallback initialization also failed:', fallbackError);
+                this.showError('Failed to initialize regions management');
+            }
         }
     }
 
@@ -122,7 +133,19 @@ class IraqRegionsManager {
             }
         } catch (error) {
             console.error('❌ Error loading regions:', error);
-            this.showError('Failed to load regions');
+            console.error('❌ Error details:', {
+                message: error.message,
+                stack: error.stack,
+                apiBase: this.apiBase,
+                level: level,
+                parentId: parentId
+            });
+            
+            // Fallback: Use sample data if API is not available
+            console.log('🔄 Loading fallback sample data...');
+            this.loadSampleRegionsData(level, parentId);
+            
+            this.showError(`API unavailable, showing sample data: ${error.message}`);
         } finally {
             this.hideLoading();
         }
@@ -150,6 +173,31 @@ class IraqRegionsManager {
             console.error('Error updating hierarchy path:', error);
             this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
             this.renderBreadcrumb();
+        }
+    }
+
+    async checkServerStatus() {
+        try {
+            console.log('🔍 Checking server status...');
+            const response = await fetch(`${this.apiBase}/health`, { 
+                method: 'GET',
+                timeout: 5000 
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ Server is online:', result);
+                return true;
+            } else {
+                console.log('❌ Server responded with error:', response.status, response.statusText);
+                return false;
+            }
+        } catch (error) {
+            console.log('❌ Server is not accessible:', error.message);
+            console.log('💡 Make sure the development server is running:');
+            console.log('   cd /Users/ghaythallaheebi/wizzcentralplatform');
+            console.log('   node local-dev-server.js');
+            return false;
         }
     }
 
@@ -361,60 +409,35 @@ class IraqRegionsManager {
 
         // Create the complete table
         container.innerHTML = `
-            <div class="table-responsive">
-                <table class="regions-table">
-                    <thead>
-                        <tr>
-                            <th>Region Name</th>
-                            <th>Level</th>
-                            <th>Status</th>
-                            <th>Drivers</th>
-                            <th>Merchants</th>
-                            <th>Orders</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-        // Add table styles if not already present
-        this.addTableStyles();
-    }
-
-    addTableStyles() {
         if (document.getElementById('regions-table-styles')) return;
-
+                <table class="regions-table">
         const styles = document.createElement('style');
         styles.id = 'regions-table-styles';
-        styles.textContent = `
-            .table-responsive {
-                overflow-x: auto;
-                margin: 1rem 0;
-            }
-
-            .regions-table {
-                width: 100%;
+        styles.textContent = `h>Region Name</th>
+            .table-responsive {>Level</th>
+                overflow-x: auto;tatus</th>
+                margin: 1rem 0;>Drivers</th>
+            }               <th>Merchants</th>
+                            <th>Orders</th>
+            .regions-table {<th>Actions</th>
+                width: 100%;>
                 border-collapse: collapse;
                 background: var(--md-sys-color-surface);
                 border-radius: var(--md-sys-shape-corner-medium);
                 overflow: hidden;
                 box-shadow: var(--md-sys-elevation-1);
-            }
-
+            }/div>
+        `;
             .regions-table th {
                 background: var(--md-sys-color-surface-container);
                 color: var(--md-sys-color-on-surface);
                 padding: 1rem 0.75rem;
                 text-align: left;
                 font-weight: 500;
-                font-size: 0.875rem;
+                font-size: 0.875rem;'regions-table-styles')) return;
                 border-bottom: 1px solid var(--md-sys-color-outline-variant);
-            }
-
+            } styles = document.createElement('style');
+        styles.id = 'regions-table-styles';
             .regions-table td {
                 padding: 0.75rem;
                 border-bottom: 1px solid var(--md-sys-color-outline-variant);
@@ -423,100 +446,100 @@ class IraqRegionsManager {
 
             .region-row:hover {
                 background: var(--md-sys-color-surface-container-low);
-            }
-
-            .region-name-cell strong {
-                display: block;
+            }   border-collapse: collapse;
+                background: var(--md-sys-color-surface);
+            .region-name-cell strong {d-sys-shape-corner-medium);
+                display: block;n;
                 color: var(--md-sys-color-on-surface);
                 font-size: 0.875rem;
             }
-
-            .region-name-arabic {
-                font-size: 0.75rem;
+            .regions-table th {
+            .region-name-arabic {-md-sys-color-surface-container);
+                font-size: 0.75rem;-color-on-surface);
                 color: var(--md-sys-color-on-surface-variant);
                 margin-top: 0.25rem;
-            }
-
-            .level-badge {
+            }   font-weight: 500;
+                font-size: 0.875rem;
+            .level-badge {tom: 1px solid var(--md-sys-color-outline-variant);
                 background: var(--md-sys-color-secondary-container);
                 color: var(--md-sys-color-on-secondary-container);
                 padding: 0.25rem 0.5rem;
                 border-radius: var(--md-sys-shape-corner-small);
-                font-size: 0.75rem;
-                font-weight: 500;
+                font-size: 0.75rem;solid var(--md-sys-color-outline-variant);
+                font-weight: 500;iddle;
                 text-transform: capitalize;
             }
-
-            .status-badge {
+            .region-row:hover {
+            .status-badge { var(--md-sys-color-surface-container-low);
                 padding: 0.25rem 0.75rem;
                 border-radius: var(--md-sys-shape-corner-full);
-                font-size: 0.75rem;
+                font-size: 0.75rem;g {
                 font-weight: 500;
-            }
-
+            }   color: var(--md-sys-color-on-surface);
+                font-size: 0.875rem;
             .status-badge.active {
                 background: var(--md-sys-color-primary-container);
                 color: var(--md-sys-color-on-primary-container);
-            }
-
+            }   font-size: 0.75rem;
+                color: var(--md-sys-color-on-surface-variant);
             .status-badge.inactive {
                 background: var(--md-sys-color-error-container);
                 color: var(--md-sys-color-on-error-container);
-            }
-
-            .action-buttons {
-                display: flex;
-                gap: 0.5rem;
+            }level-badge {
+                background: var(--md-sys-color-secondary-container);
+            .action-buttons {md-sys-color-on-secondary-container);
+                display: flex;em 0.5rem;
+                gap: 0.5rem;s: var(--md-sys-shape-corner-small);
                 align-items: center;
-            }
-
+            }   font-weight: 500;
+                text-transform: capitalize;
             .btn-small {
                 padding: 0.375rem 0.5rem;
                 border: none;
                 border-radius: var(--md-sys-shape-corner-small);
-                cursor: pointer;
+                cursor: pointer;ar(--md-sys-shape-corner-full);
                 transition: all 0.2s ease;
                 font-size: 0.75rem;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                min-width: 32px;
-                height: 32px;
+                min-width: 32px;--md-sys-color-primary-container);
+                height: 32px;md-sys-color-on-primary-container);
             }
 
             .btn-small.btn-primary {
-                background: var(--md-sys-color-primary);
-                color: var(--md-sys-color-on-primary);
+                background: var(--md-sys-color-primary);tainer);
+                color: var(--md-sys-color-on-primary);tainer);
             }
 
             .btn-small.btn-primary:hover {
                 background: var(--md-sys-color-primary-container);
                 color: var(--md-sys-color-on-primary-container);
+            }   align-items: center;
             }
-
             .btn-small.btn-secondary {
                 background: var(--md-sys-color-secondary);
                 color: var(--md-sys-color-on-secondary);
-            }
-
+            }   border: none;
+                border-radius: var(--md-sys-shape-corner-small);
             .btn-small.btn-secondary:hover {
                 background: var(--md-sys-color-secondary-container);
                 color: var(--md-sys-color-on-secondary-container);
-            }
-
-            .btn-small.btn-outline {
+            }   display: inline-flex;
+                align-items: center;
+            .btn-small.btn-outline {ter;
                 background: transparent;
                 border: 1px solid var(--md-sys-color-outline);
                 color: var(--md-sys-color-on-surface);
             }
-
-            .btn-small.btn-outline:hover {
+            .btn-small.btn-primary {
+            .btn-small.btn-outline:hover {olor-primary);
                 background: var(--md-sys-color-surface-container);
             }
         `;
         document.head.appendChild(styles);
-    }
-
+    }           background: var(--md-sys-color-primary-container);
+                color: var(--md-sys-color-on-primary-container);
     getNextLevel(currentLevel) {
         const levelSequence = ['country', 'governorate', 'district', 'neighborhood', 'street'];
         const totalDriversEl = document.getElementById('totalDrivers');
@@ -779,6 +802,110 @@ class IraqRegionsManager {
             }
         `;
         document.head.appendChild(styles);
+    }
+
+    loadSampleRegionsData(level, parentId) {
+        console.log('📊 Loading sample Iraqi regions data...');
+        
+        // Sample Iraqi regions data based on level
+        const sampleData = {
+            governorate: [
+                {
+                    id: 'IQ-BA',
+                    name: 'Baghdad',
+                    name_ar: 'بغداد',
+                    level: 'governorate',
+                    parent_id: 'iraq',
+                    coordinates: { lat: 33.3152, lng: 44.3661 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 9500000, area_km2: 4555, total_orders: 15420, active_drivers: 234 }
+                },
+                {
+                    id: 'IQ-BA2',
+                    name: 'Basra',
+                    name_ar: 'البصرة',
+                    level: 'governorate',
+                    parent_id: 'iraq',
+                    coordinates: { lat: 30.5085, lng: 47.7804 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 2750000, area_km2: 19070, total_orders: 8340, active_drivers: 89 }
+                },
+                {
+                    id: 'IQ-AR',
+                    name: 'Erbil',
+                    name_ar: 'أربيل',
+                    level: 'governorate',
+                    parent_id: 'iraq',
+                    coordinates: { lat: 36.1911, lng: 44.0092 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 1920000, area_km2: 15074, total_orders: 5670, active_drivers: 67 }
+                },
+                {
+                    id: 'IQ-NA',
+                    name: 'Najaf',
+                    name_ar: 'النجف',
+                    level: 'governorate',
+                    parent_id: 'iraq',
+                    coordinates: { lat: 31.9996, lng: 44.3267 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 1350000, area_km2: 28824, total_orders: 3240, active_drivers: 45 }
+                },
+                {
+                    id: 'IQ-SU',
+                    name: 'Sulaymaniyah',
+                    name_ar: 'السليمانية',
+                    level: 'governorate',
+                    parent_id: 'iraq',
+                    coordinates: { lat: 35.5495, lng: 45.4394 },
+                    is_active: false,
+                    service_config: { delivery: false, pickup: false },
+                    statistics: { population: 1970000, area_km2: 17023, total_orders: 0, active_drivers: 0 }
+                }
+            ],
+            district: [
+                {
+                    id: 'IQ-BA-KH',
+                    name: 'Karkh',
+                    name_ar: 'الكرخ',
+                    level: 'district',
+                    parent_id: 'IQ-BA',
+                    coordinates: { lat: 33.3380, lng: 44.3440 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 2100000, area_km2: 860, total_orders: 4200, active_drivers: 67 }
+                },
+                {
+                    id: 'IQ-BA-RU',
+                    name: 'Rusafa',
+                    name_ar: 'الرصافة',
+                    level: 'district',
+                    parent_id: 'IQ-BA',
+                    coordinates: { lat: 33.3250, lng: 44.3890 },
+                    is_active: true,
+                    service_config: { delivery: true, pickup: true },
+                    statistics: { population: 1850000, area_km2: 755, total_orders: 3890, active_drivers: 58 }
+                }
+            ]
+        };
+        
+        // Set the appropriate data based on level
+        this.regionsData = sampleData[level] || sampleData.governorate;
+        this.currentLevel = level;
+        this.currentParent = parentId;
+        
+        // Update hierarchy path for sample data
+        this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', level: 0 }];
+        
+        // Render the data
+        this.renderRegions();
+        this.renderBreadcrumb();
+        this.updateMapMarkers();
+        
+        console.log(`📊 Loaded ${this.regionsData.length} sample regions for level ${level}`);
     }
 }
 
