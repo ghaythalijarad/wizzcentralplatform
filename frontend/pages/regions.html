@@ -377,7 +377,7 @@
 
         .action-btn.edit {
             background: var(--md-sys-color-secondary-container);
-            color: var(--md-sys-color-on-secondary-container);
+            color: var (--md-sys-color-on-secondary-container);
         }
 
         .action-btn.toggle {
@@ -992,31 +992,6 @@
                                             Status
                                             <i class="fas fa-sort sort-icon"></i>
                                         </th>
-                                        <th class="sortable" onclick="sortTable('activeDrivers')">
-                                            <i class="fas fa-motorcycle"></i>
-                                            Drivers
-                                            <i class="fas fa-sort sort-icon"></i>
-                                        </th>
-                                        <th class="sortable" onclick="sortTable('activeMerchants')">
-                                            <i class="fas fa-store"></i>
-                                            Merchants
-                                            <i class="fas fa-sort sort-icon"></i>
-                                        </th>
-                                        <th class="sortable" onclick="sortTable('deliveryFee')">
-                                            <i class="fas fa-truck"></i>
-                                            Delivery Fee
-                                            <i class="fas fa-sort sort-icon"></i>
-                                        </th>
-                                        <th class="sortable" onclick="sortTable('minimumOrder')">
-                                            <i class="fas fa-shopping-cart"></i>
-                                            Min Order
-                                            <i class="fas fa-sort sort-icon"></i>
-                                        </th>
-                                        <th class="sortable" onclick="sortTable('totalOrders')">
-                                            <i class="fas fa-chart-line"></i>
-                                            Total Orders
-                                            <i class="fas fa-sort sort-icon"></i>
-                                        </th>
                                         <th>
                                             <i class="fas fa-cog"></i>
                                             Actions
@@ -1025,7 +1000,7 @@
                                 </thead>
                                 <tbody id="regionsTableBody">
                                     <tr>
-                                        <td colspan="9" class="loading-cell">
+                                        <td colspan="4" class="loading-cell">
                                             <div class="loading-state">
                                                 <i class="fas fa-spinner fa-spin"></i>
                                                 Loading regions data...
@@ -1095,16 +1070,7 @@
                         </select>
                     </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Delivery Fee (IQD)</label>
-                            <input type="number" class="form-input" id="deliveryFee" placeholder="2000" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Minimum Order (IQD)</label>
-                            <input type="number" class="form-input" id="minimumOrder" placeholder="15000" required>
-                        </div>
-                    </div>
+                    <!-- Removed delivery fee & minimum order fields per simplification -->
 
                     <div class="form-row">
                         <div class="form-group">

@@ -45,34 +45,28 @@ class IraqRegionsManager {
     }
 
     async init() {
+        // Normalize header to remove deprecated metric columns before data load
+        this.normalizeTableHeader();
         console.log('🇮🇶 Iraq Regions Manager: Initializing...');
-        
         try {
-            // Initialize map first (will no-op if container missing)
             await this.initializeMap();
-            
             if (this.isProduction) {
-                // In production, always use sample data and never hit the API
                 console.log('🌍 Production environment detected - using sample data');
                 this.loadSampleRegionsData('governorate', 'iraq');
                 this.showNotification('Regions management loaded successfully', 'success');
             } else {
-                // In development, try API first, fallback to sample data
                 try {
                     await this.loadRegions();
-                    await this.loadStatistics();
+                    // Removed statistics loading (drivers/merchants no longer displayed)
                 } catch (apiError) {
                     console.log('🔄 API unavailable - falling back to sample data');
                     this.loadSampleRegionsData('governorate', 'iraq');
                     this.showNotification('Development mode: showing sample data', 'info');
                 }
             }
-            
             console.log('✅ Iraq Regions Manager: Initialized successfully');
         } catch (error) {
             console.error('❌ Iraq Regions Manager: Initialization failed:', error);
-            
-            // Final fallback - always provide sample data
             try {
                 await this.initializeMap();
                 this.loadSampleRegionsData('governorate', 'iraq');
@@ -350,6 +344,8 @@ class IraqRegionsManager {
     }
 
     renderRegions() {
+        // Ensure header stays normalized in case of dynamic reinjection
+        this.normalizeTableHeader();
         // Populate the existing table body in regions.html
         const tbody = document.getElementById('regionsTableBody');
         if (!tbody) return;
@@ -357,7 +353,7 @@ class IraqRegionsManager {
         if (!Array.isArray(this.regionsData) || this.regionsData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="loading-cell">
+                    <td colspan="4" class="loading-cell">
                         <div class="empty-state">
                             <i class="fas fa-map"></i>
                             <h3>No regions found</h3>
@@ -372,9 +368,6 @@ class IraqRegionsManager {
         const rows = this.regionsData.map(region => {
             const nextLevel = this.getNextLevel(region.level);
             const isActive = !!region.is_active;
-            const drivers = region.statistics?.active_drivers ?? 0;
-            const merchants = region.statistics?.active_merchants ?? 0;
-            const totalOrders = region.statistics?.total_orders ?? 0;
             const governorate = region.governorate_id || (region.level === 'governorate' ? '-' : (region.parent_id || '-'));
 
             return `
@@ -391,11 +384,6 @@ class IraqRegionsManager {
                             ${isActive ? 'Active' : 'Inactive'}
                         </span>
                     </td>
-                    <td><span class="metric-value">${drivers}</span></td>
-                    <td><span class="metric-value">${merchants}</span></td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td><span class="metric-value">${totalOrders}</span></td>
                     <td class="actions-cell">
                         ${nextLevel ? `<button class="action-btn view region-drill-down" data-region-id="${region.id}"><i class="fas fa-search-plus"></i> View</button>` : ''}
                         <button class="action-btn edit" onclick="regionsManager.editRegion && regionsManager.editRegion('${region.id}')"><i class="fas fa-edit"></i> Edit</button>
@@ -456,8 +444,6 @@ class IraqRegionsManager {
                         <h4>${region.name || ''}</h4>
                         <p>${region.name_ar || ''}</p>
                         <p>Status: ${region.is_active ? 'Active' : 'Inactive'}</p>
-                        <p>Drivers: ${region.statistics?.active_drivers ?? 0}</p>
-                        <p>Merchants: ${region.statistics?.active_merchants ?? 0}</p>
                     </div>
                 `);
 
@@ -604,7 +590,7 @@ class IraqRegionsManager {
 
             if (result.success) {
                 await this.loadRegions(this.currentLevel, this.currentParent);
-                await this.loadStatistics();
+                // statistics refresh removed (metrics no longer displayed)
                 this.showSuccess('Region deleted successfully');
             } else {
                 throw new Error(result.error);
@@ -617,27 +603,6 @@ class IraqRegionsManager {
 
     refreshRegions() {
         this.loadRegions(this.currentLevel, this.currentParent);
-    }
-
-    async loadStatistics() {
-        try {
-            const res = await fetch(`${this.apiBase}/api/regions/statistics`);
-            if (!res.ok) return;
-            const body = await res.json();
-            const stats = body?.data;
-            if (!stats) return;
-            // Update any known stat elements if present
-            const totalDriversEl = document.getElementById('totalDrivers');
-            if (totalDriversEl && stats.serviceStats?.totalDrivers != null) {
-                totalDriversEl.textContent = stats.serviceStats.totalDrivers;
-            }
-            const totalMerchantsEl = document.getElementById('totalMerchants');
-            if (totalMerchantsEl && stats.serviceStats?.totalMerchants != null) {
-                totalMerchantsEl.textContent = stats.serviceStats.totalMerchants;
-            }
-        } catch (e) {
-            console.warn('Failed to load statistics:', e.message);
-        }
     }
 
     // Utility functions
@@ -658,7 +623,7 @@ class IraqRegionsManager {
         if (tbody) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" class="loading-cell">
+                    <td colspan="4" class="loading-cell">
                         <div class="loading-state">
                             <i class="fas fa-spinner fa-spin"></i>
                             Loading regions data...
@@ -789,6 +754,39 @@ class IraqRegionsManager {
         this.updateMapMarkers();
         
         console.log(`📊 Loaded ${this.regionsData.length} sample regions for level ${level}`);
+    }
+
+    normalizeTableHeader() {
+        try {
+            const headerRow = document.querySelector('#regionsDataTable thead tr');
+            if (!headerRow) return;
+            const hasDeprecated = /Drivers|Merchants|Delivery Fee|Min Order|Total Orders/i.test(headerRow.innerText) || headerRow.children.length > 4;
+            if (hasDeprecated) {
+                headerRow.innerHTML = `
+                    <th class="sortable" onclick="sortTable('regionName')">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Region Name
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" onclick="sortTable('governorate')">
+                        <i class="fas fa-map"></i>
+                        Governorate
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th class="sortable" onclick="sortTable('isActive')">
+                        <i class="fas fa-power-off"></i>
+                        Status
+                        <i class="fas fa-sort sort-icon"></i>
+                    </th>
+                    <th>
+                        <i class="fas fa-cog"></i>
+                        Actions
+                    </th>`;
+                console.log('🔧 Regions table header normalized (deprecated columns removed)');
+            }
+        } catch (e) {
+            console.warn('Header normalization failed:', e.message);
+        }
     }
 }
 
