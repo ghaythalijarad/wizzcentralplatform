@@ -2,7 +2,7 @@
 // Comprehensive regions management with governorates, districts, neighborhoods
 // Version redeploy marker: 2025-09-25T00:00:00Z force Amplify build
 
-const SCRIPT_VERSION = "20250926.3";
+const SCRIPT_VERSION = "20250926.5";
 
 // Static comprehensive data for all Iraqi regions to be used in production
 const COMPREHENSIVE_IRAQI_REGIONS = [
