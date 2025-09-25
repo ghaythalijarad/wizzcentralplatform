@@ -50,20 +50,18 @@ class IraqRegionsManager {
         console.log('🇮🇶 Iraq Regions Manager: Initializing...');
         try {
             await this.initializeMap();
-            if (this.isProduction) {
-                console.log('🌍 Production environment detected - using sample data');
+            
+            // Always try to load from API first, regardless of environment
+            try {
+                console.log('🌐 Attempting to load regions from API...');
+                await this.loadRegions();
+                console.log('✅ Successfully loaded regions from API');
+            } catch (apiError) {
+                console.log('🔄 API unavailable - falling back to sample data');
                 this.loadSampleRegionsData('governorate', 'iraq');
-                this.showNotification('Regions management loaded successfully', 'success');
-            } else {
-                try {
-                    await this.loadRegions();
-                    // Removed statistics loading (drivers/merchants no longer displayed)
-                } catch (apiError) {
-                    console.log('🔄 API unavailable - falling back to sample data');
-                    this.loadSampleRegionsData('governorate', 'iraq');
-                    this.showNotification('Development mode: showing sample data', 'info');
-                }
+                this.showNotification('Using sample data - API unavailable', 'info');
             }
+            
             console.log('✅ Iraq Regions Manager: Initialized successfully');
         } catch (error) {
             console.error('❌ Iraq Regions Manager: Initialization failed:', error);
@@ -117,13 +115,7 @@ class IraqRegionsManager {
     }
 
     async loadRegions(level = this.currentLevel, parentId = this.currentParent, search = '') {
-        // Avoid API calls entirely on production; use sample data with optional client-side filtering
-        if (this.isProduction) {
-            this.loadSampleRegionsData(level, parentId);
-            if (search) this.applyClientSearch(search, level);
-            return;
-        }
-
+        // Always try API first, fallback to sample data if needed
         try {
             this.showLoading();
             
@@ -157,7 +149,12 @@ class IraqRegionsManager {
                 this.renderRegions();
                 this.updateMapMarkers();
                 
-                console.log(`📍 Loaded ${this.regionsData.length} regions for level ${level}`);
+                console.log(`📍 Loaded ${this.regionsData.length} regions for level ${level} from API`);
+                
+                // Show success notification for API data
+                if (this.regionsData.length > 0) {
+                    this.showNotification(`Loaded ${this.regionsData.length} regions from server`, 'success');
+                }
             } else {
                 throw new Error(result.error || 'Failed to load regions');
             }
@@ -191,15 +188,8 @@ class IraqRegionsManager {
             if (this.currentParent && this.currentParent !== 'iraq') {
                 const tail = this.hierarchyPath[this.hierarchyPath.length - 1];
                 if (!tail || tail.regionId !== this.currentParent) {
-                    if (this.isProduction) {
-                        const r = this.findRegionById(this.currentParent) || {};
-                        this.hierarchyPath.push({
-                            regionName: r.name || 'Unknown',
-                            regionNameArabic: r.name_ar || 'غير معروف',
-                            regionId: r.id || this.currentParent,
-                            depth: this.hierarchyPath.length
-                        });
-                    } else {
+                    // Always try API first for parent metadata
+                    try {
                         const response = await fetch(`${this.apiBase}/api/regions/${this.currentParent}`);
                         if (response.ok) {
                             const result = await response.json();
@@ -210,7 +200,18 @@ class IraqRegionsManager {
                                 regionId: r.id || this.currentParent,
                                 depth: this.hierarchyPath.length
                             });
+                        } else {
+                            throw new Error('API not available');
                         }
+                    } catch (apiError) {
+                        // Fallback to local lookup
+                        const r = this.findRegionById(this.currentParent) || {};
+                        this.hierarchyPath.push({
+                            regionName: r.name || 'Unknown',
+                            regionNameArabic: r.name_ar || 'غير معروف',
+                            regionId: r.id || this.currentParent,
+                            depth: this.hierarchyPath.length
+                        });
                     }
                 }
             } else {
@@ -516,11 +517,11 @@ class IraqRegionsManager {
 
     searchRegions(term) {
         const q = (term || '').trim();
-        if (this.isProduction) {
+        // Always try API first, fallback to client search if needed
+        this.loadRegions(this.currentLevel, this.currentParent, q).catch(() => {
+            // If API fails, use client-side search
             this.applyClientSearch(q, this.currentLevel);
-        } else {
-            this.loadRegions(this.currentLevel, this.currentParent, q);
-        }
+        });
     }
 
     // Client-side search over sample data or current list
