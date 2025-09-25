@@ -2,7 +2,7 @@
 // Comprehensive regions management with governorates, districts, neighborhoods
 // Version redeploy marker: 2025-09-25T00:00:00Z force Amplify build
 
-const SCRIPT_VERSION = "20250926.1";
+const SCRIPT_VERSION = "20250926.3";
 
 // Static comprehensive data for all Iraqi regions to be used in production
 const COMPREHENSIVE_IRAQI_REGIONS = [
@@ -767,9 +767,13 @@ class IraqRegionsManager {
             await this.initializeMap();
             
             if (this.isProduction) {
-                console.log('🌍 Production environment detected - using sample data');
-                this.loadSampleRegionsData('governorate', 'iraq');
-                this.showNotification('Regions management loaded successfully', 'success');
+        console.log('🌍 Production environment detected - using comprehensive static data');
+        console.log('🔄 Resetting to governorate level view');
+        this.currentLevel = 'governorate';
+        this.currentParent = 'iraq';
+        this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
+        this.loadSampleRegionsData('governorate', 'iraq');
+        this.showNotification('Comprehensive Iraqi regions loaded successfully', 'success');
             } else {
                 try {
                     console.log('🌐 Development environment - attempting to load regions from API...');
@@ -1491,6 +1495,7 @@ class IraqRegionsManager {
         this.updateMapMarkers();
         
         console.log(`📊 Loaded ${this.regionsData.length} static regions for level '${level}' with parent '${parentId}'`);
+        console.log(`🎯 Current navigation state: level=${this.currentLevel}, parent=${this.currentParent}`);
     }
 
     normalizeTableHeader() {
