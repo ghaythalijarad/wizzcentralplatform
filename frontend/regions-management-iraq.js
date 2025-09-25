@@ -3,10 +3,25 @@
 
 class IraqRegionsManager {
     constructor() {
-        this.apiBase = window.location.origin;
+        // Determine API base robustly for dev (Vite on 5173) vs local API on 3000
+        const { protocol, hostname, port } = window.location;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        this.isProduction = window.location.hostname.includes('amplifyapp.com') ||
+                            window.location.hostname.includes('d2f5oacwil9cbi.amplifyapp.com');
+        if (this.isProduction) {
+            // In production we won't call the API; keep origin for completeness
+            this.apiBase = window.location.origin;
+        } else if (isLocalhost) {
+            // If running frontend on Vite (5173) or any port != 3000, point API to 3000
+            const apiPort = port && port !== '3000' ? '3000' : (port || '3000');
+            this.apiBase = `${protocol}//${hostname}:${apiPort}`;
+        } else {
+            this.apiBase = window.location.origin;
+        }
+
         this.regionsData = [];
-        this.currentLevel = 'governorate'; // Start with governorates
-        this.currentParent = 'iraq'; // Iraq root
+        this.currentLevel = 'governorate';
+        this.currentParent = 'iraq';
         this.selectedRegion = null;
         this.map = null;
         this.mapMarkers = [];
@@ -19,12 +34,11 @@ class IraqRegionsManager {
             3: 'neighborhood',
             4: 'street'
         };
-        
-        // Production configuration - detect if running on Amplify
-        this.isProduction = window.location.hostname.includes('amplifyapp.com') || 
-                           window.location.hostname.includes('d2f5oacwil9cbi.amplifyapp.com');
+        // Hold full sample dataset for production and offline fallbacks
+        this.sampleData = null;
         
         console.log('🌍 Environment detected:', this.isProduction ? 'Production (Amplify)' : 'Development');
+        console.log('🔗 API Base:', this.apiBase);
         
         // Initialize event listeners
         this.initializeEventListeners();
@@ -33,16 +47,12 @@ class IraqRegionsManager {
     async init() {
         console.log('🇮🇶 Iraq Regions Manager: Initializing...');
         
-        // Check if running in production (Amplify)
-        const isProduction = window.location.hostname.includes('amplifyapp.com') || 
-                           window.location.hostname.includes('d2f5oacwil9cbi.amplifyapp.com');
-        
         try {
-            // Initialize map first
+            // Initialize map first (will no-op if container missing)
             await this.initializeMap();
             
-            if (isProduction) {
-                // In production, always use sample data since local API won't be available
+            if (this.isProduction) {
+                // In production, always use sample data and never hit the API
                 console.log('🌍 Production environment detected - using sample data');
                 this.loadSampleRegionsData('governorate', 'iraq');
                 this.showNotification('Regions management loaded successfully', 'success');
@@ -113,28 +123,33 @@ class IraqRegionsManager {
     }
 
     async loadRegions(level = this.currentLevel, parentId = this.currentParent, search = '') {
+        // Avoid API calls entirely on production; use sample data with optional client-side filtering
+        if (this.isProduction) {
+            this.loadSampleRegionsData(level, parentId);
+            if (search) this.applyClientSearch(search, level);
+            return;
+        }
+
         try {
             this.showLoading();
             
             const params = new URLSearchParams({
-                level: level, // Use level directly as string
+                level: level,
                 limit: '100'
             });
 
-            if (parentId && parentId !== 'iraq') { // Changed from REG_IQ to iraq
-                params.append('parent_id', parentId); // Fixed: use parent_id instead of parentId
+            if (parentId && parentId !== 'iraq') {
+                params.append('parent_id', parentId);
             }
             
             if (search) {
                 params.append('search', search);
             }
 
-            console.log('📍 Loading regions with params:', params.toString());
+            console.log('📍 Loading regions with params:', params.toString(), '->', `${this.apiBase}/api/regions`);
             const response = await fetch(`${this.apiBase}/api/regions?${params}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const result = await response.json();
-
-            console.log('📍 API Response:', result);
 
             if (result.success) {
                 this.regionsData = result.data;
@@ -165,6 +180,7 @@ class IraqRegionsManager {
             // Fallback: Use sample data if API is not available
             console.log('🔄 Loading fallback sample data...');
             this.loadSampleRegionsData(level, parentId);
+            if (search) this.applyClientSearch(search, level);
             
             this.showError(`API unavailable, showing sample data: ${error.message}`);
         } finally {
@@ -174,29 +190,36 @@ class IraqRegionsManager {
 
     async updateHierarchyPath() {
         try {
-            // If we already have a path (from drilldowns), keep it in sync with current parent
             if (!this.hierarchyPath || this.hierarchyPath.length === 0) {
                 this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
             }
 
             if (this.currentParent && this.currentParent !== 'iraq') {
-                // Try to fetch current parent for display if not already in path tail
                 const tail = this.hierarchyPath[this.hierarchyPath.length - 1];
                 if (!tail || tail.regionId !== this.currentParent) {
-                    const response = await fetch(`${this.apiBase}/api/regions/${this.currentParent}`);
-                    if (response.ok) {
-                        const result = await response.json();
-                        const r = result.data || {};
+                    if (this.isProduction) {
+                        const r = this.findRegionById(this.currentParent) || {};
                         this.hierarchyPath.push({
                             regionName: r.name || 'Unknown',
                             regionNameArabic: r.name_ar || 'غير معروف',
                             regionId: r.id || this.currentParent,
                             depth: this.hierarchyPath.length
                         });
+                    } else {
+                        const response = await fetch(`${this.apiBase}/api/regions/${this.currentParent}`);
+                        if (response.ok) {
+                            const result = await response.json();
+                            const r = result.data || {};
+                            this.hierarchyPath.push({
+                                regionName: r.name || 'Unknown',
+                                regionNameArabic: r.name_ar || 'غير معروف',
+                                regionId: r.id || this.currentParent,
+                                depth: this.hierarchyPath.length
+                            });
+                        }
                     }
                 }
             } else {
-                // Reset to root when at top
                 this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
             }
             
@@ -506,9 +529,52 @@ class IraqRegionsManager {
     }
 
     searchRegions(term) {
-        // Server-side search via query param
         const q = (term || '').trim();
-        this.loadRegions(this.currentLevel, this.currentParent, q);
+        if (this.isProduction) {
+            this.applyClientSearch(q, this.currentLevel);
+        } else {
+            this.loadRegions(this.currentLevel, this.currentParent, q);
+        }
+    }
+
+    // Client-side search over sample data or current list
+    applyClientSearch(term, level = this.currentLevel) {
+        try {
+            const base = (this.sampleData?.[level]) ? this.sampleData[level] : this.regionsData;
+            const q = (term || '').toLowerCase();
+            if (!q) {
+                // Reset to base
+                this.regionsData = base.slice();
+            } else {
+                this.regionsData = base.filter(r => {
+                    const en = (r.name || '').toLowerCase();
+                    const ar = (r.name_ar || '');
+                    const id = (r.id || '').toLowerCase();
+                    return en.includes(q) || ar.includes(term) || id.includes(q);
+                });
+            }
+            this.renderRegions();
+            this.updateMapMarkers();
+            this.renderBreadcrumb();
+        } catch (e) {
+            console.warn('Client search failed:', e.message);
+        }
+    }
+
+    findRegionById(regionId) {
+        if (!regionId) return null;
+        // Search current view first
+        let found = (this.regionsData || []).find(r => r.id === regionId);
+        if (found) return found;
+        // Search sample dataset across levels
+        if (this.sampleData) {
+            for (const lvl of Object.keys(this.sampleData)) {
+                const arr = this.sampleData[lvl] || [];
+                const match = arr.find(r => r.id === regionId);
+                if (match) return match;
+            }
+        }
+        return null;
     }
 
     openAddRegionModal() {
@@ -663,78 +729,55 @@ class IraqRegionsManager {
     loadSampleRegionsData(level, parentId) {
         console.log('📊 Loading sample Iraqi regions data...');
         
-        // Sample Iraqi regions data based on level
-        const sampleData = {
-            governorate: [
-                {
-                    id: 'baghdad',
-                    name: 'Baghdad',
-                    name_ar: 'بغداد',
-                    level: 'governorate',
-                    parent_id: 'iraq',
-                    coordinates: { lat: 33.3152, lng: 44.3661 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 9500000, area_km2: 4555, total_orders: 15420, active_drivers: 234, active_merchants: 540 }
-                },
-                {
-                    id: 'basra',
-                    name: 'Basra',
-                    name_ar: 'البصرة',
-                    level: 'governorate',
-                    parent_id: 'iraq',
-                    coordinates: { lat: 30.5085, lng: 47.7804 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 2750000, area_km2: 19070, total_orders: 8340, active_drivers: 89, active_merchants: 210 }
-                },
-                {
-                    id: 'erbil',
-                    name: 'Erbil',
-                    name_ar: 'أربيل',
-                    level: 'governorate',
-                    parent_id: 'iraq',
-                    coordinates: { lat: 36.1911, lng: 44.0092 },
-                    is_active: false,
-                    service_config: { delivery: false, pickup: false },
-                    statistics: { population: 1920000, area_km2: 15074, total_orders: 0, active_drivers: 0, active_merchants: 0 }
-                }
-            ],
-            district: [
-                {
-                    id: 'al_karkh',
-                    name: 'Al-Karkh',
-                    name_ar: 'الكرخ',
-                    level: 'district',
-                    parent_id: 'baghdad',
-                    coordinates: { lat: 33.3380, lng: 44.3440 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 2100000, area_km2: 860, total_orders: 4200, active_drivers: 67, active_merchants: 150 }
-                },
-                {
-                    id: 'al_rusafa',
-                    name: 'Al-Rusafa',
-                    name_ar: 'الرصافة',
-                    level: 'district',
-                    parent_id: 'baghdad',
-                    coordinates: { lat: 33.3250, lng: 44.3890 },
-                    is_active: true,
-                    service_config: { delivery: true, pickup: true },
-                    statistics: { population: 1850000, area_km2: 755, total_orders: 3890, active_drivers: 58, active_merchants: 130 }
-                }
-            ]
-        };
+        // Initialize and cache sample dataset if not yet set
+        if (!this.sampleData) {
+            this.sampleData = {
+                governorate: [
+                    {
+                        id: 'baghdad', name: 'Baghdad', name_ar: 'بغداد', level: 'governorate', parent_id: 'iraq',
+                        coordinates: { lat: 33.3152, lng: 44.3661 }, is_active: true,
+                        service_config: { delivery: true, pickup: true },
+                        statistics: { population: 9500000, area_km2: 4555, total_orders: 15420, active_drivers: 234, active_merchants: 540 }
+                    },
+                    {
+                        id: 'basra', name: 'Basra', name_ar: 'البصرة', level: 'governorate', parent_id: 'iraq',
+                        coordinates: { lat: 30.5085, lng: 47.7804 }, is_active: true,
+                        service_config: { delivery: true, pickup: true },
+                        statistics: { population: 2750000, area_km2: 19070, total_orders: 8340, active_drivers: 89, active_merchants: 210 }
+                    },
+                    {
+                        id: 'erbil', name: 'Erbil', name_ar: 'أربيل', level: 'governorate', parent_id: 'iraq',
+                        coordinates: { lat: 36.1911, lng: 44.0092 }, is_active: false,
+                        service_config: { delivery: false, pickup: false },
+                        statistics: { population: 1920000, area_km2: 15074, total_orders: 0, active_drivers: 0, active_merchants: 0 }
+                    }
+                ],
+                district: [
+                    {
+                        id: 'al_karkh', name: 'Al-Karkh', name_ar: 'الكرخ', level: 'district', parent_id: 'baghdad',
+                        coordinates: { lat: 33.3380, lng: 44.3440 }, is_active: true,
+                        service_config: { delivery: true, pickup: true },
+                        statistics: { population: 2100000, area_km2: 860, total_orders: 4200, active_drivers: 67, active_merchants: 150 }
+                    },
+                    {
+                        id: 'al_rusafa', name: 'Al-Rusafa', name_ar: 'الرصافة', level: 'district', parent_id: 'baghdad',
+                        coordinates: { lat: 33.3250, lng: 44.3890 }, is_active: true,
+                        service_config: { delivery: true, pickup: true },
+                        statistics: { population: 1850000, area_km2: 755, total_orders: 3890, active_drivers: 58, active_merchants: 130 }
+                    }
+                ]
+            };
+        }
         
         // Set the appropriate data based on level
-        this.regionsData = sampleData[level] || sampleData.governorate;
+        this.regionsData = (this.sampleData[level] || this.sampleData.governorate).slice();
         this.currentLevel = level;
         this.currentParent = parentId;
         
         // Update hierarchy path for sample data
         this.hierarchyPath = [{ regionName: 'Iraq', regionNameArabic: 'العراق', regionId: 'iraq', depth: 0 }];
         if (parentId && parentId !== 'iraq') {
-            const parent = this.regionsData.find(r => r.id === parentId); // may be undefined; breadcrumb will still show Iraq
+            const parent = this.findRegionById(parentId);
             if (parent) {
                 this.hierarchyPath.push({ regionName: parent.name, regionNameArabic: parent.name_ar, regionId: parent.id, depth: 1 });
             }
