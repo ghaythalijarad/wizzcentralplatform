@@ -484,10 +484,10 @@
     </div>
 
     <!-- Load required dependencies -->
-    <script src="/assets/js/websocket-manager.js"></script>
-    <script src="/js/support/ChatSessionService.js"></script>
-    <script src="/js/support/LiveChatSocket.js"></script>
-    <script src="/js/auto-session-filter.js"></script>
+    <script src="../js/websocket-manager.js"></script>
+    <script src="../js/support/ChatSessionService.js"></script>
+    <script src="../js/support/LiveChatSocket.js"></script>
+    <script src="../js/auto-session-filter.js"></script>
 
     <script>
         // Global variables
@@ -495,10 +495,10 @@
         let currentSessionId = null;
         let wsManager = null;
 
-            // Initialize support page when DOM is ready
-            document.addEventListener('DOMContentLoaded', function () {
+        // Initialize support page when DOM is ready
+        document.addEventListener('DOMContentLoaded', function () {
             console.log('🚀 Production Support page initializing...');
-
+            
             // Request notification permission
             requestNotificationPermission();
             
@@ -506,7 +506,7 @@
             initializeRealLiveChatSystem();
         });
 
-            // Request notification permission
+        // Request notification permission
         function requestNotificationPermission() {
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission().then(permission => {
@@ -517,23 +517,13 @@
             }
         }
 
-            // Initialize real WebSocket live chat system (production-ready)
+        // Initialize real WebSocket live chat system (production-ready)
         async function initializeRealLiveChatSystem() {
             console.log('🚀 Initializing production live chat system...');
 
             try {
                 updateConnectionStatus('connecting', 'Connecting to live chat...');
-
-                // Wait for WebSocketManager to be available (with timeout)
-                let attempts = 0;
-                const maxAttempts = 10;
-
-                while (!window.WebSocketManager && attempts < maxAttempts) {
-                    console.log(`⏳ Waiting for WebSocketManager... (attempt ${attempts + 1})`);
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-
+                        
                 // Initialize WebSocket Manager
                 if (window.WebSocketManager) {
                     wsManager = new window.WebSocketManager();
@@ -555,22 +545,20 @@
                     }
 
                 } else {
-                    console.error('❌ WebSocketManager still not available after waiting');
-                    console.error('Available on window:', Object.keys(window).filter(key => key.includes('WebSocket')));
-                    throw new Error('WebSocketManager not available after ' + maxAttempts + ' attempts - check if websocket-manager.js is loaded correctly');
+                    throw new Error('WebSocketManager not available - check if websocket-manager.js is loaded');
                 }
                         
             } catch (error) {
                 console.error('❌ Failed to initialize live chat system:', error);
                 updateConnectionStatus('disconnected', 'Connection failed: ' + error.message);
-
+                
                 // Log production error but don't fall back to mock system
                 console.error('⚠️ Production support page requires WebSocket connection');
             }
         }
 
-            // WebSocket event handlers
-            function onWebSocketConnected() {
+        // WebSocket event handlers
+        function onWebSocketConnected() {
             console.log('✅ WebSocket connected for live support');
             updateConnectionStatus('connected', 'Connected to live chat');
 
@@ -586,31 +574,31 @@
                     businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
                     timestamp: new Date().toISOString()
                 };
-
+            
                 wsManager.send(agentMessage);
                 console.log('📤 Sent agent channel join message');
                 loadActiveChatSessions();
             }
         }
-
-                    function onWebSocketDisconnected() {
-                    console.log('⚠️ WebSocket disconnected');
-                    updateConnectionStatus('disconnected', 'Disconnected from live chat');
-                }
-
-                function onWebSocketError(error) {
-                    console.error('❌ WebSocket error:', error);
-                    updateConnectionStatus('disconnected', 'Connection error');
-                }
-
-                function onWebSocketMessage(message) {
-                    console.log('📨 Received WebSocket message:', message);
-                    handleMessage(message);
-                }
-
-                // Handle incoming chat messages
-                function handleIncomingChatMessage(message) {
-                    try {
+                
+        function onWebSocketDisconnected() {
+            console.log('⚠️ WebSocket disconnected');
+            updateConnectionStatus('disconnected', 'Disconnected from live chat');
+        }
+        
+        function onWebSocketError(error) {
+            console.error('❌ WebSocket error:', error);
+            updateConnectionStatus('disconnected', 'Connection error');
+        }
+        
+        function onWebSocketMessage(message) {
+            console.log('📨 Received WebSocket message:', message);
+            handleMessage(message);
+        }
+        
+        // Handle incoming chat messages
+        function handleIncomingChatMessage(message) {
+            try {
                 const data = typeof message === 'string' ? JSON.parse(message) : message;
 
                 switch (data.type || data.action) {
@@ -662,13 +650,13 @@
             }
         }
 
-            // Handle new chat session (only real sessions from WizzDriver app)
-            function handleNewChatSession(data) {
-                // Apply session filtering - only allow genuine WizzDriver sessions
-                if (isTestSession(data) || !isAllowedDriverSession(data)) {
-                    console.log('🚫 Filtered out test/mock session:', data.sessionId || data.id);
-                    return;
-                }
+        // Handle new chat session (only real sessions from WizzDriver app)
+        function handleNewChatSession(data) {
+            // Apply session filtering - only allow genuine WizzDriver sessions
+            if (isTestSession(data) || !isAllowedDriverSession(data)) {
+                console.log('🚫 Filtered out test/mock session:', data.sessionId || data.id);
+                return;
+            }
 
             const sessionId = data.sessionId || data.id || 'session_' + Date.now();
             const session = {
@@ -686,10 +674,10 @@
             console.log('📱 New genuine WizzDriver session:', session);
         }
 
-            // Handle chat message (only from real sessions)
-            function handleChatMessage(data) {
-                const sessionId = data.sessionId || data.payload?.sessionId;
-                let session = activeChatSessions.get(sessionId);
+        // Handle chat message (only from real sessions)
+        function handleChatMessage(data) {
+            const sessionId = data.sessionId || data.payload?.sessionId;
+            let session = activeChatSessions.get(sessionId);
 
             // Only process messages from verified sessions
             if (!session) {
@@ -743,84 +731,84 @@
             console.log('💬 New message in verified session:', sessionId, message);
         }
 
-            // Session filtering functions (production-ready)
-            function isTestSession(sessionData = {}) {
-                try {
-                    const meta = sessionData.metadata || {};
-                    const id = (sessionData.sessionId || sessionData.id || '').toString().toLowerCase();
-                    const name = (
-                        sessionData.driverName ||
-                        sessionData.driverInfo?.driverName ||
-                        sessionData.payload?.userDisplayName ||
-                        meta.driverName ||
-                        ''
-                    ).toString().toLowerCase();
-
-                    // Enhanced test detection patterns
-                    const testFlags = [
-                        sessionData.isTest,
-                        meta.isTest,
-                        meta.source === 'test',
-                        meta.source === 'mock',
-                        meta.source === 'demo'
-                    ];
-
-                    // Comprehensive test patterns
-                    const testPatterns = [
-                        id.startsWith('test_'),
-                        id.startsWith('mock_'),
-                        id.startsWith('demo_'),
-                        id.includes('test'),
-                        id.includes('mock'),
-                        id.includes('demo'),
-                        name.includes('test'),
-                        name.includes('mock'),
-                        name.includes('demo'),
-                        name === 'driver 123',
-                        name === 'test driver',
-                        name === 'mock driver',
-                        id.startsWith('support_session_') && name.toLowerCase().includes('test')
-                    ];
-
-                    return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
-                } catch (e) {
-                    return false;
-                }
+        // Session filtering functions (production-ready)
+        function isTestSession(sessionData = {}) {
+            try {
+                const meta = sessionData.metadata || {};
+                const id = (sessionData.sessionId || sessionData.id || '').toString().toLowerCase();
+                const name = (
+                    sessionData.driverName ||
+                    sessionData.driverInfo?.driverName ||
+                    sessionData.payload?.userDisplayName ||
+                    meta.driverName ||
+                    ''
+                ).toString().toLowerCase();
+                
+                // Enhanced test detection patterns
+                const testFlags = [
+                    sessionData.isTest, 
+                    meta.isTest, 
+                    meta.source === 'test', 
+                    meta.source === 'mock',
+                    meta.source === 'demo'
+                ];
+                
+                // Comprehensive test patterns
+                const testPatterns = [
+                    id.startsWith('test_'),
+                    id.startsWith('mock_'),
+                    id.startsWith('demo_'),
+                    id.includes('test'),
+                    id.includes('mock'),
+                    id.includes('demo'),
+                    name.includes('test'),
+                    name.includes('mock'),
+                    name.includes('demo'),
+                    name === 'driver 123',
+                    name === 'test driver',
+                    name === 'mock driver',
+                    id.startsWith('support_session_') && name.toLowerCase().includes('test')
+                ];
+                
+                return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
+            } catch (e) {
+                return false;
             }
+        }
 
-            function isAllowedDriverSession(sessionData = {}) {
-                try {
-                    const meta = sessionData.metadata || {};
-                    const source = meta.source || sessionData.source || 'unknown';
-                    const userType = sessionData.userType || sessionData.payload?.userType || 'unknown';
-
-                    // Only allow WizzDriver Flutter app sessions
-                    const allowedSources = ['wizzdriver_app', 'flutter_app', 'mobile_app'];
-                    const allowedUserTypes = ['driver', 'customer', 'user'];
-
-                    const hasValidSource = allowedSources.includes(source);
-                    const hasValidUserType = allowedUserTypes.includes(userType);
-
-                    // Must have at least one valid identifier
-                    return hasValidSource || hasValidUserType;
-                } catch (e) {
-                    // If we can't determine, allow it (err on side of inclusion)
-                    return true;
-                }
+        function isAllowedDriverSession(sessionData = {}) {
+            try {
+                const meta = sessionData.metadata || {};
+                const source = meta.source || sessionData.source || 'unknown';
+                const userType = sessionData.userType || sessionData.payload?.userType || 'unknown';
+                
+                // Only allow WizzDriver Flutter app sessions
+                const allowedSources = ['wizzdriver_app', 'flutter_app', 'mobile_app'];
+                const allowedUserTypes = ['driver', 'customer', 'user'];
+                
+                const hasValidSource = allowedSources.includes(source);
+                const hasValidUserType = allowedUserTypes.includes(userType);
+                
+                // Must have at least one valid identifier
+                return hasValidSource || hasValidUserType;
+            } catch (e) {
+                // If we can't determine, allow it (err on side of inclusion)
+                return true;
             }
-
-            // Handle agent sessions (with filtering)
-            function handleAgentSessions(data) {
-                if (data.payload && data.payload.sessions) {
-                    let addedCount = 0;
-
-                    data.payload.sessions.forEach(sessionData => {
-                        // Apply filtering to only show genuine WizzDriver sessions
-                        if (isTestSession(sessionData) || !isAllowedDriverSession(sessionData)) {
-                            console.log('🚫 Filtered out session:', sessionData.sessionId, sessionData.driverName || 'Unknown');
-                            return;
-                        }
+        }
         
+        // Handle agent sessions (with filtering)
+        function handleAgentSessions(data) {
+            if (data.payload && data.payload.sessions) {
+                let addedCount = 0;
+                
+                data.payload.sessions.forEach(sessionData => {
+                    // Apply filtering to only show genuine WizzDriver sessions
+                    if (isTestSession(sessionData) || !isAllowedDriverSession(sessionData)) {
+                        console.log('🚫 Filtered out session:', sessionData.sessionId, sessionData.driverName || 'Unknown');
+                        return;
+                    }
+                    
                     const session = {
                         id: sessionData.sessionId,
                         customer: sessionData.customerName || sessionData.driverName || sessionData.userId,
@@ -834,15 +822,15 @@
                     addedCount++;
                 });
 
-                            console.log(`📋 Loaded ${addedCount} verified WizzDriver sessions (filtered ${data.payload.sessions.length - addedCount} test/mock sessions)`);
-                        }
-
-                        updateSessionsList();
-                    }
-
-                    // Load active chat sessions
-                    function loadActiveChatSessions() {
-                        if (wsManager) {
+                console.log(`📋 Loaded ${addedCount} verified WizzDriver sessions (filtered ${data.payload.sessions.length - addedCount} test/mock sessions)`);
+            }
+            
+            updateSessionsList();
+        }
+                            
+        // Load active chat sessions
+        function loadActiveChatSessions() {
+            if (wsManager) {
                 const requestMessage = {
                     action: 'get_active_sessions',
                     type: 'GET_SESSIONS',
@@ -850,21 +838,21 @@
                         agentId: 'support_agent_' + Date.now()
                     }
                 };
-
+                        
                 wsManager.send(requestMessage);
                 console.log('📤 Requested active sessions');
             }
         }
 
-            // Update sessions list UI
-            function updateSessionsList() {
+        // Update sessions list UI
+        function updateSessionsList() {
             const sessionsList = document.getElementById('sessionsList');
             const activeSessionsCount = document.getElementById('activeSessions');
 
             if (!sessionsList) return;
 
             const sessionCount = activeChatSessions.size;
-            
+        
             // Update active sessions counter
             if (activeSessionsCount) {
                 activeSessionsCount.textContent = sessionCount.toString();
@@ -889,7 +877,7 @@
                 const bTime = b.messages.length > 0 ? new Date(b.messages[b.messages.length - 1].timestamp) : new Date(0);
                 return bTime - aTime;
             });
-
+            
             sortedSessions.forEach((session, index) => {
                 const sessionElement = document.createElement('div');
                 sessionElement.className = `session-card ${session.id === currentSessionId ? 'active' : ''} ${session.unread ? 'unread' : ''}`;
@@ -901,7 +889,7 @@
                     session.lastMessage;
 
                 const customerInitials = session.customer.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-
+                
                 sessionElement.innerHTML = `
                     <div class="session-info">
                         <div class="customer-avatar">${customerInitials}</div>
@@ -918,7 +906,7 @@
 
                 sessionsList.appendChild(sessionElement);
             });
-                
+            
             // Auto-select first session if none selected and we have sessions
             if (activeChatSessions.size > 0 && !currentSessionId) {
                 const firstSession = sortedSessions[0];
@@ -926,19 +914,19 @@
             }
         }
 
-            // Select a chat session
-            function selectChatSession(session) {
+        // Select a chat session
+        function selectChatSession(session) {
             console.log('📱 Selecting chat session:', session.customer);
 
             // Update current session
             const previousSessionId = currentSessionId;
             currentSessionId = session.id;
-
+            
             // Update active session UI
             document.querySelectorAll('.session-card').forEach(item => {
                 item.classList.remove('active');
             });
-
+        
             const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
             if (sessionElement) {
                 sessionElement.classList.add('active');
@@ -946,7 +934,7 @@
 
             // Mark as read
             session.unread = false;
-
+            
             // Update chat view
             updateChatView(session);
 
@@ -970,12 +958,12 @@
             }
         }
 
-            // Update chat view
-            function updateChatView(session) {
-                const chatTitle = document.getElementById('chatTitle');
-                const chatMessages = document.getElementById('chatMessages');
-                const chatInputArea = document.getElementById('chatInputArea');
-                const endSessionBtn = document.getElementById('endSessionBtn');
+        // Update chat view
+        function updateChatView(session) {
+            const chatTitle = document.getElementById('chatTitle');
+            const chatMessages = document.getElementById('chatMessages');
+            const chatInputArea = document.getElementById('chatInputArea');
+            const endSessionBtn = document.getElementById('endSessionBtn');
 
             if (chatTitle) {
                 chatTitle.textContent = session.customer;
@@ -996,10 +984,10 @@
             }
         }
 
-            // Render messages HTML
-            function renderMessages(messages) {
-                if (!messages || messages.length === 0) {
-                    return `
+        // Render messages HTML
+        function renderMessages(messages) {
+            if (!messages || messages.length === 0) {
+                return `
                     <div class="empty-state">
                         <i class="fas fa-comment-dots"></i>
                         <h3>Start the conversation</h3>
@@ -1037,8 +1025,8 @@
             }).join('');
         }
 
-            // Append single message to chat (for real-time updates)
-            function appendMessageToChat(message) {
+        // Append single message to chat (for real-time updates)
+        function appendMessageToChat(message) {
             const chatMessages = document.getElementById('chatMessages');
             if (!chatMessages) return;
 
@@ -1087,8 +1075,8 @@
             }, 10);
         }
 
-            // Setup message input handlers
-            function setupMessageInput() {
+        // Setup message input handlers
+        function setupMessageInput() {
             const messageInput = document.getElementById('messageInput');
             const sendButton = document.getElementById('sendButton');
             if (!messageInput) return;
@@ -1099,14 +1087,14 @@
                     sendMessage();
                 }
             });
-
+        
             messageInput.addEventListener('input', function () {
                 this.style.height = 'auto';
                 this.style.height = Math.min(this.scrollHeight, 120) + 'px';
 
                 // Send typing indicator
                 sendTypingIndicator();
-
+                
                 // Enable/disable send button
                 if (sendButton) {
                     sendButton.disabled = !this.value.trim();
@@ -1117,13 +1105,13 @@
             messageInput.focus();
         }
 
-            // Send message function
-            window.sendMessage = function () {
+        // Send message function
+        window.sendMessage = function() {
             const messageInput = document.getElementById('messageInput');
             const sendButton = document.getElementById('sendButton');
-
+             
             if (!messageInput || !currentSessionId) return;
-
+            
             const message = messageInput.value.trim();
             if (!message) return;
             
@@ -1135,7 +1123,7 @@
                 sendButton.disabled = true;
                 sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             }
-
+            
             // Create message object
             const messageObj = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1144,19 +1132,19 @@
                 timestamp: new Date(),
                 senderName: 'Support Agent'
             };
-
+            
             // Add message to local session immediately for instant feedback
             session.messages.push(messageObj);
             session.lastMessage = message;
             session.time = formatTimestamp(new Date());
-
+            
             // Append message to chat view immediately
             appendMessageToChat(messageObj);
             
             // Clear input immediately
             messageInput.value = '';
             messageInput.style.height = 'auto';
-
+            
             // Send via WebSocket
             if (wsManager) {
                 const chatMessage = {
@@ -1170,14 +1158,14 @@
                     agentId: 'support_agent_' + Date.now(),
                     timestamp: new Date().toISOString()
                 };
-
+            
                 wsManager.send(chatMessage);
                 console.log('📤 Sent chat message:', chatMessage);
             }
-
+            
             // Update sessions list
             updateSessionsList();
-
+            
             // Re-enable send button
             setTimeout(() => {
                 if (sendButton) {
@@ -1188,8 +1176,8 @@
             }, 500);
         };
 
-            // End chat session function
-            window.endChatSession = function (sessionId) {
+        // End chat session function
+        window.endChatSession = function(sessionId) {
             if (!sessionId) sessionId = currentSessionId;
             if (!sessionId) return;
 
@@ -1212,10 +1200,10 @@
                     wsManager.send(endMessage);
                     console.log('📤 Sent session end message:', endMessage);
                 }
-
+        
                 // Remove from local sessions
                 activeChatSessions.delete(sessionId);
-                    
+        
                 // Clear chat view if this was the active session
                 if (currentSessionId === sessionId) {
                     currentSessionId = null;
@@ -1223,7 +1211,7 @@
                     const chatInputArea = document.getElementById('chatInputArea');
                     const chatTitle = document.getElementById('chatTitle');
                     const endSessionBtn = document.getElementById('endSessionBtn');
-
+                    
                     if (chatMessages) {
                         chatMessages.innerHTML = `
                             <div class="empty-state">
@@ -1233,20 +1221,20 @@
                             </div>
                         `;
                     }
-
+                    
                     if (chatInputArea) {
                         chatInputArea.style.display = 'none';
                     }
-
+                    
                     if (chatTitle) {
                         chatTitle.textContent = 'Select a conversation';
                     }
-
+                    
                     if (endSessionBtn) {
                         endSessionBtn.style.display = 'none';
                     }
                 }
-
+    
                 // Update sessions list
                 updateSessionsList();
 
@@ -1254,21 +1242,21 @@
             }
         };
 
-            // Reconnect WebSocket function
-            window.reconnectWebSocket = function () {
-                console.log('🔄 Reconnecting WebSocket...');
-                if (wsManager) {
-                    wsManager.disconnect();
-                    setTimeout(() => {
-                        initializeRealLiveChatSystem();
-                    }, 1000);
-                } else {
-                    window.location.reload();
-                }
-            };
+        // Reconnect WebSocket function
+        window.reconnectWebSocket = function() {
+            console.log('🔄 Reconnecting WebSocket...');
+            if (wsManager) {
+                wsManager.disconnect();
+                setTimeout(() => {
+                    initializeRealLiveChatSystem();
+                }, 1000);
+            } else {
+                window.location.reload();
+            }
+        };
 
-            // Update connection status
-            function updateConnectionStatus(status, message) {
+        // Update connection status
+        function updateConnectionStatus(status, message) {
             const connectionDot = document.getElementById('connectionIndicator');
             const connectionText = document.getElementById('connectionStatus');
 
@@ -1281,18 +1269,18 @@
             }
         }
 
-            // Utility functions
-            function scrollToBottom() {
-                const chatMessages = document.getElementById('chatMessages');
-                if (chatMessages) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
+        // Utility functions
+        function scrollToBottom() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
+        }
 
-    function formatTimestamp(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMinutes = Math.floor((now - date) / (1000 * 60));
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMinutes = Math.floor((now - date) / (1000 * 60));
 
             if (diffMinutes < 1) return 'Just now';
             if (diffMinutes < 60) return `${diffMinutes}m ago`;
@@ -1302,14 +1290,14 @@
             return date.toLocaleDateString();
         }
 
-            function escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
 
-            function showNewMessageNotification(session, message) {
-                if (currentSessionId === session.id) return; // Don't notify for active session
+        function showNewMessageNotification(session, message) {
+            if (currentSessionId === session.id) return; // Don't notify for active session
 
             // Visual notification in the session list
             const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
@@ -1319,7 +1307,7 @@
                     sessionElement.style.backgroundColor = '';
                 }, 2000);
             }
-            
+        
             // Browser notification (if permitted)
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification(`New message from ${session.customer}`, {
@@ -1329,11 +1317,11 @@
             }
         }
 
-            // Send typing indicator
-            let typingTimer = null;
-            function sendTypingIndicator() {
-                if (!currentSessionId || !wsManager) return;
-        
+        // Send typing indicator
+        let typingTimer = null;
+        function sendTypingIndicator() {
+            if (!currentSessionId || !wsManager) return;
+            
             clearTimeout(typingTimer);
             
             const typingMessage = {
@@ -1347,7 +1335,7 @@
             };
             
             wsManager.send(typingMessage);
-
+            
             // Stop typing after 3 seconds
             typingTimer = setTimeout(() => {
                 const stopTypingMessage = {
@@ -1356,23 +1344,23 @@
                 };
                 wsManager.send(stopTypingMessage);
             }, 3000);
-                    }
+        }
 
-                    // Handle typing indicator
-                    function handleTypingIndicator(data) {
-                        const sessionId = data.sessionId || data.payload?.sessionId;
-                        const isTyping = data.payload?.typing || false;
-                        const userType = data.payload?.userType || 'customer';
+        // Handle typing indicator
+        function handleTypingIndicator(data) {
+            const sessionId = data.sessionId || data.payload?.sessionId;
+            const isTyping = data.payload?.typing || false;
+            const userType = data.payload?.userType || 'customer';
 
-                        if (currentSessionId === sessionId && userType !== 'agent') {
-                            const chatMessages = document.getElementById('chatMessages');
-                            if (!chatMessages) return;
+            if (currentSessionId === sessionId && userType !== 'agent') {
+                const chatMessages = document.getElementById('chatMessages');
+                if (!chatMessages) return;
 
-                            // Remove existing typing indicator
-                            const existingIndicator = chatMessages.querySelector('.typing-indicator');
-                            if (existingIndicator) {
-                                existingIndicator.remove();
-                            }
+                // Remove existing typing indicator
+                const existingIndicator = chatMessages.querySelector('.typing-indicator');
+                if (existingIndicator) {
+                    existingIndicator.remove();
+                }
 
                 // Add typing indicator if user is typing
                 if (isTyping) {
@@ -1395,24 +1383,24 @@
             }
         }
 
-            // Handle chat session end
-            function handleChatSessionEnd(data) {
-                const sessionId = data.sessionId || data.payload?.sessionId;
-                if (!sessionId) return;
+        // Handle chat session end
+        function handleChatSessionEnd(data) {
+            const sessionId = data.sessionId || data.payload?.sessionId;
+            if (!sessionId) return;
 
-                const session = activeChatSessions.get(sessionId);
-                if (!session) return;
+            const session = activeChatSessions.get(sessionId);
+            if (!session) return;
 
-                console.log('❌ Chat session ended:', sessionId);
+            console.log('❌ Chat session ended:', sessionId);
 
-                // Add system message about session end
-                const endMessage = {
-                    id: `end_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    text: 'Chat session ended',
-                    sender: 'system',
-                    timestamp: new Date(),
-                    senderName: 'System'
-                };
+            // Add system message about session end
+            const endMessage = {
+                id: `end_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                text: 'Chat session ended',
+                sender: 'system',
+                timestamp: new Date(),
+                senderName: 'System'
+            };
 
             session.messages.push(endMessage);
             session.lastMessage = 'Chat session ended';
@@ -1434,7 +1422,7 @@
                     const chatInputArea = document.getElementById('chatInputArea');
                     const chatTitle = document.getElementById('chatTitle');
                     const endSessionBtn = document.getElementById('endSessionBtn');
-            
+                    
                     if (chatMessages) {
                         chatMessages.innerHTML = `
                             <div class="empty-state">
@@ -1444,11 +1432,11 @@
                             </div>
                         `;
                     }
-
+                    
                     if (chatInputArea) {
                         chatInputArea.style.display = 'none';
                     }
-
+                    
                     if (chatTitle) {
                         chatTitle.textContent = 'Select a conversation';
                     }
@@ -1460,14 +1448,14 @@
 
                 updateSessionsList();
             }, 3000);
-                    }
+        }
 
-                    // Handle message function
-                    function handleMessage(message) {
-                        handleIncomingChatMessage(message);
-                    }
+        // Handle message function
+        function handleMessage(message) {
+            handleIncomingChatMessage(message);
+        }
 
-            console.log('✅ Production Support page loaded - ready for genuine WizzDriver sessions only');
-        </script>
+        console.log('✅ Production Support page loaded - ready for genuine WizzDriver sessions only');
+    </script>
 </body>
 </html>

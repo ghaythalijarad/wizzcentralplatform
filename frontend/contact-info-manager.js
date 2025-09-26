@@ -1,5 +1,7 @@
 // ========== COMPREHENSIVE CONTACT INFORMATION MANAGEMENT ==========
 // Contact Information Panel JavaScript Functions for Live Chat
+// NOTE: This file contains mock/demo data generation for UI demonstration purposes
+// In production, replace mock data functions with real API calls
 
 // Contact Information State Management
 let currentContactInfo = {
@@ -34,7 +36,9 @@ function loadContactProfile(contactId, contactType) {
     }, 1500);
 }
 
+// TODO: Replace with real API call in production
 function generateMockProfileData(contactId, contactType) {
+    // DEMO/MOCK DATA - Replace with actual API call
     const baseData = {
         driver: {
             'Full Name': `Driver ${contactId}`,
@@ -113,7 +117,9 @@ function loadContactOrders(contactId, contactType) {
     updateOrdersCount();
 }
 
+// TODO: Replace with real API call in production  
 function generateMockOrdersData(contactId, contactType) {
+    // DEMO/MOCK DATA - Replace with actual API call
     const now = new Date();
     
     if (contactType === 'driver') {
@@ -324,7 +330,9 @@ function loadContactHistory(contactId) {
     }, 1000);
 }
 
+// TODO: Replace with real API call in production
 function generateMockHistoryData(contactId) {
+    // DEMO/MOCK DATA - Replace with actual API call
     const now = new Date();
     return [
         {
@@ -516,8 +524,9 @@ function updateLastRefreshTime() {
     console.log('📅 Contact info last refreshed at:', new Date().toLocaleTimeString());
 }
 
-// Demo contact simulation
+// Demo contact simulation - REMOVE IN PRODUCTION
 function simulateIncomingContact(contactType = null) {
+    // DEMO FUNCTION - Remove this function in production
     const contactTypes = ['driver', 'customer', 'merchant'];
     const selectedType = contactType || contactTypes[Math.floor(Math.random() * contactTypes.length)];
     

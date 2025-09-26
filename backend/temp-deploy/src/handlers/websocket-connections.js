@@ -106,6 +106,8 @@ const handler = async (event) => {
                     return await handleAgentChatConnect(connectionId, message, apiGatewayClient);
                 case 'driver_message':
                     console.log('⚠️ Received legacy driver_message. Normalizing to chat_message for session', message.sessionId);
+                case 'agent_message':
+                    console.log('⚠️ Received agent_message. Normalizing to chat_message for session', message.sessionId);
                 case 'chat_message':
                     console.log(`💬 Chat message from ${connectionId}`);
                     return await handleChatMessage(connectionId, { ...message, type: 'chat_message' }, apiGatewayClient);

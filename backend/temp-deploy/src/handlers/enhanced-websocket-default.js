@@ -51,6 +51,8 @@ exports.handler = async (event) => {
             case 'chat_init':
                 return await handleChatInit(connectionId, message, apiGatewayClient);
             case 'chat_message':
+            case 'agent_message': // WizzCentralPlatform compatibility
+            case 'driver_message': // Flutter app compatibility
                 return await handleChatMessage(connectionId, message, apiGatewayClient);
             case 'close_session':
                 return await handleCloseSession(connectionId, message, apiGatewayClient);

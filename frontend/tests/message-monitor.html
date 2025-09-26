@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Chat Message Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .monitor-container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .logs { background: #000; color: #0f0; padding: 15px; margin: 15px 0; border-radius: 4px; font-family: monospace; max-height: 400px; overflow-y: auto; }
+        .message-item { background: #f8f9fa; padding: 10px; margin: 5px 0; border-left: 4px solid #007bff; border-radius: 4px; }
+        .timestamp { color: #666; font-size: 0.9em; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    </style>
+</head>
+<body>
+    <div class="monitor-container">
+        <h1>🔍 Live Chat Message Monitor</h1>
+        <p>Real-time monitoring of WebSocket connections and message flow</p>
+        
+        <div id="connection-status" class="status warning">
+            🔄 Initializing WebSocket connection...
+        </div>
+        
+        <div class="grid">
+            <div>
+                <h3>📊 Connection Info</h3>
+                <div id="connection-info">
+                    <p><strong>WebSocket URL:</strong> wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev</p>
+                    <p><strong>Business ID:</strong> 7ccf646c-9594-48d4-8f63-c366d89257e5</p>
+                    <p><strong>Agent ID:</strong> message_monitor</p>
+                    <p><strong>Connection State:</strong> <span id="ws-state">Disconnected</span></p>
+                </div>
+            </div>
+            
+            <div>
+                <h3>🎯 Recent Flutter Message</h3>
+                <div class="message-item">
+                    <strong>Message:</strong> "hey"<br>
+                    <strong>Status:</strong> ✅ Message processed and broadcasted successfully<br>
+                    <strong>Driver:</strong> Test Driver (test_driver_1758879098584)<br>
+                    <span class="timestamp">Sent via AWS HTTP Bridge</span>
+                </div>
+            </div>
+        </div>
+        
+        <button onclick="connectWebSocket()">🔌 Connect to WebSocket</button>
+        <button onclick="sendTestPing()">📤 Send Test Ping</button>
+        <button onclick="clearLogs()">🗑️ Clear Logs</button>
+        
+        <div class="logs" id="message-logs">
+            <div>🚀 Live Chat Message Monitor - Listening for WebSocket messages...</div>
+            <div>==========================================</div>
+        </div>
+        
+        <div>
+            <h3>📨 Received Messages</h3>
+            <div id="received-messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let messageCount = 0;
+        let isConnected = false;
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            const logsDiv = document.getElementById('message-logs');
+            const logLine = document.createElement('div');
+            logLine.textContent = logEntry;
+            
+            if (type === 'error') logLine.style.color = '#ff6b6b';
+            if (type === 'success') logLine.style.color = '#51cf66';
+            if (type === 'warning') logLine.style.color = '#ffd43b';
+            
+            logsDiv.appendChild(logLine);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function updateConnectionStatus(status, message) {
+            const statusDiv = document.getElementById('connection-status');
+            const stateSpan = document.getElementById('ws-state');
+            
+            statusDiv.className = `status ${status}`;
+            statusDiv.innerHTML = message;
+            stateSpan.textContent = isConnected ? 'Connected' : 'Disconnected';
+        }
+        
+        function addReceivedMessage(message) {
+            const messagesDiv = document.getElementById('received-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-item';
+            messageDiv.innerHTML = `
+                <strong>Type:</strong> ${message.type || 'unknown'}<br>
+                <strong>Content:</strong> ${JSON.stringify(message, null, 2)}<br>
+                <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+            `;
+            messagesDiv.insertBefore(messageDiv, messagesDiv.firstChild);
+            
+            // Keep only last 10 messages
+            while (messagesDiv.children.length > 10) {
+                messagesDiv.removeChild(messagesDiv.lastChild);
+            }
+        }
+        
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected to WebSocket', 'warning');
+                return;
+            }
+            
+            log('🔌 Connecting to WebSocket...', 'info');
+            updateConnectionStatus('warning', '🔄 Connecting to WebSocket...');
+            
+            const wsUrl = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev?userType=agent&agentId=message_monitor&businessId=7ccf646c-9594-48d4-8f63-c366d89257e5';
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                isConnected = true;
+                log('✅ WebSocket connected successfully', 'success');
+                updateConnectionStatus('success', '✅ Connected to WebSocket - Monitoring for messages');
+                
+                // Send agent registration
+                const agentConnect = {
+                    action: 'agent_connect',
+                    type: 'chat_agent_connect',
+                    agentId: 'message_monitor',
+                    agentName: 'Message Monitor',
+                    businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5'
+                };
+                
+                ws.send(JSON.stringify(agentConnect));
+                log('📤 Sent agent registration', 'info');
+            };
+            
+            ws.onmessage = function(event) {
+                messageCount++;
+                try {
+                    const message = JSON.parse(event.data);
+                    log(`📨 Message ${messageCount}: ${message.type || 'unknown'} - ${JSON.stringify(message).substring(0, 100)}...`, 'success');
+                    addReceivedMessage(message);
+                    
+                    // Special handling for chat messages
+                    if (message.type === 'chat_message' || message.type === 'driver_message') {
+                        log(`🎯 CHAT MESSAGE DETECTED! From: ${message.senderName || message.senderId} - "${message.message || message.text || message.messageText}"`, 'success');
+                    }
+                } catch (e) {
+                    log(`📨 Raw message ${messageCount}: ${event.data}`, 'info');
+                    addReceivedMessage({ raw: event.data, parsed: false });
+                }
+            };
+            
+            ws.onclose = function(event) {
+                isConnected = false;
+                log(`🔌 WebSocket closed: Code ${event.code}, Reason: ${event.reason || 'Unknown'}`, 'warning');
+                updateConnectionStatus('error', '🔌 WebSocket disconnected');
+            };
+            
+            ws.onerror = function(error) {
+                isConnected = false;
+                log(`❌ WebSocket error: ${error.message || 'Connection failed'}`, 'error');
+                updateConnectionStatus('error', '❌ WebSocket connection failed');
+            };
+        }
+        
+        function sendTestPing() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ WebSocket not connected', 'error');
+                return;
+            }
+            
+            const ping = {
+                action: 'ping',
+                type: 'ping',
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(ping));
+            log('📤 Sent test ping', 'info');
+        }
+        
+        function clearLogs() {
+            const logsDiv = document.getElementById('message-logs');
+            logsDiv.innerHTML = `
+                <div>🚀 Live Chat Message Monitor - Listening for WebSocket messages...</div>
+                <div>==========================================</div>
+            `;
+            messageCount = 0;
+        }
+        
+        // Auto-connect on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('📋 Message Monitor initialized', 'info');
+            log('🎯 Looking for Flutter message: "hey" from Test Driver', 'info');
+            
+            // Auto-connect after a brief delay
+            setTimeout(connectWebSocket, 1000);
+        });
+    </script>
+</body>
+</html>
