@@ -111,6 +111,23 @@ functions:
           method: get
           cors: true
 
+  # Public Chat Bridge for Cross-Platform Authentication
+  publicChatBridge:
+    handler: src/handlers/public-chat-bridge.handler
+    events:
+      - http:
+          path: public/chat/send
+          method: post
+          cors: true
+      - http:
+          path: public/chat/send
+          method: options
+          cors: true
+    environment:
+      SUPPORT_MESSAGES_TABLE: "wizzcentral-platform-dev-SupportMessages"
+      WEBSOCKET_CONNECTIONS_TABLE: "wizzcentral-platform-dev-WebSocketConnections"
+      WEBSOCKET_API_ENDPOINT: "https://f8gv5mj2v7.execute-api.us-east-1.amazonaws.com/dev"
+
 resources:
   Resources:
     # Support Tickets Table

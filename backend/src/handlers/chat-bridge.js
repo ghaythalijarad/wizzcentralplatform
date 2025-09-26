@@ -13,13 +13,37 @@ const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || '
 const CHAT_SESSIONS_TABLE = process.env.CHAT_SESSIONS_TABLE || 'chat-sessions-dev';
 const CHAT_MESSAGES_TABLE = process.env.CHAT_MESSAGES_TABLE || 'chat-messages-dev';
 
+// Valid API keys for cross-platform communication
+const VALID_API_KEYS = [
+    'wizzdriver_mobile_app_v1',
+    'wizzcentral_platform_v1'
+];
+
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-API-Key',
     'Content-Type': 'application/json'
 };
+
+/**
+ * Validate API Key for cross-platform access
+ */
+function validateApiKey(event) {
+    const apiKey = event.headers?.['X-API-Key'] || event.headers?.['x-api-key'] || 
+                  event.queryStringParameters?.apiKey;
+    
+    if (!apiKey) {
+        return { valid: false, error: 'Missing API key - use X-API-Key header' };
+    }
+    
+    if (!VALID_API_KEYS.includes(apiKey)) {
+        return { valid: false, error: 'Invalid API key' };
+    }
+    
+    return { valid: true };
+}
 
 /**
  * Handle HTTP chat messages from Flutter app and forward to WebSocket Live Chat
@@ -32,7 +56,20 @@ exports.sendChatMessage = async (event) => {
         return {
             statusCode: 200,
             headers: corsHeaders,
-            body: ''
+            body: JSON.stringify({ message: 'CORS preflight successful' })
+        };
+    }
+
+    // Validate API key for cross-platform access
+    const apiValidation = validateApiKey(event);
+    if (!apiValidation.valid) {
+        return {
+            statusCode: 401,
+            headers: corsHeaders,
+            body: JSON.stringify({
+                success: false,
+                error: apiValidation.error
+            })
         };
     }
 
@@ -134,7 +171,9 @@ exports.sendChatMessage = async (event) => {
                     success: true,
                     messageId,
                     sessionId,
-                    message: 'Message sent to Live Chat support'
+                    bridged: true,
+                    message: 'Message sent to Live Chat support',
+                    timestamp: nowIso
                 })
             };
         } else {
@@ -146,7 +185,9 @@ exports.sendChatMessage = async (event) => {
                     success: true,
                     messageId,
                     sessionId,
-                    message: 'Message received, waiting for agent connection'
+                    bridged: false,
+                    message: 'Message received, waiting for agent connection',
+                    timestamp: nowIso
                 })
             };
         }
