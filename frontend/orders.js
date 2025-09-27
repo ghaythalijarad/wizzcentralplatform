@@ -87,172 +87,61 @@ async function initializeOrdersManagement() {
     }
 }
 
-// Load from Backend API instead of direct DynamoDB access
+// Load orders directly from WizzOrders DynamoDB table
 async function loadOrdersFromBackend() {
-    console.log('Loading orders from backend API...');
+    console.log('Loading orders directly from WizzOrders DynamoDB table...');
 
     try {
-        // Get the API base URL from config
-        const API_BASE_URL = window.WIZZCENTRAL_CONFIG?.API_BASE_URL || 'https://ku48gxy2kg.execute-api.us-east-1.amazonaws.com/dev';
-
-        console.log(`🚀 Attempting to fetch orders from: ${API_BASE_URL}/orders`);
-
-        // Get authentication tokens (optional for testing)
-        const idToken = sessionStorage.getItem('idToken');
-        const accessToken = sessionStorage.getItem('accessToken');
-
-        // Log token availability for debugging
-        console.log('Authentication tokens:', {
-            idToken: idToken ? 'Present' : 'Missing',
-            accessToken: accessToken ? 'Present' : 'Missing',
-            idTokenLength: idToken ? idToken.length : 0
-        });
-
-        // Authentication headers (optional since API doesn't require auth currently)
-        const authHeaders = {};
-        if (idToken) {
-            authHeaders['Authorization'] = `Bearer ${idToken}`;
-        } else if (accessToken) {
-            authHeaders['Authorization'] = `Bearer ${accessToken}`;
-        }
-        // Note: Proceeding without auth since API endpoint works without authentication
-
-        // Make API call to list orders
-        const response = await fetch(`${API_BASE_URL}/orders`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                ...authHeaders
-            }
-        });
-
-        console.log(`📡 API Response Status: ${response.status} ${response.statusText}`);
-
-        if (!response.ok) {
-            // Handle specific error cases
-            if (response.status === 401) {
-                console.log('🔒 Authentication required - API returned 401 Unauthorized');
-
-                // Check if we have valid authentication tokens
-                if (!idToken && !accessToken) {
-                    showMessage('No authentication tokens found. Please log in again.', 'warning');
-                    // Redirect to login if no tokens at all
-                    setTimeout(() => {
-                        if (window.Auth && window.Auth.redirectToLogin) {
-                            window.Auth.redirectToLogin('orders:api-401-no-tokens');
-                        } else {
-                            window.location.href = window.location.origin + '/frontend/index.html';
-                        }
-                    }, 3000);
-                    return;
-                } else {
-                    showMessage('Authentication tokens may be expired. Trying to refresh the page or login again.', 'warning');
-                }
-
-            } else if (response.status === 403) {
-                console.log('🚫 Access forbidden - API returned 403 Forbidden');
-                showMessage('Access forbidden to orders API. This may be a permission issue.', 'error');
-            } else {
-                console.log(`❌ API Error: ${response.status} ${response.statusText}`);
-                showMessage(`API Error: ${response.status} ${response.statusText}. No orders to display.`, 'error');
-            }
-
-            // Try to get response body for more details
-            let errorDetails = '';
-            try {
-                const errorText = await response.text();
-                if (errorText) {
-                    console.log('Error response body:', errorText);
-                    errorDetails = errorText;
-                }
-            } catch (e) {
-                console.log('Could not read error response body');
-            }
-
-            // Show empty state instead of sample data
-            console.log(`📝 No orders available due to API error: ${response.status}`);
-            ordersData = [];
-            showMessage(`No orders available - API returned ${response.status}. ${errorDetails ? 'Error: ' + errorDetails : ''}`, 'warning');
-            return;
+        // Check if WizzOrdersAPI is available
+        if (!window.WizzOrdersAPI) {
+            throw new Error('WizzOrdersAPI not available. Please ensure orders-api.js is loaded.');
         }
 
-        const result = await response.json();
-        console.log('✅ Backend API response:', result);
+        console.log('🔄 Fetching orders from WizzOrders table...');
+        const result = await window.WizzOrdersAPI.getOrders(50);
 
-        // Handle different response formats
-        const orders = result.orders || result.data?.orders || result.Items || [];
+        if (!result.success) {
+            throw new Error(result.message || 'Failed to fetch orders');
+        }
+
+        const orders = result.orders || [];
 
         if (orders.length === 0) {
-            console.log('📭 No orders found in API response');
-
-            // Try to create some test orders if we have access
-            await tryCreateTestOrders();
-
-            // Check again for orders
-            const retryResponse = await fetch(`${API_BASE_URL}/orders`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...authHeaders
-                }
-            });
-
-            if (retryResponse.ok) {
-                const retryResult = await retryResponse.json();
-                const retryOrders = retryResult.orders || retryResult.data?.orders || retryResult.Items || [];
-
-                if (retryOrders.length > 0) {
-                    console.log(`✅ Found ${retryOrders.length} orders on retry`);
-                    ordersData = retryOrders.map(item => ({
-                        orderId: item.orderId,
-                        customerId: item.customerId,
-                        merchantId: item.merchantId,
-                        driverId: item.driverId || 'N/A',
-                        status: item.status || 'unknown',
-                        total: item.total != null ? `$${parseFloat(item.total).toFixed(2)}` : 'N/A',
-                        date: formatDate(item.createdAt),
-                        fullData: item
-                    }));
-                    showMessage(`Successfully loaded ${ordersData.length} orders from database`, 'success');
-                    return;
-                }
-            }
-
-            ordersData = getSampleOrdersData();
-            showMessage('No orders found in database. Showing sample orders for demonstration.', 'info');
+            console.log('📭 No orders found in WizzOrders table');
+            ordersData = [];
+            showMessage('No orders found in the database. Create some orders to see them here.', 'info');
             return;
         }
 
-        ordersData = orders.map(item => ({
-            orderId: item.orderId,
-            customerId: item.customerId || item.customerName || 'N/A',
-            merchantId: item.businessId || item.merchantId || 'N/A',
-            driverId: item.driverId || 'N/A',
-            status: item.status || 'unknown',
-            total: item.totalAmount ? `$${(parseFloat(item.totalAmount) / 100).toFixed(2)}` :
-                (item.total ? `$${parseFloat(item.total).toFixed(2)}` : 'N/A'),
-            date: formatDate(item.createdAt),
-            fullData: item
+        // Transform orders for the UI
+        ordersData = orders.map(order => ({
+            orderId: order.orderId,
+            customerId: order.customerName || order.customerPhone || 'N/A',
+            merchantId: order.storeName || 'N/A',
+            driverId: order.driverId || 'N/A',
+            status: order.status || 'unknown',
+            total: order.total || 'N/A',
+            date: formatDate(order.createdAt),
+            fullData: order
         }));
 
-        console.log(`✅ Loaded ${ordersData.length} orders from backend API`);
-        showMessage(`Successfully loaded ${ordersData.length} orders from database`, 'success');
+        console.log(`✅ Successfully loaded ${ordersData.length} orders from WizzOrders table`);
+        showMessage(`Successfully loaded ${ordersData.length} orders from WizzOrders table`, 'success');
 
     } catch (error) {
-        console.error('❌ Error loading orders from backend:', error);
+        console.error('❌ Error loading orders from WizzOrders table:', error);
 
-        // Show user-friendly error message based on error type
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            showMessage('Network error: Unable to connect to backend API. Showing sample orders.', 'error');
-        } else if (error.name === 'SyntaxError') {
-            showMessage('API response format error. Showing sample orders.', 'error');
+        // Show user-friendly error message
+        if (error.message.includes('not available')) {
+            showMessage('Orders API not loaded. Please refresh the page.', 'error');
+        } else if (error.message.includes('credentials')) {
+            showMessage('Authentication error: Unable to access WizzOrders table. Please check your login.', 'error');
         } else {
-            showMessage(`Backend error: ${error.message}. Showing sample orders.`, 'error');
+            showMessage(`Database error: ${error.message}. Please try again.`, 'error');
         }
 
-        // Fall back to sample data
-        ordersData = getSampleOrdersData();
-        console.log('🔄 Using sample data fallback');
+        // Set empty orders instead of fallback data
+        ordersData = [];
     }
 }
 
