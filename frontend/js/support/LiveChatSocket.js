@@ -288,17 +288,19 @@
 
       console.log('✅ LiveChatSocket connected successfully');
 
-      // Send agent connect message
+      // Send agent connect message (using 'chat_init' action as that's what the AWS handler supports)
       this.send({
-        type: 'chat_agent_connect',
+        action: 'chat_init',
+        userType: 'agent',
         agentId: this.agentId,
-        agentName: this.agentName
+        agentName: this.agentName,
+        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5'
       });
 
       // Request delta sync if we have last sync timestamp
       if (this.sessionService?.lastSyncAt) {
         this.send({
-          type: 'sync_sessions',
+          action: 'sync_sessions',
           since: this.sessionService.lastSyncAt
         });
       }

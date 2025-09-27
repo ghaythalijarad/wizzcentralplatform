@@ -596,21 +596,34 @@
                     attempts++;
                 }
 
-                // Initialize LiveChatSocket for support agents
-                if (window.LiveChatSocket) {
-                    const liveChatSocket = new window.LiveChatSocket({
-                        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
-                        endpoint: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
-                        userId: 'support_dashboard_' + Date.now(),
-                        agentId: 'support_agent_' + Date.now(),
-                        agentName: 'WizzCentral Support Agent'
-                    });
+                // Initialize LiveChatSocket for support agents                    if (window.LiveChatSocket) {
+                const liveChatSocket = new window.LiveChatSocket({
+                    businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
+                    endpoint: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
+                    userId: 'support_dashboard_' + Date.now(),
+                    agentId: 'support_agent_' + Date.now(),
+                    agentName: 'WizzCentral Support Agent'
+                });
 
-                    // Initialize the socket
-                    liveChatSocket.init();
+                // Add message listener for debugging
+                liveChatSocket.ws?.addEventListener('message', (event) => {
+                    console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
+                    try {
+                        const msg = JSON.parse(event.data);
+                        console.log('🔍 DEBUG: Parsed message type:', msg.type);
+                        if (msg.type === 'driver_message' || msg.type === 'chat_message') {
+                            console.log('🚗 DEBUG: Driver message detected!', msg);
+                        }
+                    } catch (e) {
+                        console.log('🔍 DEBUG: Raw message (not JSON):', event.data);
+                    }
+                });
 
-                    // Connect to the WebSocket
-                    const connected = await liveChatSocket.connect();
+                // Initialize the socket
+                liveChatSocket.init();
+
+                // Connect to the WebSocket
+                const connected = await liveChatSocket.connect();
                     
                     if (connected) {
                         console.log('✅ LiveChatSocket connected successfully as support agent');
