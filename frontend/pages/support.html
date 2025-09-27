@@ -8,54 +8,67 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles/dashboard.css">
     <style>
-        body {
+        .support-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .support-title h1 {
             margin: 0;
-            font-family: 'Inter', sans-serif;
-            background: #f8fafc;
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: #1f2937;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .support-title p {
+            margin: 0.25rem 0 0 0;
+            font-size: 1rem;
+            color: #6b7280;
+        }
+        
+        .support-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         
         .support-container {
             display: flex;
-            height: 100vh;
-            background: #fff;
+            height: calc(100vh - 140px);
+            background: #f8fafc;
         }
         
-        .support-sidebar {
-            width: 280px;
-            background: #1f2937;
-            color: white;
+        .sessions-panel {
+            width: 400px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid #374151;
         }
         
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid #374151;
-        }
-        
-        .sidebar-header h1 {
-            margin: 0;
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #f9fafb;
-        }
-        
-        .sidebar-header p {
-            margin: 0.5rem 0 0 0;
-            font-size: 0.875rem;
-            color: #9ca3af;
+        .sessions-header {
+            padding: 1.5rem 1.5rem 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
         }
         
         .connection-status {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            margin-top: 1rem;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
-            background: #374151;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
         }
         
         .status-indicator {
@@ -73,43 +86,45 @@
             background: #f59e0b;
         }
         
-        .sessions-section {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-        }
-        
         .section-title {
-            font-size: 0.875rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: #d1d5db;
-            margin-bottom: 1rem;
+            color: #374151;
+            margin: 0;
             text-transform: uppercase;
             letter-spacing: 0.025em;
         }
         
         .sessions-list {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
         
         .session-card {
             padding: 1rem;
-            border-radius: 0.5rem;
-            background: #374151;
+            border-radius: 0.75rem;
+            background: white;
             cursor: pointer;
             transition: all 0.2s;
-            border: 1px solid transparent;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
         
         .session-card:hover {
-            background: #4b5563;
+            background: #f8fafc;
+            border-color: #d1d5db;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            transform: translateY(-1px);
         }
         
         .session-card.active {
-            background: #009bb8;
-            border-color: #00c2e8;
+            background: #eff6ff;
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
         }
         
         .session-info {
@@ -119,16 +134,17 @@
         }
         
         .customer-avatar {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: #6b7280;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 600;
             font-size: 0.875rem;
+            flex-shrink: 0;
         }
         
         .session-details {
@@ -137,17 +153,19 @@
         }
         
         .customer-name {
-            font-weight: 500;
-            color: #f9fafb;
+            font-weight: 600;
+            color: #1f2937;
             margin-bottom: 0.25rem;
+            font-size: 0.95rem;
         }
         
         .last-message {
             font-size: 0.875rem;
-            color: #9ca3af;
+            color: #6b7280;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            line-height: 1.4;
         }
         
         .session-meta {
@@ -159,7 +177,8 @@
         
         .message-time {
             font-size: 0.75rem;
-            color: #6b7280;
+            color: #9ca3af;
+            font-weight: 500;
         }
         
         .unread-badge {
@@ -171,7 +190,7 @@
             font-weight: 500;
         }
         
-        .main-content {
+        .chat-area {
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -371,69 +390,119 @@
             font-size: 0.875rem;
         }
         
-        .quick-actions {
-            padding: 1rem;
-            border-top: 1px solid #374151;
-        }
-        
         .quick-action-button {
-            width: 100%;
-            background: #374151;
-            color: #d1d5db;
-            border: 1px solid #4b5563;
-            padding: 0.75rem;
-            border-radius: 0.375rem;
+            padding: 0.5rem 1rem;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
             cursor: pointer;
-            transition: all 0.2s;
-            margin-bottom: 0.5rem;
             font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
         .quick-action-button:hover {
-            background: #4b5563;
-            color: white;
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
         
-        .quick-action-button:last-child {
-            margin-bottom: 0;
+        .quick-action-button:active {
+            transform: translateY(0);
+        }
+        
+        .quick-action-button i {
+            font-size: 0.875rem;
+        }
+        
+        .quick-action-button:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        
+        @media (max-width: 1024px) {
+            .support-container {
+                flex-direction: column;
+                height: calc(100vh - 120px);
+            }
+            
+            .sessions-panel {
+                width: 100%;
+                height: 300px;
+                border-right: none;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            
+            .support-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .support-controls {
+                justify-content: center;
+            }
         }
         
         @media (max-width: 768px) {
-            .support-sidebar {
-                width: 100%;
-                position: absolute;
-                z-index: 10;
-                transform: translateX(-100%);
-                transition: transform 0.3s;
+            .support-header {
+                padding: 1rem;
             }
             
-            .support-sidebar.mobile-open {
-                transform: translateX(0);
+            .support-title h1 {
+                font-size: 1.5rem;
             }
             
-            .main-content {
-                width: 100%;
+            .sessions-panel {
+                height: 250px;
+            }
+            
+            .session-card {
+                padding: 0.75rem;
+            }
+            
+            .customer-avatar {
+                width: 36px;
+                height: 36px;
             }
         }
     </style>
 </head>
-<body>
-    <div class="support-container">
-        <!-- Sidebar -->
-        <div class="support-sidebar">
-            <div class="sidebar-header">
+<body data-page="support">
+    <!-- Standard WizzCentral Sidebar -->
+    <div id="sidebar-placeholder"></div>
+
+    <!-- Support Page Content -->
+    <div class="main-content" id="mainContent">
+        <div class="support-header">
+            <div class="support-title">
                 <h1><i class="fas fa-headset"></i> Live Support</h1>
                 <p>Real-time customer assistance</p>
-
+            </div>
+            
+            <div class="support-controls">
                 <div class="connection-status">
                     <div class="status-indicator" id="connectionIndicator"></div>
                     <span id="connectionStatus">Connecting...</span>
                 </div>
+                
+                <button class="quick-action-button" onclick="reconnectWebSocket()">
+                    <i class="fas fa-sync-alt"></i> Reconnect
+                </button>
             </div>
+        </div>
 
-            <div class="sessions-section">
-                <div class="section-title">
-                    Active Conversations (<span id="activeSessions">0</span>)
+        <div class="support-container">
+            <!-- Sessions Panel -->
+            <div class="sessions-panel">
+                <div class="sessions-header">
+                    <div class="section-title">
+                        Active Conversations (<span id="activeSessions">0</span>)
+                    </div>
                 </div>
                 
                 <div class="sessions-list" id="sessionsList">
@@ -445,22 +514,15 @@
                 </div>
             </div>
             
-            <div class="quick-actions">
-                <button class="quick-action-button" onclick="reconnectWebSocket()">
-                    <i class="fas fa-sync-alt"></i> Reconnect
-                </button>
-            </div>
-        </div>
-        
-        <!-- Main Chat Area -->
-        <div class="main-content">
+            <!-- Main Chat Area -->
+            <div class="chat-area">
             <div class="chat-header">
                 <div class="chat-title">
                     <i class="fas fa-user"></i>
                     <h2 id="chatTitle">Select a conversation</h2>
                 </div>
                 <div class="chat-actions">
-                    <button class="btn btn-secondary" onclick="endCurrentSession()" id="endSessionBtn" style="display: none;">
+                    <button class="btn btn-secondary" onclick="endChatSession()" id="endSessionBtn" style="display: none;">
                         <i class="fas fa-times"></i> End Session
                     </button>
                 </div>
@@ -519,45 +581,54 @@
 
             // Initialize real WebSocket live chat system (production-ready)
         async function initializeRealLiveChatSystem() {
-            console.log('🚀 Initializing production live chat system...');
+            console.log('🚀 Initializing production live chat system with LiveChatSocket...');
 
             try {
                 updateConnectionStatus('connecting', 'Connecting to live chat...');
 
-                // Wait for WebSocketManager to be available (with timeout)
+                // Wait for LiveChatSocket to be available (with timeout)
                 let attempts = 0;
                 const maxAttempts = 10;
 
-                while (!window.WebSocketManager && attempts < maxAttempts) {
-                    console.log(`⏳ Waiting for WebSocketManager... (attempt ${attempts + 1})`);
+                while (!window.LiveChatSocket && attempts < maxAttempts) {
+                    console.log(`⏳ Waiting for LiveChatSocket... (attempt ${attempts + 1})`);
                     await new Promise(resolve => setTimeout(resolve, 100));
                     attempts++;
                 }
 
-                // Initialize WebSocket Manager
-                if (window.WebSocketManager) {
-                    wsManager = new window.WebSocketManager();
+                // Initialize LiveChatSocket for support agents
+                if (window.LiveChatSocket) {
+                    const liveChatSocket = new window.LiveChatSocket({
+                        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
+                        endpoint: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
+                        userId: 'support_dashboard_' + Date.now(),
+                        agentId: 'support_agent_' + Date.now(),
+                        agentName: 'WizzCentral Support Agent'
+                    });
 
-                    // Setup event handlers
-                    wsManager.on('connected', onWebSocketConnected);
-                    wsManager.on('disconnected', onWebSocketDisconnected);
-                    wsManager.on('error', onWebSocketError);
-                    wsManager.on('message', onWebSocketMessage);
+                    // Initialize the socket
+                    liveChatSocket.init();
 
-                    // Connect with business ID
-                    const businessId = '7ccf646c-9594-48d4-8f63-c366d89257e5';
-                    const connected = await wsManager.connect(businessId);
-
+                    // Connect to the WebSocket
+                    const connected = await liveChatSocket.connect();
+                    
                     if (connected) {
-                        console.log('✅ WebSocket connected successfully');
+                        console.log('✅ LiveChatSocket connected successfully as support agent');
+                        updateConnectionStatus('connected', 'Connected to live chat as support agent');
+                        
+                        // Store reference globally
+                        window.liveChatSocket = liveChatSocket;
+                        
+                        // Load active chat sessions
+                        loadActiveChatSessions();
                     } else {
-                        throw new Error('Failed to connect to WebSocket');
+                        throw new Error('Failed to connect LiveChatSocket');
                     }
 
                 } else {
-                    console.error('❌ WebSocketManager still not available after waiting');
-                    console.error('Available on window:', Object.keys(window).filter(key => key.includes('WebSocket')));
-                    throw new Error('WebSocketManager not available after ' + maxAttempts + ' attempts - check if websocket-manager.js is loaded correctly');
+                    console.error('❌ LiveChatSocket still not available after waiting');
+                    console.error('Available on window:', Object.keys(window).filter(key => key.includes('Chat')));
+                    throw new Error('LiveChatSocket not available after ' + maxAttempts + ' attempts - check if LiveChatSocket.js is loaded correctly');
                 }
                         
             } catch (error) {
@@ -565,48 +636,11 @@
                 updateConnectionStatus('disconnected', 'Connection failed: ' + error.message);
 
                 // Log production error but don't fall back to mock system
-                console.error('⚠️ Production support page requires WebSocket connection');
+                console.error('⚠️ Production support page requires LiveChatSocket connection');
             }
         }
 
-            // WebSocket event handlers
-            function onWebSocketConnected() {
-            console.log('✅ WebSocket connected for live support');
-            updateConnectionStatus('connected', 'Connected to live chat');
-
-            // Register as support agent
-            if (wsManager) {
-                const agentMessage = {
-                    action: 'join_channel',
-                    userType: 'agent',
-                    userId: 'support_agent_' + Date.now(),
-                    userName: 'Support Agent',
-                    userPhone: '+964-support-agent',
-                    channel: 'live_chat_support',
-                    businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
-                    timestamp: new Date().toISOString()
-                };
-
-                wsManager.send(agentMessage);
-                console.log('📤 Sent agent channel join message');
-                loadActiveChatSessions();
-            }
-        }
-
-                    function onWebSocketDisconnected() {
-                    console.log('⚠️ WebSocket disconnected');
-                    updateConnectionStatus('disconnected', 'Disconnected from live chat');
-                }
-
-                function onWebSocketError(error) {
-                    console.error('❌ WebSocket error:', error);
-                    updateConnectionStatus('disconnected', 'Connection error');
-                }
-
-                function onWebSocketMessage(message) {
-                    console.log('📨 Received WebSocket message:', message);
-                    handleMessage(message);
-                }
+            // LiveChatSocket integrated event handling - managed automatically by LiveChatSocket
 
                 // Handle incoming chat messages
                 function handleIncomingChatMessage(message) {
@@ -1468,6 +1502,18 @@
                     }
 
             console.log('✅ Production Support page loaded - ready for genuine WizzDriver sessions only');
+        </script>
+        </div> <!-- End support-container -->
+        </div> <!-- End main-content -->
+        
+        <!-- Navigation Manager -->
+        <script src="../assets/js/navigation.js"></script>
+        <script>
+            // Initialize navigation when page loads
+            document.addEventListener('DOMContentLoaded', async function () {
+                const nav = new NavigationManager();
+                await nav.init();
+            });
         </script>
 </body>
 </html>

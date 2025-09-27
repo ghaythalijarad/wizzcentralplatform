@@ -482,7 +482,7 @@ body {
 
 /* Navigation */
 .md-navigation-drawer {
-    background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
+    background: var(--md-sys-color-primary);
     border-right: 1px solid var(--md-sys-color-outline-variant);
     width: 280px;
     height: 100vh;
@@ -546,7 +546,6 @@ body {
     justify-content: space-between;
     padding: 24px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
 }
 
 .logo {
@@ -577,7 +576,6 @@ body {
 .sidebar-footer {
     padding: 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
     margin-top: auto;
 }
 
@@ -1177,7 +1175,6 @@ body {
 .sidebar-footer {
     padding: 16px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.1);
 }
 
 .user-profile {
