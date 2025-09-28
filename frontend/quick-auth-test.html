@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quick Auth & Orders Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Quick Auth & Orders Test</h1>
+    <div id="status" class="status info">Ready to test...</div>
+    
+    <button class="btn-primary" onclick="authenticateUser()">🔐 Authenticate with Test Credentials</button>
+    <button class="btn-success" onclick="testOrders()">📋 Test Orders API</button>
+    <button class="btn-primary" onclick="goToOrders()">🚀 Go to Orders Page</button>
+
+    <!-- Include required scripts -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js"></script>
+    <script src="js/orders-api.js"></script>
+    <script src="auth-service.js"></script>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.innerHTML = message;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        async function authenticateUser() {
+            updateStatus('🔐 Authenticating with test credentials...', 'info');
+            
+            try {
+                const testEmail = 'g87_a@yahoo.com';
+                const testPassword = 'Gha@551987';
+
+                // Wait for AuthService to be available
+                if (typeof window.AuthService === 'undefined') {
+                    updateStatus('⏳ Waiting for AuthService to load...', 'info');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                if (typeof window.AuthService !== 'undefined' && window.AuthService.login) {
+                    updateStatus('🔐 Using AuthService for authentication...', 'info');
+                    const result = await window.AuthService.login(testEmail, testPassword);
+                    
+                    if (result.success) {
+                        updateStatus('✅ Authentication successful!', 'success');
+                        updateStatus(`Tokens stored. User: ${testEmail}`, 'success');
+                    } else {
+                        throw new Error(result.message || 'Authentication failed');
+                    }
+                } else {
+                    // Fallback: Set mock authentication
+                    updateStatus('🔧 Using mock authentication...', 'info');
+                    sessionStorage.setItem('isAuthenticated', 'true');
+                    sessionStorage.setItem('userEmail', testEmail);
+                    sessionStorage.setItem('userId', 'test-user-123');
+                    sessionStorage.setItem('idToken', 'mock-id-token');
+                    sessionStorage.setItem('accessToken', 'mock-access-token');
+                    updateStatus('✅ Mock authentication set!', 'success');
+                }
+            } catch (error) {
+                updateStatus(`❌ Authentication failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testOrders() {
+            updateStatus('📋 Testing Orders API...', 'info');
+            
+            try {
+                if (typeof WizzOrdersAPI === 'undefined') {
+                    throw new Error('WizzOrdersAPI not loaded');
+                }
+
+                const api = new WizzOrdersAPI();
+                updateStatus('🔄 Initializing Orders API...', 'info');
+                await api.initialize();
+                
+                updateStatus('📊 Fetching orders...', 'info');
+                const result = await api.getOrders(5);
+                
+                if (result.success) {
+                    updateStatus(`✅ Orders API working! Found ${result.orders.length} orders`, 'success');
+                    console.log('Orders data:', result.orders);
+                } else {
+                    throw new Error(result.message || 'Orders API failed');
+                }
+            } catch (error) {
+                updateStatus(`❌ Orders test failed: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        function goToOrders() {
+            updateStatus('🚀 Redirecting to orders page...', 'info');
+            window.location.href = '/pages/orders.html';
+        }
+
+        // Auto-run authentication on page load
+        window.addEventListener('load', () => {
+            setTimeout(authenticateUser, 1000);
+        });
+    </script>
+</body>
+</html>

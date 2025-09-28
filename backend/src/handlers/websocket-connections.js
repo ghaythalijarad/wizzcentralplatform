@@ -205,15 +205,18 @@ async function handleConnect(connectionId, event) {
         if (Array.isArray(groups)) {
             if (groups.includes('support') || groups.includes('admin')) role = 'agent';
         }
-        const userId = verified.sub || verified.email || verified.username || 'unknown_user';
+        const userId = queryParams.driverId || verified.sub;
         const userType = role === 'agent' ? 'agent' : 'driver';
+
         // Store connection only after auth
         await dynamoDB.send(new PutCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Item: {
                 connectionId,
+                driverId: userType === 'driver' ? userId : null,
                 userId,
                 userType,
+                connectionStatus: 'connected', // Add connection status
                 businessId: businessId || 'default',
                 platform: queryParams.platform || 'web',
                 appVersion: queryParams.appVersion || '1.0.0',
@@ -1305,7 +1308,7 @@ async function handleOrderStatusUpdate(connectionId, message, apiGatewayClient) 
         console.error('❌ Error handling order status update:', error);
         await sendToConnection(connectionId, {
             type: 'error',
-            message: 'Failed to update order status'
+                message: 'Failed to update order status'
         }, apiGatewayClient);
     }
 }

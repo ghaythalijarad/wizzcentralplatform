@@ -7,14 +7,14 @@ const { ApiGatewayManagementApiClient, PostToConnectionCommand } = require("@aws
 const client = new DynamoDBClient({ region: 'us-east-1' });
 const docClient = DynamoDBDocumentClient.from(client);
 
-const ORDERS_TABLE = 'WizzOrders';
+const ORDERS_TABLE = 'WizzUser_orders_dev';
 const WEBSOCKET_CONNECTIONS_TABLE = 'WizzUser_websocket_connections_dev';
 
 async function createOrderAndNotifyFlutterApp() {
     const orderId = `ORDER_${Date.now()}`;
     
     console.log('🚀 إنشاء طلب نهائي واختبار الإشعار مع تطبيق Flutter');
-    console.log('=' * 60);
+    console.log('='.repeat(60));
     console.log(`📦 رقم الطلب: ${orderId}`);
     console.log('📱 التطبيق يعمل على الآيفون - جاهز لاستقبال الإشعارات');
     
@@ -92,10 +92,12 @@ async function createOrderAndNotifyFlutterApp() {
             assignmentStatus: 'pending'
         };
         
+        console.log('   ⏳ جارٍ حفظ الطلب في DynamoDB...');
         await docClient.send(new PutCommand({
             TableName: ORDERS_TABLE,
             Item: orderData
         }));
+        console.log('   ✅ تم حفظ الطلب في DynamoDB بنجاح.');
         
         console.log('✅ تم إنشاء الطلب بنجاح');
         console.log(`   👤 العميل: ${orderData.customerName}`);

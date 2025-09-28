@@ -459,6 +459,8 @@
     <!-- Centralized utilities -->
     <script src="../assets/js/auth-utils.js"></script>
     <script src="../assets/js/aws-utils.js"></script>
+    <!-- Orders API -->
+    <script src="../js/orders-api.js"></script>
     <!-- Sidebar -->
     <script src="../assets/js/navigation.js"></script>
 <script>
@@ -473,19 +475,29 @@
         tableStatus.innerHTML = '<span class="loading-spinner"></span> Loading orders...';
 
         try {
-            const response = await fetch('/orders');
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Use WizzOrdersAPI to get orders directly from DynamoDB
+            if (!window.WizzOrdersAPI) {
+                throw new Error('WizzOrdersAPI not available. Please ensure orders-api.js is loaded.');
             }
 
-            const data = await response.json();
-            allOrders = data.orders || [];
+            console.log('🔄 Initializing WizzOrdersAPI...');
+            const ordersAPI = new window.WizzOrdersAPI();
+            await ordersAPI.initialize();
+
+            console.log('🔄 Fetching orders from WizzOrders table...');
+            const result = await ordersAPI.getOrders(50);
+
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to fetch orders');
+            }
+
+            allOrders = result.orders || [];
             filteredOrders = [...allOrders];
 
             updateStatistics();
             renderOrdersTable();
 
-            tableStatus.innerHTML = `${allOrders.length} orders loaded`;
+            tableStatus.innerHTML = `${allOrders.length} orders loaded from WizzOrders table`;
         } catch (error) {
             console.error('Error loading orders:', error);
             tableStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading orders';
@@ -728,7 +740,17 @@
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', function () {
-        loadOrders();
+        console.log('🚀 DOM Content Loaded - Starting orders page initialization');
+        console.log('🔍 Available global objects:', {
+            WizzOrdersAPI: !!window.WizzOrdersAPI,
+            AWSUtils: !!window.AWSUtils,
+            AuthUtils: !!window.AuthUtils
+        });
+
+        setTimeout(() => {
+            console.log('🔄 Starting loadOrders() after brief delay...');
+            loadOrders();
+        }, 100); // Small delay to ensure all scripts are loaded
     });
 </script>
 <!-- Sidebar Loading Script -->

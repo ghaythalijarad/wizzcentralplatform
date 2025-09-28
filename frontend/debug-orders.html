@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Orders Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f0f0f0; border-left: 3px solid #333; }
+        .error { border-left-color: #e74c3c; background: #fdf2f2; }
+        .success { border-left-color: #27ae60; background: #f2fdf3; }
+        .info { border-left-color: #3498db; background: #f2f8fd; }
+    </style>
+</head>
+<body>
+    <h1>Orders Debug Test</h1>
+    <div id="logs"></div>
+
+    <!-- Include scripts in order -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    <script src="config.js"></script>
+    <script src="assets/js/auth-utils.js"></script>
+    <script src="assets/js/aws-utils.js"></script>
+    <script src="js/orders-api.js"></script>
+
+    <script>
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            console.log(`[DEBUG] ${message}`);
+        }
+
+        async function debugTest() {
+            try {
+                log('Starting debug test...', 'info');
+
+                // Check script loading
+                log(`AWS SDK loaded: ${typeof AWS !== 'undefined'}`, 'info');
+                log(`Auth loaded: ${typeof Auth !== 'undefined'}`, 'info');
+                log(`AWSUtils loaded: ${typeof AWSUtils !== 'undefined'}`, 'info');
+                log(`WizzOrdersAPI loaded: ${typeof WizzOrdersAPI !== 'undefined'}`, 'info');
+
+                // Check authentication status
+                const isAuth = sessionStorage.getItem('isAuthenticated');
+                const userEmail = sessionStorage.getItem('userEmail');
+                log(`Authentication status: ${isAuth}, User: ${userEmail}`, isAuth === 'true' ? 'success' : 'error');
+                
+                // Check AWS config
+                if (window.WIZZCENTRAL_CONFIG) {
+                    log(`AWS Region: ${window.WIZZCENTRAL_CONFIG.AWS_REGION || window.WIZZCENTRAL_CONFIG.COGNITO_REGION}`, 'info');
+                    log(`User Pool: ${window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID}`, 'info');
+                }
+
+                if (typeof WizzOrdersAPI === 'undefined') {
+                    throw new Error('WizzOrdersAPI not loaded');
+                }
+
+                log('Creating WizzOrdersAPI instance...', 'info');
+                const api = new WizzOrdersAPI();
+
+                log('Initializing API...', 'info');
+                await api.initialize();
+
+                log('API initialized successfully! Testing getOrders...', 'success');
+                const result = await api.getOrders(3);
+
+                if (result.success) {
+                    log(`✅ SUCCESS: Found ${result.orders.length} orders`, 'success');
+                    log(`Order data: ${JSON.stringify(result.orders, null, 2)}`, 'info');
+                } else {
+                    log(`❌ API Error: ${result.message}`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+                log(`Stack trace: ${error.stack}`, 'error');
+            }
+        }
+
+        // Wait for all scripts to load
+        window.addEventListener('load', () => {
+            setTimeout(debugTest, 500);
+        });
+    </script>
+</body>
+</html>
