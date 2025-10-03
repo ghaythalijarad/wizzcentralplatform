@@ -14,8 +14,8 @@ const dynamoDB = DynamoDBDocumentClient.from(dynamoDBClient);
 
 // Table names
 const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || 'WizzUser_websocket_connections_dev';
-const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzUser_orders_dev';
-const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WizzUser_drivers_dev';
+const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzOrders';
+const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WhizzDrivers_dev';
 const ASSIGNMENT_HISTORY_TABLE = process.env.ASSIGNMENT_HISTORY_TABLE || 'WizzUser_driver_assignments_dev';
 
 // WebSocket endpoint
@@ -152,11 +152,11 @@ async function getAvailableDrivers(order) {
  * Check if driver is available for new assignments
  */
 function isDriverAvailable(driver, connection) {
-    // Check driver status
-    if (driver.status !== 'online') return false;
+    // Check driver availability status (set by Flutter app)
+    if (driver.availabilityStatus !== 'online' && driver.status !== 'online') return false;
     
-    // Check if driver is verified and active
-    if (!driver.isVerified || !driver.isActive) return false;
+    // Check if driver registration is approved
+    if (driver.registrationStatus !== 'APPROVED' && driver.status !== 'APPROVED') return false;
     
     // Check if driver has too many active orders
     const maxActiveOrders = driver.vehicleType === 'motorcycle' ? 2 : 1;
@@ -477,13 +477,30 @@ async function getOrderDetails(orderId) {
  */
 async function getDriverDetails(driverId) {
     try {
-        const result = await dynamoDB.send(new GetCommand({
-            TableName: DRIVERS_TABLE,
-            Key: {
-                PK: `DRIVER#${driverId}`,
-                SK: `DRIVER#${driverId}`
+        // Try different key patterns as WhizzDrivers_dev uses different schemas
+        let result;
+        
+        // First try with userId (most common)
+        try {
+            result = await dynamoDB.send(new GetCommand({
+                TableName: DRIVERS_TABLE,
+                Key: { userId: driverId }
+            }));
+        } catch (error) {
+            // If that fails, try with driverId
+            try {
+                result = await dynamoDB.send(new GetCommand({
+                    TableName: DRIVERS_TABLE,
+                    Key: { driverId: driverId }
+                }));
+            } catch (error2) {
+                // Finally try with id
+                result = await dynamoDB.send(new GetCommand({
+                    TableName: DRIVERS_TABLE,
+                    Key: { id: driverId }
+                }));
             }
-        }));
+        }
 
         return result.Item;
     } catch (error) {

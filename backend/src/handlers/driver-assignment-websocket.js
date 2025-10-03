@@ -14,8 +14,38 @@ const dynamoDB = DynamoDBDocumentClient.from(dynamoDBClient);
 
 // Table names
 const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || 'WizzUser_websocket_connections_dev';
-const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzUser_orders_dev';
-const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WizzUser_drivers_dev';
+const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzOrders';
+const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WhizzDrivers_dev';
+
+/**
+ * Helper function to update driver record with proper key handling
+ */
+async function updateDriverRecord(driverId, updateExpression, expressionAttributeNames, expressionAttributeValues) {
+    // Try different key patterns as WhizzDrivers_dev uses different schemas
+    const keyPatterns = [
+        { userId: driverId },
+        { driverId: driverId },
+        { id: driverId }
+    ];
+    
+    for (const key of keyPatterns) {
+        try {
+            await dynamoDB.send(new UpdateCommand({
+                TableName: DRIVERS_TABLE,
+                Key: key,
+                UpdateExpression: updateExpression,
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues
+            }));
+            return; // Success, exit
+        } catch (error) {
+            if (error.name === 'ValidationException' && keyPatterns.indexOf(key) < keyPatterns.length - 1) {
+                continue; // Try next key pattern
+            }
+            throw error; // Re-throw if last attempt or different error
+        }
+    }
+}
 
 /**
  * Handle driver assignment response
@@ -178,21 +208,14 @@ async function handleDriverLocationUpdate(connectionId, message, apiGatewayClien
         const driverId = connection.userId;
 
         // Update driver location in database
-        await dynamoDB.send(new UpdateCommand({
-            TableName: DRIVERS_TABLE,
-            Key: {
-                PK: `DRIVER#${driverId}`,
-                SK: `DRIVER#${driverId}`
-            },
-            UpdateExpression: `
-                SET #location = :location,
-                    lastLocationUpdate = :timestamp,
-                    updatedAt = :updatedAt
-            `,
-            ExpressionAttributeNames: {
+        await updateDriverRecord(driverId, 
+            `SET #location = :location,
+                lastLocationUpdate = :timestamp,
+                updatedAt = :updatedAt`,
+            {
                 '#location': 'location'
             },
-            ExpressionAttributeValues: {
+            {
                 ':location': {
                     latitude: parseFloat(latitude),
                     longitude: parseFloat(longitude),
@@ -201,7 +224,7 @@ async function handleDriverLocationUpdate(connectionId, message, apiGatewayClien
                 ':timestamp': timestamp || new Date().toISOString(),
                 ':updatedAt': new Date().toISOString()
             }
-        }));
+        );
 
         // Update connection last seen
         await dynamoDB.send(new UpdateCommand({
@@ -255,29 +278,23 @@ async function handleDriverStatusChange(connectionId, message, apiGatewayClient)
 
         const driverId = connection.userId;
 
-        // Update driver status
-        await dynamoDB.send(new UpdateCommand({
-            TableName: DRIVERS_TABLE,
-            Key: {
-                PK: `DRIVER#${driverId}`,
-                SK: `DRIVER#${driverId}`
-            },
-            UpdateExpression: `
-                SET #status = :status,
-                    statusChangedAt = :timestamp,
-                    statusReason = :reason,
-                    updatedAt = :updatedAt
-            `,
-            ExpressionAttributeNames: {
+        // Update driver status (both status and availabilityStatus for compatibility)
+        await updateDriverRecord(driverId,
+            `SET #status = :status,
+                availabilityStatus = :status,
+                statusChangedAt = :timestamp,
+                statusReason = :reason,
+                updatedAt = :updatedAt`,
+            {
                 '#status': 'status'
             },
-            ExpressionAttributeValues: {
+            {
                 ':status': status,
                 ':timestamp': new Date().toISOString(),
                 ':reason': reason || null,
                 ':updatedAt': new Date().toISOString()
             }
-        }));
+        );
 
         // Update connection status
         await dynamoDB.send(new UpdateCommand({
@@ -476,18 +493,14 @@ async function getOrder(orderId) {
  */
 async function updateDriverActiveOrders(driverId, increment) {
     try {
-        await dynamoDB.send(new UpdateCommand({
-            TableName: DRIVERS_TABLE,
-            Key: {
-                PK: `DRIVER#${driverId}`,
-                SK: `DRIVER#${driverId}`
-            },
-            UpdateExpression: 'ADD activeOrdersCount :increment SET updatedAt = :updatedAt',
-            ExpressionAttributeValues: {
+        await updateDriverRecord(driverId,
+            'ADD activeOrdersCount :increment SET updatedAt = :updatedAt',
+            {},
+            {
                 ':increment': increment,
                 ':updatedAt': new Date().toISOString()
             }
-        }));
+        );
     } catch (error) {
         console.error(`❌ Error updating active orders count for driver ${driverId}:`, error);
     }
