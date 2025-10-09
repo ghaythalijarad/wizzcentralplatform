@@ -1,0 +1,174 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   AUTOMATIC DRIVER ASSIGNMENT FLOW                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+                                  START
+                                    │
+                                    ▼
+                    ┌───────────────────────────────┐
+                    │   Customer Places Order       │
+                    │   Status: "pending"           │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   Merchant Reviews Order      │
+                    │   Clicks "Accept" Button      │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   Order Status Changes to     │
+                    │   "confirmed"                 │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+            ╔══════════════════════════════════════════╗
+            ║     🚀 AUTOMATIC ASSIGNMENT BEGINS       ║
+            ╚══════════════════════════════════════════╝
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   DynamoDB Stream Trigger     │
+                    │   Detects Status Change       │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   order-stream-processor.js   │
+                    │   • Validates order           │
+                    │   • Checks no driver assigned │
+                    │   • Calls assignment service  │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   driver-assignment-service   │
+                    │   1. Find online drivers      │
+                    │   2. Filter by distance (≤15km)│
+                    │   3. Calculate priority score  │
+                    │   4. Sort by best match       │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   Select Best Driver          │
+                    │   • Distance: 40% weight      │
+                    │   • Rating: 30% weight        │
+                    │   • Completion: 20% weight    │
+                    │   • Load: 10% weight          │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+                    ┌───────────────────────────────┐
+                    │   Send WebSocket Notification │
+                    │   To Selected Driver          │
+                    └──────────────┬────────────────┘
+                                   │
+                                   ▼
+            ╔══════════════════════════════════════════╗
+            ║        📱 DRIVER NOTIFICATION            ║
+            ║                                          ║
+            ║   ┌────────────────────────────────┐    ║
+            ║   │  🎯 NEW ORDER ASSIGNMENT       │    ║
+            ║   │                                │    ║
+            ║   │  Customer: Ahmed Ali           │    ║
+            ║   │  Restaurant: Baghdad Rest      │    ║
+            ║   │  Earnings: 5,000 IQD           │    ║
+            ║   │  Distance: 2.5 km              │    ║
+            ║   │                                │    ║
+            ║   │  ⏱️  30 seconds remaining      │    ║
+            ║   │                                │    ║
+            ║   │  [✅ ACCEPT]  [❌ REJECT]      │    ║
+            ║   └────────────────────────────────┘    ║
+            ╚══════════════════════════════════════════╝
+                        │                   │
+                   ACCEPT                REJECT
+                        │                   │
+                        ▼                   ▼
+            ┌────────────────────┐  ┌────────────────────┐
+            │  Update Order      │  │  Try Next Driver   │
+            │  • Set driverId    │  │  • Log decline     │
+            │  • Status: accepted│  │  • Repeat process  │
+            └──────────┬─────────┘  └────────────────────┘
+                       │
+                       ▼
+            ┌────────────────────────────────┐
+            │  Notify Stakeholders           │
+            │  • Customer: "Driver assigned" │
+            │  • Merchant: "Driver on way"   │
+            │  • Admin: Track in dashboard   │
+            └────────────────────────────────┘
+                       │
+                       ▼
+                     END
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         TIMING & PERFORMANCE                                 ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  • Detection Lag:        ~500ms (DynamoDB Stream latency)                    ║
+║  • Processing Time:      ~1-2s (driver search + calculation)                 ║
+║  • Notification Delivery: <100ms (WebSocket)                                 ║
+║  • Driver Timeout:       30 seconds                                          ║
+║  • Total Time:           ~2-3 seconds from accept to notification            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         FALLBACK MECHANISM                                   ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Driver 1 (Best)  ──[Reject/Timeout]──>  Try Driver 2 (2nd Best)            ║
+║                                                     │                        ║
+║                                        [Reject/Timeout]                      ║
+║                                                     │                        ║
+║                                                     ▼                        ║
+║                                          Try Driver 3 (3rd Best)             ║
+║                                                     │                        ║
+║                                        [Reject/Timeout]                      ║
+║                                                     │                        ║
+║                                                     ▼                        ║
+║                                          No More Drivers                     ║
+║                                          Order Stays Unassigned              ║
+║                                          (Manual Assignment Needed)          ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         KEY COMPONENTS                                       ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Backend (WizzCentralPlatform):                                              ║
+║    • order-stream-processor.js     - Detects status changes                 ║
+║    • driver-assignment-service.js  - Smart driver selection                 ║
+║    • driver-assignment-websocket.js - Real-time notifications               ║
+║                                                                              ║
+║  Frontend (WhizzDriver):                                                     ║
+║    • order_assignment_screen.dart      - Assignment UI                      ║
+║    • driver_websocket_service.dart     - WebSocket connection               ║
+║    • driver_connection_provider.dart   - State management                   ║
+║                                                                              ║
+║  Infrastructure:                                                             ║
+║    • DynamoDB Streams - Trigger assignments                                  ║
+║    • AWS Lambda - Process and execute                                        ║
+║    • API Gateway WebSocket - Real-time communication                         ║
+║    • DynamoDB - Store orders, drivers, assignments                           ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         CONFIGURATION                                        ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║                                                                              ║
+║  Trigger Statuses:      ['confirmed', 'ready_for_pickup']                   ║
+║  Max Distance:          15 km                                                ║
+║  Driver Timeout:        30 seconds                                           ║
+║  Max Retry Attempts:    3 drivers                                            ║
+║  Priority Weights:      Distance: 40%  Rating: 30%                           ║
+║                         Completion: 20%  Load: 10%                           ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+

@@ -16,9 +16,8 @@ const dynamoDBClient = new DynamoDBClient({ region: "us-east-1" });
 const dynamoDB = DynamoDBDocumentClient.from(dynamoDBClient);
 
 // Table names
-const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzOrders';
+const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzOrders_dev';
 const WEBSOCKET_CONNECTIONS_TABLE = process.env.WEBSOCKET_CONNECTIONS_TABLE || 'WizzUser_websocket_connections_dev';
-const WEBSOCKET_SUBSCRIPTIONS_TABLE = process.env.WEBSOCKET_SUBSCRIPTIONS_TABLE || 'WizzUser_websocket_subscriptions_dev';
 
 // WebSocket endpoint
 const WEBSOCKET_ENDPOINT = process.env.WEBSOCKET_ENDPOINT || 'wss://lwk0wf6rpl.execute-api.us-east-1.amazonaws.com/dev';
@@ -590,68 +589,32 @@ async function notifyOrderStatusChange(orderId, newStatus, order, apiGatewayClie
 }
 
 /**
- * Notify specific stakeholder - NOW USES SUBSCRIPTIONS TABLE!
+ * Notify specific stakeholder
  */
 async function notifyStakeholder(userId, userType, message, apiGatewayClient) {
     if (!userId) return;
 
     try {
-        console.log(`🔔 Notifying ${userType} ${userId} via subscriptions...`);
+        // Find WebSocket connections for this user
+        const connections = await findUserConnections(userId, userType);
         
-        // For drivers, check subscriptions first (pub/sub pattern)
-        if (userType === 'driver' && message.type === 'driver_assigned') {
-            const driverSubscriptions = await findDriverSubscriptions(userId, message.orderId);
-            
-            for (const subscription of driverSubscriptions) {
-                try {
-                    await apiGatewayClient.postToConnection({
-                        ConnectionId: subscription.connectionId,
-                        Data: JSON.stringify(message)
-                    });
-                    console.log(`✅ Sent notification to driver subscription: ${subscription.subscriptionId}`);
-                } catch (connectionError) {
-                    if (connectionError.statusCode === 410) {
-                        await removeStaleSubscription(subscription.subscriptionId);
-                    } else {
-                        console.error(`❌ Error sending to subscription ${subscription.subscriptionId}:`, connectionError);
-                    }
+        for (const connection of connections) {
+            try {
+                await apiGatewayClient.postToConnection({
+                    ConnectionId: connection.connectionId,
+                    Data: JSON.stringify(message)
+                });
+            } catch (connectionError) {
+                if (connectionError.statusCode === 410) {
+                    // Connection is stale, clean it up
+                    await removeStaleConnection(connection.connectionId);
+                } else {
+                    console.error(`❌ Error sending to connection ${connection.connectionId}:`, connectionError);
                 }
             }
-            
-            // If no subscriptions found, fall back to direct connection lookup
-            if (driverSubscriptions.length === 0) {
-                console.log(`⚠️ No driver subscriptions found for ${userId}, trying direct connection...`);
-                await notifyViaDirectConnection(userId, userType, message, apiGatewayClient);
-            }
-        } else {
-            // For non-driver users or other message types, use direct connection
-            await notifyViaDirectConnection(userId, userType, message, apiGatewayClient);
         }
     } catch (error) {
         console.error(`❌ Error notifying ${userType} ${userId}:`, error);
-    }
-}
-
-/**
- * Notify via direct connection (fallback method)
- */
-async function notifyViaDirectConnection(userId, userType, message, apiGatewayClient) {
-    const connections = await findUserConnections(userId, userType);
-    
-    for (const connection of connections) {
-        try {
-            await apiGatewayClient.postToConnection({
-                ConnectionId: connection.connectionId,
-                Data: JSON.stringify(message)
-            });
-            console.log(`✅ Sent notification via direct connection: ${connection.connectionId}`);
-        } catch (connectionError) {
-            if (connectionError.statusCode === 410) {
-                await removeStaleConnection(connection.connectionId);
-            } else {
-                console.error(`❌ Error sending to connection ${connection.connectionId}:`, connectionError);
-            }
-        }
     }
 }
 
@@ -694,27 +657,18 @@ async function notifyUsersByType(userType, message, apiGatewayClient) {
  */
 async function findUserConnections(userId, userType) {
     try {
-        // Use GSI1 to query by entity (driver/business/agent)
-        const entityType = userType === 'driver' ? 'DRIVER' : 
-                          userType === 'merchant' || userType === 'business' ? 'BUSINESS' : 
-                          'AGENT';
-        const entityKey = `${entityType}#${userId}`;
-        
-        console.log(`🔍 Querying connections with GSI1PK: ${entityKey}`);
-        
         const result = await dynamoDB.send(new QueryCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
-            IndexName: 'GSI1',
-            KeyConditionExpression: 'GSI1PK = :entityKey',
-            FilterExpression: 'isActive = :isActive AND authenticated = :authenticated',
+            IndexName: 'UserIdIndex',
+            KeyConditionExpression: 'userId = :userId',
+            FilterExpression: 'userType = :userType AND authenticated = :authenticated',
             ExpressionAttributeValues: {
-                ':entityKey': entityKey,
-                ':isActive': true,
+                ':userId': userId,
+                ':userType': userType,
                 ':authenticated': true
             }
         }));
 
-        console.log(`✅ Found ${result.Items?.length || 0} active connections for ${entityKey}`);
         return result.Items || [];
     } catch (error) {
         console.error(`❌ Error finding connections for user ${userId}:`, error);
@@ -723,90 +677,22 @@ async function findUserConnections(userId, userType) {
 }
 
 /**
- * Find driver subscriptions for order notifications
- */
-async function findDriverSubscriptions(driverId, orderId) {
-    try {
-        console.log(`🔍 Searching subscriptions for driver: ${driverId}, order: ${orderId || 'any'}`);
-        
-        // Query subscriptions table for driver_orders subscriptions
-        // Using userId-topic-index GSI with topic filter
-        const driverTopic = `driver:${driverId}:orders`;
-        
-        const result = await dynamoDB.send(new QueryCommand({
-            TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
-            IndexName: 'userId-topic-index',
-            KeyConditionExpression: 'userId = :userId',
-            FilterExpression: 'subscriptionType = :subscriptionType AND isActive = :isActive',
-            ExpressionAttributeValues: {
-                ':userId': driverId,
-                ':subscriptionType': 'driver_orders',
-                ':isActive': true
-            }
-        }));
-
-        console.log(`✅ Found ${result.Items?.length || 0} driver subscriptions`);
-        return result.Items || [];
-    } catch (error) {
-        console.error(`❌ Error finding driver subscriptions for ${driverId}:`, error);
-        return [];
-    }
-}
-
-/**
- * Remove stale subscription
- */
-async function removeStaleSubscription(subscriptionId) {
-    try {
-        await dynamoDB.send(new UpdateCommand({
-            TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
-            Key: { subscriptionId },
-            UpdateExpression: 'SET isActive = :isActive, disconnectedAt = :disconnectedAt',
-            ExpressionAttributeValues: {
-                ':isActive': false,
-                ':disconnectedAt': new Date().toISOString()
-            }
-        }));
-    } catch (error) {
-        console.warn(`⚠️ Error removing stale subscription ${subscriptionId}:`, error.message);
-    }
-}
-
-/**
  * Remove stale WebSocket connection
  */
 async function removeStaleConnection(connectionId) {
     try {
-        // First, find the connection using ConnectionIdIndex to get PK and SK
-        const queryResult = await dynamoDB.send(new QueryCommand({
+        await dynamoDB.send(new UpdateCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
-            IndexName: 'ConnectionIdIndex',
-            KeyConditionExpression: 'connectionId = :connId',
-            ExpressionAttributeValues: {
-                ':connId': connectionId
+            Key: { connectionId },
+            UpdateExpression: 'SET #status = :status, disconnectedAt = :disconnectedAt',
+            ExpressionAttributeNames: {
+                '#status': 'status'
             },
-            Limit: 1
+            ExpressionAttributeValues: {
+                ':status': 'disconnected',
+                ':disconnectedAt': new Date().toISOString()
+            }
         }));
-
-        if (queryResult.Items && queryResult.Items.length > 0) {
-            const connection = queryResult.Items[0];
-            
-            // Update to mark as inactive
-            await dynamoDB.send(new UpdateCommand({
-                TableName: WEBSOCKET_CONNECTIONS_TABLE,
-                Key: { 
-                    PK: connection.PK,
-                    SK: connection.SK
-                },
-                UpdateExpression: 'SET isActive = :isActive, disconnectedAt = :disconnectedAt',
-                ExpressionAttributeValues: {
-                    ':isActive': false,
-                    ':disconnectedAt': new Date().toISOString()
-                }
-            }));
-            
-            console.log(`✅ Marked connection ${connectionId} as inactive`);
-        }
     } catch (error) {
         console.warn(`⚠️ Error removing stale connection ${connectionId}:`, error.message);
     }

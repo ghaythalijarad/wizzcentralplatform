@@ -139,6 +139,12 @@ const handler = async (event) => {
                 case 'order_status_update':
                     console.log(`📦 Order status update from ${connectionId}`);
                     return await handleOrderStatusUpdate(connectionId, message, apiGatewayClient);
+                case 'subscribe':
+                    console.log(`📡 Subscription request from ${connectionId}`);
+                    return await handleSubscribe(connectionId, message, apiGatewayClient);
+                case 'unsubscribe':
+                    console.log(`📡 Unsubscription request from ${connectionId}`);
+                    return await handleUnsubscribe(connectionId, message, apiGatewayClient);
                 default:
                     console.log(`Unknown message type: ${messageType}`);
                     return await sendToConnection(connectionId, { type: 'error', message: `Unknown message type: ${messageType}` }, apiGatewayClient);
@@ -169,17 +175,33 @@ async function handleConnect(connectionId, event) {
         // Special handling for support agents - allow without JWT
         if (requestUserType === 'support') {
             console.log('Support agent connection - bypassing JWT verification');
+            
+            const agentId = queryParams.agentId || 'support-agent-001';
 
             await dynamoDB.send(new PutCommand({
                 TableName: WEBSOCKET_CONNECTIONS_TABLE,
                 Item: {
+                    // Composite keys for single-table design
+                    PK: `CONNECTION#${connectionId}`,
+                    SK: `AGENT#${agentId}`,
+                    
+                    // GSI for querying by entity
+                    GSI1PK: `AGENT#${agentId}`,
+                    GSI1SK: `CONNECTION#${connectionId}`,
+                    
                     connectionId,
-                    userId: queryParams.agentId || 'support-agent-001',
+                    userId: agentId,
                     userType: 'agent',
+                    entityType: 'agent',
                     businessId: businessId || 'default',
                     platform: queryParams.platform || 'web',
                     appVersion: queryParams.appVersion || '1.0.0',
                     connectedAt: new Date().toISOString(),
+                    lastActivity: new Date().toISOString(),
+                    lastHeartbeat: new Date().toISOString(),
+                    isActive: true,
+                    connectionType: 'REAL',
+                    source: 'support_portal',
                     ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60),
                     authenticated: true,
                     groups: ['support'],
@@ -208,19 +230,39 @@ async function handleConnect(connectionId, event) {
         const userId = queryParams.driverId || verified.sub;
         const userType = role === 'agent' ? 'agent' : 'driver';
 
-        // Store connection only after auth
+        // Store connection only after auth - using composite key pattern
+        const entityType = userType === 'driver' ? 'driver' : 'business';
+        const entityId = userType === 'driver' ? userId : (businessId || 'default');
+        
         await dynamoDB.send(new PutCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Item: {
+                // Composite keys for single-table design
+                PK: `CONNECTION#${connectionId}`,
+                SK: `${entityType.toUpperCase()}#${entityId}`,
+                
+                // GSI for querying by entity
+                GSI1PK: `${entityType.toUpperCase()}#${entityId}`,
+                GSI1SK: `CONNECTION#${connectionId}`,
+                
+                // Standard attributes
                 connectionId,
                 driverId: userType === 'driver' ? userId : null,
                 userId,
                 userType,
-                connectionStatus: 'connected', // Add connection status
+                entityType,
+                connectionStatus: 'connected',
                 businessId: businessId || 'default',
                 platform: queryParams.platform || 'web',
                 appVersion: queryParams.appVersion || '1.0.0',
+                deviceId: queryParams.deviceId || null,
+                deviceInfo: queryParams.deviceInfo || null,
                 connectedAt: new Date().toISOString(),
+                lastActivity: new Date().toISOString(),
+                lastHeartbeat: new Date().toISOString(),
+                isActive: true,
+                connectionType: 'REAL',
+                source: userType === 'driver' ? 'driver_app' : 'business_app',
                 ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60),
                 authenticated: true,
                 groups,
@@ -240,13 +282,33 @@ async function handleDisconnect(connectionId) {
     try {
         console.log(`WebSocket disconnection: ${connectionId}`);
 
-        // Remove connection from database
-        await dynamoDB.send(new DeleteCommand({
+        // First, find the connection using ConnectionIdIndex to get PK and SK
+        const queryResult = await dynamoDB.send(new QueryCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
-            Key: { connectionId }
+            IndexName: 'ConnectionIdIndex',
+            KeyConditionExpression: 'connectionId = :connId',
+            ExpressionAttributeValues: {
+                ':connId': connectionId
+            },
+            Limit: 1
         }));
 
-        console.log(`Connection ${connectionId} removed successfully`);
+        if (queryResult.Items && queryResult.Items.length > 0) {
+            const connection = queryResult.Items[0];
+            
+            // Remove connection from database using composite keys
+            await dynamoDB.send(new DeleteCommand({
+                TableName: WEBSOCKET_CONNECTIONS_TABLE,
+                Key: { 
+                    PK: connection.PK,
+                    SK: connection.SK
+                }
+            }));
+            
+            console.log(`Connection ${connectionId} removed successfully (PK: ${connection.PK}, SK: ${connection.SK})`);
+        } else {
+            console.log(`Connection ${connectionId} not found in database`);
+        }
 
         return {
             statusCode: 200,
@@ -1453,6 +1515,138 @@ async function notifyUsersByType(userType, message, apiGatewayClient) {
         }
     } catch (error) {
         console.error(`Error notifying users of type ${userType}:`, error);
+    }
+}
+
+/**
+ * Handle subscription requests (driver subscribes to order notifications)
+ */
+async function handleSubscribe(connectionId, message, apiGatewayClient) {
+    try {
+        const { subscriptionType, businessId, driverId, topic } = message;
+        
+        console.log(`📡 Creating subscription: ${subscriptionType} for driver ${driverId}`);
+        
+        // Get connection details
+        const connResult = await dynamoDB.send(new GetCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            Key: { connectionId }
+        }));
+        
+        if (!connResult.Item) {
+            console.error(`Connection ${connectionId} not found`);
+            return await sendToConnection(connectionId, {
+                type: 'subscription_error',
+                message: 'Connection not found'
+            }, apiGatewayClient);
+        }
+        
+        const connection = connResult.Item;
+        const userId = connection.userId || driverId;
+        const userType = connection.userType || 'driver';
+        
+        // Create subscription record
+        const subscriptionId = `${connectionId}_${subscriptionType}_${Date.now()}`;
+        const subscriptionItem = {
+            subscriptionId,
+            connectionId,
+            userId,
+            userType,
+            entityType: userType,
+            subscriptionType: subscriptionType || 'driver_orders',
+            businessId: businessId || connection.businessId,
+            driverId: driverId || userId,
+            topic: topic || `driver:${userId}:orders`,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastUpdate: new Date().toISOString(),
+            ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
+        };
+        
+        // Store subscription
+        await dynamoDB.send(new PutCommand({
+            TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
+            Item: subscriptionItem
+        }));
+        
+        console.log(`✅ Subscription created: ${subscriptionId}`);
+        
+        // Send confirmation
+        return await sendToConnection(connectionId, {
+            type: 'subscription_confirmed',
+            subscriptionId,
+            subscriptionType,
+            topic,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+        
+    } catch (error) {
+        console.error(`Error creating subscription for ${connectionId}:`, error);
+        return await sendToConnection(connectionId, {
+            type: 'subscription_error',
+            message: error.message
+        }, apiGatewayClient);
+    }
+}
+
+/**
+ * Handle unsubscription requests
+ */
+async function handleUnsubscribe(connectionId, message, apiGatewayClient) {
+    try {
+        const { subscriptionId, subscriptionType } = message;
+        
+        console.log(`📡 Removing subscription: ${subscriptionId || subscriptionType}`);
+        
+        if (subscriptionId) {
+            // Remove specific subscription
+            await dynamoDB.send(new UpdateCommand({
+                TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
+                Key: { subscriptionId },
+                UpdateExpression: 'SET isActive = :isActive, disconnectedAt = :timestamp',
+                ExpressionAttributeValues: {
+                    ':isActive': false,
+                    ':timestamp': new Date().toISOString()
+                }
+            }));
+        } else {
+            // Remove all subscriptions for this connection
+            const result = await dynamoDB.send(new ScanCommand({
+                TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
+                FilterExpression: 'connectionId = :connectionId AND isActive = :isActive',
+                ExpressionAttributeValues: {
+                    ':connectionId': connectionId,
+                    ':isActive': true
+                }
+            }));
+            
+            for (const sub of result.Items || []) {
+                await dynamoDB.send(new UpdateCommand({
+                    TableName: WEBSOCKET_SUBSCRIPTIONS_TABLE,
+                    Key: { subscriptionId: sub.subscriptionId },
+                    UpdateExpression: 'SET isActive = :isActive, disconnectedAt = :timestamp',
+                    ExpressionAttributeValues: {
+                        ':isActive': false,
+                        ':timestamp': new Date().toISOString()
+                    }
+                }));
+            }
+        }
+        
+        console.log(`✅ Unsubscribed successfully`);
+        
+        return await sendToConnection(connectionId, {
+            type: 'unsubscription_confirmed',
+            subscriptionId,
+            timestamp: new Date().toISOString()
+        }, apiGatewayClient);
+        
+    } catch (error) {
+        console.error(`Error removing subscription for ${connectionId}:`, error);
+        return await sendToConnection(connectionId, {
+            type: 'unsubscription_error',
+            message: error.message
+        }, apiGatewayClient);
     }
 }
 

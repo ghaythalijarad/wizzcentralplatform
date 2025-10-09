@@ -1,13 +1,13 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "sam-app"
+stack_name = "wizzapp-central-dev"
 resolve_s3 = true
-s3_prefix = "sam-app"
+s3_prefix = "wizzapp-central-dev"
 region = "us-east-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 disable_rollback = true
 parameter_overrides = "StageName=\"dev\" DeploymentRegion=\"us-east-1\""
 image_repositories = []
-profile = "wizz-drivers-ghayth-dev"
+profile = "ghayth-dev2"
