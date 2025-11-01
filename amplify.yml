@@ -19,6 +19,9 @@ frontend:
         - cp frontend/public/_redirects dist/_redirects 2>/dev/null || cp _redirects dist/_redirects 2>/dev/null || echo "No redirects file found"
         - echo "Listing build contents..."
         - ls -la dist/
+        - echo "--- Verifying config.js content in build folder ---"
+        - cat dist/config.js | grep "COGNITO_CLIENT_ID" || echo "config.js or CLIENT_ID not found"
+        - echo "----------------------------------------------------"
         - echo "Build completed successfully"
     postBuild:
       commands:
