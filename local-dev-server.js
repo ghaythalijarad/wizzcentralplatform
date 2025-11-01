@@ -52,6 +52,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ============================================
+// STATIC FILE SERVING
+// ============================================
+const frontendPath = path.join(__dirname, 'frontend');
+console.log(`📂 Serving static files from: ${frontendPath}`);
+app.use(express.static(frontendPath));
+
 // Request logging
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();

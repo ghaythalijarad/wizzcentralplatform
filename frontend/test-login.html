@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Test - Debug Console</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { color: #4ec9b0; }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #1177bb; }
+        #output {
+            background: #252526;
+            border: 1px solid #3c3c3c;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-size: 14px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .info { color: #9cdcfe; }
+        .warning { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Cognito Login Debug Console</h1>
+        
+        <div>
+            <button onclick="testConfig()">1. Test Config</button>
+            <button onclick="testSDK()">2. Test SDK Loaded</button>
+            <button onclick="testLogin()">3. Test Login</button>
+            <button onclick="clearOutput()">Clear</button>
+        </div>
+
+        <div id="output"></div>
+    </div>
+
+    <!-- AWS SDKs -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
+    
+    <!-- Application config -->
+    <script src="config.js"></script>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const line = `[${timestamp}] ${message}`;
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = line;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+            console.log(line);
+        }
+
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+
+        function testConfig() {
+            log('=== Testing Configuration ===', 'info');
+            
+            if (typeof window.WIZZCENTRAL_CONFIG !== 'undefined') {
+                log('✅ Config loaded', 'success');
+                log(`Region: ${window.WIZZCENTRAL_CONFIG.COGNITO_REGION}`, 'info');
+                log(`User Pool ID: ${window.WIZZCENTRAL_CONFIG.COGNITO_USER_POOL_ID}`, 'info');
+                log(`Client ID: ${window.WIZZCENTRAL_CONFIG.COGNITO_CLIENT_ID}`, 'info');
+            } else {
+                log('❌ Config not loaded', 'error');
+            }
+        }
+
+        function testSDK() {
+            log('=== Testing SDK ===', 'info');
+            
+            if (typeof AmazonCognitoIdentity !== 'undefined') {
+                log('✅ amazon-cognito-identity-js loaded', 'success');
+                log(`CognitoUserPool: ${typeof AmazonCognitoIdentity.CognitoUserPool}`, 'info');
+                log(`CognitoUser: ${typeof AmazonCognitoIdentity.CognitoUser}`, 'info');
+                log(`AuthenticationDetails: ${typeof AmazonCognitoIdentity.AuthenticationDetails}`, 'info');
+            } else {
+                log('❌ amazon-cognito-identity-js NOT loaded', 'error');
+            }
+            
+            if (typeof AWS !== 'undefined') {
+                log('✅ AWS SDK loaded', 'success');
+            } else {
+                log('⚠️  AWS SDK not loaded', 'warning');
+            }
+        }
+
+        async function testLogin() {
+            log('=== Starting Login Test ===', 'info');
+            
+            const email = 'g87_a@yahoo.com';
+            const password = 'Gha@551987';
+            
+            log(`Email: ${email}`, 'info');
+            log(`Password: ${'*'.repeat(password.length)}`, 'info');
+            
+            try {
+                // Check config
+                if (!window.WIZZCENTRAL_CONFIG) {
+                    throw new Error('Config not loaded');
+                }
+                
+                const config = window.WIZZCENTRAL_CONFIG;
+                log(`Using User Pool: ${config.COGNITO_USER_POOL_ID}`, 'info');
+                log(`Using Client: ${config.COGNITO_CLIENT_ID}`, 'info');
+                
+                // Create user pool
+                const poolData = {
+                    UserPoolId: config.COGNITO_USER_POOL_ID,
+                    ClientId: config.COGNITO_CLIENT_ID
+                };
+                
+                log('Creating CognitoUserPool...', 'info');
+                const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+                log('✅ UserPool created', 'success');
+                
+                // Create user
+                const userData = {
+                    Username: email,
+                    Pool: userPool
+                };
+                
+                log('Creating CognitoUser...', 'info');
+                const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+                log('✅ CognitoUser created', 'success');
+                
+                // Create auth details
+                const authenticationData = {
+                    Username: email,
+                    Password: password
+                };
+                
+                log('Creating AuthenticationDetails...', 'info');
+                const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
+                log('✅ AuthenticationDetails created', 'success');
+                
+                // Attempt authentication
+                log('🔄 Calling authenticateUser() with SRP flow...', 'info');
+                
+                cognitoUser.authenticateUser(authenticationDetails, {
+                    onSuccess: function(result) {
+                        log('✅ ✅ ✅ LOGIN SUCCESSFUL! ✅ ✅ ✅', 'success');
+                        log(`Access Token: ${result.getAccessToken().getJwtToken().substring(0, 50)}...`, 'success');
+                        log(`ID Token: ${result.getIdToken().getJwtToken().substring(0, 50)}...`, 'success');
+                        
+                        // Decode ID token
+                        try {
+                            const idToken = result.getIdToken().getJwtToken();
+                            const payload = JSON.parse(atob(idToken.split('.')[1]));
+                            log(`User Email: ${payload.email}`, 'success');
+                            log(`Email Verified: ${payload.email_verified}`, 'success');
+                            log(`User ID: ${payload.sub}`, 'success');
+                        } catch (e) {
+                            log(`Could not decode token: ${e.message}`, 'warning');
+                        }
+                    },
+                    
+                    onFailure: function(err) {
+                        log('❌ ❌ ❌ LOGIN FAILED! ❌ ❌ ❌', 'error');
+                        log(`Error Code: ${err.code || 'Unknown'}`, 'error');
+                        log(`Error Message: ${err.message || err.toString()}`, 'error');
+                        log(`Full Error: ${JSON.stringify(err, null, 2)}`, 'error');
+                    },
+                    
+                    newPasswordRequired: function(userAttributes, requiredAttributes) {
+                        log('⚠️  New password required', 'warning');
+                        log(`User Attributes: ${JSON.stringify(userAttributes)}`, 'warning');
+                    }
+                });
+                
+            } catch (error) {
+                log('❌ Exception during login:', 'error');
+                log(`Error: ${error.message || error.toString()}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+            }
+        }
+
+        // Auto-run config test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testConfig();
+                testSDK();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

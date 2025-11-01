@@ -16,8 +16,8 @@ window.WIZZCENTRAL_CONFIG = {
 
     // AWS Cognito Configuration (WizzCentral User Pool)
     COGNITO_REGION: 'us-east-1',
-    COGNITO_USER_POOL_ID: 'us-east-1_LDgfo1Pmc',
-    COGNITO_CLIENT_ID: '3ngjf86vuq8up86urecprvm08j',
+    COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi',
+    COGNITO_CLIENT_ID: '5hun8p61grnakisu5gammcjelv', // NEW: Browser-specific client with no secret
     COGNITO_IDENTITY_POOL_ID: 'us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a',
 
     // WebSocket Configuration for Live Chat

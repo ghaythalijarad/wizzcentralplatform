@@ -5,7 +5,7 @@ echo "🚀 Starting WizzCentralPlatform Amplify Deployment"
 echo "================================================="
 
 # Navigate to project directory
-cd /Users/ghaythallaheebi/wizzcentralplatform
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
 
 # Check git status
 echo "📊 Checking git status..."

@@ -1,12 +1,19 @@
 // Flutter: Send token to backend API
 // This handles sending the FCM/APNs token along with user role to the backend
 
+// NOTE: This file is not part of an active Flutter project.
+// It's placed in whizzCentralPlatform which is a web/JavaScript project.
+// These files should be moved to whizzDrivers, whizzMerchants, or whizzCustomers.
+// Commenting out imports to prevent errors until properly relocated.
+
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:http/http.dart' as http;
+// import 'package:shared_preferences/shared_preferences.dart';
+// import '../services/push_notification_service.dart';
 
-import '../services/push_notification_service.dart';
+// TEMPORARY STUB - This file needs to be moved to a proper Flutter project
+// with pubspec.yaml containing http and shared_preferences dependencies
 
 class NotificationApi {
   static const String baseUrl =
