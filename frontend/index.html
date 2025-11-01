@@ -101,28 +101,6 @@
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
-        .console-log {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 5px;
-            max-height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-            display: none;
-        }
-        .console-log.visible {
-            display: block;
-        }
-        .log-entry {
-            margin-bottom: 5px;
-            padding: 5px;
-        }
-        .log-info { color: #0066cc; }
-        .log-success { color: #28a745; }
-        .log-error { color: #dc3545; }
-        .log-warning { color: #ffc107; }
     </style>
 </head>
 <body>
@@ -145,7 +123,6 @@
         </form>
         
         <div id="status" class="status"></div>
-        <div id="consoleLog" class="console-log"></div>
     </div>
 
     <!-- AWS SDK and Cognito -->
@@ -153,16 +130,9 @@
     <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
     
     <script>
-        // Logger
-        const consoleLog = document.getElementById('consoleLog');
+        // Simple logger - only to browser console
         function log(message, type = 'info') {
-            console.log(message);
-            const entry = document.createElement('div');
-            entry.className = `log-entry log-${type}`;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            consoleLog.appendChild(entry);
-            consoleLog.scrollTop = consoleLog.scrollHeight;
-            consoleLog.classList.add('visible');
+            console.log(`[${type.toUpperCase()}] ${message}`);
         }
 
         function showStatus(message, type = 'info') {
