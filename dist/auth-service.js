@@ -8,8 +8,8 @@
     const GLOBAL_CFG = (typeof window !== 'undefined' ? (window.WIZZCENTRAL_CONFIG || {}) : {});
     const COGNITO_CONFIG = {
         region: GLOBAL_CFG.COGNITO_REGION || 'us-east-1',
-        userPoolId: GLOBAL_CFG.COGNITO_USER_POOL_ID || 'us-east-1_LDgfo1Pmc',
-        clientId: GLOBAL_CFG.COGNITO_CLIENT_ID || '3ngjf86vuq8up86urecprvm08j',
+        userPoolId: GLOBAL_CFG.COGNITO_USER_POOL_ID || 'us-east-1_Cp9YnOQWi', // wizzcentral user pool
+        clientId: GLOBAL_CFG.COGNITO_CLIENT_ID || '5hun8p61grnakisu5gammcjelv', // NEW: Browser-specific client
         identityPoolId: GLOBAL_CFG.COGNITO_IDENTITY_POOL_ID || 'us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a'
     };
 
