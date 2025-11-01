@@ -11,8 +11,6 @@ frontend:
         - echo "Cleaning build directory..."
         - rm -rf dist/
         - mkdir -p dist
-        - echo "DEBUG: Checking index.html in repo before copy..."
-        - head -20 frontend/index.html
         - echo "Copying frontend files directly to build root..."
         - cp -r frontend/* dist/
         - echo "Ensuring proper index.html at root..."
