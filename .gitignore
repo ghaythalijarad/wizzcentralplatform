@@ -186,3 +186,8 @@ amplifytools.xcconfig
 .secret-*
 **.sample
 #amplify-do-not-edit-end
+
+# Ignore build artifacts and node modules
+/dist
+/node_modules
+.DS_Store

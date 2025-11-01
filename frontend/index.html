@@ -1,447 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WizzCentral Platform - Login</title>
-  <link rel="stylesheet" href="styles/dashboard.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral - Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 5px;
+            display: none;
+            font-size: 14px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .console-log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+        }
+        .console-log.visible {
+            display: block;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+        }
+        .log-info { color: #0066cc; }
+        .log-success { color: #28a745; }
+        .log-error { color: #dc3545; }
+        .log-warning { color: #ffc107; }
+    </style>
 </head>
-
 <body>
-  <script>
-    // Check for existing valid session and redirect after page loads
-    window.addEventListener('DOMContentLoaded', function() {
-      try {
-        const hasValidSession = sessionStorage.getItem('isAuthenticated') === 'true' && 
-                               sessionStorage.getItem('idToken') && 
-                               sessionStorage.getItem('userEmail');
+    <div class="login-container">
+        <h1>🚀 WizzCentral</h1>
+        <p class="subtitle">Sign in to your account</p>
         
-        if (hasValidSession) {
-          console.log('✅ Valid session found, redirecting to dashboard...');
-          // Use proper redirect logic
-          setTimeout(() => {
-            let dashboardUrl;
-            if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
-              dashboardUrl = window.Auth.getPostLoginRedirectUrl();
-              console.log('📍 Using Auth redirect:', dashboardUrl);
-            } else {
-              // Correct URL for dashboard (server serves from frontend directory)
-              dashboardUrl = window.location.origin + '/pages/dashboard.html';
-              console.log('📍 Using corrected fallback:', dashboardUrl);
-            }
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" required value="g87_a@yahoo.com">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" required value="Gha@551987">
+            </div>
+            
+            <button type="submit" id="loginBtn">Sign In</button>
+        </form>
+        
+        <div id="status" class="status"></div>
+        <div id="consoleLog" class="console-log"></div>
+    </div>
 
-            console.log('🚀 Redirecting to:', dashboardUrl);
-            window.location.href = dashboardUrl;
-          }, 1000);
-        }
-      } catch (e) { 
-        console.warn('Session check failed', e); 
-      }
-    });
-  </script>
-
-  <!-- AWS SDKs -->
-  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
-  <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
-  
-  <!-- Application config -->
-  <script src="config.js"></script>
-  <!-- Auth Service (direct Cognito) -->
-  <script src="auth-service.js"></script>
-  <!-- Ensure auth utils available on login page for returnUrl logic -->
-  <script src="assets/js/auth-utils.js"></script>
-
-  <!-- Immediate form submission prevention -->
-  <script>
-    console.log('🔧 Setting up immediate form protection...');
+    <!-- AWS SDK and Cognito -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
+    <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>
     
-    // Prevent any form submission until our handlers are ready
-    window.addEventListener('load', function() {
-      const form = document.getElementById('loginForm');
-      if (form) {
-        console.log('🛡️ Form protection activated');
-        form.onsubmit = function(e) {
-          console.log('🚫 Form submission blocked by protection');
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
+    <script>
+        // Logger
+        const consoleLog = document.getElementById('consoleLog');
+        function log(message, type = 'info') {
+            console.log(message);
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            consoleLog.appendChild(entry);
+            consoleLog.scrollTop = consoleLog.scrollHeight;
+            consoleLog.classList.add('visible');
+        }
+
+        function showStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        // Cognito Configuration
+        const COGNITO_CONFIG = {
+            region: 'us-east-1',
+            userPoolId: 'us-east-1_Cp9YnOQWi',
+            clientId: '5hun8p61grnakisu5gammcjelv'
         };
-      }
-    });
-  </script>
 
-  <!-- Main Content -->
-  <div class="login-container">
-    <div class="login-card">
-      <div class="login-header">
-        <div class="logo">
-          <i class="fas fa-rocket"></i>
-          <h1>WizzCentral</h1>
-        </div>
-        <p class="subtitle">Welcome back! Please sign in to your account.</p>
-        <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
-          🔧 <strong>Organized Frontend Version</strong><br>
-          Test credentials pre-filled
-        </p>
-      </div>
+        log('Initializing Cognito User Pool...', 'info');
+        const poolData = {
+            UserPoolId: COGNITO_CONFIG.userPoolId,
+            ClientId: COGNITO_CONFIG.clientId
+        };
+        const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
+        log('✅ User Pool initialized', 'success');
 
-      <form class="login-form" id="loginForm" method="post" action="#" onsubmit="return false;">
-        <div class="form-group">
-          <label for="email">Email Address</label>
-          <div class="input-wrapper">
-            <i class="fas fa-envelope"></i>
-            <input type="email" id="email" name="email" placeholder="Enter your email" required value="g87_a@yahoo.com">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="password">Password</label>
-          <div class="input-wrapper">
-            <i class="fas fa-lock"></i>
-            <input type="password" id="password" name="password" placeholder="Enter your password" required
-              value="Gha@551987">
-            <button type="button" class="password-toggle" id="passwordToggle">
-              <i class="fas fa-eye"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="form-options">
-          <div class="remember-me">
-            <input type="checkbox" id="remember" name="remember">
-            <label for="remember">Remember me</label>
-          </div>
-        </div>
-
-        <button type="button" class="login-btn" onclick="manualLogin(); return false;">
-          <span>Sign In</span>
-          <i class="fas fa-arrow-right"></i>
-        </button>
-      </form>
-
-      <!-- Status Message -->
-      <div id="statusMessage"
-        style="display: none; margin-top: 20px; padding: 15px; border-radius: 8px; border-left: 4px solid #00c2e8; background: #f8f9fa;">
-        <div id="statusText"></div>
-      </div>
-    </div>
-
-    <div class="background-animation">
-      <div class="floating-shape shape-1"></div>
-      <div class="floating-shape shape-2"></div>
-      <div class="floating-shape shape-3"></div>
-      <div class="floating-shape shape-4"></div>
-    </div>
-  </div>
-
-  <script>
-    console.log('🚀 WizzCentral Login Page Loading (Organized Frontend)...');
-
-    let isConfigLoaded = false;
-
-    // Status message functions
-    function showStatus(message, type = 'info') {
-      const statusDiv = document.getElementById('statusMessage');
-      const statusText = document.getElementById('statusText');
-
-      statusText.innerHTML = message;
-      statusDiv.style.display = 'block';
-
-      // Style based on type
-      if (type === 'success') {
-        statusDiv.style.backgroundColor = '#d4edda';
-        statusDiv.style.borderLeft = '4px solid #28a745';
-        statusDiv.style.color = '#155724';
-      } else if (type === 'error') {
-        statusDiv.style.backgroundColor = '#f8d7da';
-        statusDiv.style.borderLeft = '4px solid #dc3545';
-        statusDiv.style.color = '#721c24';
-      } else if (type === 'warning') {
-        statusDiv.style.backgroundColor = '#fff3cd';
-        statusDiv.style.borderLeft = '4px solid #ffc107';
-        statusDiv.style.color = '#856404';
-      } else {
-        statusDiv.style.backgroundColor = '#d1ecf1';
-        statusDiv.style.borderLeft = '4px solid #17a2b8';
-        statusDiv.style.color = '#0c5460';
-      }
-    }
-
-    // Manual login function that can be called directly
-    window.manualLogin = function() {
-      console.log('🚀 Manual login triggered');
-      
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value.trim();
-      const remember = document.getElementById('remember').checked;
-
-      if (!email || !password) {
-        showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
-        return;
-      }
-
-      console.log('🔐 Starting manual login with:', email);
-      handleLogin(email, password, remember);
-    };
-
-    // Login handler using AuthService
-    async function handleLogin(email, password, remember) {
-      const loginBtn = document.querySelector('.login-btn');
-      if (!loginBtn) return;
-
-      const originalText = loginBtn.innerHTML;
-
-      // Update button state
-      loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Signing In...</span>';
-      loginBtn.disabled = true;
-
-      showStatus('🔄 Authenticating with AWS Cognito...', 'info');
-
-      try {
-        console.log('🔐 Attempting login with email:', email);
-
-        // Wait for AuthService to be available
-        let retries = 0;
-        while (!window.AuthService && retries < 20) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          retries++;
-        }
-        
-        if (!window.AuthService) {
-          throw new Error('Authentication service not available');
-        }
-        
-        // Initialize and perform login
-        await AuthService.initialize();
-        const result = await AuthService.login(email, password);
-
-        if (result.success) {
-          console.log('✅ Login successful');
-          showStatus('✅ <strong>Login successful!</strong><br>Storing authentication tokens and redirecting...', 'success');
-
-          // Store user info and session
-          sessionStorage.setItem('userEmail', email);
-          sessionStorage.setItem('isAuthenticated', 'true');
-
-          // Store remember preference
-          if (remember) {
-            localStorage.setItem('rememberLogin', 'true');
-            localStorage.setItem('lastEmail', email);
-          } else {
-            localStorage.removeItem('rememberLogin');
-            localStorage.removeItem('lastEmail');
-          }
-
-          console.log('📦 Authentication data stored successfully');
-
-          // Redirect to app page
-          setTimeout(() => {
-            console.log('🚀 Determining redirect URL...');
-
-            let redirectUrl;
-            if (window.Auth && window.Auth.getPostLoginRedirectUrl) {
-              redirectUrl = window.Auth.getPostLoginRedirectUrl();
-              console.log('📍 Using Auth.getPostLoginRedirectUrl():', redirectUrl);
-            } else {
-              // Fallback logic with better path handling
-              const cfg = window.WIZZCENTRAL_CONFIG || {};
-              const currentPath = window.location.pathname;
-              console.log('📍 Current path:', currentPath);
-
-              // Determine base prefix more reliably
-              const isInFrontendFolder = currentPath.includes('/frontend/');
-              const basePrefix = isInFrontendFolder ? '/frontend' : '';
-
-              const defaultPage = cfg.DEFAULT_POST_LOGIN_PAGE || '/pages/dashboard.html';
-              console.log('📍 Default page from config:', defaultPage);
-
-              // Construct redirect URL
-              if (isInFrontendFolder) {
-                // We're in /frontend/ folder structure
-                redirectUrl = window.location.origin + '/frontend/pages/dashboard.html';
-              } else {
-                // We're at web root
-                redirectUrl = window.location.origin + '/pages/dashboard.html';
-              }
-              console.log('📍 Using fallback redirect logic:', redirectUrl);
-            }
-
-            console.log('🚀 Final redirect URL:', redirectUrl);
-            console.log('🚀 Redirecting in 1.5 seconds...');
-
-            // Validate URL before redirecting
-            try {
-              const url = new URL(redirectUrl);
-              console.log('✅ URL validation passed');
-              window.location.href = redirectUrl;
-            } catch (urlError) {
-              console.error('❌ Invalid redirect URL:', redirectUrl, urlError);
-              // Safe fallback
-              const fallbackUrl = window.location.origin + '/frontend/pages/dashboard.html';
-              console.log('🔄 Using safe fallback:', fallbackUrl);
-              window.location.href = fallbackUrl;
-            }
-          }, 1500);
-
-        } else {
-          console.log('❌ Login failed:', result.message);
-          showStatus(`❌ <strong>Login Failed</strong><br>${result.message}`, 'error');
-        }
-
-      } catch (error) {
-        console.error('❌ Login error:', error);
-
-        let errorMessage = 'Login failed';
-        const errorString = error.message || error.toString();
-
-        if (errorString.includes('NotAuthorizedException') || errorString.includes('Incorrect username or password')) {
-          errorMessage = 'Invalid email or password';
-        } else if (errorString.includes('UserNotConfirmedException')) {
-          errorMessage = 'Please verify your email address';
-        } else if (errorString.includes('UserNotFoundException')) {
-          errorMessage = 'User not found';
-        } else if (errorString.includes('TooManyRequestsException')) {
-          errorMessage = 'Too many login attempts. Please try again later.';
-        } else if (error.message && error.message !== 'Authentication failed') {
-          errorMessage = error.message;
-        }
-
-        showStatus(`❌ <strong>Login Failed</strong><br>${errorMessage}`, 'error');
-      } finally {
-        // Reset button state
-        loginBtn.innerHTML = originalText;
-        loginBtn.disabled = false;
-      }
-    }
-
-    // Initialize page with improved configuration loading
-    function initializePage() {
-      console.log('🚀 Login page loaded - Organized Frontend');
-
-      // Check if configuration is loaded with retry mechanism
-      let retryCount = 0;
-      const maxRetries = 10;
-      
-      function checkConfiguration() {
-        if (window.WIZZCENTRAL_CONFIG) {
-          console.log('✅ Configuration loaded');
-          isConfigLoaded = true;
-          showStatus('✅ <strong>Ready for Authentication</strong><br>AWS Cognito configuration loaded successfully.', 'success');
-          
-          // Initialize UI elements after configuration is loaded
-          initializeUI();
-          return true;
-        } else if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`⏳ Configuration not ready, retry ${retryCount}/${maxRetries}...`);
-          setTimeout(checkConfiguration, 100);
-          return false;
-        } else {
-          console.error('❌ Configuration not loaded after retries');
-          showStatus('❌ <strong>Configuration Error</strong><br>AWS Cognito configuration not loaded. Please refresh the page.', 'error');
-          return false;
-        }
-      }
-      
-      checkConfiguration();
-    }
-
-    function initializeUI() {
-      // Password toggle functionality
-      const passwordToggle = document.getElementById('passwordToggle');
-      const passwordInput = document.getElementById('password');
-
-      if (passwordToggle && passwordInput) {
-        passwordToggle.addEventListener('click', function () {
-          const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-          passwordInput.setAttribute('type', type);
-
-          const icon = this.querySelector('i');
-          icon.classList.toggle('fa-eye');
-          icon.classList.toggle('fa-eye-slash');
-        });
-      }
-
-      // Form submission
-      const loginForm = document.getElementById('loginForm');
-      if (loginForm) {
-        console.log('✅ Login form found, attaching event listener');
-        
-        loginForm.addEventListener('submit', function (e) {
-          console.log('🔥 Form submit event triggered');
-          e.preventDefault(); // Prevent default form submission
-          e.stopPropagation(); // Stop event bubbling
-          
-          console.log('🔒 Default form submission prevented');
-
-          // Wait for configuration to be loaded
-          const waitForConfig = () => {
-            if (isConfigLoaded) {
-              console.log('✅ Configuration ready, processing login');
-              const email = document.getElementById('email').value.trim();
-              const password = document.getElementById('password').value.trim();
-              const remember = document.getElementById('remember').checked;
-
-              if (!email || !password) {
-                showStatus('❌ <strong>Missing Information</strong><br>Please fill in all required fields.', 'error');
-                return;
-              }
-
-              console.log('🚀 Calling handleLogin with:', email);
-              handleLogin(email, password, remember);
-            } else {
-              console.log('⏳ Waiting for configuration to load...');
-              setTimeout(waitForConfig, 100);
-            }
-          };
-          
-          waitForConfig();
-          
-          return false; // Additional prevention of form submission
-        });
-        
-        // Also prevent form submission on any button clicks
-        const submitButton = loginForm.querySelector('button[type="submit"], .login-btn');
-        if (submitButton) {
-          submitButton.addEventListener('click', function(e) {
-            console.log('🔥 Submit button clicked');
+        // Login Handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            e.stopPropagation();
             
-            // Trigger form submission event
-            const form = document.getElementById('loginForm');
-            if (form) {
-              const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-              form.dispatchEvent(submitEvent);
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const loginBtn = document.getElementById('loginBtn');
+            
+            if (!email || !password) {
+                showStatus('Please enter both email and password', 'error');
+                return;
             }
-            
-            return false;
-          });
-        }
-        
-      } else {
-        console.error('❌ Login form not found!');
-      }
 
-      // Auto-fill remembered email
-      const rememberLogin = localStorage.getItem('rememberLogin');
-      const lastEmail = localStorage.getItem('lastEmail');
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing in...';
+            showStatus('Authenticating...', 'info');
+            log(`Starting authentication for: ${email}`, 'info');
 
-      if (rememberLogin === 'true' && lastEmail) {
-        const emailInput = document.getElementById('email');
-        if (emailInput) {
-          emailInput.value = lastEmail;
-          const rememberCheckbox = document.getElementById('remember');
-          if (rememberCheckbox) rememberCheckbox.checked = true;
-        }
-      }
-    }
+            try {
+                const authenticationData = {
+                    Username: email,
+                    Password: password
+                };
+                const authenticationDetails = new AmazonCognitoIdentity.AuthenticationDetails(authenticationData);
 
-    document.addEventListener('DOMContentLoaded', initializePage);
-  </script>
+                const userData = {
+                    Username: email,
+                    Pool: userPool
+                };
+                const cognitoUser = new AmazonCognitoIdentity.CognitoUser(userData);
+
+                cognitoUser.authenticateUser(authenticationDetails, {
+                    onSuccess: function(result) {
+                        log('✅ Authentication successful!', 'success');
+                        
+                        const accessToken = result.getAccessToken().getJwtToken();
+                        const idToken = result.getIdToken().getJwtToken();
+                        const refreshToken = result.getRefreshToken().getToken();
+
+                        log('✅ Tokens received', 'success');
+                        
+                        // Store tokens
+                        sessionStorage.setItem('accessToken', accessToken);
+                        sessionStorage.setItem('idToken', idToken);
+                        sessionStorage.setItem('refreshToken', refreshToken);
+                        sessionStorage.setItem('userEmail', email);
+                        sessionStorage.setItem('isAuthenticated', 'true');
+
+                        log('✅ Tokens stored in session', 'success');
+                        showStatus('✅ Login successful! Redirecting...', 'success');
+
+                        // Redirect to dashboard
+                        setTimeout(() => {
+                            log('Redirecting to dashboard...', 'info');
+                            window.location.href = '/pages/dashboard.html';
+                        }, 1500);
+                    },
+
+                    onFailure: function(err) {
+                        log(`❌ Authentication failed: ${err.code || err.name}`, 'error');
+                        log(`Error message: ${err.message}`, 'error');
+                        
+                        let errorMessage = 'Login failed';
+                        
+                        if (err.code === 'NotAuthorizedException') {
+                            errorMessage = 'Invalid email or password';
+                        } else if (err.code === 'UserNotConfirmedException') {
+                            errorMessage = 'Please verify your email address';
+                        } else if (err.code === 'UserNotFoundException') {
+                            errorMessage = 'User not found';
+                        } else if (err.message) {
+                            errorMessage = err.message;
+                        }
+
+                        showStatus(`❌ ${errorMessage}`, 'error');
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Sign In';
+                    },
+
+                    newPasswordRequired: function(userAttributes, requiredAttributes) {
+                        log('⚠️ New password required', 'warning');
+                        showStatus('New password required. Please contact support.', 'error');
+                        loginBtn.disabled = false;
+                        loginBtn.textContent = 'Sign In';
+                    }
+                });
+
+            } catch (error) {
+                log(`❌ Exception: ${error.message}`, 'error');
+                console.error('Login exception:', error);
+                showStatus('An error occurred during login', 'error');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        log('✅ Login page ready', 'success');
+    </script>
 </body>
-
 </html>
