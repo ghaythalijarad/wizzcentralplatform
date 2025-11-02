@@ -776,6 +776,20 @@
 
     <!-- Centralized utilities -->
     <script src="../assets/js/auth-utils.js?v=20250906"></script>
+    <script>
+        // Require authentication before loading this page
+        if (typeof Auth !== 'undefined' && Auth.requireAuthentication) {
+            Auth.requireAuthentication();
+        } else {
+            // Fallback: check if user is authenticated
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            const idToken = sessionStorage.getItem('idToken');
+            if (!isAuthenticated || !idToken) {
+                sessionStorage.setItem('returnUrl', window.location.pathname);
+                window.location.href = '/index.html';
+            }
+        }
+    </script>
     <script src="../assets/js/aws-utils.js?v=20250906"></script>
 
     <!-- Data service (depends on aws-utils) -->

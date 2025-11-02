@@ -208,10 +208,17 @@
                         log('✅ Tokens stored in session', 'success');
                         showStatus('✅ Login successful! Redirecting...', 'success');
 
-                        // Redirect to dashboard
+                        // Check for return URL, otherwise redirect to dashboard
                         setTimeout(() => {
-                            log('Redirecting to dashboard...', 'info');
-                            window.location.href = '/pages/dashboard.html';
+                            const returnUrl = sessionStorage.getItem('returnUrl');
+                            if (returnUrl) {
+                                log(`Redirecting to original destination: ${returnUrl}`, 'info');
+                                sessionStorage.removeItem('returnUrl'); // Clear it after use
+                                window.location.href = returnUrl;
+                            } else {
+                                log('Redirecting to dashboard...', 'info');
+                                window.location.href = '/pages/dashboard.html';
+                            }
                         }, 1500);
                     },
 
