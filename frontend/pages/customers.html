@@ -686,26 +686,31 @@
 
     <!-- Centralized utilities -->
     <script src="../assets/js/auth-utils.js"></script>
-    <script>
-        // Require authentication before loading this page
-        if (typeof Auth !== 'undefined' && Auth.requireAuthentication) {
-            Auth.requireAuthentication();
-        } else {
-            // Fallback: check if user is authenticated
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            const idToken = sessionStorage.getItem('idToken');
-            if (!isAuthenticated || !idToken) {
-                sessionStorage.setItem('returnUrl', window.location.pathname);
-                window.location.href = '/index.html';
-            }
-        }
-    </script>
     <script src="../assets/js/aws-utils.js"></script>
 
     <!-- Page-specific scripts -->
     <script src="../assets/js/navigation.js"></script>
     <script src="../customer-points-service.js"></script>
     <script src="../customers.js"></script>
+    
+    <!-- Authentication check -->
+    <script>
+        // Check authentication before page loads
+        (function checkAuth() {
+            if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
+                console.log('Running auth check for customers page...');
+                const isAuth = window.Auth.requireAuthentication();
+                if (!isAuth) {
+                    console.log('Auth check failed, redirecting to login');
+                    return;
+                }
+            } else {
+                console.warn('Auth not loaded yet, retrying...');
+                setTimeout(checkAuth, 100);
+            }
+        })();
+    </script>
+    
     <!-- Sidebar Loading Script -->
     <script>
         // Load sidebar content

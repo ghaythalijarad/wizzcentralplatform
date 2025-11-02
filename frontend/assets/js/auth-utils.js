@@ -18,10 +18,11 @@ window.Auth = {
 
         console.log('📊 Auth status:', {
             isAuthenticated: isAuthenticated,
-            userEmail: !!userEmail,
+            userEmail: userEmail ? userEmail.substring(0, 5) + '***' : null,
             userId: !!userId,
             hasIdToken: !!idToken,
-            hasAccessToken: !!accessToken
+            hasAccessToken: !!accessToken,
+            idTokenLength: idToken ? idToken.length : 0
         });
 
         // More lenient check - if we have basic auth flags, trust them
@@ -131,9 +132,20 @@ window.Auth = {
         } catch (e) { console.warn('Loop protection error', e); }
 
         // Skip redirect if already on login page
-        if (window.location.pathname.endsWith('/index.html')) {
+        if (window.location.pathname.endsWith('/index.html') || window.location.pathname === '/') {
             console.log('Already on login page, not redirecting again.');
             return;
+        }
+        
+        // Check if we just came from login (within last 5 seconds) to avoid redirect loops
+        const lastLoginTime = sessionStorage.getItem('lastLoginTime');
+        if (lastLoginTime) {
+            const timeSinceLogin = Date.now() - parseInt(lastLoginTime, 10);
+            if (timeSinceLogin < 5000) {
+                console.warn('⚠️ Just logged in ' + timeSinceLogin + 'ms ago, but auth check is failing. Check token storage!');
+                // Give a bit more time for tokens to be available
+                return;
+            }
         }
 
         // Telemetry for debugging redirect loops

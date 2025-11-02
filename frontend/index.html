@@ -204,6 +204,7 @@
                         sessionStorage.setItem('refreshToken', refreshToken);
                         sessionStorage.setItem('userEmail', email);
                         sessionStorage.setItem('isAuthenticated', 'true');
+                        sessionStorage.setItem('lastLoginTime', Date.now().toString());
 
                         log('✅ Tokens stored in session', 'success');
                         showStatus('✅ Login successful! Redirecting...', 'success');

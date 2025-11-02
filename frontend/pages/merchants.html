@@ -1075,20 +1075,6 @@
 
         <!-- Centralized utilities -->
         <script src="../assets/js/auth-utils.js?v=2024-merchants"></script>
-        <script>
-            // Require authentication before loading this page
-            if (typeof Auth !== 'undefined' && Auth.requireAuthentication) {
-                Auth.requireAuthentication();
-            } else {
-                // Fallback: check if user is authenticated
-                const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-                const idToken = sessionStorage.getItem('idToken');
-                if (!isAuthenticated || !idToken) {
-                    sessionStorage.setItem('returnUrl', window.location.pathname);
-                    window.location.href = '/index.html';
-                }
-            }
-        </script>
         <script src="../assets/js/aws-utils.js?v=2024-merchants"></script>
 
         <!-- Data service (depends on aws-utils) -->
@@ -1101,11 +1087,31 @@
         <script src="../merchants.js?v=2024-merchants"></script>
         <script>
             console.log('Merchants page script loaded');
-            // Initialize merchants page when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', window.onDomReady);
+            
+            // Check authentication before initializing page
+            function initWithAuth() {
+                if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
+                    console.log('Running auth check...');
+                    const isAuth = window.Auth.requireAuthentication();
+                    if (!isAuth) {
+                        console.log('Auth check failed, redirecting to login');
+                        return; // Stop initialization
+                    }
+                }
+                
+                // Initialize merchants page when DOM is ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', window.onDomReady);
+                } else {
+                    window.onDomReady();
+                }
+            }
+            
+            // Wait a moment for Auth to be defined, then initialize
+            if (window.Auth) {
+                initWithAuth();
             } else {
-                window.onDomReady();
+                setTimeout(initWithAuth, 100);
             }
         </script>
 <!-- Sidebar Loading Script -->
