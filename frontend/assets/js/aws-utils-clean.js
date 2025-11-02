@@ -39,13 +39,14 @@ window.AWSUtils = {
                 throw new Error('AWS SDK not loaded.');
             }
 
-            // Use embedded configuration to avoid CORS issues
+            // Use configuration from config.js
+            const cfg = window.WIZZCENTRAL_CONFIG || {};
             const outputs = {
                 "auth": {
-                    "user_pool_id": "us-east-1_LDgfo1Pmc",
-                    "aws_region": "us-east-1",
-                    "user_pool_client_id": "3ngjf86vuq8up86urecprvm08j",
-                    "identity_pool_id": "us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a",
+                    "user_pool_id": cfg.COGNITO_USER_POOL_ID || "us-east-1_Cp9YnOQWi",
+                    "aws_region": cfg.COGNITO_REGION || "us-east-1",
+                    "user_pool_client_id": cfg.COGNITO_CLIENT_ID || "5hun8p61grnakisu5gammcjelv",
+                    "identity_pool_id": cfg.COGNITO_IDENTITY_POOL_ID || "us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a",
                     "mfa_methods": [],
                     "standard_required_attributes": ["email"],
                     "username_attributes": ["email"],
