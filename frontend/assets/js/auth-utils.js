@@ -26,8 +26,15 @@ window.Auth = {
         });
 
         // More lenient check - if we have basic auth flags, trust them
-        if (isAuthenticated === 'true' && userEmail) {
-            console.log('✅ Authentication check passed (basic auth flags)');
+        if (isAuthenticated === 'true') {
+            console.log('✅ Authentication check passed (isAuthenticated flag is true)');
+            return true;
+        }
+
+        // Also check if we have userEmail (might be set without isAuthenticated flag)
+        if (userEmail && idToken) {
+            console.log('✅ Authentication check passed (userEmail + idToken present)');
+            sessionStorage.setItem('isAuthenticated', 'true'); // Set the flag for next time
             return true;
         }
 
@@ -137,13 +144,13 @@ window.Auth = {
             return;
         }
         
-        // Check if we just came from login (within last 5 seconds) to avoid redirect loops
+        // Check if we just came from login (within last 10 seconds) to avoid redirect loops
         const lastLoginTime = sessionStorage.getItem('lastLoginTime');
         if (lastLoginTime) {
             const timeSinceLogin = Date.now() - parseInt(lastLoginTime, 10);
-            if (timeSinceLogin < 5000) {
-                console.warn('⚠️ Just logged in ' + timeSinceLogin + 'ms ago, but auth check is failing. Check token storage!');
-                // Give a bit more time for tokens to be available
+            if (timeSinceLogin < 10000) {
+                console.log('✅ Within grace period after login (' + timeSinceLogin + 'ms ago), skipping redirect');
+                // Give more time for tokens to be fully available across page navigation
                 return;
             }
         }

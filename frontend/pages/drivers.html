@@ -615,20 +615,14 @@
 
     <!-- Authentication check -->
     <script>
-        // Check authentication before page loads
-        (function checkAuth() {
-            if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
-                console.log('Running auth check for drivers page...');
-                const isAuth = window.Auth.requireAuthentication();
-                if (!isAuth) {
-                    console.log('Auth check failed, redirecting to login');
-                    return;
-                }
-            } else {
-                console.warn('Auth not loaded yet, retrying...');
-                setTimeout(checkAuth, 100);
+        // Check authentication silently in background
+        if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
+            try {
+                window.Auth.requireAuthentication();
+            } catch (e) {
+                console.warn('Auth check error:', e);
             }
-        })();
+        }
     </script>
     
     <!-- Inline build stamp for debugging -->
