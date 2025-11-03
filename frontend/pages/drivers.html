@@ -364,7 +364,7 @@
         .btn-primary:hover {
             background: var(--md-sys-color-primary-container);
             color: var(--md-sys-color-on-primary-container);
-            box-shadow: var(--md-sys-elevation-level1);
+            box-shadow: var (--md-sys-elevation-level1);
         }
 
         .btn-secondary {
@@ -618,7 +618,7 @@
                         </div>
                         <div style="grid-column: 1 / -1;">
                             <strong style="color: var(--md-sys-color-on-surface-variant);">Last Updated:</strong>
-                            <span id="viewLastUpdated" style="color: var(--md-sys-color-on-surface);"></span>
+                            <span id="viewLastUpdated" style="color: var (--md-sys-color-on-surface);"></span>
                         </div>
                     </div>
                 </div>
@@ -719,6 +719,225 @@
             </div>
         </div>
     </div>
+
+    <!-- View Driver Modal (Read-Only) -->
+    <div class="modal" id="viewDriverModal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-circle" style="color: var(--md-sys-color-primary);"></i> Driver Profile</h2>
+                <button class="modal-close" onclick="closeViewDriverModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                
+                <!-- Driver Header Section -->
+                <div style="background: linear-gradient(135deg, var(--md-sys-color-primary-container) 0%, var(--md-sys-color-secondary-container) 100%); padding: 24px; border-radius: var(--md-sys-shape-corner-large); margin-bottom: 24px; text-align: center;">
+                    <div style="width: 100px; height: 100px; margin: 0 auto 16px; border-radius: 50%; background: var(--md-sys-color-surface); display: flex; align-items: center; justify-content: center; font-size: 48px; color: var(--md-sys-color-primary);">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <h2 id="viewDriverNameHeader" style="font: var(--md-sys-typescale-headline-medium-font); color: var(--md-sys-color-on-primary-container); margin: 0 0 8px 0;"></h2>
+                    <div id="viewDriverStatusBadge" style="display: inline-block; padding: 6px 16px; border-radius: var(--md-sys-shape-corner-full); font: var(--md-sys-typescale-label-medium-font); font-weight: 600;"></div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div style="display: flex; gap: 12px; margin-bottom: 24px; justify-content: center;">
+                    <button class="btn-primary" onclick="editDriverFromView()" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-edit"></i> Edit Driver
+                    </button>
+                    <button class="btn-secondary" onclick="window.print()" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                </div>
+
+                <!-- Information Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px;">
+                    
+                    <!-- Personal Information Card -->
+                    <div class="info-card">
+                        <h3 class="info-card-title">
+                            <i class="fas fa-id-card"></i> Personal Information
+                        </h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Full Name:</label>
+                                <span id="viewDriverNameFull"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>National ID:</label>
+                                <span id="viewDriverNationalId"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>City / Region:</label>
+                                <span id="viewDriverCityFull"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>License Number:</label>
+                                <span id="viewDriverLicenseFull"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vehicle Information Card -->
+                    <div class="info-card">
+                        <h3 class="info-card-title">
+                            <i class="fas fa-motorcycle"></i> Vehicle Information
+                        </h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Vehicle Type:</label>
+                                <span id="viewDriverVehicleType"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Registration Status:</label>
+                                <span id="viewDriverRegStatus"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Information Card -->
+                    <div class="info-card">
+                        <h3 class="info-card-title">
+                            <i class="fas fa-cog"></i> System Information
+                        </h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Driver ID:</label>
+                                <span id="viewDriverIdFull" style="font-family: monospace; font-size: 11px; word-break: break-all;"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Profile Completed:</label>
+                                <span id="viewProfileCompletedFull"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Last Updated:</label>
+                                <span id="viewLastUpdatedFull"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documents Section -->
+                <div style="margin-bottom: 24px;">
+                    <h3 style="font: var(--md-sys-typescale-title-medium-font); color: var(--md-sys-color-on-surface); margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-file-image" style="color: var(--md-sys-color-primary);"></i> Documents
+                    </h3>
+                    <div id="viewDocumentsSection" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;"></div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeViewDriverModal()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+                <button type="button" class="btn-primary" onclick="editDriverFromView()">
+                    <i class="fas fa-edit"></i> Edit Driver
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add styles for info cards -->
+    <style>
+        .info-card {
+            background: var(--md-sys-color-surface-container-low);
+            border-radius: var(--md-sys-shape-corner-large);
+            padding: 20px;
+            box-shadow: var(--md-sys-elevation-level1);
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+        }
+
+        .info-card:hover {
+            box-shadow: var(--md-sys-elevation-level2);
+            transform: translateY(-2px);
+        }
+
+        .info-card-title {
+            font: var(--md-sys-typescale-title-small-font);
+            font-weight: var(--md-sys-typescale-title-small-weight);
+            color: var(--md-sys-color-on-surface);
+            margin: 0 0 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .info-card-title i {
+            color: var(--md-sys-color-primary);
+        }
+
+        .info-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-item label {
+            font: var(--md-sys-typescale-body-small-font);
+            color: var(--md-sys-color-on-surface-variant);
+            font-weight: 500;
+        }
+
+        .info-item span {
+            font: var(--md-sys-typescale-body-large-font);
+            color: var(--md-sys-color-on-surface);
+        }
+
+        .document-card {
+            background: var(--md-sys-color-surface-container-highest);
+            border-radius: var(--md-sys-shape-corner-medium);
+            padding: 16px;
+            border: 1px solid var(--md-sys-color-outline-variant);
+        }
+
+        .document-card h4 {
+            font: var(--md-sys-typescale-title-small-font);
+            color: var(--md-sys-color-on-surface);
+            margin: 0 0 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .document-card a {
+            color: var(--md-sys-color-primary);
+            text-decoration: none;
+            font: var(--md-sys-typescale-label-large-font);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .document-card a:hover {
+            text-decoration: underline;
+        }
+
+        .document-card img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: contain;
+            border-radius: var(--md-sys-shape-corner-small);
+            border: 1px solid var(--md-sys-color-outline);
+        }
+
+        @media print {
+            .modal-header button,
+            .modal-footer,
+            .btn-primary,
+            .btn-secondary {
+                display: none !important;
+            }
+        }
+    </style>
 
     <!-- AWS SDK and Cognito SDK -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>

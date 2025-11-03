@@ -584,8 +584,144 @@ function handleAddDriver(e) {
 // Driver action functions
 function viewDriver(driverId) {
     const driver = drivers.find(d => d.id === driverId);
-    if (driver) {
-        notify(`Driver: ${driver.name} | ${driver.phone} | Status: ${driver.status}`, 'info');
+    if (!driver) {
+        notify('Driver not found', 'error');
+        return;
+    }
+    
+    // Store current driver ID for quick edit access
+    window.currentViewDriverId = driverId;
+    
+    // Populate driver header
+    document.getElementById('viewDriverNameHeader').textContent = driver.name || 'Unknown Driver';
+    
+    // Populate status badge
+    const statusBadge = document.getElementById('viewDriverStatusBadge');
+    const statusMap = {
+        'ACTIVE': { text: 'Active', color: 'var(--md-sys-color-primary)', bg: 'var(--md-sys-color-primary-container)' },
+        'APPROVED': { text: 'Approved', color: 'var(--md-sys-color-primary)', bg: 'var(--md-sys-color-primary-container)' },
+        'PENDING_REVIEW': { text: 'Pending Review', color: 'var(--md-sys-color-tertiary)', bg: 'var(--md-sys-color-tertiary-container)' },
+        'SUSPENDED': { text: 'Suspended', color: 'var(--md-sys-color-error)', bg: 'var(--md-sys-color-error-container)' },
+        'REJECTED': { text: 'Rejected', color: 'var(--md-sys-color-error)', bg: 'var(--md-sys-color-error-container)' }
+    };
+    
+    const statusInfo = statusMap[driver.status] || statusMap['PENDING_REVIEW'];
+    statusBadge.textContent = statusInfo.text;
+    statusBadge.style.color = statusInfo.color;
+    statusBadge.style.background = statusInfo.bg;
+    
+    // Populate Personal Information
+    document.getElementById('viewDriverNameFull').textContent = driver.name || 'N/A';
+    document.getElementById('viewDriverNationalId').textContent = driver.nationalId || 'N/A';
+    document.getElementById('viewDriverCityFull').textContent = driver.city || 'N/A';
+    document.getElementById('viewDriverLicenseFull').textContent = driver.licenseNumber || 'N/A';
+    
+    // Populate Vehicle Information
+    const vehicleTypeMap = {
+        'motorcycle': 'Motorcycle (دراجة نارية)',
+        'دراجة نارية': 'Motorcycle (دراجة نارية)',
+        'car': 'Car (سيارة)',
+        'سيارة': 'Car (سيارة)',
+        'bicycle': 'Bicycle (دراجة هوائية)',
+        'دراجة هوائية': 'Bicycle (دراجة هوائية)'
+    };
+    document.getElementById('viewDriverVehicleType').textContent = vehicleTypeMap[driver.vehicleType] || driver.vehicleType || 'N/A';
+    document.getElementById('viewDriverRegStatus').textContent = statusInfo.text;
+    
+    // Populate System Information
+    document.getElementById('viewDriverIdFull').textContent = driver.id || 'N/A';
+    document.getElementById('viewProfileCompletedFull').textContent = formatDateTime(driver.profileCompletedAt);
+    document.getElementById('viewLastUpdatedFull').textContent = formatDateTime(driver.updatedAt);
+    
+    // Display documents with larger previews
+    displayViewDriverDocuments(driver);
+    
+    // Open the view modal
+    openViewDriverModal();
+}
+
+function displayViewDriverDocuments(driver) {
+    const documentsSection = document.getElementById('viewDocumentsSection');
+    if (!documentsSection) return;
+    
+    let html = '';
+    
+    // Driving License
+    if (driver.drivingLicenseUrl) {
+        html += `
+            <div class="document-card">
+                <h4>
+                    <i class="fas fa-id-card"></i> Driving License
+                </h4>
+                <a href="${driver.drivingLicenseUrl}" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Open in New Tab
+                </a>
+                <img src="${driver.drivingLicenseUrl}" 
+                     alt="Driving License" 
+                     onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="document-card">
+                <h4>
+                    <i class="fas fa-id-card"></i> Driving License
+                </h4>
+                <em style="color: var(--md-sys-color-on-surface-variant);">No driving license uploaded</em>
+            </div>
+        `;
+    }
+    
+    // Registration Paper
+    if (driver.registrationPaperUrl) {
+        html += `
+            <div class="document-card">
+                <h4>
+                    <i class="fas fa-file-alt"></i> Registration Paper
+                </h4>
+                <a href="${driver.registrationPaperUrl}" target="_blank">
+                    <i class="fas fa-external-link-alt"></i> Open in New Tab
+                </a>
+                <img src="${driver.registrationPaperUrl}" 
+                     alt="Registration Paper" 
+                     onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="document-card">
+                <h4>
+                    <i class="fas fa-file-alt"></i> Registration Paper
+                </h4>
+                <em style="color: var(--md-sys-color-on-surface-variant);">No registration paper uploaded</em>
+            </div>
+        `;
+    }
+    
+    documentsSection.innerHTML = html;
+}
+
+function openViewDriverModal() {
+    const modal = document.getElementById('viewDriverModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeViewDriverModal() {
+    const modal = document.getElementById('viewDriverModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function editDriverFromView() {
+    // Close view modal
+    closeViewDriverModal();
+    
+    // Open edit modal with the same driver
+    if (window.currentViewDriverId) {
+        editDriver(window.currentViewDriverId);
     }
 }
 
@@ -1097,6 +1233,7 @@ async function toggleDriverStatus(driverId, currentStatus) {
 window.addEventListener('click', function (e) {
     const addModal = document.getElementById('addDriverModal');
     const editModal = document.getElementById('editDriverModal');
+    const viewModal = document.getElementById('viewDriverModal');
     
     if (e.target === addModal) {
         closeAddDriverModal();
@@ -1104,6 +1241,10 @@ window.addEventListener('click', function (e) {
     
     if (e.target === editModal) {
         closeEditDriverModal();
+    }
+    
+    if (e.target === viewModal) {
+        closeViewDriverModal();
     }
 });
 
@@ -1113,8 +1254,11 @@ window.driversManager = {
     closeAddDriverModal,
     openEditDriverModal,
     closeEditDriverModal,
+    openViewDriverModal,
+    closeViewDriverModal,
     viewDriver,
     editDriver,
+    editDriverFromView,
     toggleDriverStatus
 };
 
