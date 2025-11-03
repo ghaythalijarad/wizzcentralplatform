@@ -137,11 +137,11 @@
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
+            color: var(--md-sys-color-on-primary);
             font-weight: 600;
             font-size: 0.875rem;
             flex-shrink: 0;
@@ -182,8 +182,8 @@
         }
         
         .unread-badge {
-            background: #ef4444;
-            color: white;
+            background: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error);
             font-size: 0.75rem;
             padding: 0.125rem 0.5rem;
             border-radius: 9999px;
@@ -235,12 +235,12 @@
         }
         
         .btn-primary {
-            background: #00c2e8;
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
         }
         
         .btn-primary:hover {
-            background: #009bb8;
+            background: var(--wizz-primary-dark);
         }
         
         .btn-secondary {
@@ -1520,6 +1520,8 @@
         </div> <!-- End main-content -->
         
         <!-- Navigation Manager -->
+        <script src="../aggressive-sidebar-fix.js"></script>
+        <script src="../immediate-sidebar-fix.js"></script>
         <script src="../assets/js/navigation.js"></script>
         <script>
             // Initialize navigation when page loads

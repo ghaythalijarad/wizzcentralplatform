@@ -1,7 +1,10 @@
 :root {
-  --color-primary: #00c2e8;
-    --color-primaryHover: #009bb8;
-    --color-primaryMuted: #e6f9fe;
+  --color-primary: #FDC500;
+    --color-primaryHover: #E6B100;
+    --color-primaryMuted: #FFF8E6;
+    --color-secondary: #00296B;
+    --color-secondaryHover: #001f52;
+    --color-secondaryMuted: #f0f7ff;
   --color-danger: #dc2626;
   --color-dangerHover: #b91c1c;
   --color-warning: #f59e0b;
@@ -42,14 +45,14 @@
 }
 
 .btn-secondary {
-  background: var(--color-surfaceAlt);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
+  background: var(--color-secondary);
+    color: #fff;
+    border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
 }
 
 .btn-secondary:hover {
-  background: var(--color-primaryMuted);
+  background: var(--color-secondaryHover);
 }
 
 .lc-session-chip {

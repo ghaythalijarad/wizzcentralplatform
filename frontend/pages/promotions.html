@@ -28,7 +28,7 @@
         }
 
         .modal-content {
-            background: #fff;
+            background: var(--md-sys-color-surface);
             border-radius: 8px;
             max-width: 600px;
             width: 90%;
@@ -50,8 +50,8 @@
         input[type="datetime-local"] {
             position: relative;
             padding-right: 50px !important;
-            background: #fff;
-            border: 1px solid #ddd;
+            background: var(--md-sys-color-surface);
+            border: 1px solid var(--md-sys-color-outline);
             border-radius: 4px;
             padding: 12px;
             font-family: 'Inter', sans-serif;
@@ -71,7 +71,7 @@
             width: 95%;
             max-height: 90vh;
             overflow-y: auto;
-            background: #fefbff;
+            background: var(--md-sys-color-surface);
             border-radius: 16px;
             padding: 0;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
@@ -79,8 +79,8 @@
 
         .material-3-header {
             padding: 24px 24px 16px 24px;
-            background: linear-gradient(135deg, #00c2e8, #33cceb);
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             border-radius: 16px 16px 0 0;
             margin: 0;
         }
@@ -102,9 +102,9 @@
             position: absolute;
             top: 16px;
             right: 16px;
-            background: rgba(255, 255, 255, 0.2);
+            background: var(--md-sys-color-surface-variant);
             border: none;
-            color: white;
+            color: var(--md-sys-color-on-surface-variant);
             width: 40px;
             height: 40px;
             border-radius: 20px;
@@ -126,24 +126,24 @@
 
         .material-3-section {
             margin-bottom: 24px;
-            background: #f8f5ff;
+            background: var(--md-sys-color-surface-container-low);
             border-radius: 12px;
             padding: 20px;
-            border-left: 4px solid #00c2e8;
+            border-left: 4px solid var(--md-sys-color-primary);
         }
 
         .section-title {
             margin: 0 0 20px 0;
             font-size: 1.125rem;
             font-weight: 500;
-            color: #1c1b1f;
+            color: var(--md-sys-color-on-surface);
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
         .section-title i {
-            color: #00c2e8;
+            color: var(--md-sys-color-primary);
         }
 
         .form-row {
@@ -163,9 +163,9 @@
         .material-3-textarea {
             width: 100%;
             padding: 16px 12px 8px 12px;
-            border: 1px solid #79747e;
+            border: 1px solid var(--md-sys-color-outline);
             border-radius: 8px;
-            background: #fefbff;
+            background: var(--md-sys-color-surface);
             font-size: 16px;
             font-family: 'Inter', sans-serif;
             transition: all 0.2s ease;
@@ -181,8 +181,8 @@
         .material-3-input:focus,
         .material-3-select:focus,
         .material-3-textarea:focus {
-            border-color: #00c2e8;
-            box-shadow: 0 0 0 2px rgba(0, 194, 232, 0.1);
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 2px rgba(253, 197, 0, 0.1);
         }
 
         .material-3-input:not(:placeholder-shown),
@@ -196,11 +196,11 @@
             position: absolute;
             left: 12px;
             top: 16px;
-            color: #49454f;
+            color: var(--md-sys-color-on-surface-variant);
             font-size: 16px;
             transition: all 0.2s ease;
             pointer-events: none;
-            background: #fefbff;
+            background: var(--md-sys-color-surface);
             padding: 0 4px;
         }
 
@@ -212,7 +212,7 @@
         .material-3-textarea:not(:placeholder-shown) + .material-3-label {
             top: -8px;
             font-size: 12px;
-            color: #00c2e8;
+            color: var(--md-sys-color-primary);
             font-weight: 500;
         }
 
@@ -222,7 +222,7 @@
             left: 0;
             width: 100%;
             height: 2px;
-            background: #00c2e8;
+            background: var(--md-sys-color-primary);
             transform: scaleX(0);
             transition: transform 0.2s ease;
         }
@@ -237,7 +237,7 @@
             display: block;
             margin-top: 4px;
             font-size: 12px;
-            color: #79747e;
+            color: var(--md-sys-color-on-surface-variant);
         }
 
         .material-3-checkboxes {
@@ -252,7 +252,7 @@
             gap: 12px;
             cursor: pointer;
             font-size: 14px;
-            color: #1c1b1f;
+            color: var(--md-sys-color-on-surface);
         }
 
         .material-3-checkbox input[type="checkbox"] {
@@ -262,16 +262,16 @@
         .material-3-checkmark {
             width: 20px;
             height: 20px;
-            border: 2px solid #79747e;
+            border: 2px solid var(--md-sys-color-outline);
             border-radius: 4px;
             position: relative;
             transition: all 0.2s ease;
-            background: #fefbff;
+            background: var(--md-sys-color-surface);
         }
 
         .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark {
-            background: #00c2e8;
-            border-color: #00c2e8;
+            background: var(--md-sys-color-primary);
+            border-color: var(--md-sys-color-primary);
         }
 
         .material-3-checkbox input[type="checkbox"]:checked + .material-3-checkmark::after {
@@ -280,7 +280,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
+            color: var(--md-sys-color-on-primary);
             font-size: 12px;
             font-weight: bold;
         }
@@ -295,7 +295,7 @@
             gap: 12px;
             margin-top: 32px;
             padding-top: 20px;
-            border-top: 1px solid #e7e0ec;
+            border-top: 1px solid var(--md-sys-color-outline-variant);
         }
 
         .material-3-btn-primary,
@@ -314,32 +314,33 @@
         }
 
         .material-3-btn-primary {
-            background: #00c2e8;
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             border: none;
-            box-shadow: 0 2px 8px rgba(0, 194, 232, 0.3);
+            box-shadow: 0 2px 8px rgba(253, 197, 0, 0.3);
         }
 
         .material-3-btn-primary:hover {
-            background: #009bb8;
-            box-shadow: 0 4px 12px rgba(0, 194, 232, 0.4);
+            background: var(--wizz-primary-dark);
+            box-shadow: 0 4px 12px rgba(253, 197, 0, 0.4);
         }
 
         .material-3-btn-secondary {
             background: transparent;
-            color: #00c2e8;
-            border: 1px solid #79747e;
+            color: var(--md-sys-color-secondary);
+            border: 1px solid var(--md-sys-color-secondary);
         }
 
         .material-3-btn-secondary:hover {
-            background: rgba(0, 194, 232, 0.1);
+            background: var(--md-sys-color-secondary-container);
+            color: var(--md-sys-color-on-secondary-container);
         }
 
         .material-3-loader {
             display: none;
             text-align: center;
             padding: 32px;
-            background: #f8f5ff;
+            background: var(--md-sys-color-surface-container-low);
             margin: 24px;
             border-radius: 12px;
         }
@@ -349,7 +350,7 @@
             align-items: center;
             justify-content: center;
             gap: 12px;
-            color: #00c2e8;
+            color: var(--md-sys-color-primary);
             font-weight: 500;
         }
 
@@ -675,20 +676,20 @@
             <!-- Merchant Discounts Section -->
             <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
                 <div class="section-header"
-                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #00c2e8;">
-                    <h2 style="margin: 0; color: #2c3e50;">
-                        <i class="fas fa-store" style="margin-right: 0.5rem; color: #00c2e8;"></i>
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: var(--md-sys-color-surface-container-low); border-radius: 8px; border-left: 4px solid var(--md-sys-color-primary);">
+                    <h2 style="margin: 0; color: var(--md-sys-color-on-surface);">
+                        <i class="fas fa-store" style="margin-right: 0.5rem; color: var(--md-sys-color-primary);"></i>
                         Merchant Discounts
                     </h2>
                     <div style="display: flex; align-items: center; gap: 1rem;">
                         <div class="merchant-discount-stats" style="display: flex; gap: 1rem;">
                             <span class="stat-item"
-                                style="padding: 0.25rem 0.75rem; background: #e6f9fe; border-radius: 20px; font-size: 0.9rem;">
-                                Total: <strong id="totalMerchantDiscounts" style="color: #00c2e8;">0</strong>
+                                style="padding: 0.25rem 0.75rem; background: var(--md-sys-color-primary-container); border-radius: 20px; font-size: 0.9rem;">
+                                Total: <strong id="totalMerchantDiscounts" style="color: var(--md-sys-color-on-primary-container);">0</strong>
                             </span>
                             <span class="stat-item"
-                                style="padding: 0.25rem 0.75rem; background: #e8f5e8; border-radius: 20px; font-size: 0.9rem;">
-                                Active: <strong id="activeMerchantDiscounts" style="color: #388e3c;">0</strong>
+                                style="padding: 0.25rem 0.75rem; background: var(--md-sys-color-secondary-container); border-radius: 20px; font-size: 0.9rem;">
+                                Active: <strong id="activeMerchantDiscounts" style="color: var(--md-sys-color-on-secondary-container);">0</strong>
                             </span>
                         </div>
                         <button onclick="refreshMerchantDiscounts()" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">
@@ -713,9 +714,9 @@
                         </thead>
                         <tbody id="merchantDiscountsTableBody">
                             <tr>
-                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
                                     <i class="fas fa-spinner fa-spin"
-                                        style="font-size: 3rem; margin-bottom: 1rem; color: #00c2e8;"></i>
+                                        style="font-size: 3rem; margin-bottom: 1rem; color: var(--md-sys-color-primary);"></i>
                                     <div>Loading merchant discounts...</div>
                                 </td>
                             </tr>
@@ -727,20 +728,20 @@
             <!-- Special Campaigns Section -->
             <div class="page-section" style="margin-top: 2rem; margin-bottom: 2rem;">
                 <div class="section-header"
-                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
-                    <h2 style="margin: 0; color: #2c3e50;">
-                        <i class="fas fa-rocket" style="margin-right: 0.5rem; color: #ffc107;"></i>
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: var(--md-sys-color-primary-container); border-radius: 8px; border-left: 4px solid var(--md-sys-color-primary);">
+                    <h2 style="margin: 0; color: var(--md-sys-color-on-primary-container);">
+                        <i class="fas fa-rocket" style="margin-right: 0.5rem; color: var(--md-sys-color-primary);"></i>
                         Special Campaigns
                     </h2>
                     <div style="display: flex; align-items: center; gap: 1rem;">
                         <div class="campaign-stats" style="display: flex; gap: 1rem;">
                             <span class="stat-item"
-                                style="padding: 0.25rem 0.75rem; background: #fff3cd; border-radius: 20px; font-size: 0.9rem;">
-                                Active: <strong id="activeCampaigns" style="color: #856404;">0</strong>
+                                style="padding: 0.25rem 0.75rem; background: var(--md-sys-color-primary-container); border-radius: 20px; font-size: 0.9rem;">
+                                Active: <strong id="activeCampaigns" style="color: var(--md-sys-color-on-primary-container);">0</strong>
                             </span>
                             <span class="stat-item"
-                                style="padding: 0.25rem 0.75rem; background: #d1ecf1; border-radius: 20px; font-size: 0.9rem;">
-                                Total: <strong id="totalCampaigns" style="color: #0c5460;">0</strong>
+                                style="padding: 0.25rem 0.75rem; background: var(--md-sys-color-secondary-container); border-radius: 20px; font-size: 0.9rem;">
+                                Total: <strong id="totalCampaigns" style="color: var(--md-sys-color-on-secondary-container);">0</strong>
                             </span>
                         </div>
                         <button id="createCampaignBtn" class="btn-primary"
@@ -755,28 +756,28 @@
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                     <div class="campaign-type-card"
                         onclick="window.campaignManager && window.campaignManager.createCampaignType('first-order')"
-                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #00c2e8, #009bb8); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary)); color: var(--md-sys-color-on-primary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-star" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">First Order</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Welcome new customers with special discounts</p>
                     </div>
                     <div class="campaign-type-card"
                         onclick="window.campaignManager && window.campaignManager.createCampaignType('restaurant-first')"
-                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #f093fb, #f5576c); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-secondary), var(--md-sys-color-primary)); color: var(--md-sys-color-on-secondary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-utensils" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">Restaurant First Order</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">First order from specific restaurants</p>
                     </div>
                     <div class="campaign-type-card"
                         onclick="window.campaignManager && window.campaignManager.createCampaignType('new-customer')"
-                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #4facfe, #00f2fe); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-tertiary), var(--md-sys-color-primary)); color: var(--md-sys-color-on-tertiary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-user-plus" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">New Customer</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Exclusive offers for newly registered users</p>
                     </div>
                     <div class="campaign-type-card"
                         onclick="window.campaignManager && window.campaignManager.createCampaignType('special-occasion')"
-                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, #43e97b, #38f9d7); color: white; border-radius: 8px; text-align: center; transition: transform 0.2s;">
+                        style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary)); color: var(--md-sys-color-on-primary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-calendar-alt" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">Special Occasions</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Holiday and event-based campaigns</p>
@@ -800,8 +801,8 @@
                         </thead>
                         <tbody id="campaignsTableBody">
                             <tr>
-                                <td colspan="8" style="text-align: center; padding: 2rem; color: #666;">
-                                    <i class="fas fa-rocket" style="font-size: 3rem; margin-bottom: 1rem; color: #ccc;"></i>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
+                                    <i class="fas fa-rocket" style="font-size: 3rem; margin-bottom: 1rem; color: var(--md-sys-color-outline);"></i>
                                     <div>Loading campaigns...</div>
                                 </td>
                             </tr>
@@ -829,6 +830,8 @@
     <script src="../data-service.js?v=10"></script>
 
     <!-- Page-specific scripts -->
+    <script src="../aggressive-sidebar-fix.js"></script>
+    <script src="../immediate-sidebar-fix.js"></script>
     <script src="../assets/js/navigation.js"></script>
     <!-- Include centralized ModalManager for modals/toasts -->
     <script src="../js/core/ModalManager.js"></script>
@@ -1141,12 +1144,12 @@
                     if (input.value || input.type === 'date') {
                         label.style.top = '-8px';
                         label.style.fontSize = '12px';
-                        label.style.color = '#00c2e8';
+                        label.style.color = 'var(--md-sys-color-primary)';
                         label.style.fontWeight = '500';
                     } else {
                         label.style.top = '16px';
                         label.style.fontSize = '16px';
-                        label.style.color = '#49454f';
+                        label.style.color = 'var(--md-sys-color-on-surface-variant)';
                         label.style.fontWeight = '400';
                     }
                 }

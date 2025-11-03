@@ -1102,6 +1102,8 @@
     </div>
 
     <!-- Scripts -->
+    <script src="../aggressive-sidebar-fix.js"></script>
+    <script src="../immediate-sidebar-fix.js"></script>
     <script src="../assets/js/navigation.js"></script>
     <script src="../config.js"></script>
     <script src="../assets/js/auth-utils.js"></script>
@@ -1144,30 +1146,7 @@
                                 }
                             });
                             
-                            // Setup sidebar functionality
-                            const menuToggle = document.getElementById('menuToggle');
-                            const sidebarToggle = document.getElementById('sidebarToggle');
-                            const mainContent = document.getElementById('mainContent');
-                            
-                            // Menu toggle for mobile
-                            if (menuToggle) {
-                                menuToggle.addEventListener('click', function() {
-                                    sidebar.classList.toggle('active');
-                                    if (window.innerWidth <= 768) {
-                                        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-                                    }
-                                });
-                            }
-                            
-                            // Sidebar toggle for desktop
-                            if (sidebarToggle) {
-                                sidebarToggle.addEventListener('click', function() {
-                                    sidebar.classList.toggle('collapsed');
-                                    if (mainContent) {
-                                        mainContent.classList.toggle('collapsed-sidebar');
-                                    }
-                                });
-                            }
+                            // Sidebar functionality is now handled by navigation.js
                         }
                         
                         // Initialize Iraq regions management after sidebar is loaded

@@ -105,9 +105,9 @@
         }
     
         .table-header {
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
             padding: 1rem 1.5rem;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -126,28 +126,28 @@
         .orders-grid td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #f1f5f9;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
         }
     
         .orders-grid th {
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
             font-weight: 600;
-            color: #475569;
+            color: var(--md-sys-color-on-surface-variant);
             font-size: 14px;
         }
     
         .orders-grid td {
             font-size: 14px;
-            color: #1e293b;
+            color: var(--md-sys-color-on-surface);
         }
     
         .orders-grid tr:hover {
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
         }
     
         .view-details-btn {
-            background: #00c2e8;
-            color: white;
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
             border: none;
             padding: 0.5rem 1rem;
             border-radius: 6px;
@@ -157,15 +157,15 @@
         }
     
         .view-details-btn:hover {
-            background: #009bb8;
+            background: var(--wizz-primary-dark);
         }
     
         .loading-spinner {
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #00c2e8;
+            border: 3px solid var(--md-sys-color-surface-variant);
+            border-top: 3px solid var(--md-sys-color-primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -192,7 +192,7 @@
         }
     
         .modal-content {
-            background-color: white;
+            background-color: var(--md-sys-color-surface);
             margin: 5% auto;
             padding: 0;
             border-radius: 12px;
@@ -204,7 +204,7 @@
     
         .modal-header {
             padding: 1.5rem;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
             display: flex;
             justify-content: between;
             align-items: center;
@@ -212,7 +212,7 @@
     
         .modal-header h2 {
             margin: 0;
-            color: #1e293b;
+            color: var(--md-sys-color-on-surface);
         }
     
         .modal-close {
@@ -220,7 +220,7 @@
             border: none;
             font-size: 24px;
             cursor: pointer;
-            color: #64748b;
+            color: var(--md-sys-color-on-surface-variant);
             margin-left: auto;
         }
     
@@ -237,13 +237,13 @@
     
         .detail-item {
             padding: 1rem;
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
             border-radius: 8px;
         }
     
         .detail-label {
             font-size: 12px;
-            color: #64748b;
+            color: var(--md-sys-color-on-surface-variant);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 0.5rem;
@@ -251,13 +251,13 @@
     
         .detail-value {
             font-size: 14px;
-            color: #1e293b;
+            color: var(--md-sys-color-on-surface);
             font-weight: 500;
         }
     
         .raw-data {
-            background: #1e293b;
-            color: #e2e8f0;
+            background: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-on-secondary);
             padding: 1rem;
             border-radius: 8px;
             font-family: 'Courier New', monospace;
@@ -267,7 +267,7 @@
         }
 
         .items-list {
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -278,7 +278,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 0.75rem 0;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
         }
 
         .item-row:last-child {
@@ -287,7 +287,7 @@
 
         .item-name {
             font-weight: 500;
-            color: #1e293b;
+            color: var(--md-sys-color-on-surface);
             flex: 1;
         }
 
@@ -295,11 +295,11 @@
             display: flex;
             gap: 1rem;
             font-size: 14px;
-            color: #64748b;
+            color: var(--md-sys-color-on-surface-variant);
         }
 
         .pricing-details {
-            background: #f8fafc;
+            background: var(--md-sys-color-surface-container-low);
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -309,7 +309,7 @@
             display: flex;
             justify-content: space-between;
             padding: 0.5rem 0;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
         }
 
         .price-row:last-child {
@@ -319,7 +319,7 @@
         .total-row {
             margin-top: 0.5rem;
             padding-top: 0.75rem;
-            border-top: 2px solid #00c2e8;
+            border-top: 2px solid var(--md-sys-color-primary);
             font-size: 16px;
         }
     
@@ -340,6 +340,10 @@
 </head>
 
 <body data-page="orders">
+    <!-- Aggressive sidebar fix - runs first -->
+    <script src="../aggressive-sidebar-fix.js"></script>
+    <!-- Immediate sidebar state fix -->
+    <script src="../immediate-sidebar-fix.js"></script>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
 
@@ -350,7 +354,8 @@
             <!-- Orders Statistics -->
             <div class="orders-stats">
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(45deg, #00c2e8, #009bb8);">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(45deg, var(--md-sys-color-primary), var(--wizz-primary-dark));">
                         <i class="fas fa-shopping-bag"></i>
                     </div>
                     <div class="stat-info">
@@ -359,7 +364,8 @@
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(45deg, #10b981, #047857);">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(45deg, var(--md-sys-color-secondary), var(--wizz-secondary-dark));">
                         <i class="fas fa-check-circle"></i>
                     </div>
                     <div class="stat-info">
@@ -368,7 +374,8 @@
                     </div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-icon" style="background: linear-gradient(45deg, #f59e0b, #d97706);">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(45deg, var(--md-sys-color-tertiary), var(--md-sys-color-tertiary));">
                         <i class="fas fa-clock"></i>
                     </div>
                     <div class="stat-info">
@@ -377,7 +384,8 @@
                         </div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-icon" style="background: linear-gradient(45deg, #ef4444, #dc2626);">
+                            <div class="stat-icon"
+                                style="background: linear-gradient(45deg, var(--md-sys-color-error), var(--md-sys-color-error));">
                                 <i class="fas fa-times-circle"></i>
                             </div>
                             <div class="stat-info">
@@ -463,6 +471,7 @@
     <script src="../js/orders-api.js"></script>
     <!-- Sidebar -->
     <script src="../assets/js/navigation.js"></script>
+    <script src="../test-toggle-functionality.js"></script>
 <script>
     let allOrders = [];
     let filteredOrders = [];
@@ -503,7 +512,7 @@
             tableStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading orders';
             tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: #ef4444;">
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                             <div>Failed to load orders: ${error.message}</div>
                         </td>
@@ -535,7 +544,7 @@
         if (filteredOrders.length === 0) {
             tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: #64748b;">
+                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
                             <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                             <div>No orders found</div>
                         </td>
@@ -549,7 +558,7 @@
                     <td><strong>${order.orderId}</strong></td>
                     <td>
                         <div>${order.customerName || 'N/A'}</div>
-                        <div style="font-size: 12px; color: #64748b;">${order.customerEmail || ''}</div>
+                        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${order.customerEmail || ''}</div>
                     </td>
                     <td>
                         <span class="status-badge status-${order.status}">
@@ -717,7 +726,7 @@
         } catch (error) {
             console.error('Error loading order details:', error);
             content.innerHTML = `
-                    <div style="text-align: center; color: #ef4444;">
+                    <div style="text-align: center; color: var(--md-sys-color-error);">
                         <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                         <div>Failed to load order details: ${error.message}</div>
                     </div>

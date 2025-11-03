@@ -6,12 +6,12 @@
 // Main brand color palette - Change these to update the entire platform
 const WIZZ_THEME_CONFIG = {
   // Primary brand colors
-  primary: '#00C2E8',        // Main cyan - used for primary buttons, links, focus states
-  primaryLight: '#33CCEB',   // Lighter variant for hover states
-  primaryDark: '#009BB8',    // Darker variant for active states
+  primary: '#FDC500',        // Main yellow-gold - used for primary buttons, links, focus states
+  primaryLight: '#FDD633',   // Lighter variant for hover states
+  primaryDark: '#E6B100',    // Darker variant for active states
   
   // Secondary brand colors  
-  secondary: '#625B71',      // Secondary purple-gray
+  secondary: '#00296B',      // Secondary navy blue
   tertiary: '#7D5260',       // Tertiary brownish-purple
   
   // Accent colors for semantic meanings

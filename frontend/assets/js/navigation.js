@@ -38,13 +38,16 @@ class NavigationManager {
             this.initializeNavigation();
 
             // Set active page
-            this.setActivePage();
+            this.setActivePage();        // Setup event listeners
+        this.setupEventListeners();
 
-            // Setup event listeners
-            this.setupEventListeners();
+        // Ensure toggle buttons are connected with multiple retries
+        setTimeout(() => this.ensureToggleButtonConnected(), 100);
+        setTimeout(() => this.ensureToggleButtonConnected(), 300);
+        setTimeout(() => this.ensureToggleButtonConnected(), 500);
 
-            this.isInitialized = true;
-            console.log('✅ NavigationManager: Initialized successfully');
+        this.isInitialized = true;
+        console.log('✅ NavigationManager: Initialized successfully');
 
             // Dispatch event for other scripts
             document.dispatchEvent(new CustomEvent('navigation:ready', {
@@ -107,8 +110,18 @@ class NavigationManager {
                 console.log('✅ NavigationManager: Sidebar HTML loaded from', url);
                 // Ensure links are valid for current base after injection
                 this.rewriteNavLinks(container);
-                // Initialize user profile after sidebar is loaded
-                setTimeout(() => this.initializeUserProfile(), 100);
+                // Re-setup DOM references and event listeners after sidebar loads
+                setTimeout(() => {
+                    this.setupDOMReferences();
+                    this.setupEventListeners();
+                    this.initializeUserProfile();
+                    this.ensureToggleButtonConnected();
+                }, 100);
+                
+                // Additional retries for toggle button connection
+                setTimeout(() => this.ensureToggleButtonConnected(), 300);
+                setTimeout(() => this.ensureToggleButtonConnected(), 600);
+                setTimeout(() => this.ensureToggleButtonConnected(), 1000);
                 return;
             } catch (err) {
                 lastError = err;
@@ -153,6 +166,10 @@ class NavigationManager {
             if (!this.isMobile()) {
                 this.sidebar.classList.add('md-navigation-drawer--open');
                 this.sidebar.style.transform = 'translateX(0)';
+                
+                // Force extended state first, then restore any user preferences
+                this.forceExtendedAsDefault();
+                this.restoreCollapseState();
             }
         }
 
@@ -161,6 +178,31 @@ class NavigationManager {
 
         // Initialize user profile if available
         this.initializeUserProfile();
+    }
+
+    // Force sidebar to extended state as the absolute default
+    forceExtendedAsDefault() {
+        if (!this.sidebar || !this.mainContent) return;
+        
+        // Remove any collapsed classes that might be applied
+        this.sidebar.classList.remove('collapsed');
+        this.mainContent.classList.remove('collapsed-sidebar');
+        
+        console.log('🔧 NavigationManager: Forced to extended state as default');
+    }
+
+    // Method to ensure sidebar starts in extended state by default
+    restoreCollapseState() {
+        if (!this.sidebar || !this.mainContent) return;
+        
+        // SIMPLIFIED: Always start in extended state
+        this.sidebar.classList.remove('collapsed');
+        this.mainContent.classList.remove('collapsed-sidebar');
+        
+        // Set proper storage values
+        localStorage.setItem('sidebar-collapsed', 'false');
+        
+        console.log('🔧 NavigationManager: Forced to extended state (simplified logic)');
     }
 
     setActivePage() {
@@ -184,11 +226,15 @@ class NavigationManager {
         // Mobile menu toggle
         if (this.menuToggle) {
             this.menuToggle.addEventListener('click', () => this.toggleSidebar());
+            console.log('🔧 NavigationManager: Mobile menu toggle connected');
         }
 
         // Sidebar toggle button
         if (this.sidebarToggle) {
             this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+            console.log('🔧 NavigationManager: Sidebar toggle button connected');
+        } else {
+            console.warn('⚠️ NavigationManager: Sidebar toggle button not found');
         }
 
         // Handle window resize
@@ -357,14 +403,20 @@ class NavigationManager {
     }
 
     toggleDesktopSidebar() {
-        if (!this.sidebar || !this.mainContent) return;
+        if (!this.sidebar || !this.mainContent) {
+            console.warn('⚠️ NavigationManager: Cannot toggle - sidebar or mainContent not found');
+            return;
+        }
 
+        // Simple toggle
         this.sidebar.classList.toggle('collapsed');
         this.mainContent.classList.toggle('collapsed-sidebar');
 
-        // Store preference
+        // Store current state
         const isCollapsed = this.sidebar.classList.contains('collapsed');
-        localStorage.setItem('sidebar-collapsed', isCollapsed);
+        localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
+        
+        console.log(`🔧 NavigationManager: Desktop sidebar toggled to: ${isCollapsed ? 'collapsed' : 'expanded'}`);
     }
 
     closeMobileSidebar() {
@@ -418,21 +470,15 @@ class NavigationManager {
             }
             this.closeMobileSidebar();
         } else {
-            // Desktop: Remove mobile classes, restore collapsed state
+            // Desktop: Remove mobile classes, restore proper desktop state
             this.sidebar.classList.remove('active');
             this.sidebar.classList.add('md-navigation-drawer--open');
             this.sidebar.style.transform = 'translateX(0)';
             this.removeBackdrop();
             document.body.style.overflow = '';
 
-            // Restore desktop collapsed state from localStorage
-            const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-            if (isCollapsed) {
-                this.sidebar.classList.add('collapsed');
-                if (this.mainContent) {
-                    this.mainContent.classList.add('collapsed-sidebar');
-                }
-            }
+            // Restore desktop state using the proper method
+            this.restoreCollapseState();
         }
     }
 
@@ -600,6 +646,68 @@ class NavigationManager {
         `;
     }
 
+    // Ensure toggle button is properly connected
+    ensureToggleButtonConnected() {
+        let connected = false;
+        
+        // Connect sidebar toggle button (desktop)
+        if (!this.sidebarToggle || !this.sidebarToggle.isConnected) {
+            this.sidebarToggle = document.getElementById('sidebarToggle');
+            if (this.sidebarToggle) {
+                // Remove any existing listeners to prevent duplicates
+                this.sidebarToggle.onclick = null;
+                this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
+                console.log('🔧 NavigationManager: Connected sidebar toggle button');
+                connected = true;
+            }
+        }
+        
+        // Connect menu toggle button (mobile hamburger)
+        if (!this.menuToggle || !this.menuToggle.isConnected) {
+            this.menuToggle = document.getElementById('menuToggle');
+            if (this.menuToggle) {
+                // Remove any existing listeners to prevent duplicates
+                this.menuToggle.onclick = null;
+                this.menuToggle.addEventListener('click', () => this.toggleSidebar());
+                console.log('🔧 NavigationManager: Connected menu toggle button (hamburger)');
+                connected = true;
+            }
+        }
+        
+        // Also try to connect by class name as fallback
+        if (!this.menuToggle) {
+            const menuToggleByClass = document.querySelector('.menu-toggle');
+            if (menuToggleByClass && menuToggleByClass.id !== 'menuToggle') {
+                menuToggleByClass.id = 'menuToggle';  // Assign ID for consistency
+                this.menuToggle = menuToggleByClass;
+                this.menuToggle.onclick = null;
+                this.menuToggle.addEventListener('click', () => this.toggleSidebar());
+                console.log('🔧 NavigationManager: Connected menu toggle by class (assigned ID)');
+                connected = true;
+            }
+        }
+        
+        console.log('🔍 NavigationManager: Toggle button status', {
+            sidebarToggle: !!this.sidebarToggle,
+            menuToggle: !!this.menuToggle,
+            sidebarExists: !!document.getElementById('sidebar'),
+            connected: connected
+        });
+        
+        return connected;
+    }
+
+    // Reset sidebar to default extended state
+    resetToExtendedState() {
+        if (!this.sidebar || !this.mainContent) return;
+        
+        this.sidebar.classList.remove('collapsed');
+        this.mainContent.classList.remove('collapsed-sidebar');
+        localStorage.setItem('sidebar-collapsed', 'false');
+        sessionStorage.removeItem('sidebar-user-collapsed');
+        console.log('🔧 NavigationManager: Reset to extended state and cleared all state markers');
+    }
+
     // Public API
     refresh() {
         this.setActivePage();
@@ -667,4 +775,90 @@ window.refreshUserProfile = function() {
     }
 };
 
+// Global function to manually toggle sidebar (useful for testing and debugging)
+window.toggleSidebar = function() {
+    console.log('🔄 Manually toggling sidebar...');
+    if (window.navigationManager && typeof window.navigationManager.toggleSidebar === 'function') {
+        window.navigationManager.toggleSidebar();
+        console.log('✅ Sidebar toggle triggered');
+    } else {
+        console.error('❌ NavigationManager not available for sidebar toggle');
+    }
+};
+
+// Global function to reset sidebar to default extended state
+window.resetSidebarToExtended = function() {
+    console.log('🔄 Resetting sidebar to extended state...');
+    if (window.navigationManager && typeof window.navigationManager.resetToExtendedState === 'function') {
+        window.navigationManager.resetToExtendedState();
+        console.log('✅ Sidebar reset to extended state');
+        // Reload page to apply changes
+        window.location.reload();
+    } else {
+        console.error('❌ NavigationManager not available for sidebar reset');
+    }
+};
+
 console.log('🧭 Navigation system loaded');
+
+// Additional global debugging functions
+window.debugToggleButtons = function() {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const mainContent = document.getElementById('mainContent');
+    
+    console.log('🔍 Debug Toggle Buttons:', {
+        sidebar: !!sidebar,
+        menuToggle: !!menuToggle,
+        sidebarToggle: !!sidebarToggle,
+        mainContent: !!mainContent,
+        navigationManager: !!window.navigationManager,
+        sidebarClasses: sidebar ? Array.from(sidebar.classList) : null,
+        menuToggleListeners: menuToggle ? 'check DevTools' : null
+    });
+    
+    if (menuToggle) {
+        console.log('🔧 Found menu toggle button, attempting manual click test...');
+        try {
+            menuToggle.click();
+            console.log('✅ Manual click successful');
+        } catch (error) {
+            console.error('❌ Manual click failed:', error);
+        }
+    }
+    
+    return {sidebar, menuToggle, sidebarToggle, mainContent};
+};
+
+window.forceConnectToggle = function() {
+    if (window.navigationManager && window.navigationManager.ensureToggleButtonConnected) {
+        const result = window.navigationManager.ensureToggleButtonConnected();
+        console.log('🔧 Force connect toggle result:', result);
+        return result;
+    }
+    return false;
+};
+
+window.forceSidebarExtended = function() {
+    console.log('🔧 FORCE SIDEBAR EXTENDED - Manual override');
+    
+    // Clear all storage
+    localStorage.removeItem('sidebar-collapsed');
+    localStorage.setItem('sidebar-collapsed', 'false');
+    sessionStorage.removeItem('sidebar-user-collapsed');
+    
+    // Force DOM elements
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    
+    if (sidebar && mainContent) {
+        sidebar.classList.remove('collapsed');
+        mainContent.classList.remove('collapsed-sidebar');
+        console.log('✅ Sidebar forced to extended state');
+        return true;
+    } else {
+        console.error('❌ Sidebar elements not found');
+        return false;
+    }
+};

@@ -391,21 +391,21 @@
         }
         
         .data-source-indicator.demo {
-            background-color: #fff7ed;
-            border-color: #fdba74;
-            color: #7c2d12;
+            background-color: var(--md-sys-color-tertiary-container);
+            border-color: var(--md-sys-color-tertiary);
+            color: var(--md-sys-color-on-tertiary-container);
         }
         
         .data-source-indicator.real {
-            background-color: #f0fdf4;
-            border-color: #86efac;
-            color: #166534;
+            background-color: var(--md-sys-color-secondary-container);
+            border-color: var(--md-sys-color-secondary);
+            color: var(--md-sys-color-on-secondary-container);
         }
         
         .data-source-indicator.failed {
-            background-color: #fef2f2;
-            border-color: #fca5a5;
-            color: #dc2626;
+            background-color: var(--md-sys-color-error-container);
+            border-color: var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error-container);
         }
         
         .data-source-indicator .indicator-content {
@@ -433,6 +433,10 @@
 </head>
 
 <body data-page="dashboard">
+    <!-- Aggressive sidebar fix - runs first -->
+    <script src="../aggressive-sidebar-fix.js"></script>
+    <!-- Immediate sidebar state fix -->
+    <script src="../immediate-sidebar-fix.js"></script>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
     
@@ -783,6 +787,7 @@
 
     <!-- Page-specific scripts -->
     <script src="../assets/js/navigation.js?v=20250906"></script>
+    <script src="../test-toggle-functionality.js"></script>
     
     <!-- Authentication check -->
     <script>

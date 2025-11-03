@@ -8,10 +8,10 @@
 :root {
     /* === WIZZ BRAND COLORS === */
     /* Primary Brand Colors */
-    --wizz-primary: #00C2E8;
-        --wizz-primary-light: #33CCEB;
-        --wizz-primary-dark: #009BB8;
-    --wizz-secondary: #625B71;
+    --wizz-primary: #FDC500;
+        --wizz-primary-light: #FDD633;
+        --wizz-primary-dark: #E6B100;
+        --wizz-secondary: #00296B;
     --wizz-tertiary: #7D5260;
     
     /* Accent Colors */
@@ -31,8 +31,8 @@
     /* Secondary Colors */
     --md-sys-color-secondary: var(--wizz-secondary);
     --md-sys-color-on-secondary: #ffffff;
-    --md-sys-color-secondary-container: #e8def8;
-    --md-sys-color-on-secondary-container: #1d192b;
+    --md-sys-color-secondary-container: #f0f7ff;
+        --md-sys-color-on-secondary-container: #001136;
     
     /* Tertiary Colors */
     --md-sys-color-tertiary: var(--wizz-tertiary);
@@ -594,7 +594,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
 }
 
 .user-info {
@@ -606,7 +606,7 @@ body {
     font-family: var(--md-sys-typescale-body-medium-font);
     font-size: var(--md-sys-typescale-body-medium-size);
     font-weight: var(--md-sys-typescale-body-medium-weight);
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
 }
 
 .user-role {
@@ -620,7 +620,7 @@ body {
     width: 100%;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
     padding: 12px;
     border-radius: var(--md-sys-shape-corner-small);
     cursor: pointer;
@@ -1029,8 +1029,8 @@ body {
     top: 0;
     width: 280px;
     height: 100vh;
-    background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary));
-    color: var(--md-sys-color-on-primary);
+    background: var(--md-sys-color-secondary);
+        color: var(--md-sys-color-on-secondary);
     display: flex;
     flex-direction: column;
     box-shadow: var(--md-sys-elevation-level1);
@@ -1054,13 +1054,13 @@ body {
     gap: 12px;
     font-size: var(--md-sys-typescale-title-large-font-size);
     font-weight: var(--md-sys-typescale-title-large-font-weight);
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
 }
 
 .sidebar-toggle {
     background: none;
     border: none;
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
     cursor: pointer;
     padding: 8px;
     border-radius: var(--md-sys-shape-corner-small);
@@ -1088,7 +1088,7 @@ body {
     gap: 12px;
     padding: 12px 16px;
     border-radius: var(--md-sys-shape-corner-large);
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
     text-decoration: none;
     transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
     font-size: var(--md-sys-typescale-label-large-font-size);
@@ -1099,12 +1099,12 @@ body {
 .md-navigation-item:hover {
     background: rgba(255, 255, 255, 0.1);
     text-decoration: none;
-    color: var(--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
 }
 
 .md-navigation-item.active {
     background: rgba(255, 255, 255, 0.2);
-    color: var (--md-sys-color-on-primary);
+    color: var(--md-sys-color-on-secondary);
 }
 
 .md-navigation-item__icon {
