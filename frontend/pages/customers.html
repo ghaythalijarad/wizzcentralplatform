@@ -532,10 +532,23 @@
         }
 
         .main-content {
-            margin-left: 0;
+            margin-left: 280px; /* Account for sidebar width */
             padding: 0;
             min-height: 100vh;
             background: var(--md-sys-color-surface);
+            transition: margin-left var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+        }
+
+        /* When sidebar is collapsed */
+        .main-content.collapsed-sidebar {
+            margin-left: 80px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0 !important;
+            }
         }
 
         .page-content {
