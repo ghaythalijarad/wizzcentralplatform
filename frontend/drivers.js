@@ -602,44 +602,130 @@ async function editDriver(driverId) {
     // Wait for cities to load
     await loadCitiesDropdown();
     
-    // Pre-populate the edit form with driver data (only fields that exist in DynamoDB)
+    // Populate read-only information section
+    document.getElementById('viewDriverId').textContent = driver.id || 'N/A';
+    document.getElementById('viewProfileCompleted').textContent = formatDateTime(driver.fullData?.profileCompletedAt) || 'N/A';
+    document.getElementById('viewLastUpdated').textContent = formatDateTime(driver.fullData?.updatedAt) || 'N/A';
+    
+    // Pre-populate the edit form with driver data
     document.getElementById('editDriverId').value = driver.id;
     document.getElementById('editDriverName').value = driver.name || '';
     
     // Set city after dropdown is loaded
     setTimeout(() => {
         const citySelect = document.getElementById('editDriverCity');
-        if (citySelect && driver.city) {
-            // Try to find exact match
-            let found = false;
-            for (let option of citySelect.options) {
-                if (option.value === driver.city || option.textContent.includes(driver.city)) {
-                    option.selected = true;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                console.warn(`City "${driver.city}" not found in dropdown, setting as-is`);
-                citySelect.value = driver.city;
+        if (citySelect && driver.location) {
+            const matchingOption = Array.from(citySelect.options).find(
+                option => option.value === driver.location
+            );
+            
+            if (matchingOption) {
+                matchingOption.selected = true;
+                console.log(`✅ Auto-selected city: ${driver.location}`);
+            } else {
+                console.warn(`⚠️ City "${driver.location}" not found in dropdown`);
             }
         }
-    }, 100);
+    }, 150);
     
     document.getElementById('editDriverLicense').value = driver.licenseNumber || '';
     document.getElementById('editDriverNationalId').value = driver.nationalId || '';
-    document.getElementById('editVehicleType').value = driver.vehicleType || '';
+    document.getElementById('editVehicleType').value = driver.fullData?.vehicleType || driver.vehicleType || '';
     
     // Map display status to DB status
-    let dbStatus = driver.status || 'PENDING_REVIEW';
-    if (driver.status === 'online' || driver.status === 'approved') {
-        dbStatus = 'APPROVED';
-    } else if (driver.status === 'offline' || driver.status === 'suspended') {
+    const fullStatus = driver.fullData?.status || driver.status;
+    let dbStatus = 'PENDING_REVIEW';
+    if (fullStatus === 'online' || fullStatus === 'approved' || fullStatus === 'APPROVED' || fullStatus === 'ACTIVE') {
+        dbStatus = 'ACTIVE';
+    } else if (fullStatus === 'offline' || fullStatus === 'suspended' || fullStatus === 'SUSPENDED') {
         dbStatus = 'SUSPENDED';
-    } else if (driver.status === 'pending') {
-        dbStatus = 'PENDING_REVIEW';
+    } else if (fullStatus === 'rejected' || fullStatus === 'REJECTED') {
+        dbStatus = 'REJECTED';
     }
     document.getElementById('editDriverStatus').value = dbStatus;
+    
+    // Display documents
+    displayDriverDocuments(driver);
+}
+
+function displayDriverDocuments(driver) {
+    // Driving License
+    const drivingLicenseLink = document.getElementById('drivingLicenseLink');
+    const drivingLicenseImage = document.getElementById('drivingLicenseImage');
+    const drivingLicenseNone = document.getElementById('drivingLicenseNone');
+    
+    const drivingLicenseUrl = driver.fullData?.drivingLicenseUrl || driver.documents?.drivingLicense;
+    
+    if (drivingLicenseUrl) {
+        drivingLicenseLink.href = drivingLicenseUrl;
+        drivingLicenseLink.style.display = 'inline-block';
+        drivingLicenseNone.style.display = 'none';
+        
+        // Show image preview if it's an image
+        if (drivingLicenseUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+            const img = drivingLicenseImage.querySelector('img');
+            img.src = drivingLicenseUrl;
+            img.onerror = function() {
+                drivingLicenseImage.style.display = 'none';
+            };
+            drivingLicenseImage.style.display = 'block';
+        } else {
+            drivingLicenseImage.style.display = 'none';
+        }
+    } else {
+        drivingLicenseLink.style.display = 'none';
+        drivingLicenseImage.style.display = 'none';
+        drivingLicenseNone.style.display = 'block';
+    }
+    
+    // Registration Paper
+    const registrationPaperLink = document.getElementById('registrationPaperLink');
+    const registrationPaperImage = document.getElementById('registrationPaperImage');
+    const registrationPaperNone = document.getElementById('registrationPaperNone');
+    
+    const registrationPaperUrl = driver.fullData?.registrationPaperUrl || driver.documents?.vehicleRegistration;
+    
+    if (registrationPaperUrl) {
+        registrationPaperLink.href = registrationPaperUrl;
+        registrationPaperLink.style.display = 'inline-block';
+        registrationPaperNone.style.display = 'none';
+        
+        // Show image preview if it's an image
+        if (registrationPaperUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+            const img = registrationPaperImage.querySelector('img');
+            img.src = registrationPaperUrl;
+            img.onerror = function() {
+                registrationPaperImage.style.display = 'none';
+            };
+            registrationPaperImage.style.display = 'block';
+        } else {
+            registrationPaperImage.style.display = 'none';
+        }
+    } else {
+        registrationPaperLink.style.display = 'none';
+        registrationPaperImage.style.display = 'none';
+        registrationPaperNone.style.display = 'block';
+    }
+}
+
+function formatDateTime(timestamp) {
+    if (!timestamp) return null;
+    try {
+        // Handle both ISO string and Unix timestamp
+        const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp * 1000);
+        if (isNaN(date.getTime())) return null;
+        
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        console.warn(`Could not parse datetime: ${timestamp}`);
+        return null;
+    }
 }
 
 async function loadCitiesDropdown() {
@@ -671,25 +757,38 @@ async function loadCitiesDropdown() {
         const regions = result.Items || [];
         console.log(`Found ${regions.length} regions`);
         
-        // Sort regions alphabetically by Arabic name
-        regions.sort((a, b) => {
-            const nameA = a.regionNameArabic || a.regionName || '';
-            const nameB = b.regionNameArabic || b.regionName || '';
-            return nameA.localeCompare(nameB, 'ar');
+        // Remove duplicates based on English name (some regions appear multiple times)
+        const uniqueRegions = [];
+        const seenNames = new Set();
+        regions.forEach(region => {
+            const englishName = region.regionName || '';
+            if (englishName && !seenNames.has(englishName)) {
+                seenNames.add(englishName);
+                uniqueRegions.push(region);
+            }
+        });
+        
+        console.log(`Found ${uniqueRegions.length} unique cities after deduplication`);
+        
+        // Sort regions alphabetically by English name (since drivers table uses English)
+        uniqueRegions.sort((a, b) => {
+            const nameA = a.regionName || '';
+            const nameB = b.regionName || '';
+            return nameA.localeCompare(nameB, 'en');
         });
         
         // Populate dropdown
         citySelect.innerHTML = '<option value="">Select City / Region</option>';
-        regions.forEach(region => {
+        uniqueRegions.forEach(region => {
             const option = document.createElement('option');
-            const arabicName = region.regionNameArabic || region.regionName;
-            const englishName = region.regionName || region.regionNameArabic;
-            option.value = arabicName; // Store Arabic name as value
-            option.textContent = `${arabicName} - ${englishName}`;
+            const englishName = region.regionName || '';
+            const arabicName = region.regionNameArabic || '';
+            option.value = englishName; // Store English name (matches driver data)
+            option.textContent = `${englishName}${arabicName ? ' - ' + arabicName : ''}`;
             citySelect.appendChild(option);
         });
         
-        console.log(`✅ Loaded ${regions.length} cities into dropdown`);
+        console.log(`✅ Loaded ${uniqueRegions.length} cities into dropdown`);
         
     } catch (error) {
         console.error('Error loading cities:', error);
@@ -701,28 +800,27 @@ async function loadCitiesDropdown() {
 }
 
 function populateFallbackCities(selectElement) {
-    // Fallback cities in case DynamoDB fails
+    // Fallback cities in case DynamoDB fails (English names to match driver data)
     const fallbackCities = [
-        'بغداد - Baghdad',
-        'البصرة - Basra',
-        'أربيل - Erbil',
-        'النجف - Najaf',
-        'كركوك - Kirkuk',
-        'الموصل - Mosul',
-        'السليمانية - Sulaymaniyah',
-        'كربلاء - Karbala',
-        'الديوانية - Diwaniyah',
-        'العمارة - Amarah',
-        'الناصرية - Nasiriyah',
-        'الحلة - Hillah'
+        { english: 'Baghdad', arabic: 'بغداد' },
+        { english: 'Basra', arabic: 'البصرة' },
+        { english: 'Erbil', arabic: 'أربيل' },
+        { english: 'Najaf', arabic: 'النجف' },
+        { english: 'Kirkuk', arabic: 'كركوك' },
+        { english: 'Mosul', arabic: 'الموصل' },
+        { english: 'Sulaymaniyah', arabic: 'السليمانية' },
+        { english: 'Karbala', arabic: 'كربلاء' },
+        { english: 'Diwaniyah', arabic: 'الديوانية' },
+        { english: 'Amarah', arabic: 'العمارة' },
+        { english: 'Nasiriyah', arabic: 'الناصرية' },
+        { english: 'Hillah', arabic: 'الحلة' }
     ];
     
     selectElement.innerHTML = '<option value="">Select City / Region</option>';
     fallbackCities.forEach(city => {
         const option = document.createElement('option');
-        const arabicName = city.split(' - ')[0];
-        option.value = arabicName;
-        option.textContent = city;
+        option.value = city.english; // Store English name
+        option.textContent = `${city.english} - ${city.arabic}`;
         selectElement.appendChild(option);
     });
 }

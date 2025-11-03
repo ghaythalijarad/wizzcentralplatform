@@ -594,7 +594,7 @@
 
     <!-- Edit Driver Modal -->
     <div class="modal" id="editDriverModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h2>Edit Driver</h2>
                 <button class="modal-close" onclick="closeEditDriverModal()">
@@ -602,8 +602,35 @@
                 </button>
             </div>
             <div class="modal-body">
+                <!-- Read-Only Driver Information Section -->
+                <div class="driver-info-section" style="background: var(--md-sys-color-surface-container-highest); padding: 16px; border-radius: var(--md-sys-shape-corner-medium); margin-bottom: 24px;">
+                    <h3 style="font: var(--md-sys-typescale-title-small-font); color: var(--md-sys-color-on-surface); margin: 0 0 12px 0;">
+                        <i class="fas fa-info-circle"></i> Driver Information
+                    </h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font: var(--md-sys-typescale-body-small-font);">
+                        <div>
+                            <strong style="color: var(--md-sys-color-on-surface-variant);">Driver ID:</strong>
+                            <span id="viewDriverId" style="color: var(--md-sys-color-on-surface); font-family: monospace; font-size: 11px;"></span>
+                        </div>
+                        <div>
+                            <strong style="color: var(--md-sys-color-on-surface-variant);">Profile Completed:</strong>
+                            <span id="viewProfileCompleted" style="color: var(--md-sys-color-on-surface);"></span>
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <strong style="color: var(--md-sys-color-on-surface-variant);">Last Updated:</strong>
+                            <span id="viewLastUpdated" style="color: var(--md-sys-color-on-surface);"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Editable Form -->
                 <form id="editDriverForm">
                     <input type="hidden" id="editDriverId" name="driverId">
+                    
+                    <!-- Basic Information -->
+                    <h3 style="font: var(--md-sys-typescale-title-small-font); color: var(--md-sys-color-on-surface); margin: 0 0 16px 0;">
+                        <i class="fas fa-user"></i> Basic Information
+                    </h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="editDriverName">Full Name</label>
@@ -626,24 +653,60 @@
                             <input type="text" id="editDriverNationalId" name="nationalId" required>
                         </div>
                     </div>
+
+                    <!-- Vehicle & Status -->
+                    <h3 style="font: var(--md-sys-typescale-title-small-font); color: var(--md-sys-color-on-surface); margin: 24px 0 16px 0;">
+                        <i class="fas fa-car"></i> Vehicle & Status
+                    </h3>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="editVehicleType">Vehicle Type</label>
                             <select id="editVehicleType" name="vehicleType" required>
                                 <option value="">Select vehicle type</option>
-                                <option value="دراجة نارية">دراجة نارية (Motorcycle)</option>
-                                <option value="سيارة">سيارة (Car)</option>
-                                <option value="دراجة هوائية">دراجة هوائية (Bicycle)</option>
+                                <option value="motorcycle">Motorcycle (دراجة نارية)</option>
+                                <option value="car">Car (سيارة)</option>
+                                <option value="bicycle">Bicycle (دراجة هوائية)</option>
                             </select>
                         </div>
                         <div class="form-group">
                             <label for="editDriverStatus">Status</label>
                             <select id="editDriverStatus" name="status" required>
                                 <option value="PENDING_REVIEW">Pending Review</option>
-                                <option value="APPROVED">Approved/Active</option>
+                                <option value="ACTIVE">Active/Approved</option>
                                 <option value="SUSPENDED">Suspended</option>
                                 <option value="REJECTED">Rejected</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Documents Section -->
+                    <h3 style="font: var(--md-sys-typescale-title-small-font); color: var(--md-sys-color-on-surface); margin: 24px 0 16px 0;">
+                        <i class="fas fa-file-alt"></i> Documents
+                    </h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Driving License</label>
+                            <div id="drivingLicensePreview" style="margin-top: 8px;">
+                                <a id="drivingLicenseLink" href="#" target="_blank" style="display: none; color: var(--md-sys-color-primary); text-decoration: none;">
+                                    <i class="fas fa-external-link-alt"></i> View Document
+                                </a>
+                                <div id="drivingLicenseImage" style="display: none; margin-top: 8px; max-width: 100%; border-radius: var(--md-sys-shape-corner-medium); overflow: hidden;">
+                                    <img src="" alt="Driving License" style="max-width: 100%; height: auto; display: block;">
+                                </div>
+                                <span id="drivingLicenseNone" style="color: var(--md-sys-color-on-surface-variant); font-size: 14px;">No document uploaded</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Registration Paper</label>
+                            <div id="registrationPaperPreview" style="margin-top: 8px;">
+                                <a id="registrationPaperLink" href="#" target="_blank" style="display: none; color: var(--md-sys-color-primary); text-decoration: none;">
+                                    <i class="fas fa-external-link-alt"></i> View Document
+                                </a>
+                                <div id="registrationPaperImage" style="display: none; margin-top: 8px; max-width: 100%; border-radius: var(--md-sys-shape-corner-medium); overflow: hidden;">
+                                    <img src="" alt="Registration Paper" style="max-width: 100%; height: auto; display: block;">
+                                </div>
+                                <span id="registrationPaperNone" style="color: var(--md-sys-color-on-surface-variant); font-size: 14px;">No document uploaded</span>
+                            </div>
                         </div>
                     </div>
                 </form>
