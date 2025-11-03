@@ -583,77 +583,108 @@ function formatDate(dateString) {
 
 // Customer action functions
 function viewCustomer(customerId) {
-    console.log('👁️ View customer:', customerId);
+    console.log('👁️ View customer called with ID:', customerId);
+    console.log('📊 Total customers in array:', customers.length);
+    
     const customer = customers.find(c => c.id === customerId);
+    
     if (!customer) {
+        console.error('❌ Customer not found! ID:', customerId);
+        console.log('Available customer IDs:', customers.map(c => c.id));
         showMessage('Customer not found', 'error');
         return;
     }
     
-    // Store current customer ID for quick edit access
-    window.currentViewCustomerId = customerId;
+    console.log('✅ Customer found:', customer);
     
-    // Populate customer header (using correct IDs from HTML)
-    document.getElementById('viewCustomerFullName').textContent = customer.name || 'Unknown Customer';
-    document.getElementById('viewCustomerEmail').textContent = customer.email || 'N/A';
-    
-    // Populate status badge with proper styling
-    const statusBadge = document.getElementById('viewCustomerStatusBadge');
-    const isActive = customer.status === 'active' || customer.isActive === true || customer.isActive === 'true';
-    
-    if (isActive) {
-        statusBadge.textContent = 'Active';
-        statusBadge.className = 'active';
-    } else {
-        statusBadge.textContent = 'Inactive';
-        statusBadge.className = 'inactive';
-    }
-    
-    // Populate Personal Information (matching HTML IDs)
-    document.getElementById('viewFullName').textContent = customer.name || 'N/A';
-    document.getElementById('viewEmail').textContent = customer.email || 'N/A';
-    document.getElementById('viewPhone').textContent = customer.phone || customer.countryCode || 'N/A';
-    
-    // Format gender properly
-    let genderText = 'N/A';
-    if (customer.gender) {
-        const genderMap = {
-            'male': 'Male',
-            'female': 'Female',
-            'other': 'Other',
-            'prefer-not-to-say': 'Prefer not to say'
+    try {
+        // Store current customer ID for quick edit access
+        window.currentViewCustomerId = customerId;
+        
+        // Check if modal exists
+        const modal = document.getElementById('viewCustomerModal');
+        if (!modal) {
+            console.error('❌ viewCustomerModal not found in DOM!');
+            showMessage('View modal not found. Please refresh the page.', 'error');
+            return;
+        }
+        
+        // Populate customer header
+        const headerNameEl = document.getElementById('viewCustomerFullName');
+        const headerEmailEl = document.getElementById('viewCustomerEmail');
+        
+        if (headerNameEl) headerNameEl.textContent = customer.name || 'Unknown Customer';
+        if (headerEmailEl) headerEmailEl.textContent = customer.email || 'N/A';
+        
+        // Populate status badge
+        const statusBadge = document.getElementById('viewCustomerStatusBadge');
+        if (statusBadge) {
+            const isActive = customer.status === 'active' || customer.isActive === true || customer.isActive === 'true';
+            statusBadge.textContent = isActive ? 'Active' : 'Inactive';
+            statusBadge.className = isActive ? 'active' : 'inactive';
+        }
+        
+        // Helper function to safely set text content
+        const setTextContent = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+            else console.warn(`⚠️ Element not found: ${id}`);
         };
-        genderText = genderMap[customer.gender.toLowerCase()] || customer.gender.charAt(0).toUpperCase() + customer.gender.slice(1);
+        
+        // Populate Personal Information
+        setTextContent('viewFullName', customer.name || 'N/A');
+        setTextContent('viewEmail', customer.email || 'N/A');
+        setTextContent('viewPhone', customer.phone || customer.countryCode || 'N/A');
+        
+        // Format gender
+        let genderText = 'N/A';
+        if (customer.gender) {
+            const genderMap = {
+                'male': 'Male',
+                'female': 'Female',
+                'other': 'Other',
+                'prefer-not-to-say': 'Prefer not to say'
+            };
+            genderText = genderMap[customer.gender.toLowerCase()] || customer.gender.charAt(0).toUpperCase() + customer.gender.slice(1);
+        }
+        setTextContent('viewGender', genderText);
+        
+        // Populate Account Details
+        setTextContent('viewSegment', customer.segment ? customer.segment.toUpperCase() : customer.customer_segment ? customer.customer_segment.toUpperCase() : 'REGULAR');
+        
+        // Populate tier
+        const tierElement = document.getElementById('viewTier');
+        if (tierElement) {
+            if (customer.vipStatus || customer.tier === 'vip') {
+                tierElement.innerHTML = '<span style="background: rgba(255, 215, 0, 0.2); color: #b8860b; padding: 4px 12px; border-radius: 12px; font-weight: 600;">⭐ VIP</span>';
+            } else {
+                tierElement.textContent = customer.tierLevel || customer.tier || 'Regular';
+            }
+        }
+        
+        setTextContent('viewLanguage', getLanguageName(customer.preferredLanguage));
+        setTextContent('viewMarketing', customer.marketingConsent || customer.marketing_consent ? '✓ Yes' : '✗ No');
+        
+        // Populate Order & Points Statistics
+        setTextContent('viewTotalOrders', customer.totalOrders || customer.total_orders || 0);
+        setTextContent('viewTotalSpent', `${(customer.totalSpent || customer.total_spent || 0).toLocaleString()} IQD`);
+        setTextContent('viewLoyaltyPoints', (customer.points || customer.loyalty_points || 0).toLocaleString());
+        setTextContent('viewLastOrderDate', customer.lastOrder || customer.last_order_date || 'Never');
+        
+        // Populate System Information
+        setTextContent('viewSysCustomerId', customer.id || customer.userId || 'N/A');
+        setTextContent('viewJoinedDate', customer.joinDate || formatDateTime(customer.createdAt) || 'N/A');
+        setTextContent('viewUpdatedDate', formatDateTime(customer.updatedAt) || 'N/A');
+        
+        console.log('✅ All fields populated, opening modal...');
+        
+        // Open the view modal
+        openViewCustomerModal();
+        
+    } catch (error) {
+        console.error('❌ Error in viewCustomer:', error);
+        showMessage('Error displaying customer details: ' + error.message, 'error');
     }
-    document.getElementById('viewGender').textContent = genderText;
-    
-    // Populate Account Details (matching HTML IDs)
-    document.getElementById('viewSegment').textContent = customer.segment ? customer.segment.toUpperCase() : customer.customer_segment ? customer.customer_segment.toUpperCase() : 'REGULAR';
-    
-    // Populate tier with proper styling
-    const tierElement = document.getElementById('viewTier');
-    if (customer.vipStatus || customer.tier === 'vip') {
-        tierElement.innerHTML = '<span style="background: rgba(255, 215, 0, 0.2); color: #b8860b; padding: 4px 12px; border-radius: 12px; font-weight: 600;">⭐ VIP</span>';
-    } else {
-        tierElement.textContent = customer.tierLevel || customer.tier || 'Regular';
-    }
-    
-    document.getElementById('viewLanguage').textContent = getLanguageName(customer.preferredLanguage);
-    document.getElementById('viewMarketing').textContent = customer.marketingConsent || customer.marketing_consent ? '✓ Yes' : '✗ No';
-    
-    // Populate Order & Points Statistics (matching HTML IDs)
-    document.getElementById('viewTotalOrders').textContent = customer.totalOrders || customer.total_orders || 0;
-    document.getElementById('viewTotalSpent').textContent = `${(customer.totalSpent || customer.total_spent || 0).toLocaleString()} IQD`;
-    document.getElementById('viewLoyaltyPoints').textContent = (customer.points || customer.loyalty_points || 0).toLocaleString();
-    document.getElementById('viewLastOrderDate').textContent = customer.lastOrder || customer.last_order_date || 'Never';
-    
-    // Populate System Information (matching HTML IDs)
-    document.getElementById('viewSysCustomerId').textContent = customer.id || customer.userId || 'N/A';
-    document.getElementById('viewJoinedDate').textContent = customer.joinDate || formatDateTime(customer.createdAt) || 'N/A';
-    document.getElementById('viewUpdatedDate').textContent = formatDateTime(customer.updatedAt) || 'N/A';
-    
-    // Open the view modal
-    openViewCustomerModal();
 }
 
 function getLanguageName(code) {
