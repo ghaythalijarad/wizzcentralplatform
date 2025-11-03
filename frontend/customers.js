@@ -590,11 +590,178 @@ function viewCustomer(customerId) {
     }
 }
 
-function editCustomer(customerId) {
+async function editCustomer(customerId) {
     console.log('✏️ Edit customer:', customerId);
     const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-        alert(`Edit customer functionality would open here for: ${customer.name}`);
+    if (!customer) {
+        showMessage('Customer not found', 'error');
+        return;
+    }
+    
+    // Open the edit modal
+    openEditCustomerModal();
+    
+    // Populate read-only information
+    document.getElementById('viewCustomerId').textContent = customer.id || 'N/A';
+    document.getElementById('viewJoinDate').textContent = customer.joinDate || 'N/A';
+    document.getElementById('viewLastUpdated').textContent = customer.updatedAt 
+        ? formatDateTime(customer.updatedAt) 
+        : 'N/A';
+    
+    // Pre-populate the edit form with customer data
+    document.getElementById('editCustomerId').value = customer.id;
+    document.getElementById('editCustomerName').value = customer.name || '';
+    document.getElementById('editCustomerEmail').value = customer.email || '';
+    document.getElementById('editCustomerPhone').value = customer.phone || customer.countryCode || '';
+    document.getElementById('editCustomerGender').value = customer.gender || '';
+    document.getElementById('editCustomerBirthDate').value = customer.birthDate || '';
+    document.getElementById('editCustomerLanguage').value = customer.preferredLanguage || 'en';
+    document.getElementById('editCustomerStatus').value = customer.isActive ? 'true' : 'false';
+    document.getElementById('editMarketingConsent').checked = customer.marketingConsent || false;
+    document.getElementById('editNewsletterSubscription').checked = customer.newsletterSubscription || false;
+}
+
+function formatDateTime(timestamp) {
+    if (!timestamp) return 'N/A';
+    try {
+        let date;
+        if (typeof timestamp === 'number') {
+            date = new Date(timestamp * 1000); // Unix timestamp
+        } else {
+            date = new Date(timestamp); // ISO string
+        }
+        
+        if (isNaN(date.getTime())) return 'Invalid Date';
+        
+        return date.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        console.error('Error formatting date:', e);
+        return 'N/A';
+    }
+}
+
+function openEditCustomerModal() {
+    const modal = document.getElementById('editCustomerModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeEditCustomerModal() {
+    const modal = document.getElementById('editCustomerModal');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('editCustomerForm').reset();
+    }
+}
+
+async function handleEditCustomer(e) {
+    e.preventDefault();
+    
+    const submitButton = e.target.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    try {
+        // Show loading state
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        
+        // Get form data
+        const customerId = document.getElementById('editCustomerId').value;
+        const name = document.getElementById('editCustomerName').value;
+        const email = document.getElementById('editCustomerEmail').value;
+        const phone = document.getElementById('editCustomerPhone').value;
+        const gender = document.getElementById('editCustomerGender').value;
+        const birthDate = document.getElementById('editCustomerBirthDate').value;
+        const preferredLanguage = document.getElementById('editCustomerLanguage').value;
+        const isActive = document.getElementById('editCustomerStatus').value === 'true';
+        const marketingConsent = document.getElementById('editMarketingConsent').checked;
+        const newsletterSubscription = document.getElementById('editNewsletterSubscription').checked;
+        
+        console.log('💾 Saving customer:', { customerId, name, email, phone });
+        
+        // Get DynamoDB client
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
+        if (!dynamoDB) {
+            throw new Error('Failed to initialize DynamoDB client');
+        }
+        
+        // Build update expression
+        const updateExpression = 'SET #name = :name, #email = :email, #countryCode = :phone, #gender = :gender, #birthDate = :birthDate, #preferredLanguage = :preferredLanguage, #isActive = :isActive, #marketingConsent = :marketingConsent, #newsletterSubscription = :newsletterSubscription, #updatedAt = :timestamp';
+        
+        const expressionAttributeNames = {
+            '#name': 'name',
+            '#email': 'email',
+            '#countryCode': 'countryCode',
+            '#gender': 'gender',
+            '#birthDate': 'birth_date',
+            '#preferredLanguage': 'preferredLanguage',
+            '#isActive': 'isActive',
+            '#marketingConsent': 'marketingConsent',
+            '#newsletterSubscription': 'newsletter_subscription',
+            '#updatedAt': 'updatedAt'
+        };
+        
+        const expressionAttributeValues = {
+            ':name': name,
+            ':email': email,
+            ':phone': phone,
+            ':gender': gender || null,
+            ':birthDate': birthDate || null,
+            ':preferredLanguage': preferredLanguage,
+            ':isActive': isActive,
+            ':marketingConsent': marketingConsent,
+            ':newsletterSubscription': newsletterSubscription,
+            ':timestamp': new Date().toISOString()
+        };
+        
+        // Update customer in DynamoDB
+        const params = {
+            TableName: 'WizzUser_users_dev',
+            Key: { userId: customerId },
+            UpdateExpression: updateExpression,
+            ExpressionAttributeNames: expressionAttributeNames,
+            ExpressionAttributeValues: expressionAttributeValues,
+            ReturnValues: 'ALL_NEW'
+        };
+        
+        console.log('Updating customer in DynamoDB:', params);
+        const result = await dynamoDB.update(params).promise();
+        console.log('✅ Customer updated successfully:', result);
+        
+        // Reload customer data
+        await loadCustomersData();
+        await loadOrderDataForCustomers();
+        renderCustomersTable();
+        updateStatCards();
+        
+        // Close modal and show success message
+        closeEditCustomerModal();
+        showMessage('Customer updated successfully!', 'success');
+        
+    } catch (error) {
+        console.error('❌ Error updating customer:', error);
+        
+        let errorMessage = 'Failed to update customer';
+        if (error.code === 'ValidationException') {
+            errorMessage = 'Invalid data provided';
+        } else if (error.code === 'AccessDeniedException') {
+            errorMessage = 'Permission denied. Check IAM role permissions.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        showMessage(errorMessage, 'error');
+    } finally {
+        // Restore button state
+        submitButton.disabled = false;
+        submitButton.innerHTML = originalText;
     }
 }
 
@@ -615,6 +782,8 @@ window.viewCustomer = viewCustomer;
 window.editCustomer = editCustomer;
 window.toggleCustomerStatus = toggleCustomerStatus;
 window.refreshCustomerData = refreshCustomerData;
+window.openEditCustomerModal = openEditCustomerModal;
+window.closeEditCustomerModal = closeEditCustomerModal;
 // Added global exposure for initialization & data loading
 window.initializeCustomersPage = initializeCustomersPage;
 window.loadCustomersData = loadCustomersData;
@@ -986,5 +1155,20 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('❌ Failed to initialize customers page:', error);
         });
     }, 100);
+    
+    // Setup edit customer form submit handler
+    const editCustomerForm = document.getElementById('editCustomerForm');
+    if (editCustomerForm) {
+        editCustomerForm.addEventListener('submit', handleEditCustomer);
+        console.log('✅ Edit customer form handler attached');
+    }
+});
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    const editModal = document.getElementById('editCustomerModal');
+    if (e.target === editModal) {
+        closeEditCustomerModal();
+    }
 });
 
