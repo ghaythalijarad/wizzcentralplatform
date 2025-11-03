@@ -610,18 +610,18 @@
                             <input type="text" id="editDriverName" name="name" required>
                         </div>
                         <div class="form-group">
-                            <label for="editDriverEmail">Email</label>
-                            <input type="email" id="editDriverEmail" name="email" required>
+                            <label for="editDriverCity">City</label>
+                            <input type="text" id="editDriverCity" name="city" placeholder="e.g., Baghdad, Basra" required>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="editDriverPhone">Phone Number</label>
-                            <input type="tel" id="editDriverPhone" name="phone" required>
+                            <label for="editDriverLicense">License Number</label>
+                            <input type="text" id="editDriverLicense" name="licenseNumber" required>
                         </div>
                         <div class="form-group">
-                            <label for="editDriverLicense">License Number</label>
-                            <input type="text" id="editDriverLicense" name="license" required>
+                            <label for="editDriverNationalId">National ID</label>
+                            <input type="text" id="editDriverNationalId" name="nationalId" required>
                         </div>
                     </div>
                     <div class="form-row">
@@ -629,28 +629,18 @@
                             <label for="editVehicleType">Vehicle Type</label>
                             <select id="editVehicleType" name="vehicleType" required>
                                 <option value="">Select vehicle type</option>
-                                <option value="motorcycle">Motorcycle</option>
-                                <option value="bicycle">Bicycle</option>
-                                <option value="car">Car</option>
-                                <option value="scooter">Scooter</option>
+                                <option value="دراجة نارية">دراجة نارية (Motorcycle)</option>
+                                <option value="سيارة">سيارة (Car)</option>
+                                <option value="دراجة هوائية">دراجة هوائية (Bicycle)</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="editEmergencyContact">Emergency Contact</label>
-                            <input type="tel" id="editEmergencyContact" name="emergencyContact" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="editDriverLocation">Location</label>
-                            <input type="text" id="editDriverLocation" name="location" placeholder="City, Area">
-                        </div>
-                        <div class="form-group">
                             <label for="editDriverStatus">Status</label>
-                            <select id="editDriverStatus" name="status">
-                                <option value="pending">Pending Review</option>
-                                <option value="online">Active/Approved</option>
-                                <option value="offline">Suspended</option>
+                            <select id="editDriverStatus" name="status" required>
+                                <option value="PENDING_REVIEW">Pending Review</option>
+                                <option value="APPROVED">Approved/Active</option>
+                                <option value="SUSPENDED">Suspended</option>
+                                <option value="REJECTED">Rejected</option>
                             </select>
                         </div>
                     </div>

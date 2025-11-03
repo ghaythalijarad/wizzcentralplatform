@@ -596,16 +596,24 @@ function editDriver(driverId) {
         return;
     }
     
-    // Pre-populate the edit form with driver data
+    // Pre-populate the edit form with driver data (only fields that exist in DynamoDB)
     document.getElementById('editDriverId').value = driver.id;
     document.getElementById('editDriverName').value = driver.name || '';
-    document.getElementById('editDriverEmail').value = driver.email || '';
-    document.getElementById('editDriverPhone').value = driver.rawPhone || driver.phone || '';
-    document.getElementById('editDriverLicense').value = driver.licenseNumber || driver.license || '';
-    document.getElementById('editVehicleType').value = driver.vehicleType || 'motorcycle';
-    document.getElementById('editEmergencyContact').value = driver.emergencyContact || '';
-    document.getElementById('editDriverLocation').value = driver.location || '';
-    document.getElementById('editDriverStatus').value = driver.status || 'pending';
+    document.getElementById('editDriverCity').value = driver.city || '';
+    document.getElementById('editDriverLicense').value = driver.licenseNumber || '';
+    document.getElementById('editDriverNationalId').value = driver.nationalId || '';
+    document.getElementById('editVehicleType').value = driver.vehicleType || '';
+    
+    // Map display status to DB status
+    let dbStatus = driver.status || 'PENDING_REVIEW';
+    if (driver.status === 'online' || driver.status === 'approved') {
+        dbStatus = 'APPROVED';
+    } else if (driver.status === 'offline' || driver.status === 'suspended') {
+        dbStatus = 'SUSPENDED';
+    } else if (driver.status === 'pending') {
+        dbStatus = 'PENDING_REVIEW';
+    }
+    document.getElementById('editDriverStatus').value = dbStatus;
     
     // Open the edit modal
     openEditDriverModal();
@@ -638,19 +646,18 @@ async function handleEditDriver(e) {
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
         }
         
-        // Get form data
+        // Get form data (only fields that exist in DynamoDB)
         const formData = new FormData(e.target);
         const driverId = formData.get('driverId');
         const name = formData.get('name');
-        const email = formData.get('email');
-        const rawPhone = formData.get('phone');
-        const license = formData.get('license');
+        const city = formData.get('city');
+        const licenseNumber = formData.get('licenseNumber');
+        const nationalId = formData.get('nationalId');
         const vehicleType = formData.get('vehicleType');
-        const emergencyContact = formData.get('emergencyContact');
-        const location = formData.get('location');
         const status = formData.get('status');
         
         console.log(`📝 Updating driver ${driverId}...`);
+        console.log('Form data:', { name, city, licenseNumber, nationalId, vehicleType, status });
         
         // Get DynamoDB client
         const dynamoDB = await AWSUtils.getDynamoDBClient();
@@ -658,34 +665,26 @@ async function handleEditDriver(e) {
             throw new Error('AWS is not initialized. Please login again.');
         }
         
-        // Map status to DB format
-        const dbStatus = status === 'online' ? 'APPROVED' : status === 'offline' ? 'SUSPENDED' : 'PENDING_REVIEW';
-        
-        // Prepare update expression
-        const updateExpression = 'SET #name = :name, #email = :email, #phone = :phone, #license = :license, #vehicleType = :vehicleType, #emergencyContact = :emergencyContact, #location = :location, #status = :status, #regStatus = :status, #updatedAt = :timestamp';
+        // Prepare update expression (only for fields that exist in table)
+        const updateExpression = 'SET #name = :name, #city = :city, #license = :license, #nationalId = :nationalId, #vehicleType = :vehicleType, #status = :status, #updatedAt = :timestamp';
         
         const expressionAttributeNames = {
             '#name': 'name',
-            '#email': 'email',
-            '#phone': 'phone',
+            '#city': 'city',
             '#license': 'licenseNumber',
+            '#nationalId': 'nationalId',
             '#vehicleType': 'vehicleType',
-            '#emergencyContact': 'emergencyContact',
-            '#location': 'location',
             '#status': 'status',
-            '#regStatus': 'registrationStatus',
             '#updatedAt': 'updatedAt'
         };
         
         const expressionAttributeValues = {
             ':name': name,
-            ':email': email,
-            ':phone': formatPhoneNumber(rawPhone),
-            ':license': license,
+            ':city': city,
+            ':license': licenseNumber,
+            ':nationalId': nationalId,
             ':vehicleType': vehicleType,
-            ':emergencyContact': emergencyContact,
-            ':location': location || 'Location not specified',
-            ':status': dbStatus,
+            ':status': status, // Already in DB format (APPROVED, PENDING_REVIEW, SUSPENDED)
             ':timestamp': Math.floor(Date.now() / 1000)
         };
         
