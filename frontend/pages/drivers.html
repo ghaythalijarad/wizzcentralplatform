@@ -592,6 +592,79 @@
         </div>
     </div>
 
+    <!-- Edit Driver Modal -->
+    <div class="modal" id="editDriverModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Driver</h2>
+                <button class="modal-close" onclick="closeEditDriverModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editDriverForm">
+                    <input type="hidden" id="editDriverId" name="driverId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editDriverName">Full Name</label>
+                            <input type="text" id="editDriverName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editDriverEmail">Email</label>
+                            <input type="email" id="editDriverEmail" name="email" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editDriverPhone">Phone Number</label>
+                            <input type="tel" id="editDriverPhone" name="phone" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editDriverLicense">License Number</label>
+                            <input type="text" id="editDriverLicense" name="license" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editVehicleType">Vehicle Type</label>
+                            <select id="editVehicleType" name="vehicleType" required>
+                                <option value="">Select vehicle type</option>
+                                <option value="motorcycle">Motorcycle</option>
+                                <option value="bicycle">Bicycle</option>
+                                <option value="car">Car</option>
+                                <option value="scooter">Scooter</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editEmergencyContact">Emergency Contact</label>
+                            <input type="tel" id="editEmergencyContact" name="emergencyContact" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editDriverLocation">Location</label>
+                            <input type="text" id="editDriverLocation" name="location" placeholder="City, Area">
+                        </div>
+                        <div class="form-group">
+                            <label for="editDriverStatus">Status</label>
+                            <select id="editDriverStatus" name="status">
+                                <option value="pending">Pending Review</option>
+                                <option value="online">Active/Approved</option>
+                                <option value="offline">Suspended</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeEditDriverModal()">Cancel</button>
+                <button type="submit" form="editDriverForm" class="btn-primary">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- AWS SDK and Cognito SDK -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1471.0.min.js"></script>
     <script src="https://unpkg.com/amazon-cognito-identity-js@6.3.12/dist/amazon-cognito-identity.min.js"></script>

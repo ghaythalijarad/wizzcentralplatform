@@ -344,6 +344,12 @@ function setupEventListeners() {
     if (addDriverForm) {
         addDriverForm.addEventListener('submit', handleAddDriver);
     }
+    
+    // Edit driver form
+    const editDriverForm = document.getElementById('editDriverForm');
+    if (editDriverForm) {
+        editDriverForm.addEventListener('submit', handleEditDriver);
+    }
 }
 
 function renderDriversTable(driversList = drivers) {
@@ -585,8 +591,175 @@ function viewDriver(driverId) {
 
 function editDriver(driverId) {
     const driver = drivers.find(d => d.id === driverId);
-    if (driver) {
-        notify(`Edit dialog for ${driver.name} would open here.`, 'info');
+    if (!driver) {
+        notify('Driver not found', 'error');
+        return;
+    }
+    
+    // Pre-populate the edit form with driver data
+    document.getElementById('editDriverId').value = driver.id;
+    document.getElementById('editDriverName').value = driver.name || '';
+    document.getElementById('editDriverEmail').value = driver.email || '';
+    document.getElementById('editDriverPhone').value = driver.rawPhone || driver.phone || '';
+    document.getElementById('editDriverLicense').value = driver.licenseNumber || driver.license || '';
+    document.getElementById('editVehicleType').value = driver.vehicleType || 'motorcycle';
+    document.getElementById('editEmergencyContact').value = driver.emergencyContact || '';
+    document.getElementById('editDriverLocation').value = driver.location || '';
+    document.getElementById('editDriverStatus').value = driver.status || 'pending';
+    
+    // Open the edit modal
+    openEditDriverModal();
+}
+
+function openEditDriverModal() {
+    const modal = document.getElementById('editDriverModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeEditDriverModal() {
+    const modal = document.getElementById('editDriverModal');
+    if (modal) {
+        modal.style.display = 'none';
+        // Reset form
+        document.getElementById('editDriverForm').reset();
+    }
+}
+
+async function handleEditDriver(e) {
+    e.preventDefault();
+    
+    try {
+        const submitBtn = document.querySelector('#editDriverModal .btn-primary');
+        const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        }
+        
+        // Get form data
+        const formData = new FormData(e.target);
+        const driverId = formData.get('driverId');
+        const name = formData.get('name');
+        const email = formData.get('email');
+        const rawPhone = formData.get('phone');
+        const license = formData.get('license');
+        const vehicleType = formData.get('vehicleType');
+        const emergencyContact = formData.get('emergencyContact');
+        const location = formData.get('location');
+        const status = formData.get('status');
+        
+        console.log(`📝 Updating driver ${driverId}...`);
+        
+        // Get DynamoDB client
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
+        if (!dynamoDB) {
+            throw new Error('AWS is not initialized. Please login again.');
+        }
+        
+        // Map status to DB format
+        const dbStatus = status === 'online' ? 'APPROVED' : status === 'offline' ? 'SUSPENDED' : 'PENDING_REVIEW';
+        
+        // Prepare update expression
+        const updateExpression = 'SET #name = :name, #email = :email, #phone = :phone, #license = :license, #vehicleType = :vehicleType, #emergencyContact = :emergencyContact, #location = :location, #status = :status, #regStatus = :status, #updatedAt = :timestamp';
+        
+        const expressionAttributeNames = {
+            '#name': 'name',
+            '#email': 'email',
+            '#phone': 'phone',
+            '#license': 'licenseNumber',
+            '#vehicleType': 'vehicleType',
+            '#emergencyContact': 'emergencyContact',
+            '#location': 'location',
+            '#status': 'status',
+            '#regStatus': 'registrationStatus',
+            '#updatedAt': 'updatedAt'
+        };
+        
+        const expressionAttributeValues = {
+            ':name': name,
+            ':email': email,
+            ':phone': formatPhoneNumber(rawPhone),
+            ':license': license,
+            ':vehicleType': vehicleType,
+            ':emergencyContact': emergencyContact,
+            ':location': location || 'Location not specified',
+            ':status': dbStatus,
+            ':timestamp': Math.floor(Date.now() / 1000)
+        };
+        
+        // Try updating with 'driverId' key first
+        let updateResult;
+        try {
+            const params = {
+                TableName: DRIVERS_TABLE,
+                Key: { driverId: driverId },
+                UpdateExpression: updateExpression,
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues,
+                ReturnValues: 'ALL_NEW'
+            };
+            
+            console.log('Updating with driverId key:', params);
+            updateResult = await dynamoDB.update(params).promise();
+        } catch (e1) {
+            // Fallback: try with 'id' key
+            if (e1?.code === 'ValidationException' || /key element does not match/i.test(e1?.message || '')) {
+                console.warn('Primary key driverId failed, retrying with id key');
+                const params = {
+                    TableName: DRIVERS_TABLE,
+                    Key: { id: driverId },
+                    UpdateExpression: updateExpression,
+                    ExpressionAttributeNames: expressionAttributeNames,
+                    ExpressionAttributeValues: expressionAttributeValues,
+                    ReturnValues: 'ALL_NEW'
+                };
+                
+                console.log('Updating with id key:', params);
+                updateResult = await dynamoDB.update(params).promise();
+            } else {
+                throw e1;
+            }
+        }
+        
+        console.log('✅ Driver updated successfully:', updateResult);
+        
+        // Refresh data from database
+        await loadDriversData();
+        
+        // Update UI
+        renderDriversTable();
+        updateDriverStats();
+        
+        // Close modal
+        closeEditDriverModal();
+        
+        // Show success notification
+        notify(`Driver "${name}" updated successfully`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error updating driver:', error);
+        
+        let errorMessage = 'Failed to update driver';
+        if (error.code === 'ResourceNotFoundException') {
+            errorMessage = 'Driver not found in database';
+        } else if (error.code === 'ValidationException') {
+            errorMessage = 'Invalid data provided';
+        } else if (error.code === 'AccessDeniedException') {
+            errorMessage = 'Permission denied. Check IAM role has UpdateItem permission.';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        notify(`Error: ${errorMessage}`, 'error');
+        
+    } finally {
+        const submitBtn = document.querySelector('#editDriverModal .btn-primary');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        }
     }
 }
 
@@ -713,11 +886,17 @@ async function toggleDriverStatus(driverId, currentStatus) {
     }
 }
 
-// Close modal when clicking outside
+// Close modals when clicking outside
 window.addEventListener('click', function (e) {
-    const modal = document.getElementById('addDriverModal');
-    if (e.target === modal) {
+    const addModal = document.getElementById('addDriverModal');
+    const editModal = document.getElementById('editDriverModal');
+    
+    if (e.target === addModal) {
         closeAddDriverModal();
+    }
+    
+    if (e.target === editModal) {
+        closeEditDriverModal();
     }
 });
 
@@ -725,6 +904,8 @@ window.addEventListener('click', function (e) {
 window.driversManager = {
     openAddDriverModal,
     closeAddDriverModal,
+    openEditDriverModal,
+    closeEditDriverModal,
     viewDriver,
     editDriver,
     toggleDriverStatus
