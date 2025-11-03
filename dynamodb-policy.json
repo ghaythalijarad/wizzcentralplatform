@@ -1,0 +1,24 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:GetItem",
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem",
+                "dynamodb:Query",
+                "dynamodb:Scan",
+                "dynamodb:BatchGetItem",
+                "dynamodb:BatchWriteItem"
+            ],
+            "Resource": [
+                "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzDrivers_dev",
+                "arn:aws:dynamodb:us-east-1:031857856164:table/WhizzMerchants_Businesses",
+                "arn:aws:dynamodb:us-east-1:031857856164:table/WizzUser_users_dev",
+                "arn:aws:dynamodb:us-east-1:031857856164:table/WizzCentral_*"
+            ]
+        }
+    ]
+}

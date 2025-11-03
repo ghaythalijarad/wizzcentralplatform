@@ -18,7 +18,7 @@ window.WIZZCENTRAL_CONFIG = {
     COGNITO_REGION: 'us-east-1',
     COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi',
     COGNITO_CLIENT_ID: '5hun8p61grnakisu5gammcjelv', // NEW: Browser-specific client with no secret
-    COGNITO_IDENTITY_POOL_ID: 'us-east-1:864073dc-423f-42ae-9b1a-67c1c913b38a',
+    COGNITO_IDENTITY_POOL_ID: 'us-east-1:10dd68af-9c1e-448e-ae67-89eaeb3c8160', // NEW: WizzCentralPlatform Identity Pool
 
     // WebSocket Configuration for Live Chat
     WEBSOCKET: {
