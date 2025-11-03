@@ -585,8 +585,107 @@ function formatDate(dateString) {
 function viewCustomer(customerId) {
     console.log('👁️ View customer:', customerId);
     const customer = customers.find(c => c.id === customerId);
-    if (customer) {
-        alert(`Viewing customer: ${customer.name}\nEmail: ${customer.email}\nTotal Orders: ${customer.totalOrders}\nTotal Spent: ${customer.totalSpent.toLocaleString()} IQD\nPoints: ${customer.points.toLocaleString()}`);
+    if (!customer) {
+        showMessage('Customer not found', 'error');
+        return;
+    }
+    
+    // Store current customer ID for quick edit access
+    window.currentViewCustomerId = customerId;
+    
+    // Populate customer header (using correct IDs from HTML)
+    document.getElementById('viewCustomerFullName').textContent = customer.name || 'Unknown Customer';
+    document.getElementById('viewCustomerEmail').textContent = customer.email || 'N/A';
+    
+    // Populate status badge with proper styling
+    const statusBadge = document.getElementById('viewCustomerStatusBadge');
+    const isActive = customer.status === 'active' || customer.isActive === true || customer.isActive === 'true';
+    
+    if (isActive) {
+        statusBadge.textContent = 'Active';
+        statusBadge.className = 'active';
+    } else {
+        statusBadge.textContent = 'Inactive';
+        statusBadge.className = 'inactive';
+    }
+    
+    // Populate Personal Information (matching HTML IDs)
+    document.getElementById('viewFullName').textContent = customer.name || 'N/A';
+    document.getElementById('viewEmail').textContent = customer.email || 'N/A';
+    document.getElementById('viewPhone').textContent = customer.phone || customer.countryCode || 'N/A';
+    
+    // Format gender properly
+    let genderText = 'N/A';
+    if (customer.gender) {
+        const genderMap = {
+            'male': 'Male',
+            'female': 'Female',
+            'other': 'Other',
+            'prefer-not-to-say': 'Prefer not to say'
+        };
+        genderText = genderMap[customer.gender.toLowerCase()] || customer.gender.charAt(0).toUpperCase() + customer.gender.slice(1);
+    }
+    document.getElementById('viewGender').textContent = genderText;
+    
+    // Populate Account Details (matching HTML IDs)
+    document.getElementById('viewSegment').textContent = customer.segment ? customer.segment.toUpperCase() : customer.customer_segment ? customer.customer_segment.toUpperCase() : 'REGULAR';
+    
+    // Populate tier with proper styling
+    const tierElement = document.getElementById('viewTier');
+    if (customer.vipStatus || customer.tier === 'vip') {
+        tierElement.innerHTML = '<span style="background: rgba(255, 215, 0, 0.2); color: #b8860b; padding: 4px 12px; border-radius: 12px; font-weight: 600;">⭐ VIP</span>';
+    } else {
+        tierElement.textContent = customer.tierLevel || customer.tier || 'Regular';
+    }
+    
+    document.getElementById('viewLanguage').textContent = getLanguageName(customer.preferredLanguage);
+    document.getElementById('viewMarketing').textContent = customer.marketingConsent || customer.marketing_consent ? '✓ Yes' : '✗ No';
+    
+    // Populate Order & Points Statistics (matching HTML IDs)
+    document.getElementById('viewTotalOrders').textContent = customer.totalOrders || customer.total_orders || 0;
+    document.getElementById('viewTotalSpent').textContent = `${(customer.totalSpent || customer.total_spent || 0).toLocaleString()} IQD`;
+    document.getElementById('viewLoyaltyPoints').textContent = (customer.points || customer.loyalty_points || 0).toLocaleString();
+    document.getElementById('viewLastOrderDate').textContent = customer.lastOrder || customer.last_order_date || 'Never';
+    
+    // Populate System Information (matching HTML IDs)
+    document.getElementById('viewSysCustomerId').textContent = customer.id || customer.userId || 'N/A';
+    document.getElementById('viewJoinedDate').textContent = customer.joinDate || formatDateTime(customer.createdAt) || 'N/A';
+    document.getElementById('viewUpdatedDate').textContent = formatDateTime(customer.updatedAt) || 'N/A';
+    
+    // Open the view modal
+    openViewCustomerModal();
+}
+
+function getLanguageName(code) {
+    const languages = {
+        'en': 'English',
+        'ar': 'Arabic (العربية)',
+        'ku': 'Kurdish (کوردی)'
+    };
+    return languages[code] || code || 'N/A';
+}
+
+function openViewCustomerModal() {
+    const modal = document.getElementById('viewCustomerModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeViewCustomerModal() {
+    const modal = document.getElementById('viewCustomerModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function editCustomerFromView() {
+    // Close view modal
+    closeViewCustomerModal();
+    
+    // Open edit modal with the same customer
+    if (window.currentViewCustomerId) {
+        editCustomer(window.currentViewCustomerId);
     }
 }
 
@@ -784,6 +883,9 @@ window.toggleCustomerStatus = toggleCustomerStatus;
 window.refreshCustomerData = refreshCustomerData;
 window.openEditCustomerModal = openEditCustomerModal;
 window.closeEditCustomerModal = closeEditCustomerModal;
+window.openViewCustomerModal = openViewCustomerModal;
+window.closeViewCustomerModal = closeViewCustomerModal;
+window.editCustomerFromView = editCustomerFromView;
 // Added global exposure for initialization & data loading
 window.initializeCustomersPage = initializeCustomersPage;
 window.loadCustomersData = loadCustomersData;
@@ -1167,8 +1269,14 @@ document.addEventListener('DOMContentLoaded', function() {
 // Close modal when clicking outside
 window.addEventListener('click', function(e) {
     const editModal = document.getElementById('editCustomerModal');
+    const viewModal = document.getElementById('viewCustomerModal');
+    
     if (e.target === editModal) {
         closeEditCustomerModal();
+    }
+    
+    if (e.target === viewModal) {
+        closeViewCustomerModal();
     }
 });
 
