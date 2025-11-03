@@ -176,7 +176,7 @@ function processDriversItems(items) {
         name: item.name || item.fullName || 'Unknown Driver',
         email: item.email || 'N/A',
         phone: formatPhoneNumber(item.phoneNumber || item.phone),
-        status: mapDriverStatus(item.registrationStatus || item.status),
+        status: mapDriverStatus(item.status || item.registrationStatus),
         location: item.city || item.location || 'Unknown Location',
         ordersCompleted: item.ordersCompleted || 0,
         rating: typeof item.rating === 'number' ? item.rating : 4.5,
@@ -184,13 +184,13 @@ function processDriversItems(items) {
         vehicleType: mapVehicleType(item.vehicleType),
         licenseNumber: item.licenseNumber || 'N/A',
         nationalId: item.nationalId || 'N/A',
-        createdAt: item.createdAt ? formatDate(item.createdAt) : 'N/A',
+        createdAt: item.profileCompletedAt ? formatDate(item.profileCompletedAt) : (item.createdAt ? formatDate(item.createdAt) : 'N/A'),
         updatedAt: item.updatedAt ? formatDate(item.updatedAt) : 'N/A',
         avatar: generateDriverAvatar(item.name || item.fullName),
         documents: {
-            drivingLicense: item.drivingLicense || null,
+            drivingLicense: item.drivingLicenseUrl || item.drivingLicense || null,
             nationalId: item.nationalId || null,
-            vehicleRegistration: item.vehicleRegistration || null,
+            vehicleRegistration: item.registrationPaperUrl || item.vehicleRegistration || null,
             nonCriminalRecord: item.nonCriminalRecord || null
         },
         fullData: item
