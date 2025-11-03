@@ -589,17 +589,43 @@ function viewDriver(driverId) {
     }
 }
 
-function editDriver(driverId) {
+async function editDriver(driverId) {
     const driver = drivers.find(d => d.id === driverId);
     if (!driver) {
         notify('Driver not found', 'error');
         return;
     }
     
+    // Open the edit modal first
+    openEditDriverModal();
+    
+    // Wait for cities to load
+    await loadCitiesDropdown();
+    
     // Pre-populate the edit form with driver data (only fields that exist in DynamoDB)
     document.getElementById('editDriverId').value = driver.id;
     document.getElementById('editDriverName').value = driver.name || '';
-    document.getElementById('editDriverCity').value = driver.city || '';
+    
+    // Set city after dropdown is loaded
+    setTimeout(() => {
+        const citySelect = document.getElementById('editDriverCity');
+        if (citySelect && driver.city) {
+            // Try to find exact match
+            let found = false;
+            for (let option of citySelect.options) {
+                if (option.value === driver.city || option.textContent.includes(driver.city)) {
+                    option.selected = true;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                console.warn(`City "${driver.city}" not found in dropdown, setting as-is`);
+                citySelect.value = driver.city;
+            }
+        }
+    }, 100);
+    
     document.getElementById('editDriverLicense').value = driver.licenseNumber || '';
     document.getElementById('editDriverNationalId').value = driver.nationalId || '';
     document.getElementById('editVehicleType').value = driver.vehicleType || '';
@@ -614,15 +640,99 @@ function editDriver(driverId) {
         dbStatus = 'PENDING_REVIEW';
     }
     document.getElementById('editDriverStatus').value = dbStatus;
+}
+
+async function loadCitiesDropdown() {
+    try {
+        const citySelect = document.getElementById('editDriverCity');
+        if (!citySelect) return;
+        
+        // Show loading state
+        citySelect.innerHTML = '<option value="">Loading cities...</option>';
+        
+        // Get DynamoDB client
+        const dynamoDB = await AWSUtils.getDynamoDBClient();
+        if (!dynamoDB) {
+            console.warn('DynamoDB not initialized, using fallback cities');
+            populateFallbackCities(citySelect);
+            return;
+        }
+        
+        // Scan WizzCentral_Regions table
+        const params = {
+            TableName: 'WizzCentral_Regions',
+            ProjectionExpression: 'regionName, regionNameArabic, regionCode',
+            Limit: 200
+        };
+        
+        console.log('Loading cities from WizzCentral_Regions...');
+        const result = await dynamoDB.scan(params).promise();
+        
+        const regions = result.Items || [];
+        console.log(`Found ${regions.length} regions`);
+        
+        // Sort regions alphabetically by Arabic name
+        regions.sort((a, b) => {
+            const nameA = a.regionNameArabic || a.regionName || '';
+            const nameB = b.regionNameArabic || b.regionName || '';
+            return nameA.localeCompare(nameB, 'ar');
+        });
+        
+        // Populate dropdown
+        citySelect.innerHTML = '<option value="">Select City / Region</option>';
+        regions.forEach(region => {
+            const option = document.createElement('option');
+            const arabicName = region.regionNameArabic || region.regionName;
+            const englishName = region.regionName || region.regionNameArabic;
+            option.value = arabicName; // Store Arabic name as value
+            option.textContent = `${arabicName} - ${englishName}`;
+            citySelect.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${regions.length} cities into dropdown`);
+        
+    } catch (error) {
+        console.error('Error loading cities:', error);
+        const citySelect = document.getElementById('editDriverCity');
+        if (citySelect) {
+            populateFallbackCities(citySelect);
+        }
+    }
+}
+
+function populateFallbackCities(selectElement) {
+    // Fallback cities in case DynamoDB fails
+    const fallbackCities = [
+        'بغداد - Baghdad',
+        'البصرة - Basra',
+        'أربيل - Erbil',
+        'النجف - Najaf',
+        'كركوك - Kirkuk',
+        'الموصل - Mosul',
+        'السليمانية - Sulaymaniyah',
+        'كربلاء - Karbala',
+        'الديوانية - Diwaniyah',
+        'العمارة - Amarah',
+        'الناصرية - Nasiriyah',
+        'الحلة - Hillah'
+    ];
     
-    // Open the edit modal
-    openEditDriverModal();
+    selectElement.innerHTML = '<option value="">Select City / Region</option>';
+    fallbackCities.forEach(city => {
+        const option = document.createElement('option');
+        const arabicName = city.split(' - ')[0];
+        option.value = arabicName;
+        option.textContent = city;
+        selectElement.appendChild(option);
+    });
 }
 
 function openEditDriverModal() {
     const modal = document.getElementById('editDriverModal');
     if (modal) {
         modal.style.display = 'flex';
+        // Load cities when modal opens (if not already loaded)
+        loadCitiesDropdown();
     }
 }
 
@@ -944,6 +1054,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('✅ User authenticated, loading drivers data...');
             await loadDriversData();
             setupEventListeners();
+            
+            // Pre-load cities in background for faster edit modal
+            loadCitiesDropdown().catch(err => {
+                console.warn('Failed to pre-load cities:', err);
+            });
         } else {
             console.log('❌ User not authenticated, redirecting...');
         }

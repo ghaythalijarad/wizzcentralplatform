@@ -610,8 +610,10 @@
                             <input type="text" id="editDriverName" name="name" required>
                         </div>
                         <div class="form-group">
-                            <label for="editDriverCity">City</label>
-                            <input type="text" id="editDriverCity" name="city" placeholder="e.g., Baghdad, Basra" required>
+                            <label for="editDriverCity">City / Region</label>
+                            <select id="editDriverCity" name="city" required>
+                                <option value="">Loading cities...</option>
+                            </select>
                         </div>
                     </div>
                     <div class="form-row">
