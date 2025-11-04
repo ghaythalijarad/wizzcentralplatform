@@ -489,12 +489,12 @@
                 throw new Error('WizzOrdersAPI not available. Please ensure orders-api.js is loaded.');
             }
 
-            console.log('🔄 Initializing WizzOrdersAPI...');
-            const ordersAPI = new window.WizzOrdersAPI();
-            await ordersAPI.initialize();
+            console.log('🔄 Using WizzOrdersAPI instance...');
+            // WizzOrdersAPI is already instantiated globally, just use it directly
+            await window.WizzOrdersAPI.initialize();
 
             console.log('🔄 Fetching orders from WizzOrders table...');
-            const result = await ordersAPI.getOrders(50);
+            const result = await window.WizzOrdersAPI.getOrders(50);
 
             if (!result.success) {
                 throw new Error(result.message || 'Failed to fetch orders');
