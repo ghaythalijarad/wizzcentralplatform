@@ -81,10 +81,68 @@ function initializeDashboardFeatures() {
 }
 
 async function loadDashboardStats() {
-    console.log('🔢 Loading dashboard stats from all tables...');
+    console.log('🔢 Loading dashboard stats from Orders and Promotions APIs...');
 
     try {
-        // First try to load stats from real AWS data
+        // Try to load stats from Orders and Promotions APIs
+        let ordersData = null;
+        let campaignsData = null;
+        let merchantDiscountsData = null;
+        let hasRealData = false;
+
+        // Load Orders Data
+        try {
+            console.log('📦 Loading orders data...');
+            if (window.WizzOrdersAPI) {
+                await window.WizzOrdersAPI.initialize();
+                const ordersResult = await window.WizzOrdersAPI.getOrders(100);
+                ordersData = ordersResult.orders || [];
+                console.log(`✅ Loaded ${ordersData.length} orders`);
+                hasRealData = true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load orders:', error.message);
+        }
+
+        // Load Campaigns Data
+        try {
+            console.log('🎯 Loading campaigns data...');
+            if (window.WizzCampaignsAPI) {
+                await window.WizzCampaignsAPI.initialize();
+                const campaignsResult = await window.WizzCampaignsAPI.getCampaigns(100);
+                campaignsData = campaignsResult.campaigns || [];
+                console.log(`✅ Loaded ${campaignsData.length} campaigns`);
+                hasRealData = true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load campaigns:', error.message);
+        }
+
+        // Load Merchant Discounts Data
+        try {
+            console.log('🏪 Loading merchant discounts data...');
+            if (window.WizzMerchantDiscountsAPI) {
+                await window.WizzMerchantDiscountsAPI.initialize();
+                const discountsResult = await window.WizzMerchantDiscountsAPI.getMerchantDiscounts(100);
+                merchantDiscountsData = discountsResult.discounts || [];
+                console.log(`✅ Loaded ${merchantDiscountsData.length} merchant discounts`);
+                hasRealData = true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Failed to load merchant discounts:', error.message);
+        }
+
+        // Calculate statistics from loaded data
+        if (hasRealData) {
+            const stats = calculateDashboardStatistics(ordersData, campaignsData, merchantDiscountsData);
+            updateDashboardUI(stats);
+            showDashboardDataSourceIndicator('real');
+            console.log('✅ Dashboard stats loaded from real APIs:', stats);
+            return;
+        }
+
+        // Fallback to AWS DynamoDB if APIs failed
+        console.log('🔄 Falling back to AWS DynamoDB data...');
         if (window.dataService) {
             try {
                 await window.dataService.initialize();
@@ -224,6 +282,148 @@ async function loadDashboardStats() {
             showDashboardDataSourceIndicator('failed');
         }
     }
+}
+
+// Calculate dashboard statistics from API data
+function calculateDashboardStatistics(ordersData, campaignsData, merchantDiscountsData) {
+    const stats = {
+        customersCount: 0,
+        merchantsCount: 0,
+        driversCount: 0,
+        ordersCount: 0,
+        revenueCount: 0,
+        ticketsCount: 0,
+        promotionsCount: 0
+    };
+
+    // Calculate from orders data
+    if (ordersData && Array.isArray(ordersData)) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Count orders today
+        const ordersToday = ordersData.filter(order => {
+            if (!order.orderDate) return false;
+            const orderDate = new Date(order.orderDate);
+            return orderDate >= today;
+        });
+
+        stats.ordersCount = ordersToday.length;
+
+        // Calculate revenue today from orders
+        ordersToday.forEach(order => {
+            // Extract numeric value from total (e.g., "$20,010.00" or "20,010.00 IQD")
+            if (order.total) {
+                const numericValue = parseFloat(order.total.replace(/[^0-9.]/g, ''));
+                if (!isNaN(numericValue)) {
+                    stats.revenueCount += numericValue;
+                }
+            }
+        });
+
+        // Extract unique customers and merchants from all orders
+        const uniqueCustomers = new Set();
+        const uniqueMerchants = new Set();
+        const uniqueDrivers = new Set();
+
+        ordersData.forEach(order => {
+            if (order.customerId) uniqueCustomers.add(order.customerId);
+            if (order.merchantId) uniqueMerchants.add(order.merchantId);
+            if (order.driverId) uniqueDrivers.add(order.driverId);
+        });
+
+        stats.customersCount = uniqueCustomers.size;
+        stats.merchantsCount = uniqueMerchants.size;
+        stats.driversCount = uniqueDrivers.size;
+    }
+
+    // Calculate active promotions from campaigns and merchant discounts
+    let activePromotions = 0;
+
+    if (campaignsData && Array.isArray(campaignsData)) {
+        const activeCampaigns = campaignsData.filter(campaign => {
+            if (campaign.status === 'active') {
+                const now = new Date();
+                const startDate = campaign.startDate ? new Date(campaign.startDate) : null;
+                const endDate = campaign.endDate ? new Date(campaign.endDate) : null;
+                const withinDateRange = (!startDate || now >= startDate) && (!endDate || now <= endDate);
+                return withinDateRange;
+            }
+            return false;
+        });
+        activePromotions += activeCampaigns.length;
+    }
+
+    if (merchantDiscountsData && Array.isArray(merchantDiscountsData)) {
+        const activeDiscounts = merchantDiscountsData.filter(discount => {
+            if (discount.status === 'active') {
+                const now = new Date();
+                const validUntil = discount.validUntil ? new Date(discount.validUntil) : null;
+                return !validUntil || now <= validUntil;
+            }
+            return false;
+        });
+        activePromotions += activeDiscounts.length;
+    }
+
+    stats.promotionsCount = activePromotions;
+
+    // Support tickets would need a separate API - set to 0 for now
+    stats.ticketsCount = 0;
+
+    return stats;
+}
+
+// Update dashboard UI with calculated statistics
+function updateDashboardUI(stats) {
+    console.log('🎨 Updating dashboard UI with stats:', stats);
+
+    // Update customers count
+    const customersEl = document.getElementById('customersCount');
+    if (customersEl) {
+        customersEl.textContent = stats.customersCount.toLocaleString();
+    }
+
+    // Update merchants count
+    const merchantsEl = document.getElementById('merchantsCount');
+    if (merchantsEl) {
+        merchantsEl.textContent = stats.merchantsCount.toLocaleString();
+    }
+
+    // Update drivers count
+    const driversEl = document.getElementById('driversCount');
+    if (driversEl) {
+        driversEl.textContent = stats.driversCount.toLocaleString();
+    }
+
+    // Update orders count
+    const ordersEl = document.getElementById('ordersCount');
+    if (ordersEl) {
+        ordersEl.textContent = stats.ordersCount.toLocaleString();
+    }
+
+    // Update revenue count
+    const revenueEl = document.getElementById('revenueCount');
+    if (revenueEl) {
+        revenueEl.textContent = `$${stats.revenueCount.toLocaleString('en-US', { 
+            minimumFractionDigits: 2, 
+            maximumFractionDigits: 2 
+        })}`;
+    }
+
+    // Update tickets count
+    const ticketsEl = document.getElementById('ticketsCount');
+    if (ticketsEl) {
+        ticketsEl.textContent = stats.ticketsCount.toLocaleString();
+    }
+
+    // Update promotions count
+    const promotionsEl = document.getElementById('promotionsCount');
+    if (promotionsEl) {
+        promotionsEl.textContent = stats.promotionsCount.toLocaleString();
+    }
+
+    console.log('✅ Dashboard UI updated successfully');
 }
 
 // Show data source indicator to inform users about the data source
