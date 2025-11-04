@@ -519,12 +519,29 @@
             tableStatus.innerHTML = `${allOrders.length} orders loaded from WizzOrders table`;
         } catch (error) {
             console.error('Error loading orders:', error);
+            
+            // Check if error is due to expired token
+            const errorMessage = error.message || '';
+            if (errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token')) {
+                console.warn('⚠️ Token expired, redirecting to login...');
+                // Clear expired tokens
+                sessionStorage.removeItem('idToken');
+                sessionStorage.removeItem('accessToken');
+                sessionStorage.removeItem('refreshToken');
+                sessionStorage.removeItem('isAuthenticated');
+                // Redirect to login
+                window.location.href = '/pages/login.html';
+                return;
+            }
+            
             tableStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading orders';
             tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                             <div>Failed to load orders: ${error.message}</div>
+                            ${errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token') ? 
+                                '<div style="margin-top: 1rem;"><a href="/pages/login.html" style="color: var(--md-sys-color-primary);">Please log in again</a></div>' : ''}
                         </td>
                     </tr>
                 `;
