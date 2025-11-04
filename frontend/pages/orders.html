@@ -684,23 +684,21 @@
         modal.style.display = 'block';
 
         try {
-            const response = await fetch(`/orders/${orderId}`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Find the order in the allOrders array
+            const order = allOrders.find(o => o.orderId === orderId || o.cleanOrderId === orderId);
+            
+            if (!order) {
+                throw new Error('Order not found');
             }
 
-            const orderData = await response.json();
-            const order = orderData.order;
+            // Use the fullData if available, otherwise use the order itself
+            const orderData = order.fullData || order;
 
             content.innerHTML = `
                 <div class="order-detail-grid">
                     <div class="detail-item">
                         <div class="detail-label">Order ID</div>
-                        <div class="detail-value">${order.orderId || order.PK}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Order Number</div>
-                        <div class="detail-value">${order.orderNumber || 'N/A'}</div>
+                        <div class="detail-value">${order.orderId}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Status</div>
@@ -710,19 +708,15 @@
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Total Amount</div>
-                        <div class="detail-value">${order.currency || 'IQD'} ${(order.pricing?.total || order.total_legacy || 0).toLocaleString()}</div>
+                        <div class="detail-value">${order.total}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Created Date</div>
-                        <div class="detail-value">${order.createdAtFormatted || new Date(order.createdAt).toLocaleString()}</div>
+                        <div class="detail-value">${order.formattedDate}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Customer Name</div>
                         <div class="detail-value">${order.customerName || 'N/A'}</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Customer Email</div>
-                        <div class="detail-value">${order.customerEmail || 'N/A'}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Customer Phone</div>
@@ -737,13 +731,25 @@
                         <div class="detail-value">${order.paymentMethod || 'N/A'}</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Delivery Type</div>
-                        <div class="detail-value">${order.deliveryType || 'N/A'}</div>
+                        <div class="detail-label">Delivery Address</div>
+                        <div class="detail-value">${order.deliveryAddress || 'N/A'}</div>
                     </div>
                     <div class="detail-item">
-                        <div class="detail-label">Channel</div>
-                        <div class="detail-value">${order.channel || 'N/A'}</div>
+                        <div class="detail-label">Currency</div>
+                        <div class="detail-value">${order.currency || 'IQD'}</div>
                     </div>
+                    ${order.driverId ? `
+                    <div class="detail-item">
+                        <div class="detail-label">Driver ID</div>
+                        <div class="detail-value">${order.driverId}</div>
+                    </div>
+                    ` : ''}
+                    ${order.confirmedAt ? `
+                    <div class="detail-item">
+                        <div class="detail-label">Confirmed At</div>
+                        <div class="detail-value">${new Date(order.confirmedAt).toLocaleString()}</div>
+                    </div>
+                    ` : ''}
                 </div>
                 
                 ${order.items && order.items.length > 0 ? `
@@ -751,46 +757,19 @@
                 <div class="items-list">
                     ${order.items.map(item => `
                         <div class="item-row">
-                            <div class="item-name">${item.name}</div>
+                            <div class="item-name">${item.name || item.title || 'Item'}</div>
                             <div class="item-details">
-                                <span>Qty: ${item.quantity}</span>
-                                <span>Price: ${order.currency || 'IQD'} ${item.unitPrice?.toLocaleString()}</span>
-                                <span>Total: ${order.currency || 'IQD'} ${(item.unitPrice * item.quantity)?.toLocaleString()}</span>
+                                <span>Qty: ${item.quantity || 1}</span>
+                                ${item.price ? `<span>Price: ${order.currency || 'IQD'} ${item.price}</span>` : ''}
                             </div>
                         </div>
                     `).join('')}
                 </div>
                 ` : ''}
                 
-                ${order.pricing ? `
-                <h4>Pricing Breakdown</h4>
-                <div class="pricing-details">
-                    <div class="price-row">
-                        <span>Subtotal:</span>
-                        <span>${order.currency || 'IQD'} ${order.pricing.goodsSubtotal?.toLocaleString()}</span>
-                    </div>
-                    <div class="price-row">
-                        <span>Delivery Fee:</span>
-                        <span>${order.currency || 'IQD'} ${order.pricing.deliveryFee?.toLocaleString()}</span>
-                    </div>
-                    <div class="price-row">
-                        <span>Service Fee:</span>
-                        <span>${order.currency || 'IQD'} ${order.pricing.serviceFee?.toLocaleString()}</span>
-                    </div>
-                    <div class="price-row">
-                        <span>Tax:</span>
-                        <span>${order.currency || 'IQD'} ${order.pricing.tax?.toLocaleString()}</span>
-                    </div>
-                    <div class="price-row total-row">
-                        <span><strong>Total:</strong></span>
-                        <span><strong>${order.currency || 'IQD'} ${order.pricing.total?.toLocaleString()}</strong></span>
-                    </div>
-                </div>
-                ` : ''}
-                
                 <details style="margin-top: 20px;">
                     <summary style="cursor: pointer; font-weight: bold;">Raw Order Data</summary>
-                    <div class="raw-data" style="max-height: 300px; overflow-y: auto;">${JSON.stringify(order, null, 2)}</div>
+                    <div class="raw-data" style="max-height: 300px; overflow-y: auto;">${JSON.stringify(orderData, null, 2)}</div>
                 </details>
             `;
         } catch (error) {
