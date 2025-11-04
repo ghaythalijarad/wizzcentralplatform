@@ -826,6 +826,9 @@
     <script src="../assets/js/auth-utils.js"></script>
     <script src="../assets/js/aws-utils.js?v=10"></script>
 
+    <!-- Campaigns API -->
+    <script src="../js/campaigns-api.js"></script>
+
     <!-- Data service (depends on aws-utils) -->
     <script src="../data-service.js?v=10"></script>
 
@@ -890,17 +893,24 @@
                 
                 async loadCampaigns() {
                     try {
-                        const response = await fetch('/campaigns');
-                        const result = await response.json();
+                        // Use WizzCampaignsAPI instead of fetching from backend
+                        if (!window.WizzCampaignsAPI) {
+                            throw new Error('WizzCampaignsAPI not available');
+                        }
+
+                        console.log('🔄 Loading campaigns from WizzCampaignsAPI...');
+                        const result = await window.WizzCampaignsAPI.getCampaigns(50);
                         
                         if (result.success && result.campaigns) {
                             this.campaigns = result.campaigns;
-                            console.log(`📊 Loaded ${this.campaigns.length} campaigns`);
+                            console.log(`📊 Loaded ${this.campaigns.length} campaigns from ${result.source}`);
                             this.updateCampaignStats();
+                            this.renderCampaigns();
                         }
                     } catch (error) {
                         console.error('❌ Error loading campaigns:', error);
                         this.campaigns = [];
+                        this.showError('Failed to load campaigns: ' + error.message);
                     }
                 }
                 
@@ -930,22 +940,16 @@
                             throw new Error('Please fill in all required fields');
                         }
                         
-                        // Call backend API
-                        const response = await fetch('/campaigns', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'x-user-id': 'fallback-campaign-manager'
-                            },
-                            body: JSON.stringify(campaignData)
-                        });
-                        
-                        if (!response.ok) {
-                            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-                            throw new Error(errorData.error || errorData.message || `HTTP ${response.status}`);
+                        // Use WizzCampaignsAPI instead of backend
+                        if (!window.WizzCampaignsAPI) {
+                            throw new Error('WizzCampaignsAPI not available');
                         }
                         
-                        const result = await response.json();
+                        const result = await window.WizzCampaignsAPI.createCampaign(campaignData);
+                        
+                        if (!result.success) {
+                            throw new Error(result.message || 'Failed to create campaign');
+                        }
                         
                         this.hideLoading();
                         this.showSuccess('Campaign created successfully!');
@@ -964,9 +968,70 @@
                 
                 updateCampaignStats() {
                     const totalElement = document.getElementById('totalCampaigns');
+                    const activeElement = document.getElementById('activeCampaigns');
+                    
                     if (totalElement) {
                         totalElement.textContent = this.campaigns.length;
                     }
+                    
+                    if (activeElement) {
+                        const activeCampaigns = this.campaigns.filter(c => c.status === 'active').length;
+                        activeElement.textContent = activeCampaigns;
+                    }
+                }
+                
+                renderCampaigns() {
+                    const tbody = document.getElementById('campaignsTableBody');
+                    if (!tbody) return;
+
+                    if (this.campaigns.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
+                                    <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; color: var(--md-sys-color-outline);"></i>
+                                    <div>No campaigns found</div>
+                                    <div style="margin-top: 0.5rem; font-size: 0.9rem;">Create your first campaign to get started</div>
+                                </td>
+                            </tr>
+                        `;
+                        return;
+                    }
+
+                    tbody.innerHTML = this.campaigns.map(campaign => `
+                        <tr>
+                            <td>
+                                <div style="font-weight: 500;">${campaign.name}</div>
+                                <div style="font-size: 0.85rem; color: var(--md-sys-color-on-surface-variant);">${campaign.description}</div>
+                            </td>
+                            <td><span class="badge badge-${campaign.type}">${campaign.type || 'general'}</span></td>
+                            <td>${campaign.targetAudience || 'All Customers'}</td>
+                            <td>
+                                ${campaign.discountType === 'percentage' ? 
+                                    `${campaign.discountValue}%` : 
+                                    `${window.WizzCampaignsAPI.formatCurrency(campaign.discountValue)}`}
+                            </td>
+                            <td>
+                                <span class="status-badge ${campaign.status === 'active' ? 'status-active' : 'status-inactive'}">
+                                    ${campaign.status}
+                                </span>
+                            </td>
+                            <td>${campaign.usage || 0} / ${campaign.maxUsage || '∞'}</td>
+                            <td>
+                                <div style="font-size: 0.85rem;">
+                                    ${window.WizzCampaignsAPI.formatDate(campaign.startDate)} - 
+                                    ${window.WizzCampaignsAPI.formatDate(campaign.endDate)}
+                                </div>
+                            </td>
+                            <td>
+                                <button class="icon-btn" onclick="alert('Edit campaign: ${campaign.id}')" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="icon-btn" onclick="alert('Delete campaign: ${campaign.id}')" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
                 }
                 
                 openCampaignModal() {
