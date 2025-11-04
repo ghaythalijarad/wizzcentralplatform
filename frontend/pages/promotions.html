@@ -893,9 +893,17 @@
                 
                 async loadCampaigns() {
                     try {
-                        // Use WizzCampaignsAPI instead of fetching from backend
+                        // Wait for WizzCampaignsAPI to be available (with retry)
+                        let retries = 0;
+                        const maxRetries = 10;
+                        while (!window.WizzCampaignsAPI && retries < maxRetries) {
+                            console.log(`⏳ Waiting for WizzCampaignsAPI... (attempt ${retries + 1}/${maxRetries})`);
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                            retries++;
+                        }
+
                         if (!window.WizzCampaignsAPI) {
-                            throw new Error('WizzCampaignsAPI not available');
+                            throw new Error('WizzCampaignsAPI not available after waiting');
                         }
 
                         console.log('🔄 Loading campaigns from WizzCampaignsAPI...');
