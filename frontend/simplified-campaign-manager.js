@@ -58,31 +58,38 @@ class SimplifiedCampaignManager {
         }
     }
 
-    // Load campaigns from backend API
+    // Load campaigns from WizzCampaignsAPI (mock data)
     async loadCampaigns() {
         const tbody = document.getElementById('campaignsTableBody');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading campaigns...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Loading campaigns...</td></tr>';
         }
 
         try {
             this.isLoading = true;
             this.showLoading('Loading campaigns...');
             
-            // Use the backend API directly
-            const response = await fetch('/campaigns');
-            
-            if (!response.ok) {
-                throw new Error(`Failed to load campaigns: HTTP ${response.status}`);
+            // Wait for WizzCampaignsAPI to be available (with retry)
+            let retries = 0;
+            const maxRetries = 10;
+            while (!window.WizzCampaignsAPI && retries < maxRetries) {
+                console.log(`⏳ Waiting for WizzCampaignsAPI... (attempt ${retries + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
             }
-            
-            const result = await response.json();
+
+            if (!window.WizzCampaignsAPI) {
+                throw new Error('WizzCampaignsAPI not available after waiting');
+            }
+
+            console.log('🔄 Loading campaigns from WizzCampaignsAPI...');
+            const result = await window.WizzCampaignsAPI.getCampaigns(50);
             
             if (result.success && result.campaigns) {
                 this.campaigns = result.campaigns;
-                console.log(`📊 Loaded ${this.campaigns.length} campaigns from backend API`);
+                console.log(`📊 Loaded ${this.campaigns.length} campaigns from ${result.source}`);
             } else {
-                throw new Error('Invalid response format from campaigns API');
+                throw new Error('Failed to load campaigns from API');
             }
             
             this.hideLoading();
@@ -96,7 +103,7 @@ class SimplifiedCampaignManager {
             // Fallback to empty state
             this.campaigns = [];
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem; color: #e74c3c;">
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 2rem; color: #e74c3c;">
                     Error loading campaigns: ${error.message}
                     <br><button onclick="campaignManager.loadCampaigns()" class="btn-secondary" style="margin-top: 1rem;">
                         <i class="fas fa-refresh"></i> Retry
