@@ -763,6 +763,97 @@
 
         /* ===== END ENHANCED TABLE STYLES ===== */
 
+        /* ===== MERCHANT DISCOUNTS TABLE STYLES ===== */
+        
+        .discount-row {
+            transition: background-color 0.2s ease;
+        }
+
+        .discount-row:hover {
+            background: var(--md-sys-color-surface-container-low);
+        }
+
+        /* Discount Name/Code Cell */
+        .discount-name-cell {
+            min-width: 180px;
+        }
+
+        .discount-code {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--md-sys-color-primary);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .discount-description {
+            font-size: 13px;
+            color: var(--md-sys-color-on-surface-variant);
+            line-height: 1.4;
+            opacity: 0.8;
+        }
+
+        /* Merchant Name Cell */
+        .merchant-name-cell {
+            min-width: 200px;
+        }
+
+        .merchant-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--md-sys-color-on-surface);
+            margin-bottom: 4px;
+        }
+
+        .merchant-id {
+            font-size: 11px;
+            color: var(--md-sys-color-on-surface-variant);
+            font-family: 'Courier New', monospace;
+            opacity: 0.6;
+        }
+
+        /* Discount Type Badge */
+        .discount-type-cell {
+            min-width: 130px;
+        }
+
+        .type-percentage {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .type-fixed {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        /* Discount Value Cell */
+        .discount-value-cell {
+            min-width: 120px;
+        }
+
+        /* Discount Validity Cell */
+        .discount-validity-cell {
+            min-width: 140px;
+        }
+
+        .validity-date {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--md-sys-color-error);
+        }
+
+        .validity-date i {
+            font-size: 11px;
+            color: var(--md-sys-color-error);
+        }
+
+        /* ===== END MERCHANT DISCOUNTS TABLE STYLES ===== */
+
+        /* Modal dialog styles */
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -1195,6 +1286,9 @@
 
     <!-- Campaigns API -->
     <script src="../js/campaigns-api.js"></script>
+    
+    <!-- Merchant Discounts API -->
+    <script src="../js/merchant-discounts-api.js"></script>
 
     <!-- Data service (depends on aws-utils) -->
     <script src="../data-service.js?v=10"></script>
@@ -1752,6 +1846,185 @@
             }, 1000);
         })();
 </script>
+
+<!-- Merchant Discounts Management Script -->
+<script>
+    // Merchant Discounts Management
+    let merchantDiscounts = [];
+
+    // Load merchant discounts
+    async function refreshMerchantDiscounts() {
+        try {
+            console.log('🔄 Loading merchant discounts...');
+            
+            // Wait for API to be available
+            let retries = 0;
+            const maxRetries = 10;
+            while (!window.WizzMerchantDiscountsAPI && retries < maxRetries) {
+                console.log(`⏳ Waiting for WizzMerchantDiscountsAPI... (attempt ${retries + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 100));
+                retries++;
+            }
+
+            if (!window.WizzMerchantDiscountsAPI) {
+                throw new Error('WizzMerchantDiscountsAPI not available after waiting');
+            }
+
+            const result = await window.WizzMerchantDiscountsAPI.getMerchantDiscounts(50);
+
+            if (result.success && result.discounts) {
+                merchantDiscounts = result.discounts;
+                console.log(`📊 Loaded ${merchantDiscounts.length} merchant discounts from ${result.source}`);
+                renderMerchantDiscounts();
+                updateMerchantDiscountStats();
+            } else {
+                throw new Error(result.message || 'Failed to load merchant discounts');
+            }
+        } catch (error) {
+            console.error('❌ Error loading merchant discounts:', error);
+            showMerchantDiscountsError(error.message);
+        }
+    }
+
+    // Render merchant discounts table
+    function renderMerchantDiscounts() {
+        const tbody = document.getElementById('merchantDiscountsTableBody');
+        if (!tbody) return;
+
+        if (merchantDiscounts.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
+                        <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; color: var(--md-sys-color-outline);"></i>
+                        <div>No merchant discounts found</div>
+                        <div style="margin-top: 0.5rem; font-size: 0.9rem;">Merchants can create their own discounts</div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = merchantDiscounts.map(discount => `
+            <tr class="discount-row">
+                <td class="discount-name-cell">
+                    <div class="discount-code">${discount.discountCode || 'N/A'}</div>
+                    ${discount.description ? `<div class="discount-description">${discount.description}</div>` : ''}
+                </td>
+                <td class="merchant-name-cell">
+                    <div class="merchant-name">${discount.merchantName || 'Unknown Merchant'}</div>
+                    <div class="merchant-id">ID: ${discount.merchantId || 'N/A'}</div>
+                </td>
+                <td class="discount-type-cell">
+                    <span class="type-badge type-${discount.discountType}">
+                        ${discount.discountType === 'percentage' ? 'Percentage' : 'Fixed Amount'}
+                    </span>
+                </td>
+                <td class="discount-value-cell">
+                    <div class="discount-value">
+                        ${discount.discountType === 'percentage' ? 
+                            `<span class="discount-number">${discount.discountValue}%</span>` : 
+                            `<span class="discount-number">${window.WizzMerchantDiscountsAPI.formatCurrency(discount.discountValue)}</span>`}
+                    </div>
+                    ${discount.minimumOrderValue ? `<div class="min-order">Min: ${window.WizzMerchantDiscountsAPI.formatCurrency(discount.minimumOrderValue)}</div>` : ''}
+                </td>
+                <td class="discount-status-cell">
+                    <span class="status-badge status-${discount.status || 'inactive'}">
+                        <i class="fas fa-circle"></i> ${(discount.status || 'inactive').toUpperCase()}
+                    </span>
+                </td>
+                <td class="discount-usage-cell">
+                    <div class="usage-container">
+                        <div class="usage-text">${discount.usage || 0} / ${discount.maxUsage || '∞'}</div>
+                        ${discount.maxUsage ? `
+                            <div class="usage-bar">
+                                <div class="usage-fill" style="width: ${Math.min(((discount.usage || 0) / discount.maxUsage) * 100, 100)}%"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </td>
+                <td class="discount-validity-cell">
+                    <div class="validity-date">
+                        <i class="fas fa-calendar-times"></i>
+                        <span>${window.WizzMerchantDiscountsAPI.formatDate(discount.validUntil)}</span>
+                    </div>
+                </td>
+                <td class="discount-actions-cell">
+                    <div class="action-buttons">
+                        <button class="action-btn edit-btn" onclick="editMerchantDiscount('${discount.id}')" title="Edit Discount">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete-btn" onclick="deleteMerchantDiscount('${discount.id}')" title="Delete Discount">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // Update merchant discount statistics
+    function updateMerchantDiscountStats() {
+        const totalElement = document.getElementById('totalMerchantDiscounts');
+        const activeElement = document.getElementById('activeMerchantDiscounts');
+        
+        if (totalElement) {
+            totalElement.textContent = merchantDiscounts.length;
+        }
+        
+        if (activeElement) {
+            const activeDiscounts = merchantDiscounts.filter(d => d.status === 'active').length;
+            activeElement.textContent = activeDiscounts;
+        }
+    }
+
+    // Show error in table
+    function showMerchantDiscountsError(message) {
+        const tbody = document.getElementById('merchantDiscountsTableBody');
+        if (!tbody) return;
+
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                    <div>Error loading merchant discounts: ${message}</div>
+                    <button onclick="refreshMerchantDiscounts()" class="btn-primary" style="margin-top: 1rem;">
+                        <i class="fas fa-sync-alt"></i> Try Again
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+
+    // Edit merchant discount
+    function editMerchantDiscount(discountId) {
+        const discount = merchantDiscounts.find(d => d.id === discountId);
+        if (discount) {
+            alert(`Edit Merchant Discount:\n\nCode: ${discount.discountCode}\nMerchant: ${discount.merchantName}\nValue: ${discount.discountValue}${discount.discountType === 'percentage' ? '%' : ' IQD'}\n\n(Edit functionality to be implemented)`);
+        }
+    }
+
+    // Delete merchant discount
+    function deleteMerchantDiscount(discountId) {
+        const discount = merchantDiscounts.find(d => d.id === discountId);
+        if (discount && confirm(`Are you sure you want to delete the discount "${discount.discountCode}" from ${discount.merchantName}?`)) {
+            console.log('🗑️ Deleting discount:', discountId);
+            // Remove from array
+            merchantDiscounts = merchantDiscounts.filter(d => d.id !== discountId);
+            renderMerchantDiscounts();
+            updateMerchantDiscountStats();
+            alert('Discount deleted successfully!');
+        }
+    }
+
+    // Load merchant discounts on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📋 Initializing merchant discounts section...');
+        setTimeout(() => {
+            refreshMerchantDiscounts();
+        }, 500); // Small delay to ensure API is loaded
+    });
+</script>
+
 <!-- Sidebar Loading Script -->
 <script>
     // Load sidebar content
