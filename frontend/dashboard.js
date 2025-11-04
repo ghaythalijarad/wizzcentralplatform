@@ -81,13 +81,21 @@ function initializeDashboardFeatures() {
 }
 
 async function loadDashboardStats() {
-    console.log('🔢 Loading dashboard stats from REAL AWS DynamoDB data...');
+    console.log('═══════════════════════════════════════════════════');
+    console.log('🔢 loadDashboardStats() FUNCTION CALLED');
+    console.log('🔢 Timestamp:', new Date().toISOString());
+    console.log('🔢 window.dataService exists:', !!window.dataService);
+    console.log('🔢 AWS object exists:', !!window.AWS);
+    console.log('═══════════════════════════════════════════════════');
 
     try {
         // Initialize AWS data service first
         if (!window.dataService) {
+            console.error('❌ CRITICAL: window.dataService is NOT available!');
             throw new Error('dataService not available');
         }
+        
+        console.log('✅ dataService found, calling initialize()...');
 
         await window.dataService.initialize();
         console.log('✅ AWS dataService initialized');
@@ -516,6 +524,11 @@ function showFallbackStats() {
 
 // Initialize dashboard functionality
 function initializeDashboard() {
+    console.log('🔧 initializeDashboard() called');
+    
+    // Load dashboard statistics FIRST (most important!)
+    loadDashboardStats();
+    
     // Handle window resize
     window.addEventListener('resize', handleResize);
 
