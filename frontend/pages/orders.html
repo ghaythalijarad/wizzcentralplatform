@@ -501,6 +501,16 @@
             }
 
             allOrders = result.orders || [];
+            
+            // Process orders to add formatted fields
+            allOrders = allOrders.map(order => ({
+                ...order,
+                cleanOrderId: order.orderId,
+                formattedDate: formatOrderDate(order.createdAt),
+                totalAmount: extractTotalAmount(order.total),
+                customerEmail: order.customerPhone || ''
+            }));
+            
             filteredOrders = [...allOrders];
 
             updateStatistics();
@@ -519,6 +529,49 @@
                     </tr>
                 `;
         }
+    }
+
+    // Helper function to format order date
+    function formatOrderDate(dateString) {
+        if (!dateString || dateString === 'N/A') return 'N/A';
+        
+        try {
+            // Handle ISO string or timestamp
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'Invalid Date';
+            
+            // Format as: Nov 4, 2025
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return 'Invalid Date';
+        }
+    }
+    
+    // Helper function to extract total amount from string
+    function extractTotalAmount(totalString) {
+        if (!totalString) return 0;
+        
+        // If it's already a number
+        if (typeof totalString === 'number') return totalString;
+        
+        // If it's a string like "25000 IQD" or "N/A"
+        if (typeof totalString === 'string') {
+            if (totalString === 'N/A') return 0;
+            
+            // Extract numbers from string
+            const match = totalString.match(/[\d,]+/);
+            if (match) {
+                const number = parseFloat(match[0].replace(/,/g, ''));
+                return isNaN(number) ? 0 : number;
+            }
+        }
+        
+        return 0;
     }
 
     // Update statistics
