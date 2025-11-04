@@ -81,206 +81,146 @@ function initializeDashboardFeatures() {
 }
 
 async function loadDashboardStats() {
-    console.log('🔢 Loading dashboard stats from Orders and Promotions APIs...');
+    console.log('🔢 Loading dashboard stats from REAL AWS DynamoDB data...');
 
     try {
-        // Try to load stats from Orders and Promotions APIs
-        let ordersData = null;
-        let campaignsData = null;
-        let merchantDiscountsData = null;
-        let hasRealData = false;
+        // Initialize AWS data service first
+        if (!window.dataService) {
+            throw new Error('dataService not available');
+        }
 
-        // Load Orders Data
+        await window.dataService.initialize();
+        console.log('✅ AWS dataService initialized');
+
+        const stats = {
+            customersCount: 0,
+            merchantsCount: 0,
+            driversCount: 0,
+            ordersCount: 0,
+            revenueCount: 0,
+            ticketsCount: 0,
+            promotionsCount: 0
+        };
+
+        // Define the real DynamoDB tables we'll scan
+        const tables = {
+            customers: 'WizzUser_users_dev',
+            merchants: 'WhizzMerchants_Businesses',
+            drivers: 'WhizzDrivers_dev',
+            orders: 'WizzOrders',
+            transactions: 'WizzUser_transactions_dev',
+            promotions: 'WhizzMerchants_Discounts'
+        };
+
+        console.log('📊 Scanning DynamoDB tables for real data...');
+
+        // 1. Get REAL customers count
         try {
-            console.log('📦 Loading orders data...');
-            if (window.WizzOrdersAPI) {
-                await window.WizzOrdersAPI.initialize();
-                const ordersResult = await window.WizzOrdersAPI.getOrders(100);
-                ordersData = ordersResult.orders || [];
-                console.log(`✅ Loaded ${ordersData.length} orders`);
-                hasRealData = true;
-            }
+            const customersResult = await window.dataService.scan(tables.customers, { Select: 'COUNT' });
+            stats.customersCount = customersResult?.Count || 0;
+            console.log(`✅ Customers: ${stats.customersCount} (from ${tables.customers})`);
         } catch (error) {
-            console.warn('⚠️ Failed to load orders:', error.message);
+            console.warn(`⚠️ Failed to get customers:`, error.message);
         }
 
-        // Load Campaigns Data
+        // 2. Get REAL merchants count
         try {
-            console.log('🎯 Loading campaigns data...');
-            if (window.WizzCampaignsAPI) {
-                await window.WizzCampaignsAPI.initialize();
-                const campaignsResult = await window.WizzCampaignsAPI.getCampaigns(100);
-                campaignsData = campaignsResult.campaigns || [];
-                console.log(`✅ Loaded ${campaignsData.length} campaigns`);
-                hasRealData = true;
-            }
+            const merchantsResult = await window.dataService.scan(tables.merchants, { Select: 'COUNT' });
+            stats.merchantsCount = merchantsResult?.Count || 0;
+            console.log(`✅ Merchants: ${stats.merchantsCount} (from ${tables.merchants})`);
         } catch (error) {
-            console.warn('⚠️ Failed to load campaigns:', error.message);
+            console.warn(`⚠️ Failed to get merchants:`, error.message);
         }
 
-        // Load Merchant Discounts Data
+        // 3. Get REAL drivers count
         try {
-            console.log('🏪 Loading merchant discounts data...');
-            if (window.WizzMerchantDiscountsAPI) {
-                await window.WizzMerchantDiscountsAPI.initialize();
-                const discountsResult = await window.WizzMerchantDiscountsAPI.getMerchantDiscounts(100);
-                merchantDiscountsData = discountsResult.discounts || [];
-                console.log(`✅ Loaded ${merchantDiscountsData.length} merchant discounts`);
-                hasRealData = true;
-            }
+            const driversResult = await window.dataService.scan(tables.drivers, { Select: 'COUNT' });
+            stats.driversCount = driversResult?.Count || 0;
+            console.log(`✅ Drivers: ${stats.driversCount} (from ${tables.drivers})`);
         } catch (error) {
-            console.warn('⚠️ Failed to load merchant discounts:', error.message);
+            console.warn(`⚠️ Failed to get drivers:`, error.message);
         }
 
-        // Calculate statistics from loaded data
-        if (hasRealData) {
-            const stats = calculateDashboardStatistics(ordersData, campaignsData, merchantDiscountsData);
-            updateDashboardUI(stats);
-            showDashboardDataSourceIndicator('real');
-            console.log('✅ Dashboard stats loaded from real APIs:', stats);
-            return;
-        }
-
-        // Fallback to AWS DynamoDB if APIs failed
-        console.log('🔄 Falling back to AWS DynamoDB data...');
-        if (window.dataService) {
-            try {
-                await window.dataService.initialize();
-                console.log('🔄 Attempting to load real data from AWS...');
-                
-                const tables = {
-                    customersCount: 'WizzUser_users_dev',
-                    merchantsCount: 'WhizzMerchants_Businesses',
-                    driversCount: 'WhizzDrivers_dev',
-                    ordersCount: 'WizzUser_transactions_dev',
-                    promotionsCount: 'WhizzMerchants_Discounts',
-                    ticketsCount: 'WizzUser_users_dev' 
-                };
-
-                const counts = {};
-                let awsSuccess = true;
-
-                // Try to get at least one table count to test AWS connectivity
-                try {
-                    const testRes = await window.dataService.scan('WizzUser_users_dev', { Select: 'COUNT' });
-                    const testCount = testRes && typeof testRes.Count === 'number' ? testRes.Count : 0;
-                    console.log(`✅ AWS Connection test successful - found ${testCount} customers`);
-                } catch (testError) {
-                    console.warn('⚠️ AWS connection failed, falling back to demo data:', testError.message);
-                    awsSuccess = false;
-                }
-
-                if (awsSuccess) {
-                    // Update each stat card via data-service.scan with Select: COUNT
-                    for (const [elementId, tableName] of Object.entries(tables)) {
-                        try {
-                            // Special handling for promotions count - get actual active promotions
-                            if (elementId === 'promotionsCount') {
-                                const platformDiscounts = await window.dataService.getPlatformDiscounts();
-                                const activePromotions = platformDiscounts.filter(promo => {
-                                    const isActive = promo.isActive === true || promo.isActive === 'true';
-                                    const now = new Date();
-                                    const startDate = promo.startDate ? new Date(promo.startDate) : null;
-                                    const endDate = promo.endDate ? new Date(promo.endDate) : null;
-                                    const withinDateRange = (!startDate || now >= startDate) && (!endDate || now <= endDate);
-                                    return isActive && withinDateRange;
-                                }).length;
-                                
-                                counts[elementId.replace('Count','')] = activePromotions;
-                                const el = document.getElementById(elementId);
-                                if (el) el.textContent = activePromotions.toString();
-                                console.log(`✅ ${elementId}: ${activePromotions} (active promotions)`);
-                                continue;
-                            }
-                            
-                            const res = await window.dataService.scan(tableName, { Select: 'COUNT' });
-                            const count = res && typeof res.Count === 'number' ? res.Count : 0;
-                            counts[elementId.replace('Count','')] = count;
-                            const el = document.getElementById(elementId);
-                            if (el) el.textContent = count.toLocaleString();
-                            console.log(`✅ ${elementId}: ${count} (real data)`);
-                        } catch (error) {
-                            console.warn(`Count fallback for ${elementId}:`, error?.message || error);
-                            const el = document.getElementById(elementId);
-                            if (el) el.textContent = '0';
-                        }
-                    }
-                    
-                    // Also load recent businesses list via dataService helper
-                    try {
-                        const recent = await window.dataService.getRecentBusinesses(5);
-                        counts.recentMerchants = Array.isArray(recent) ? recent.length : 0;
-                    } catch (_) { 
-                        counts.recentMerchants = 0;
-                    }
-
-                    // Show success indicator
-                    showDashboardDataSourceIndicator('real');
-                    
-                    console.log('✅ Dashboard stats loaded (real AWS data)');
-                    return; // Exit successfully
-                } else {
-                    throw new Error('AWS credentials not available');
-                }
-            } catch (awsError) {
-                console.warn('⚠️ AWS data loading failed, using demo endpoint:', awsError.message);
-                throw awsError; // Re-throw to trigger demo fallback
-            }
-        } else {
-            throw new Error('dataService is not available');
-        }
-    } catch (error) {
-        // Fallback to demo endpoint
-        console.log('🎭 Loading dashboard stats from demo endpoint...');
-        
+        // 4. Get REAL orders from WizzOrders table
         try {
-            const response = await fetch('/dashboard/stats/demo');
-            if (!response.ok) {
-                throw new Error(`Demo endpoint failed: ${response.status}`);
-            }
-            
-            const demoData = await response.json();
-            console.log('✅ Demo dashboard stats loaded:', demoData);
-            
-            if (demoData.success && demoData.data) {
-                const stats = demoData.data;
-                const counts = {};
-                
-                // Update all stat cards with demo data
-                Object.entries(stats).forEach(([key, value]) => {
-                    const el = document.getElementById(key);
-                    if (el) {
-                        if (key.includes('revenue') || key.includes('Revenue')) {
-                            el.textContent = `${value.toLocaleString()} IQD`;
-                        } else if (key.includes('Rate')) {
-                            el.textContent = `${value}%`;
-                        } else if (key.includes('Time')) {
-                            el.textContent = `${value} min`;
-                        } else {
-                            el.textContent = value.toLocaleString();
-                        }
-                        console.log(`✅ ${key}: ${value} (demo data)`);
-                    }
-                    counts[key.replace('Count', '')] = value;
-                });
-                
-                // Show data source indicator
-                showDashboardDataSourceIndicator('demo');
-                
-                console.log('✅ Dashboard stats loaded (demo data)');
-                return; // Exit successfully
-            }
-        } catch (demoError) {
-            console.error('❌ Demo endpoint also failed:', demoError);
-            // Set all values to 0 as final fallback
-            const statElements = ['customersCount', 'merchantsCount', 'driversCount', 'ordersCount', 'promotionsCount', 'ticketsCount'];
-            statElements.forEach(id => {
-                const element = document.getElementById(id);
-                if (element) element.textContent = '0';
+            const ordersResult = await window.dataService.scan(tables.orders, { 
+                Limit: 100,
+                FilterExpression: 'begins_with(PK, :prefix)',
+                ExpressionAttributeValues: { ':prefix': 'ORDER#' }
             });
             
-            showDashboardDataSourceIndicator('failed');
+            const orders = ordersResult?.Items || [];
+            console.log(`✅ Found ${orders.length} orders in WizzOrders table`);
+
+            // Filter orders from today
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const ordersToday = orders.filter(order => {
+                if (!order.orderDate && !order.createdAt && !order.timestamp) return false;
+                
+                const dateStr = order.orderDate || order.createdAt || order.timestamp;
+                const orderDate = new Date(dateStr);
+                return orderDate >= today;
+            });
+
+            stats.ordersCount = ordersToday.length;
+            console.log(`✅ Orders Today: ${stats.ordersCount}`);
+
+            // Calculate revenue from today's orders
+            ordersToday.forEach(order => {
+                const totalField = order.total || order.totalAmount || order.amount || '0';
+                const numericValue = parseFloat(totalField.toString().replace(/[^0-9.]/g, ''));
+                if (!isNaN(numericValue)) {
+                    stats.revenueCount += numericValue;
+                }
+            });
+            console.log(`✅ Revenue Today: $${stats.revenueCount.toFixed(2)}`);
+
+        } catch (error) {
+            console.warn(`⚠️ Failed to get orders:`, error.message);
         }
+
+        // 5. Get REAL promotions count
+        try {
+            const promotionsResult = await window.dataService.scan(tables.promotions, { 
+                FilterExpression: 'attribute_exists(isActive) AND isActive = :active',
+                ExpressionAttributeValues: { ':active': true }
+            });
+            stats.promotionsCount = promotionsResult?.Items?.length || 0;
+            console.log(`✅ Active Promotions: ${stats.promotionsCount} (from ${tables.promotions})`);
+        } catch (error) {
+            console.warn(`⚠️ Failed to get promotions:`, error.message);
+        }
+
+        // 6. Support tickets - would need a real tickets table
+        stats.ticketsCount = 0;
+
+        // Update UI with real data
+        updateDashboardUI(stats);
+        showDashboardDataSourceIndicator('real');
+        console.log('✅ Dashboard stats loaded from REAL AWS data:', stats);
+        
+        return;
+
+    } catch (error) {
+        console.error('❌ Failed to load real AWS data:', error.message);
+        console.log('📋 Setting all stats to 0 as fallback');
+        
+        // Set all values to 0 as fallback
+        const stats = {
+            customersCount: 0,
+            merchantsCount: 0,
+            driversCount: 0,
+            ordersCount: 0,
+            revenueCount: 0,
+            ticketsCount: 0,
+            promotionsCount: 0
+        };
+        
+        updateDashboardUI(stats);
+        showDashboardDataSourceIndicator('failed');
+        console.error('❌ All data sources failed, showing zeros');
     }
 }
 
