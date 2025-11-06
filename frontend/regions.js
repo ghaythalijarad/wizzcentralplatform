@@ -45,6 +45,29 @@ class RegionsManager {
         }
     }
 
+    // ===== Notification helpers (in-page banners + console fallbacks) =====
+    showNotification(message, type = 'info') {
+        try {
+            const banner = document.getElementById('apiErrorBanner');
+            if (banner) {
+                banner.style.display = 'block';
+                banner.style.background = type === 'error' ? 'var(--md-sys-color-error-container)' : 'var(--md-sys-color-surface-container-lowest)';
+                banner.style.borderColor = type === 'error' ? 'var(--md-sys-color-error)' : 'var(--md-sys-color-outline-variant)';
+                banner.style.color = 'var(--md-sys-color-on-surface)';
+                banner.textContent = message;
+                // Auto-hide non-error messages after short delay
+                if (type !== 'error') {
+                    setTimeout(() => { try { banner.style.display = 'none'; } catch {} }, 3500);
+                }
+            } else {
+                console.log(`[${type.toUpperCase()}]`, message);
+            }
+        } catch (e) { console.log(message); }
+    }
+
+    showError(message) { this.showNotification(message, 'error'); }
+    showSuccess(message) { this.showNotification(message, 'success'); }
+
     _detectApiBase() {
         try {
             const host = (window.location && window.location.hostname) || '';
@@ -363,7 +386,7 @@ class RegionsManager {
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
             const backendRegions = await this.fetchRegionsFromBackend();
             if (Array.isArray(backendRegions)) {
-                this.regions = backendRegions; // one page when in server mode
+                this.regions = backendRegions;
                 this.lastPageCount = backendRegions.length;
                 this.renderRegionsList();
                 this.updateStatistics?.();
@@ -382,8 +405,29 @@ class RegionsManager {
         try {
             const tbody = document.getElementById('regionsTableBody');
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
+
+            // Build query params based on current filters + server/client mode
+            const params = new URLSearchParams();
+            const levelEl = document.getElementById('levelFilter');
+            const statusEl = document.getElementById('statusFilter');
+            const searchEl = document.getElementById('regionSearch');
+            if (levelEl && levelEl.value !== '') params.set('level', String(parseInt(levelEl.value, 10)));
+            if (statusEl && statusEl.value !== '') params.set('active', statusEl.value);
+            if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
+
+            if (this.pageMode === 'server') {
+                params.set('pageMode', 'server');
+                params.set('limit', String(this.itemsPerPage));
+                const token = this.tokenStack[this.serverPageIndex] || null;
+                if (token) params.set('nextToken', token);
+            } else {
+                // client mode fetch-all then paginate locally
+                params.set('limit', '1000');
+                params.set('offset', '0');
+            }
+
+            const url = `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
             const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
-            const url = `${this._apiBase}/regions`;
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
             if (!response.ok) {
                 await this.maybeHandleAwsAuthError(response, url);
@@ -401,7 +445,9 @@ class RegionsManager {
             }
             const result = await response.json();
             const list = result?.data || result?.regions || (Array.isArray(result) ? result : []);
-            console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A');
+            this.lastNextToken = result?.pagination?.nextToken || null;
+            console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
+
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
             const findGovernorateName = (rid) => {
                 let cursor = rawById.get(rid);
@@ -643,18 +689,17 @@ class RegionsManager {
     }
 
     async nextServerPage() {
-        if (!this.lastNextToken) return; // nothing more
-        // advance to next page start token
+        if (!this.lastNextToken) return;
         this.serverPageIndex += 1;
-        // ensure token stack has the token for this page
+        // store token for this page index (acts as ExclusiveStartKey for the requested page)
         this.tokenStack[this.serverPageIndex] = this.lastNextToken;
-        await this.loadRegions();
+        return this.loadRegions();
     }
 
     async previousServerPage() {
         if (this.serverPageIndex <= 0) return;
         this.serverPageIndex -= 1;
-        await this.loadRegions();
+        return this.loadRegions();
     }
 
     async maybeHandleAwsAuthError(response, endpoint) {

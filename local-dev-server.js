@@ -79,6 +79,16 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Legacy path rewrite: /frontend/* -> /* (e.g., /frontend/pages/regions.html -> /pages/regions.html)
+app.use((req, res, next) => {
+    if (req.path.startsWith('/frontend/')) {
+        const target = req.path.replace(/^\/frontend/, '');
+        console.log(`🔀 Rewriting legacy path ${req.path} -> ${target}`);
+        return res.redirect(target);
+    }
+    next();
+});
+
 // ============================================
 // STATIC FILE SERVING
 // ============================================
@@ -1341,6 +1351,13 @@ app.get('/frontend/regions-management-iraq.html', (req, res) => {
 app.get('/regions-management-iraq.html', (req, res) => {
     console.log('📍 Redirecting old regions URL to new location...');
     res.redirect('/pages/regions.html');
+});
+
+// NEW: Backward-compatibility redirect for /frontend/pages/* paths
+app.get('/frontend/pages/*', (req, res) => {
+    const newPath = req.path.replace(/^\/frontend/, '');
+    console.log(`📍 Redirecting legacy path ${req.path} -> ${newPath}`);
+    res.redirect(newPath);
 });
 
 // Health check
