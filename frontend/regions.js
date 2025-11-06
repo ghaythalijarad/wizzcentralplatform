@@ -27,6 +27,7 @@ class RegionsManager {
         this.serverPageIndex = 0; // current index in tokenStack
         this.lastNextToken = null; // nextToken returned by last fetch
         this.lastPageCount = 0; // last page item count
+        this._apiBase = this._detectApiBase();
 
         console.log('🗺️ RegionsManager: Constructor called, readyState:', document.readyState);
 
@@ -42,6 +43,18 @@ class RegionsManager {
             // Use setTimeout to ensure everything is rendered
             setTimeout(() => this.init(), 100);
         }
+    }
+
+    _detectApiBase() {
+        try {
+            const host = (window.location && window.location.hostname) || '';
+            // Local dev uses Express routes under /api
+            if (host === 'localhost' || host === '127.0.0.1') return '/api';
+            // Production: use API Gateway base from config.js (already includes stage)
+            const cfg = window.WIZZCENTRAL_CONFIG || {};
+            const base = (cfg.API_BASE_URL || '').replace(/\/$/, '');
+            return base || '/api';
+        } catch { return '/api'; }
     }
 
     async init() {
@@ -366,68 +379,49 @@ class RegionsManager {
     }
 
     async fetchRegionsFromBackend() {
-        // Build query for server-side pagination when enabled
-        const params = new URLSearchParams();
-        if (this.pageMode === 'server') {
-            params.set('pageMode', 'server');
-            params.set('limit', String(this.itemsPerPage));
-            const token = this.tokenStack?.[this.serverPageIndex] || null;
-            if (token) params.set('nextToken', token);
-            // Forward current filters to backend
-            const levelFilter = document.getElementById('levelFilter');
-            const statusFilter = document.getElementById('statusFilter');
-            const searchInput = document.getElementById('regionSearch');
-            if (levelFilter && levelFilter.value) {
-                let lvl = parseInt(levelFilter.value, 10);
-                if (lvl === 4) lvl = 3; // normalize UI streets to backend 3
-                params.set('level', String(lvl));
+        try {
+            const tbody = document.getElementById('regionsTableBody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
+            const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+            const url = `${this._apiBase}/regions`;
+            let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
+            if (!response.ok) {
+                await this.maybeHandleAwsAuthError(response, url);
+                const idToken = sessionStorage.getItem('idToken');
+                if (idToken) {
+                    response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }});
+                }
             }
-            if (statusFilter && statusFilter.value !== '') params.set('active', statusFilter.value);
-            if (searchInput && searchInput.value.trim()) params.set('search', searchInput.value.trim());
-        } else {
-            // client mode uses default endpoint and will filter locally
-            params.set('limit', '1000');
-        }
-
-        let url = '/api/regions';
-        const qs = params.toString();
-        if (qs) url += `?${qs}`;
-
-        let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
-        if (!response.ok) {
-            await this.maybeHandleAwsAuthError(response, url);
-            const idToken = sessionStorage.getItem('idToken');
-            if (idToken) {
-                response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }});
+            if (!response.ok) {
+                const msg = await response.text();
+                if (!isLocal && typeof showApiErrorBanner === 'function') {
+                    showApiErrorBanner(`Failed to load regions (${response.status}). ${url} ${msg ? '- ' + msg : ''}`);
+                }
+                throw new Error(`HTTP ${response.status}: ${msg}`);
             }
+            const result = await response.json();
+            const list = result?.data || result?.regions || (Array.isArray(result) ? result : []);
+            console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A');
+            const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
+            const findGovernorateName = (rid) => {
+                let cursor = rawById.get(rid);
+                let steps = 0;
+                while (cursor && steps < 10) {
+                    const lvl = Number(cursor.level);
+                    if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
+                    if (!cursor.parent_id) break;
+                    cursor = rawById.get(cursor.parent_id);
+                    steps++;
+                }
+                return undefined;
+            };
+            const transformed = list.map(r => this.transformRegionData(r, findGovernorateName));
+            console.log('🧭 Transformed regions count:', transformed.length);
+            return transformed;
+        } catch (e) {
+            console.error('fetchRegionsFromBackend failed:', e);
+            throw e;
         }
-        if (!response.ok) {
-            const msg = await response.text();
-            throw new Error(`HTTP ${response.status}: ${msg}`);
-        }
-        const result = await response.json();
-        const list = result?.data || result?.regions || (Array.isArray(result) ? result : []);
-        // Track server nextToken
-        if (this.pageMode === 'server') {
-            this.lastNextToken = result?.pagination?.nextToken || null;
-        }
-        console.log('📡 /api/regions returned items:', Array.isArray(list) ? list.length : 'N/A');
-        const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
-        const findGovernorateName = (rid) => {
-            let cursor = rawById.get(rid);
-            let steps = 0;
-            while (cursor && steps < 10) {
-                const lvl = Number(cursor.level);
-                if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
-                if (!cursor.parent_id) break;
-                cursor = rawById.get(cursor.parent_id);
-                steps++;
-            }
-            return undefined;
-        };
-        const transformed = list.map(r => this.transformRegionData(r, findGovernorateName));
-        console.log('🧭 Transformed regions count:', transformed.length);
-        return transformed;
     }
 
     renderRegionsList() {
@@ -940,23 +934,19 @@ class RegionsManager {
 
     async saveRegionToBackend(region) {
         try {
-            // Try without auth first
-            let response = await fetch('/api/regions', {
+            const url = `${this._apiBase}/regions`;
+            let response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(region)
             });
             if (!response.ok) {
-                await this.maybeHandleAwsAuthError(response, '/api/regions [POST]');
-                // Fallback with idToken if available
+                await this.maybeHandleAwsAuthError(response, `${url} [POST]`);
                 const idToken = sessionStorage.getItem('idToken');
                 if (idToken) {
-                    response = await fetch('/api/regions', {
+                    response = await fetch(url, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${idToken}`,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify(region)
                     });
                 }
@@ -992,12 +982,13 @@ class RegionsManager {
         this.regions[idx].isActive = !prev; // optimistic
         this.renderRegionsList();
         try {
-            let resp = await fetch(`/api/regions/${regionId}/toggle`, { method: 'PATCH' });
+            let url = `${this._apiBase}/regions/${regionId}/toggle`;
+            let resp = await fetch(url, { method: 'PATCH' });
             if (!resp.ok) {
-                await this.maybeHandleAwsAuthError(resp, `/api/regions/${regionId}/toggle`);
+                await this.maybeHandleAwsAuthError(resp, url);
                 const idToken = sessionStorage.getItem('idToken');
                 if (idToken) {
-                    resp = await fetch(`/api/regions/${regionId}/toggle`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${idToken}` }});
+                    resp = await fetch(url, { method: 'PATCH', headers: { 'Authorization': `Bearer ${idToken}` }});
                 }
             }
             if (!resp.ok) throw new Error(await resp.text());
@@ -1019,11 +1010,12 @@ class RegionsManager {
         const ok = window.confirm('Delete this region? This cannot be undone.');
         if (!ok) return;
         try {
-            let resp = await fetch(`/api/regions/${regionId}`, { method: 'DELETE' });
+            let url = `${this._apiBase}/regions/${regionId}`;
+            let resp = await fetch(url, { method: 'DELETE' });
             if (!resp.ok) {
-                await this.maybeHandleAwsAuthError(resp, `/api/regions/${regionId} [DELETE]`);
+                await this.maybeHandleAwsAuthError(resp, `${url} [DELETE]`);
                 const idToken = sessionStorage.getItem('idToken');
-                if (idToken) resp = await fetch(`/api/regions/${regionId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` }});
+                if (idToken) resp = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` }});
             }
             if (!resp.ok) throw new Error(await resp.text());
             // Remove from memory and refresh

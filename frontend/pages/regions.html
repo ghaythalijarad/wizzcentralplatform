@@ -969,6 +969,16 @@
             background: var(--md-sys-color-error-container);
             color: var(--md-sys-color-on-error-container);
         }
+        .api-error-banner {
+            margin: 8px 12px 0 12px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--md-sys-color-error);
+            color: var(--md-sys-color-on-error-container);
+            background: var(--md-sys-color-error-container);
+            display: none;
+            font-size: .85rem;
+        }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -1042,6 +1052,7 @@
                     </div>
                     <div id="regionInfoPanel" class="region-info-panel" style="display:none;"></div>
                     <div id="regionsMap"></div>
+                    <div id="apiErrorBanner" class="api-error-banner"></div>
                 </div>
 
                 <!-- Regions List -->
@@ -1376,6 +1387,13 @@
                     form.dispatchEvent(event);
                 }
             }
+        }
+
+        function showApiErrorBanner(message) {
+            const el = document.getElementById('apiErrorBanner');
+            if (!el) return;
+            el.textContent = message;
+            el.style.display = 'block';
         }
     </script>
 </body>
