@@ -17,6 +17,9 @@ class RegionsManager {
         this.awsAuthWarningShown = this.awsAuthWarningShown || false;
         this._modalEl = null;
         this._formEl = null;
+        this._drawMap = null;
+        this._drawnLayer = null;
+        this._drawnBoundary = null; // GeoJSON-like { type, coordinates }
 
         console.log('🗺️ RegionsManager: Constructor called, readyState:', document.readyState);
 
@@ -70,6 +73,19 @@ class RegionsManager {
                     this.saveRegion();
                 });
             }
+
+            // Bind Draw Area modal events
+            const drawBtn = document.getElementById('drawAreaBtn');
+            const drawModal = document.getElementById('drawRegionModal');
+            const closeDrawBtn = document.getElementById('closeDrawRegionModalBtn');
+            const useShapeBtn = document.getElementById('useDrawnShapeBtn');
+            const clearShapeBtn = document.getElementById('clearDrawnShapeBtn');
+            if (drawBtn && drawModal) {
+                drawBtn.addEventListener('click', () => this.openDrawRegionModal());
+            }
+            if (closeDrawBtn) closeDrawBtn.addEventListener('click', () => this.closeDrawRegionModal());
+            if (useShapeBtn) useShapeBtn.addEventListener('click', () => this.applyDrawnBoundary());
+            if (clearShapeBtn) clearShapeBtn.addEventListener('click', () => this.clearDrawnBoundary());
 
             console.log('✅ RegionsManager: Initialized successfully');
         } catch (error) {
@@ -128,6 +144,167 @@ class RegionsManager {
             this.showSuccess('Coordinates set from map');
         }
         console.log('Map clicked at:', e.latlng);
+    }
+
+    openDrawRegionModal() {
+        const modal = document.getElementById('drawRegionModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        setTimeout(() => this.initializeDrawMap(), 50);
+    }
+
+    closeDrawRegionModal() {
+        const modal = document.getElementById('drawRegionModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    initializeDrawMap() {
+        const container = document.getElementById('regionDrawMap');
+        if (!container || typeof L === 'undefined' || typeof L.Draw === 'undefined') {
+            this.showError('Map draw tools not available');
+            return;
+        }
+        if (this._drawMap) {
+            this._drawMap.invalidateSize();
+            return;
+        }
+        const center = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+        const map = L.map('regionDrawMap').setView([center.lat, center.lng], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+        const drawnItems = new L.FeatureGroup();
+        map.addLayer(drawnItems);
+
+        const drawControl = new L.Control.Draw({
+            position: 'topleft',
+            draw: {
+                marker: false,
+                circle: false,
+                rectangle: false,
+                circlemarker: false,
+                polyline: { shapeOptions: { color: '#ff7f50' } },
+                polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#1e88e5' } }
+            },
+            edit: { featureGroup: drawnItems, remove: true }
+        });
+        map.addControl(drawControl);
+
+        map.on(L.Draw.Event.CREATED, (e) => {
+            // Replace previous shape
+            drawnItems.clearLayers();
+            this._drawnLayer = e.layer;
+            drawnItems.addLayer(this._drawnLayer);
+            this._drawnBoundary = this._convertLayerToBoundary(e.layer);
+            this._updateDrawSummary();
+        });
+        map.on(L.Draw.Event.EDITED, () => {
+            if (this._drawnLayer) {
+                this._drawnBoundary = this._convertLayerToBoundary(this._drawnLayer);
+                this._updateDrawSummary();
+            }
+        });
+        map.on(L.Draw.Event.DELETED, () => {
+            this._drawnLayer = null;
+            this._drawnBoundary = null;
+            this._updateDrawSummary();
+        });
+
+        this._drawMap = map;
+        setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    _convertLayerToBoundary(layer) {
+        if (!layer) return null;
+        if (layer.getLatLngs) {
+            // Polygon or Polyline
+            const latlngs = layer.getLatLngs();
+            // Leaflet returns multi-d arrays. Normalize to single ring for Polygon or sequence for LineString
+            if (layer instanceof L.Polygon) {
+                const ring = (Array.isArray(latlngs[0]) ? latlngs[0] : latlngs).map(p => [Number(p.lng), Number(p.lat)]);
+                if (ring.length >= 3) {
+                    // Ensure closure for GeoJSON
+                    const first = ring[0];
+                    const last = ring[ring.length - 1];
+                    if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+                    return { type: 'Polygon', coordinates: [ring] };
+                }
+            } else if (layer instanceof L.Polyline) {
+                const line = (Array.isArray(latlngs[0]) ? latlngs[0] : latlngs).map(p => [Number(p.lng), Number(p.lat)]);
+                if (line.length >= 2) return { type: 'LineString', coordinates: line };
+            }
+        }
+        return null;
+    }
+
+    _updateDrawSummary() {
+        const el = document.getElementById('drawSummary');
+        if (!el) return;
+        if (!this._drawnBoundary) {
+            el.style.display = 'none';
+            el.textContent = '';
+            return;
+        }
+        const type = this._drawnBoundary.type;
+        const count = this._drawnBoundary.coordinates?.[0]?.length || this._drawnBoundary.coordinates?.length || 0;
+        el.style.display = 'block';
+        el.textContent = `Selected ${type} with ${count} points`;
+    }
+
+    clearDrawnBoundary() {
+        this._drawnBoundary = null;
+        this._drawnLayer = null;
+        if (this._drawMap) {
+            const groups = this._drawMap._layers;
+            // Simple clear by re-initializing FeatureGroup would be cleaner, but we track only via summary
+        }
+        this._updateDrawSummary();
+    }
+
+    applyDrawnBoundary() {
+        if (!this._drawnBoundary) {
+            this.showError('Draw a shape first');
+            return;
+        }
+        // Optional: compute centroid to prefill center
+        try {
+            const centroid = this._computeCentroid(this._drawnBoundary);
+            if (centroid) {
+                const latEl = document.getElementById('coordLat');
+                const lngEl = document.getElementById('coordLng');
+                if (latEl) latEl.value = centroid.lat.toFixed(6);
+                if (lngEl) lngEl.value = centroid.lng.toFixed(6);
+            }
+        } catch {}
+        this.closeDrawRegionModal();
+        this.showSuccess('Area selected from map');
+        this._updateDrawSummary();
+    }
+
+    _computeCentroid(boundary) {
+        if (!boundary || !boundary.coordinates) return null;
+        if (boundary.type === 'Polygon') {
+            const ring = boundary.coordinates[0];
+            let area = 0, cx = 0, cy = 0;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                const [x1, y1] = ring[j];
+                const [x2, y2] = ring[i];
+                const f = (x1 * y2 - x2 * y1);
+                area += f;
+                cx += (x1 + x2) * f;
+                cy += (y1 + y2) * f;
+            }
+            area *= 0.5;
+            if (area === 0) return null;
+            return { lng: cx / (6 * area), lat: cy / (6 * area) };
+        }
+        if (boundary.type === 'LineString') {
+            const pts = boundary.coordinates;
+            const m = pts.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
+            return { lng: m[0] / pts.length, lat: m[1] / pts.length };
+        }
+        return null;
     }
 
     async loadRegions() {
@@ -525,6 +702,11 @@ class RegionsManager {
                 },
                 coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lngVal, radius: isNaN(radiusVal) ? 3000 : radiusVal }
             };
+
+            // Attach boundary if provided via draw modal
+            if (this._drawnBoundary) {
+                payload.boundary = this._drawnBoundary;
+            }
 
             // Persist to backend
             const resp = await this.saveRegionToBackend(payload);

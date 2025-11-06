@@ -13,6 +13,9 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Add Leaflet.draw for polygon/line drawing -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
@@ -1108,14 +1111,18 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Map Tools</label>
-                            <div style="display:flex; gap:.5rem;">
+                            <div style="display:flex; gap:.5rem; flex-wrap: wrap;">
                                 <button type="button" class="btn-map" id="pickOnMapBtn">
                                     <i class="fas fa-location-crosshairs"></i> Pick on Map
                                 </button>
                                 <button type="button" class="btn-secondary" id="useMapCenterBtn">
                                     <i class="fas fa-crosshairs"></i> Use Map Center
                                 </button>
+                                <button type="button" class="btn-secondary" id="drawAreaBtn">
+                                    <i class="fas fa-draw-polygon"></i> Draw Area
+                                </button>
                             </div>
+                            <div id="drawSummary" style="margin-top:.5rem; font-size:.8rem; color:var(--md-sys-color-on-surface-variant); display:none;"></div>
                         </div>
                     </div>
 
@@ -1159,6 +1166,27 @@
                     <span id="saveButtonText">Save Region</span>
                     <span id="saveButtonSpinner" class="loading-spinner" style="display: none; margin-left: 0.5rem;"></span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Draw Region Modal -->
+    <div class="modal" id="drawRegionModal" style="display:none;">
+        <div class="modal-content" style="max-width: 960px; width: 96%; max-height: 90vh;">
+            <div class="modal-header">
+                <h2 class="modal-title">Draw Service Area</h2>
+                <button class="btn-close" id="closeDrawRegionModalBtn" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="regionDrawMap" style="height: 70vh; width: 100%;"></div>
+                <div style="padding: .75rem 1rem; display:flex; gap:.5rem; align-items:center; border-top:1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container-lowest);">
+                    <span style="font-size:.85rem; color: var(--md-sys-color-on-surface-variant);" id="drawHint">Use the polygon/line tools to draw the boundary. Edit/delete with the toolbar.</span>
+                    <div style="flex:1 1 auto"></div>
+                    <button class="btn-secondary" id="clearDrawnShapeBtn" type="button"><i class="fas fa-eraser"></i> Clear</button>
+                    <button class="btn-primary" id="useDrawnShapeBtn" type="button"><i class="fas fa-check"></i> Use This Shape</button>
+                </div>
             </div>
         </div>
     </div>
