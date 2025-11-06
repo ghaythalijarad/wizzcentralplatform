@@ -9,7 +9,8 @@
     "build": "vite build frontend",
     "preview": "vite preview frontend",
     "local": "node local-dev-server.js",
-    "playground": "node regions-api/server.js"
+    "playground": "node regions-api/server.js",
+    "regions:upgrade-gsis": "node backend/upgrade-regions-indexes.js"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",

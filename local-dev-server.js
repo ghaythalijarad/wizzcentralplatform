@@ -209,8 +209,8 @@ const REGIONS_TABLE = 'WizzCentral_Regions';
 
 // Recommended GSIs (must exist on the table). The server will try them first and fall back to Scan if missing:
 //  - GSI1_ParentLevelName:   PK=parent_id,   SK=level_name (format: `L#<level>#N#<name_lower>`)
-//  - GSI2_Level:             PK=level,       SK=name_lower
-//  - GSI3_IsActive:          PK=is_active,   SK=level_updated_at (format: `L#<level>#U#<updated_at>`)
+//  - GSI2_Level:             PK=level_n,     SK=name_lower
+//  - GSI3_IsActive:          PK=is_active_s, SK=level_updated_at (format: `L#<level>#U#<updated_at>`)
 const REGIONS_GSI_PARENT_LEVEL_NAME = 'GSI1_ParentLevelName';
 const REGIONS_GSI_LEVEL = 'GSI2_Level';
 const REGIONS_GSI_IS_ACTIVE = 'GSI3_IsActive';
@@ -876,7 +876,7 @@ app.get('/api/regions', async (req, res) => {
                     TableName: REGIONS_TABLE,
                     IndexName: REGIONS_GSI_LEVEL,
                     KeyConditionExpression: '#lvl = :lvl',
-                    ExpressionAttributeNames: { '#lvl': 'level' },
+                    ExpressionAttributeNames: { '#lvl': 'level_n' },
                     ExpressionAttributeValues: { ':lvl': Number(level) },
                     Limit: Number(limit) || 50
                 };
@@ -888,8 +888,8 @@ app.get('/api/regions', async (req, res) => {
                     TableName: REGIONS_TABLE,
                     IndexName: REGIONS_GSI_IS_ACTIVE,
                     KeyConditionExpression: '#act = :act',
-                    ExpressionAttributeNames: { '#act': 'is_active' },
-                    ExpressionAttributeValues: { ':act': (active === 'true' || active === true) },
+                    ExpressionAttributeNames: { '#act': 'is_active_s' },
+                    ExpressionAttributeValues: { ':act': (active === 'true' || active === true) ? 'true' : 'false' },
                     Limit: Number(limit) || 50
                 };
                 if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
@@ -968,9 +968,9 @@ app.get('/api/regions', async (req, res) => {
         }
 
         // Extra in-memory filters
-        if (level !== undefined && level !== '') regions = regions.filter(r => Number(r.level) === Number(level));
+        if (level !== undefined && level !== '') regions = regions.filter(r => Number(r.level_n ?? r.level) === Number(level));
         if (parent_id) regions = regions.filter(r => r.parent_id === parent_id);
-        if (active !== undefined && active !== '') regions = regions.filter(r => Boolean(r.is_active) === (active === 'true' || active === true));
+        if (active !== undefined && active !== '') regions = regions.filter(r => ((r.is_active === true || r.is_active === 'true') === (active === 'true' || active === true)));
         if (search) {
             const searchLower = String(search).toLowerCase();
             regions = regions.filter(r => (
@@ -982,10 +982,10 @@ app.get('/api/regions', async (req, res) => {
 
         // Level breakdown by numeric levels
         const levelBreakdown = {
-            country: regions.filter(r => Number(r.level) === 0).length,
-            governorates: regions.filter(r => Number(r.level) === 1).length,
-            districts: regions.filter(r => Number(r.level) === 2).length,
-            neighborhoods: regions.filter(r => Number(r.level) === 3).length
+            country: regions.filter(r => Number(r.level_n ?? r.level) === 0).length,
+            governorates: regions.filter(r => Number(r.level_n ?? r.level) === 1).length,
+            districts: regions.filter(r => Number(r.level_n ?? r.level) === 2).length,
+            neighborhoods: regions.filter(r => Number(r.level_n ?? r.level) === 3).length
         };
 
         // Pagination (offset based, client-side within the result set)
@@ -1022,13 +1022,10 @@ app.post('/api/regions', async (req, res) => {
         // Level normalization
         let level = b.level;
         if (typeof level === 'string') {
-            const map = { country: 0, governorate: 1, district: 2, neighborhood: 3 };
-            level = map[level.toLowerCase()] ?? b.level;
-        } else if (typeof b.region_type === 'string') {
-            const mapType = { COUNTRY: 0, GOVERNORATE: 1, DISTRICT: 2, NEIGHBORHOOD: 3 };
-            level = mapType[b.region_type.toUpperCase()] ?? level;
+            const map = { country: 0, governorate: 1, district: 2, neighborhood: 3, '0': 0, '1': 1, '2': 2, '3': 3 };
+            level = map[level.toLowerCase?.() ?? String(level)] ?? Number(level);
         }
-        level = typeof level === 'number' ? level : 3;
+        level = typeof level === 'number' && !Number.isNaN(level) ? level : 3;
 
         // Coordinates normalization
         let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
@@ -1046,7 +1043,8 @@ app.post('/api/regions', async (req, res) => {
             const parentRes = await dynamoDB.send(new GetCommand({ TableName: REGIONS_TABLE, Key: { regionId: b.parent_id } }));
             parentItem = parentRes.Item || null;
             if (!parentItem) return res.status(400).json({ success: false, error: 'Invalid parent_id', message: 'Parent region does not exist', code: 'PARENT_NOT_FOUND' });
-            if (Number(parentItem.level) !== Number(level) - 1) {
+            const parentLevel = Number(parentItem.level_n ?? parentItem.level);
+            if (parentLevel !== Number(level) - 1) {
                 return res.status(400).json({ success: false, error: 'Invalid parent level', message: 'Parent level must be exactly level-1', code: 'PARENT_LEVEL_INVALID' });
             }
             if (b.parent_id === regionId) {
@@ -1080,13 +1078,13 @@ app.post('/api/regions', async (req, res) => {
                 }
             }
             if (!dupItems.length) {
-                // Fallback to level GSI
+                // Fallback to level_n GSI
                 try {
                     const q = await dynamoDB.send(new QueryCommand({
                         TableName: REGIONS_TABLE,
                         IndexName: REGIONS_GSI_LEVEL,
                         KeyConditionExpression: '#lvl = :lvl',
-                        ExpressionAttributeNames: { '#lvl': 'level' },
+                        ExpressionAttributeNames: { '#lvl': 'level_n' },
                         ExpressionAttributeValues: { ':lvl': Number(level) },
                         Limit: 2000
                     }));
@@ -1099,14 +1097,15 @@ app.post('/api/regions', async (req, res) => {
                 // Last resort: table scan
                 const dupScan = await dynamoDB.send(new ScanCommand({
                     TableName: REGIONS_TABLE,
-                    ProjectionExpression: 'regionId, #lvl, parent_id, #nm, name_ar',
+                    ProjectionExpression: 'regionId, #lvl, level_n, parent_id, #nm, name_ar',
                     ExpressionAttributeNames: { '#lvl': 'level', '#nm': 'name' }
                 }));
                 dupItems = dupScan.Items || [];
             }
             const dup = (dupItems || []).find(r => {
                 if (r.regionId === regionId) return false; // skip self when editing
-                if (Number(r.level) !== Number(level)) return false;
+                const rLevel = Number(r.level_n ?? r.level);
+                if (rLevel !== Number(level)) return false;
                 if ((r.parent_id || null) !== (b.parent_id || null)) return false;
                 const nm1 = String(r.name || '').trim().toLowerCase();
                 const ar1 = String(r.name_ar || '').trim().toLowerCase();
@@ -1126,9 +1125,11 @@ app.post('/api/regions', async (req, res) => {
             regionId,
             name: b.name || b.regionName || `Region ${regionId}`,
             name_ar: b.name_ar || b.regionNameArabic || '',
-            level,
+            level, // keep for backward compatibility
+            level_n: Number(level), // helper for GSI2
             parent_id: b.parent_id || null,
             is_active: isActive,
+            is_active_s: isActive ? 'true' : 'false', // helper for GSI3
             governorate_id: b.governorate_id || b.governorate || undefined,
             service_config: b.service_config || b.serviceTypes || undefined,
             delivery_config: b.delivery_config || (b.deliveryFee || b.minimumOrder || b.estimatedDeliveryTime ? {
@@ -1151,8 +1152,8 @@ app.post('/api/regions', async (req, res) => {
         const nameLower = String(item.name || '').trim().toLowerCase();
         if (nameLower) item.name_lower = nameLower;
         if (item.name_ar) item.name_ar_lower = String(item.name_ar).trim().toLowerCase();
-        item.level_name = `L#${item.level}#N#${nameLower}`; // for GSI1 sort key
-        item.level_updated_at = `L#${item.level}#U#${item.updated_at}`; // for GSI3 sort key
+        item.level_name = `L#${item.level_n ?? item.level}#N#${nameLower}`; // for GSI1 sort key
+        item.level_updated_at = `L#${item.level_n ?? item.level}#U#${item.updated_at}`; // for GSI3 sort key
 
         // Create vs Update
         if (!clientProvidedId) {
@@ -1168,7 +1169,7 @@ app.post('/api/regions', async (req, res) => {
             if (!existing.Item) return res.status(404).json({ success: false, error: 'Region not found', message: 'Cannot update non-existing region', code: 'NOT_FOUND' });
             item.createdAt = existing.Item.createdAt || existing.Item.created_at || now;
             // Recompute level_updated_at for update time
-            item.level_updated_at = `L#${item.level}#U#${item.updated_at}`;
+            item.level_updated_at = `L#${item.level_n ?? item.level}#U#${item.updated_at}`;
             await dynamoDB.send(new PutCommand({ TableName: REGIONS_TABLE, Item: item }));
             return res.json({ success: true, message: 'Region updated', region: item, source: 'dynamodb' });
         }
@@ -1198,15 +1199,17 @@ app.patch('/api/regions/:id/toggle', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Region not found', regionId: requestedId, source: 'dynamodb' });
         }
 
-        const previous = Boolean(Item.is_active);
+        const previous = (Item.is_active === true || Item.is_active === 'true');
         const newStatus = !previous;
         const now = new Date().toISOString();
+        const levelNum = Number(Item.level_n ?? Item.level);
+        const newLevelUpdated = `L#${levelNum}#U#${now}`;
 
         const updateRes = await dynamoDB.send(new UpdateCommand({
             TableName: REGIONS_TABLE,
             Key: { regionId: requestedId },
-            UpdateExpression: 'SET is_active = :s, updated_at = :u, updatedAt = :u',
-            ExpressionAttributeValues: { ':s': newStatus, ':u': now },
+            UpdateExpression: 'SET is_active = :s, is_active_s = :ss, updated_at = :u, updatedAt = :u, level_updated_at = :lua',
+            ExpressionAttributeValues: { ':s': newStatus, ':ss': newStatus ? 'true' : 'false', ':u': now, ':lua': newLevelUpdated },
             ReturnValues: 'ALL_NEW'
         }));
 
@@ -1215,7 +1218,7 @@ app.patch('/api/regions/:id/toggle', async (req, res) => {
             data: {
                 regionId: requestedId,
                 previousStatus: previous,
-                newStatus: Boolean(updateRes.Attributes?.is_active),
+                newStatus: (updateRes.Attributes?.is_active === true || updateRes.Attributes?.is_active === 'true'),
                 region: updateRes.Attributes
             },
             source: 'dynamodb',
@@ -1243,13 +1246,13 @@ app.get('/api/regions/statistics', async (req, res) => {
         
         const stats = {
             totalRegions: regions.length,
-            activeRegions: regions.filter(r => r.is_active).length,
-            inactiveRegions: regions.filter(r => !r.is_active).length,
+            activeRegions: regions.filter(r => (r.is_active === true || r.is_active === 'true')).length,
+            inactiveRegions: regions.filter(r => (r.is_active === false || r.is_active === 'false')).length,
             levelBreakdown: {
-                country: regions.filter(r => Number(r.level) === 0).length,
-                governorates: regions.filter(r => Number(r.level) === 1).length,
-                districts: regions.filter(r => Number(r.level) === 2).length,
-                neighborhoods: regions.filter(r => Number(r.level) === 3).length
+                country: regions.filter(r => Number(r.level_n ?? r.level) === 0).length,
+                governorates: regions.filter(r => Number(r.level_n ?? r.level) === 1).length,
+                districts: regions.filter(r => Number(r.level_n ?? r.level) === 2).length,
+                neighborhoods: regions.filter(r => Number(r.level_n ?? r.level) === 3).length
             },
             serviceStats: {
                 totalDrivers: regions.reduce((sum, r) => sum + (r.statistics?.active_drivers || 0), 0),
