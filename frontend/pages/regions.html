@@ -1054,10 +1054,31 @@
                         <label class="form-label">Region Name (Arabic)</label>
                         <input type="text" class="form-input" id="regionNameArabic" placeholder="e.g., بغداد المركز" required>
                     </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Governorate</label>
-                        <select class="form-select" id="governorate" required>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Level</label>
+                            <select class="form-select" id="regionLevel" required>
+                                <option value="3" selected>Neighborhood</option>
+                                <option value="2">District</option>
+                                <option value="1">Governorate</option>
+                                <option value="0">Country</option>
+                            </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Parent Region</label>
+                                <select class="form-select" id="parentRegion">
+                                    <option value="">None</option>
+                                </select>
+                                <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); margin-top: 0.25rem;">
+                                    Parent must be level (selected level - 1)
+                                </div>
+                            </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Governorate (Label only)</label>
+                                <select class="form-select" id="governorate">
                             <option value="">Select Governorate</option>
                             <option value="Baghdad">Baghdad / بغداد</option>
                             <option value="Basra">Basra / البصرة</option>
@@ -1070,7 +1091,33 @@
                         </select>
                     </div>
 
-                    <!-- Removed delivery fee & minimum order fields per simplification -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Latitude</label>
+                            <input type="number" step="0.000001" class="form-input" id="coordLat" placeholder="33.3152">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Longitude</label>
+                            <input type="number" step="0.000001" class="form-input" id="coordLng" placeholder="44.3661">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Radius (meters)</label>
+                            <input type="number" class="form-input" id="coordRadius" placeholder="3000">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Map Tools</label>
+                            <div style="display:flex; gap:.5rem;">
+                                <button type="button" class="btn-map" id="pickOnMapBtn">
+                                    <i class="fas fa-location-crosshairs"></i> Pick on Map
+                                </button>
+                                <button type="button" class="btn-secondary" id="useMapCenterBtn">
+                                    <i class="fas fa-crosshairs"></i> Use Map Center
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="form-row">
                         <div class="form-group">
