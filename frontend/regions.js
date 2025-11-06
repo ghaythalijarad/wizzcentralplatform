@@ -515,22 +515,14 @@ class RegionsManager {
                     </span>
                 </td>
                 <td class="actions-cell">
-                    <button class="action-btn view" data-id="${region.regionId}" title="View Details"><i class="fas fa-eye"></i></button>
-                    <button class="action-btn edit" data-id="${region.regionId}" title="Edit"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn toggle" data-id="${region.regionId}" title="Toggle Status"><i class="fas fa-power-off"></i></button>
-                    <button class="action-btn delete" data-id="${region.regionId}" title="Delete"><i class="fas fa-trash"></i></button>
+                    <button class="action-btn view" onclick="window.viewRegionDetails('${region.regionId}', event)" title="View Details"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn edit" onclick="window.editRegion('${region.regionId}', event)" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn toggle" onclick="window.toggleRegionStatus('${region.regionId}', event)" title="Toggle Status"><i class="fas fa-power-off"></i></button>
+                    <button class="action-btn delete" onclick="window.deleteRegion('${region.regionId}', event)" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>`).join('');
         tbody.innerHTML = rows;
         this.updatePagination?.(this.pageMode === 'server' ? null : this.filteredRegions.length);
-
-        // Bind row action events
-        try {
-            tbody.querySelectorAll('button.view').forEach(btn => btn.addEventListener('click', (e) => this.viewRegionDetails(btn.dataset.id, e)));
-            tbody.querySelectorAll('button.edit').forEach(btn => btn.addEventListener('click', (e) => this.editRegion(btn.dataset.id, e)));
-            tbody.querySelectorAll('button.toggle').forEach(btn => btn.addEventListener('click', (e) => this.toggleRegionStatus(btn.dataset.id, e)));
-            tbody.querySelectorAll('button.delete').forEach(btn => btn.addEventListener('click', (e) => this.deleteRegion(btn.dataset.id, e)));
-        } catch {}
     }
 
     renderMapMarkers() {
@@ -711,7 +703,7 @@ class RegionsManager {
             governorate: gov || (lvl === 0 ? '—' : 'N/A'),
             level: lvl,
             parent_id: region.parent_id,
-            isActive: region.is_active !== false,
+            isActive: (region.is_active === true || region.is_active === 'true'),
             serviceTypes: region.service_config,
             deliveryConfig: region.delivery_config,
             coordinates: { center: coordinates, boundaries: region.boundary ? region.boundary.coordinates : [] },
@@ -975,14 +967,20 @@ class RegionsManager {
     }
 
     async toggleRegionStatus(regionId, event) {
+        console.log('🔄 Toggle status for:', regionId);
         if (event) event.stopPropagation();
         const idx = this.regions.findIndex(r => r.regionId === regionId);
-        if (idx === -1) return;
+        if (idx === -1) {
+            console.error('❌ Region not found:', regionId);
+            return;
+        }
         const prev = this.regions[idx].isActive;
+        console.log('Previous status:', prev);
         this.regions[idx].isActive = !prev; // optimistic
         this.renderRegionsList();
         try {
             let url = `${this._apiBase}/regions/${regionId}/toggle`;
+            console.log('📤 Calling:', url);
             let resp = await fetch(url, { method: 'PATCH' });
             if (!resp.ok) {
                 await this.maybeHandleAwsAuthError(resp, url);
@@ -993,11 +991,14 @@ class RegionsManager {
             }
             if (!resp.ok) throw new Error(await resp.text());
             const data = await resp.json();
+            console.log('📥 Toggle response:', data);
             const newStatus = !!(data?.data?.newStatus ?? this.regions[idx].isActive);
+            console.log('New status:', newStatus);
             this.regions[idx].isActive = newStatus;
             this.renderRegionsList();
             this.showSuccess('Status updated');
         } catch (e) {
+            console.error('❌ Toggle failed:', e);
             this.regions[idx].isActive = prev; // rollback
             this.renderRegionsList();
             this.showError(e.message || 'Failed to toggle status');
@@ -1122,6 +1123,8 @@ class RegionsManager {
 window.selectRegion = (regionId) => regionsManager.selectRegion(regionId);
 window.toggleRegionStatus = (regionId, event) => regionsManager.toggleRegionStatus(regionId, event);
 window.editRegion = (regionId, event) => regionsManager.editRegion(regionId, event);
+window.deleteRegion = (regionId, event) => regionsManager.deleteRegion(regionId, event);
+window.viewRegionDetails = (regionId, event) => regionsManager.viewRegionDetails(regionId, event);
 window.openAddRegionModal = () => regionsManager.openRegionModal();
 window.closeRegionModal = () => regionsManager.closeRegionModal();
 window.saveRegion = () => regionsManager.saveRegion();
