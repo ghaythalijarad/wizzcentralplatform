@@ -20,6 +20,13 @@ class RegionsManager {
         this._drawMap = null;
         this._drawnLayer = null;
         this._drawnBoundary = null; // GeoJSON-like { type, coordinates }
+        this._shapesLayer = null; // LayerGroup for polygons/lines
+        // Server-side pagination state
+        this.pageMode = 'server'; // enable server paging by default
+        this.tokenStack = [null]; // stack of page start tokens (null for first page)
+        this.serverPageIndex = 0; // current index in tokenStack
+        this.lastNextToken = null; // nextToken returned by last fetch
+        this.lastPageCount = 0; // last page item count
 
         console.log('🗺️ RegionsManager: Constructor called, readyState:', document.readyState);
 
@@ -108,6 +115,7 @@ class RegionsManager {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 18
         }).addTo(this.map);
+        this._shapesLayer = L.layerGroup().addTo(this.map);
         this.map.on('click', (e) => this.onMapClick(e));
         // Pick-on-map helpers
         this._pickOnMapActive = false;
@@ -176,6 +184,7 @@ class RegionsManager {
         }).addTo(map);
         const drawnItems = new L.FeatureGroup();
         map.addLayer(drawnItems);
+        this._drawnItems = drawnItems;
 
         const drawControl = new L.Control.Draw({
             position: 'topleft',
@@ -212,6 +221,19 @@ class RegionsManager {
         });
 
         this._drawMap = map;
+        // If we already have a boundary (editing existing), render it
+        try {
+            if (this._drawnBoundary) {
+                const layer = this._boundaryToLeafletLayer(this._drawnBoundary);
+                if (layer) {
+                    this._drawnItems.clearLayers();
+                    this._drawnLayer = layer;
+                    this._drawnItems.addLayer(layer);
+                    map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+                    this._updateDrawSummary();
+                }
+            }
+        } catch {}
         setTimeout(() => map.invalidateSize(), 150);
     }
 
@@ -238,6 +260,22 @@ class RegionsManager {
         return null;
     }
 
+    _boundaryToLeafletLayer(boundary) {
+        if (!boundary || !boundary.coordinates) return null;
+        try {
+            if (boundary.type === 'Polygon') {
+                const ring = boundary.coordinates[0] || [];
+                const latlngs = ring.map(([lng, lat]) => [lat, lng]);
+                return L.polygon(latlngs, { color: '#1e88e5', weight: 2, fillOpacity: 0.1 });
+            }
+            if (boundary.type === 'LineString') {
+                const pts = boundary.coordinates.map(([lng, lat]) => [lat, lng]);
+                return L.polyline(pts, { color: '#ff7f50', weight: 3 });
+            }
+        } catch {}
+        return null;
+    }
+
     _updateDrawSummary() {
         const el = document.getElementById('drawSummary');
         if (!el) return;
@@ -255,9 +293,8 @@ class RegionsManager {
     clearDrawnBoundary() {
         this._drawnBoundary = null;
         this._drawnLayer = null;
-        if (this._drawMap) {
-            const groups = this._drawMap._layers;
-            // Simple clear by re-initializing FeatureGroup would be cleaner, but we track only via summary
+        if (this._drawMap && this._drawnItems) {
+            this._drawnItems.clearLayers();
         }
         this._updateDrawSummary();
     }
@@ -313,7 +350,8 @@ class RegionsManager {
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
             const backendRegions = await this.fetchRegionsFromBackend();
             if (Array.isArray(backendRegions)) {
-                this.regions = backendRegions;
+                this.regions = backendRegions; // one page when in server mode
+                this.lastPageCount = backendRegions.length;
                 this.renderRegionsList();
                 this.updateStatistics?.();
             } else {
@@ -328,12 +366,39 @@ class RegionsManager {
     }
 
     async fetchRegionsFromBackend() {
-        let response = await fetch('/api/regions', { headers: { 'Content-Type': 'application/json' }});
+        // Build query for server-side pagination when enabled
+        const params = new URLSearchParams();
+        if (this.pageMode === 'server') {
+            params.set('pageMode', 'server');
+            params.set('limit', String(this.itemsPerPage));
+            const token = this.tokenStack?.[this.serverPageIndex] || null;
+            if (token) params.set('nextToken', token);
+            // Forward current filters to backend
+            const levelFilter = document.getElementById('levelFilter');
+            const statusFilter = document.getElementById('statusFilter');
+            const searchInput = document.getElementById('regionSearch');
+            if (levelFilter && levelFilter.value) {
+                let lvl = parseInt(levelFilter.value, 10);
+                if (lvl === 4) lvl = 3; // normalize UI streets to backend 3
+                params.set('level', String(lvl));
+            }
+            if (statusFilter && statusFilter.value !== '') params.set('active', statusFilter.value);
+            if (searchInput && searchInput.value.trim()) params.set('search', searchInput.value.trim());
+        } else {
+            // client mode uses default endpoint and will filter locally
+            params.set('limit', '1000');
+        }
+
+        let url = '/api/regions';
+        const qs = params.toString();
+        if (qs) url += `?${qs}`;
+
+        let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
         if (!response.ok) {
-            await this.maybeHandleAwsAuthError(response, '/api/regions');
+            await this.maybeHandleAwsAuthError(response, url);
             const idToken = sessionStorage.getItem('idToken');
             if (idToken) {
-                response = await fetch('/api/regions', { headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }});
+                response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }});
             }
         }
         if (!response.ok) {
@@ -342,6 +407,10 @@ class RegionsManager {
         }
         const result = await response.json();
         const list = result?.data || result?.regions || (Array.isArray(result) ? result : []);
+        // Track server nextToken
+        if (this.pageMode === 'server') {
+            this.lastNextToken = result?.pagination?.nextToken || null;
+        }
         console.log('📡 /api/regions returned items:', Array.isArray(list) ? list.length : 'N/A');
         const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
         const findGovernorateName = (rid) => {
@@ -364,6 +433,7 @@ class RegionsManager {
     renderRegionsList() {
         this.applyFilters();
         this.renderTableView();
+        this.renderMapMarkers();
     }
 
     applyFilters() {
@@ -371,28 +441,43 @@ class RegionsManager {
         const levelFilter = document.getElementById('levelFilter');
         const statusFilter = document.getElementById('statusFilter');
         let filtered = [...this.regions];
-        // Search
-        if (searchInput && searchInput.value.trim()) {
-            const term = searchInput.value.trim().toLowerCase();
-            filtered = filtered.filter(r =>
-                (r.regionName || '').toLowerCase().includes(term) ||
-                (r.regionNameArabic || '').toLowerCase().includes(term) ||
-                (r.governorate || '').toLowerCase().includes(term)
-            );
-        }
-        // Level filter (normalize 4 -> 3 as UI has Streets but backend levels are 0..3)
-        if (levelFilter && levelFilter.value) {
-            let lvl = parseInt(levelFilter.value, 10);
-            if (lvl === 4) lvl = 3;
-            filtered = filtered.filter(r => Number(r.level) === lvl);
-        }
-        // Status filter
-        if (statusFilter && statusFilter.value !== '') {
-            const isActive = statusFilter.value === 'true';
-            filtered = filtered.filter(r => !!r.isActive === isActive);
+        if (this.pageMode !== 'server') {
+            // Local filtering in client mode
+            if (searchInput && searchInput.value.trim()) {
+                const term = searchInput.value.trim().toLowerCase();
+                filtered = filtered.filter(r =>
+                    (r.regionName || '').toLowerCase().includes(term) ||
+                    (r.regionNameArabic || '').toLowerCase().includes(term) ||
+                    (r.governorate || '').toLowerCase().includes(term)
+                );
+            }
+            if (levelFilter && levelFilter.value) {
+                let lvl = parseInt(levelFilter.value, 10);
+                if (lvl === 4) lvl = 3;
+                filtered = filtered.filter(r => Number(r.level) === lvl);
+            }
+            if (statusFilter && statusFilter.value !== '') {
+                const isActive = statusFilter.value === 'true';
+                filtered = filtered.filter(r => !!r.isActive === isActive);
+            }
         }
         this.filteredRegions = filtered;
+        // Apply sort if set (page-level)
+        if (this.sortField) {
+            const dir = this.sortDirection === 'asc' ? 1 : -1;
+            const f = this.sortField;
+            this.filteredRegions.sort((a, b) => {
+                let va = a[f];
+                let vb = b[f];
+                if (typeof va === 'string') va = va.toLowerCase();
+                if (typeof vb === 'string') vb = vb.toLowerCase();
+                if (va < vb) return -1 * dir;
+                if (va > vb) return 1 * dir;
+                return 0;
+            });
+        }
         console.log('📊 Filters applied:', {
+            mode: this.pageMode,
             total: this.regions.length,
             afterFilters: this.filteredRegions.length,
             level: levelFilter?.value || '',
@@ -409,11 +494,16 @@ class RegionsManager {
             this.updatePagination?.(0);
             return;
         }
-        const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-        const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredRegions.length);
-        const pageRegions = this.filteredRegions.slice(startIndex, endIndex);
+        let pageRegions;
+        if (this.pageMode === 'server') {
+            pageRegions = this.filteredRegions; // already a single server page
+        } else {
+            const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+            const endIndex = Math.min(startIndex + this.itemsPerPage, this.filteredRegions.length);
+            pageRegions = this.filteredRegions.slice(startIndex, endIndex);
+        }
         const rows = pageRegions.map(region => `
-            <tr>
+            <tr data-id="${region.regionId}">
                 <td class="region-name-cell">
                     <div class="region-name-en">${region.regionName || ''}</div>
                     <div class="region-name-ar">${region.regionNameArabic || ''}</div>
@@ -431,13 +521,47 @@ class RegionsManager {
                     </span>
                 </td>
                 <td class="actions-cell">
-                    <button class="action-btn view" title="View Details"><i class="fas fa-eye"></i></button>
-                    <button class="action-btn edit" title="Edit"><i class="fas fa-edit"></i></button>
-                    <button class="action-btn toggle" title="Toggle Status"><i class="fas fa-power-off"></i></button>
+                    <button class="action-btn view" data-id="${region.regionId}" title="View Details"><i class="fas fa-eye"></i></button>
+                    <button class="action-btn edit" data-id="${region.regionId}" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="action-btn toggle" data-id="${region.regionId}" title="Toggle Status"><i class="fas fa-power-off"></i></button>
+                    <button class="action-btn delete" data-id="${region.regionId}" title="Delete"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>`).join('');
         tbody.innerHTML = rows;
-        this.updatePagination?.(this.filteredRegions.length);
+        this.updatePagination?.(this.pageMode === 'server' ? null : this.filteredRegions.length);
+
+        // Bind row action events
+        try {
+            tbody.querySelectorAll('button.view').forEach(btn => btn.addEventListener('click', (e) => this.viewRegionDetails(btn.dataset.id, e)));
+            tbody.querySelectorAll('button.edit').forEach(btn => btn.addEventListener('click', (e) => this.editRegion(btn.dataset.id, e)));
+            tbody.querySelectorAll('button.toggle').forEach(btn => btn.addEventListener('click', (e) => this.toggleRegionStatus(btn.dataset.id, e)));
+            tbody.querySelectorAll('button.delete').forEach(btn => btn.addEventListener('click', (e) => this.deleteRegion(btn.dataset.id, e)));
+        } catch {}
+    }
+
+    renderMapMarkers() {
+        if (!this.map || !this._shapesLayer) return;
+        this._shapesLayer.clearLayers();
+        this.markers.forEach(m => { try { this._shapesLayer.removeLayer(m); } catch {} });
+        this.markers = [];
+        const regionsToShow = this.filteredRegions && this.filteredRegions.length ? this.filteredRegions : this.regions;
+        regionsToShow.slice(0, 500).forEach(r => {
+            const c = r.coordinates?.center || { lat: 33.3152, lng: 44.3661 };
+            // Center marker (small)
+            try {
+                const m = L.circleMarker([c.lat, c.lng], { radius: 4, color: r.isActive ? '#2e7d32' : '#9e9e9e' })
+                    .bindTooltip(`${r.regionName || ''}`);
+                m.addTo(this._shapesLayer);
+                this.markers.push(m);
+            } catch {}
+            // Boundary shape
+            if (r.boundary && r.boundary.coordinates) {
+                const layer = this._boundaryToLeafletLayer(r.boundary);
+                if (layer) {
+                    layer.addTo(this._shapesLayer);
+                }
+            }
+        });
     }
 
     updatePagination(totalItems) {
@@ -449,7 +573,21 @@ class RegionsManager {
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
         if (!paginationInfo) return;
-        if (totalItems === 0) {
+
+        if (this.pageMode === 'server') {
+            const startIndex = this.serverPageIndex * this.itemsPerPage + 1;
+            const endIndex = startIndex + (this.filteredRegions?.length || 0) - 1;
+            paginationInfo.style.display = 'flex';
+            showingStart && (showingStart.textContent = String(this.filteredRegions.length ? startIndex : 0));
+            showingEnd && (showingEnd.textContent = String(this.filteredRegions.length ? endIndex : 0));
+            totalCount && (totalCount.textContent = '—');
+            if (pageNumbers) pageNumbers.innerHTML = '';
+            prevBtn && (prevBtn.disabled = this.serverPageIndex <= 0);
+            nextBtn && (nextBtn.disabled = !this.lastNextToken);
+            return;
+        }
+
+        if (!totalItems) {
             paginationInfo.style.display = 'flex';
             showingStart && (showingStart.textContent = '0');
             showingEnd && (showingEnd.textContent = '0');
@@ -466,7 +604,6 @@ class RegionsManager {
         showingStart && (showingStart.textContent = String(startIndex));
         showingEnd && (showingEnd.textContent = String(endIndex));
         totalCount && (totalCount.textContent = String(totalItems));
-        // Simple page numbers
         if (pageNumbers) {
             let html = '';
             const maxVisible = 5;
@@ -490,11 +627,48 @@ class RegionsManager {
         const levelFilter = document.getElementById('levelFilter');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
-        if (searchInput) searchInput.addEventListener('input', () => { this.currentPage = 1; this.renderRegionsList(); });
-        if (statusFilter) statusFilter.addEventListener('change', () => { this.currentPage = 1; this.renderRegionsList(); });
-        if (levelFilter) levelFilter.addEventListener('change', () => { this.currentPage = 1; this.renderRegionsList(); });
-        if (prevBtn) prevBtn.addEventListener('click', () => { this.currentPage = Math.max(1, this.currentPage - 1); this.renderRegionsList(); });
-        if (nextBtn) nextBtn.addEventListener('click', () => { const totalPages = Math.ceil((this.filteredRegions?.length || 0) / this.itemsPerPage); this.currentPage = Math.min(totalPages, this.currentPage + 1); this.renderRegionsList(); });
+        if (searchInput) searchInput.addEventListener('input', async () => {
+            if (this.pageMode === 'server') { this.resetServerPaging(); await this.loadRegions(); }
+            else { this.currentPage = 1; this.renderRegionsList(); }
+        });
+        if (statusFilter) statusFilter.addEventListener('change', async () => {
+            if (this.pageMode === 'server') { this.resetServerPaging(); await this.loadRegions(); }
+            else { this.currentPage = 1; this.renderRegionsList(); }
+        });
+        if (levelFilter) levelFilter.addEventListener('change', async () => {
+            if (this.pageMode === 'server') { this.resetServerPaging(); await this.loadRegions(); }
+            else { this.currentPage = 1; this.renderRegionsList(); }
+        });
+        if (prevBtn) prevBtn.addEventListener('click', async () => {
+            if (this.pageMode === 'server') { await this.previousServerPage(); }
+            else { this.currentPage = Math.max(1, this.currentPage - 1); this.renderRegionsList(); }
+        });
+        if (nextBtn) nextBtn.addEventListener('click', async () => {
+            if (this.pageMode === 'server') { await this.nextServerPage(); }
+            else { const totalPages = Math.ceil((this.filteredRegions?.length || 0) / this.itemsPerPage); this.currentPage = Math.min(totalPages, this.currentPage + 1); this.renderRegionsList(); }
+        });
+    }
+
+    resetServerPaging() {
+        this.tokenStack = [null];
+        this.serverPageIndex = 0;
+        this.lastNextToken = null;
+        this.currentPage = 1; // keep table UI consistent
+    }
+
+    async nextServerPage() {
+        if (!this.lastNextToken) return; // nothing more
+        // advance to next page start token
+        this.serverPageIndex += 1;
+        // ensure token stack has the token for this page
+        this.tokenStack[this.serverPageIndex] = this.lastNextToken;
+        await this.loadRegions();
+    }
+
+    async previousServerPage() {
+        if (this.serverPageIndex <= 0) return;
+        this.serverPageIndex -= 1;
+        await this.loadRegions();
     }
 
     async maybeHandleAwsAuthError(response, endpoint) {
@@ -546,7 +720,8 @@ class RegionsManager {
             isActive: region.is_active !== false,
             serviceTypes: region.service_config,
             deliveryConfig: region.delivery_config,
-            coordinates: { center: coordinates, boundaries: region.boundary ? region.boundary.coordinates : [] }
+            coordinates: { center: coordinates, boundaries: region.boundary ? region.boundary.coordinates : [] },
+            boundary: region.boundary || null
         };
     }
 
@@ -603,7 +778,19 @@ class RegionsManager {
                 if (svcDel) svcDel.checked = !!(r.serviceTypes?.delivery ?? true);
                 if (svcPck) svcPck.checked = !!(r.serviceTypes?.pickup ?? false);
                 if (svcDine) svcDine.checked = !!(r.serviceTypes?.dineIn ?? false);
+                // Also keep selectedRegion and boundary for editing in draw modal
+                this.selectedRegion = r;
+                this._drawnBoundary = r.boundary || null;
+                // Prefill coordinates with region center if present
+                try {
+                    if (latEl && r.coordinates?.center?.lat) latEl.value = Number(r.coordinates.center.lat).toFixed(6);
+                    if (lngEl && r.coordinates?.center?.lng) lngEl.value = Number(r.coordinates.center.lng).toFixed(6);
+                } catch {}
             }
+        } else {
+            this.selectedRegion = null;
+            // Clear any previous drawn boundary when creating a new region
+            this._drawnBoundary = null;
         }
 
         modal.style.display = 'flex';
@@ -687,6 +874,8 @@ class RegionsManager {
 
             // Build payload matching server normalization
             const payload = {
+                // If editing, include regionId to update existing item
+                ...(this.selectedRegion ? { regionId: this.selectedRegion.regionId } : {}),
                 name,
                 name_ar: nameAr,
                 level: selectedLevel,
@@ -712,15 +901,33 @@ class RegionsManager {
             const resp = await this.saveRegionToBackend(payload);
             if (resp?.success) {
                 const created = resp.region || resp.data || payload;
-                // Add to in-memory list and refresh UI
-                this.regions.unshift(this.transformRegionData(created));
+                // Update in-memory list and refresh UI
+                const newItem = this.transformRegionData(created);
+                const existingIdx = this.regions.findIndex(x => x.regionId === newItem.regionId);
+                if (existingIdx >= 0) {
+                    this.regions.splice(existingIdx, 1, newItem);
+                } else {
+                    this.regions.unshift(newItem);
+                }
                 this.closeRegionModal();
                 this.renderRegionsList();
-                this.renderMapMarkers();
-                this.updateStatistics();
+                this.renderMapMarkers?.();
+                this.updateStatistics?.();
                 this.showSuccess('Region saved successfully');
             } else {
-                this.showError('Failed to save region');
+                // Handle known backend validation errors for better UX
+                const code = resp?.code || resp?.error || '';
+                const msg = resp?.message || 'Failed to save region';
+                if (resp?.status === 409 || String(code).toUpperCase().includes('DUPLICATE')) {
+                    this.showError('Duplicate region: a region with the same name exists under the same parent/level');
+                } else if (resp?.status === 400) {
+                    if (code === 'PARENT_NOT_FOUND') this.showError('Parent region does not exist');
+                    else if (code === 'PARENT_LEVEL_INVALID') this.showError('Parent level must be exactly level-1');
+                    else if (code === 'SELF_PARENT') this.showError('Region cannot be its own parent');
+                    else this.showError(msg);
+                } else {
+                    this.showError(msg);
+                }
             }
         } catch (e) {
             console.error('saveRegion error:', e);
@@ -754,14 +961,17 @@ class RegionsManager {
                     });
                 }
             }
+            const status = response.status;
+            const ct = response.headers.get('content-type') || '';
+            let body = null;
+            try { body = ct.includes('application/json') ? await response.json() : { message: await response.text() }; } catch {}
             if (!response.ok) {
-                const txt = await response.text();
-                throw new Error(`HTTP ${response.status}: ${txt}`);
+                return { success: false, status, ...(body || {}) };
             }
-            return await response.json();
+            return body || { success: true };
         } catch (error) {
             console.warn('Failed to save to backend:', error);
-            throw error;
+            return { success: false, status: 0, message: error.message || 'Network error' };
         }
     }
 
@@ -774,7 +984,146 @@ class RegionsManager {
         this.openRegionModal(regionId);
     }
 
-    // ...existing methods...
+    async toggleRegionStatus(regionId, event) {
+        if (event) event.stopPropagation();
+        const idx = this.regions.findIndex(r => r.regionId === regionId);
+        if (idx === -1) return;
+        const prev = this.regions[idx].isActive;
+        this.regions[idx].isActive = !prev; // optimistic
+        this.renderRegionsList();
+        try {
+            let resp = await fetch(`/api/regions/${regionId}/toggle`, { method: 'PATCH' });
+            if (!resp.ok) {
+                await this.maybeHandleAwsAuthError(resp, `/api/regions/${regionId}/toggle`);
+                const idToken = sessionStorage.getItem('idToken');
+                if (idToken) {
+                    resp = await fetch(`/api/regions/${regionId}/toggle`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${idToken}` }});
+                }
+            }
+            if (!resp.ok) throw new Error(await resp.text());
+            const data = await resp.json();
+            const newStatus = !!(data?.data?.newStatus ?? this.regions[idx].isActive);
+            this.regions[idx].isActive = newStatus;
+            this.renderRegionsList();
+            this.showSuccess('Status updated');
+        } catch (e) {
+            this.regions[idx].isActive = prev; // rollback
+            this.renderRegionsList();
+            this.showError(e.message || 'Failed to toggle status');
+        }
+    }
+
+    async deleteRegion(regionId, event) {
+        if (event) event.stopPropagation();
+        if (!regionId) return;
+        const ok = window.confirm('Delete this region? This cannot be undone.');
+        if (!ok) return;
+        try {
+            let resp = await fetch(`/api/regions/${regionId}`, { method: 'DELETE' });
+            if (!resp.ok) {
+                await this.maybeHandleAwsAuthError(resp, `/api/regions/${regionId} [DELETE]`);
+                const idToken = sessionStorage.getItem('idToken');
+                if (idToken) resp = await fetch(`/api/regions/${regionId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` }});
+            }
+            if (!resp.ok) throw new Error(await resp.text());
+            // Remove from memory and refresh
+            this.regions = this.regions.filter(r => r.regionId !== regionId);
+            this.renderRegionsList();
+            this.updateStatistics?.();
+            this.showSuccess('Region deleted');
+        } catch (e) {
+            this.showError(e.message || 'Failed to delete region');
+        }
+    }
+
+    viewRegionDetails(regionId, event) {
+        if (event) event.stopPropagation();
+        const r = this.regions.find(x => x.regionId === regionId);
+        if (!r) return;
+        // Focus map
+        if (this.map) {
+            const c = r.coordinates?.center || { lat: 33.3152, lng: 44.3661 };
+            this.map.setView([c.lat, c.lng], 12, { animate: true });
+            if (r.boundary) {
+                const layer = this._boundaryToLeafletLayer(r.boundary);
+                if (layer && this._shapesLayer) {
+                    layer.addTo(this._shapesLayer);
+                    try { this.map.fitBounds(layer.getBounds(), { padding: [20, 20] }); } catch {}
+                    setTimeout(() => { try { this._shapesLayer.removeLayer(layer); } catch {} }, 2500);
+                }
+            }
+        }
+        // Render info panel
+        this._renderRegionInfoPanel(r);
+    }
+
+    _renderRegionInfoPanel(region) {
+        const panel = document.getElementById('regionInfoPanel');
+        if (!panel) return;
+        const parent = region.parent_id ? (this.regions.find(x => x.regionId === region.parent_id) || null) : null;
+        const children = this.regions.filter(x => x.parent_id === region.regionId);
+        const coords = region.coordinates?.center || { lat: 33.3152, lng: 44.3661 };
+        const boundaryType = region.boundary?.type || '—';
+        const boundaryPoints = region.boundary?.coordinates ? (region.boundary.type === 'Polygon' ? (region.boundary.coordinates[0]?.length || 0) : region.boundary.coordinates.length) : 0;
+        const lvl = Number(region.level);
+        const levelLabel = ({0:'Country',1:'Governorate',2:'District',3:'Neighborhood'})[lvl] || String(lvl);
+        const statusCls = region.isActive ? 'active' : 'inactive';
+        const statusText = region.isActive ? 'ACTIVE' : 'INACTIVE';
+        panel.innerHTML = `
+            <div class="region-info-header">
+                <div class="region-info-title"><i class="fas fa-location-dot" style="opacity:.7;"></i> ${region.regionName || ''}</div>
+                <button class="region-info-close" title="Close" onclick="(function(){const p=document.getElementById('regionInfoPanel'); if(p) p.style.display='none';})()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="region-info-grid">
+                <div class="region-info-label">Arabic</div><div class="region-info-value">${region.regionNameArabic || '—'}</div>
+                <div class="region-info-label">Region ID</div><div class="region-info-value">${region.regionId}</div>
+                <div class="region-info-label">Level</div><div class="region-info-value">${levelLabel}</div>
+                <div class="region-info-label">Status</div><div class="region-info-value"><span class="region-info-badge ${statusCls}">${statusText}</span></div>
+                <div class="region-info-label">Governorate</div><div class="region-info-value">${region.governorate || '—'}</div>
+                <div class="region-info-label">Parent</div><div class="region-info-value">${parent ? `${parent.regionName} (${parent.regionId})` : '—'}</div>
+                <div class="region-info-label">Children</div><div class="region-info-value">${children.length}</div>
+                <div class="region-info-label">Center</div><div class="region-info-value">${coords.lat?.toFixed ? coords.lat.toFixed(6) : coords.lat}, ${coords.lng?.toFixed ? coords.lng.toFixed(6) : coords.lng}</div>
+                <div class="region-info-label">Boundary</div><div class="region-info-value">${boundaryType} ${boundaryPoints ? `(${boundaryPoints} pts)` : ''}</div>
+                <div class="region-info-label">Updated</div><div class="region-info-value">${region.updatedAt || region.updated_at || '—'}</div>
+            </div>
+        `;
+        panel.style.display = 'block';
+    }
+
+    selectRegion(regionId) {
+        this.selectedRegion = this.regions.find(x => x.regionId === regionId) || null;
+    }
+
+    handleSort(field) {
+        if (!field) return;
+        if (this.sortField === field) {
+            this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.sortField = field;
+            this.sortDirection = 'asc';
+        }
+        this.renderRegionsList();
+    }
+
+    changePage(page) {
+        if (this.pageMode === 'server') return; // ignore direct page jumps in server mode
+        this.goToPage(page);
+    }
+
+    goToPage(page) {
+        if (this.pageMode === 'server') return; // handled by next/prev only
+        const totalPages = Math.ceil((this.filteredRegions?.length || 0) / this.itemsPerPage) || 1;
+        this.currentPage = Math.max(1, Math.min(totalPages, parseInt(page, 10) || 1));
+        this.renderRegionsList();
+    }
+
+    previousPage() { this.pageMode === 'server' ? this.previousServerPage() : this.goToPage(this.currentPage - 1); }
+    nextPage() { this.pageMode === 'server' ? this.nextServerPage() : this.goToPage(this.currentPage + 1); }
+
+    toggleView(viewType) {
+        this.currentView = viewType || 'table';
+        this.renderRegionsList();
+    }
 }
 
 // Global functions for HTML onclick handlers

@@ -207,6 +207,22 @@ const ORDERS_TABLE = 'WizzOrders_dev';
 // Add regions table for regions management (DynamoDB exclusive source)
 const REGIONS_TABLE = 'WizzCentral_Regions';
 
+// Recommended GSIs (must exist on the table). The server will try them first and fall back to Scan if missing:
+//  - GSI1_ParentLevelName:   PK=parent_id,   SK=level_name (format: `L#<level>#N#<name_lower>`)
+//  - GSI2_Level:             PK=level,       SK=name_lower
+//  - GSI3_IsActive:          PK=is_active,   SK=level_updated_at (format: `L#<level>#U#<updated_at>`)
+const REGIONS_GSI_PARENT_LEVEL_NAME = 'GSI1_ParentLevelName';
+const REGIONS_GSI_LEVEL = 'GSI2_Level';
+const REGIONS_GSI_IS_ACTIVE = 'GSI3_IsActive';
+
+// Helpers for encoding/decoding DynamoDB LastEvaluatedKey
+function encodeToken(obj) {
+    try { return Buffer.from(JSON.stringify(obj || {}), 'utf8').toString('base64'); } catch { return null; }
+}
+function decodeToken(token) {
+    try { return JSON.parse(Buffer.from(String(token), 'base64').toString('utf8')); } catch { return undefined; }
+}
+
 // Real DynamoDB helper functions (updated for AWS SDK v3)
 const getUserFromDynamoDB = async (userId) => {
     try {
@@ -830,25 +846,131 @@ if (ENABLE_REGIONS_DEBUG) {
 // GET /api/regions - Fetch all regions from DynamoDB
 app.get('/api/regions', async (req, res) => {
     try {
-        const { level, parent_id, active, search, limit = 50, offset = 0 } = req.query;
-        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search });
+        const { level, parent_id, active, search, limit = 50, offset = 0, nextToken, pageMode } = req.query;
+        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search, limit, offset, nextToken, pageMode });
 
-        const scanCommand = new ScanCommand({ TableName: REGIONS_TABLE });
-        const result = await dynamoDB.send(scanCommand);
-        let regions = result.Items || [];
+        const useServerPaging = Boolean(nextToken) || String(pageMode || '').toLowerCase() === 'server';
 
-        // Filters
-        if (level !== undefined && level !== '') {
-            const levelNum = Number(level);
-            regions = regions.filter(r => Number(r.level) === levelNum);
+        // Build a query plan that prefers GSIs, with graceful fallback to Scan
+        const buildQueryPlan = () => {
+            // Prefer most selective first
+            if (parent_id) {
+                const params = {
+                    TableName: REGIONS_TABLE,
+                    IndexName: REGIONS_GSI_PARENT_LEVEL_NAME,
+                    KeyConditionExpression: '#pid = :pid',
+                    ExpressionAttributeNames: { '#pid': 'parent_id' },
+                    ExpressionAttributeValues: { ':pid': parent_id },
+                    Limit: Number(limit) || 50
+                };
+                if (level !== undefined && level !== '') {
+                    params.KeyConditionExpression += ' AND begins_with(#lvlname, :lvlprefix)';
+                    params.ExpressionAttributeNames['#lvlname'] = 'level_name';
+                    params.ExpressionAttributeValues[':lvlprefix'] = `L#${Number(level)}#`;
+                }
+                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
+                return { type: 'Query', params };
+            }
+            if (level !== undefined && level !== '') {
+                const params = {
+                    TableName: REGIONS_TABLE,
+                    IndexName: REGIONS_GSI_LEVEL,
+                    KeyConditionExpression: '#lvl = :lvl',
+                    ExpressionAttributeNames: { '#lvl': 'level' },
+                    ExpressionAttributeValues: { ':lvl': Number(level) },
+                    Limit: Number(limit) || 50
+                };
+                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
+                return { type: 'Query', params };
+            }
+            if (active !== undefined && active !== '') {
+                const params = {
+                    TableName: REGIONS_TABLE,
+                    IndexName: REGIONS_GSI_IS_ACTIVE,
+                    KeyConditionExpression: '#act = :act',
+                    ExpressionAttributeNames: { '#act': 'is_active' },
+                    ExpressionAttributeValues: { ':act': (active === 'true' || active === true) },
+                    Limit: Number(limit) || 50
+                };
+                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
+                return { type: 'Query', params };
+            }
+            // Fallback
+            const params = { TableName: REGIONS_TABLE };
+            if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
+            params.Limit = Number(limit) || 50;
+            return { type: 'Scan', params };
+        };
+
+        // Server-side pagination mode: single page fetch using GSI when possible
+        if (useServerPaging) {
+            const plan = buildQueryPlan();
+            let result;
+            try {
+                if (plan.type === 'Query') result = await dynamoDB.send(new QueryCommand(plan.params));
+                else result = await dynamoDB.send(new ScanCommand(plan.params));
+            } catch (e) {
+                // Index might not exist, fall back to Scan once
+                console.warn('Query plan failed, falling back to Scan:', e?.name || e?.message);
+                result = await dynamoDB.send(new ScanCommand({ TableName: REGIONS_TABLE, Limit: Number(limit) || 50, ExclusiveStartKey: plan.params?.ExclusiveStartKey }));
+            }
+            let items = result.Items || [];
+            // Apply light in-memory filters that cannot be in KeyCondition
+            if (search) {
+                const s = String(search).toLowerCase();
+                items = items.filter(r => (
+                    (r.name && String(r.name).toLowerCase().includes(s)) ||
+                    (r.name_ar && String(r.name_ar).toLowerCase().includes(s)) ||
+                    (r.regionId && String(r.regionId).toLowerCase().includes(s))
+                ));
+            }
+            if (parent_id && (level === undefined || level === '')) {
+                // If parent selected without level, optionally filter by level if a UI default exists
+            }
+            const leKey = result.LastEvaluatedKey || null;
+            const token = leKey ? encodeToken(leKey) : null;
+            return res.json({
+                success: true,
+                data: items,
+                pagination: { limit: Number(limit) || 50, nextToken: token },
+                filters: { level, parent_id, active, search },
+                source: plan.type === 'Query' ? 'dynamodb-gsi' : 'dynamodb-scan',
+                timestamp: new Date().toISOString()
+            });
         }
-        if (parent_id) {
-            regions = regions.filter(r => r.parent_id === parent_id);
+
+        // Default behavior: prefer GSI-backed Query to fetch all matching rows; avoid full table scan
+        const plan = buildQueryPlan();
+        let regions = [];
+        try {
+            if (plan.type === 'Query') {
+                // Drain all pages (cap to prevent runaway)
+                let lastKey = undefined;
+                let pageCount = 0;
+                const maxPages = 50;
+                do {
+                    const pageParams = { ...plan.params, ExclusiveStartKey: lastKey, Limit: 1000 };
+                    const page = await dynamoDB.send(new QueryCommand(pageParams));
+                    regions.push(...(page.Items || []));
+                    lastKey = page.LastEvaluatedKey;
+                    pageCount++;
+                } while (lastKey && pageCount < maxPages);
+            } else {
+                // Fallback single scan (unchanged)
+                const scanCommand = new ScanCommand({ TableName: REGIONS_TABLE });
+                const result = await dynamoDB.send(scanCommand);
+                regions = result.Items || [];
+            }
+        } catch (e) {
+            console.warn('Query-all failed, falling back to single Scan:', e?.name || e?.message);
+            const result = await dynamoDB.send(new ScanCommand({ TableName: REGIONS_TABLE }));
+            regions = result.Items || [];
         }
-        if (active !== undefined && active !== '') {
-            const isActive = active === 'true' || active === true;
-            regions = regions.filter(r => Boolean(r.is_active) === isActive);
-        }
+
+        // Extra in-memory filters
+        if (level !== undefined && level !== '') regions = regions.filter(r => Number(r.level) === Number(level));
+        if (parent_id) regions = regions.filter(r => r.parent_id === parent_id);
+        if (active !== undefined && active !== '') regions = regions.filter(r => Boolean(r.is_active) === (active === 'true' || active === true));
         if (search) {
             const searchLower = String(search).toLowerCase();
             regions = regions.filter(r => (
@@ -866,7 +988,7 @@ app.get('/api/regions', async (req, res) => {
             neighborhoods: regions.filter(r => Number(r.level) === 3).length
         };
 
-        // Pagination
+        // Pagination (offset based, client-side within the result set)
         const total = regions.length;
         const start = parseInt(offset);
         const end = start + parseInt(limit);
@@ -875,14 +997,9 @@ app.get('/api/regions', async (req, res) => {
         res.json({
             success: true,
             data: paginatedRegions,
-            pagination: {
-                total,
-                limit: parseInt(limit),
-                offset: start,
-                hasMore: end < total
-            },
+            pagination: { total, limit: parseInt(limit), offset: start, hasMore: end < total },
             filters: { level, parent_id, active, search },
-            source: 'dynamodb',
+            source: plan.type === 'Query' ? 'dynamodb-gsi' : 'dynamodb-scan',
             summary: { ...levelBreakdown, total },
             timestamp: new Date().toISOString()
         });
@@ -899,6 +1016,7 @@ app.post('/api/regions', async (req, res) => {
         const b = req.body || {};
         // Normalize to table schema
         const now = new Date().toISOString();
+        const clientProvidedId = !!b.regionId;
         const regionId = b.regionId || b.id || `region_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
         // Level normalization
@@ -910,6 +1028,7 @@ app.post('/api/regions', async (req, res) => {
             const mapType = { COUNTRY: 0, GOVERNORATE: 1, DISTRICT: 2, NEIGHBORHOOD: 3 };
             level = mapType[b.region_type.toUpperCase()] ?? level;
         }
+        level = typeof level === 'number' ? level : 3;
 
         // Coordinates normalization
         let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
@@ -921,18 +1040,95 @@ app.post('/api/regions', async (req, res) => {
 
         const isActive = typeof b.is_active === 'boolean' ? b.is_active : (typeof b.isActive === 'boolean' ? b.isActive : (b.status ? String(b.status).toLowerCase() === 'active' : true));
 
+        // Parent validation (if provided)
+        let parentItem = null;
+        if (b.parent_id) {
+            const parentRes = await dynamoDB.send(new GetCommand({ TableName: REGIONS_TABLE, Key: { regionId: b.parent_id } }));
+            parentItem = parentRes.Item || null;
+            if (!parentItem) return res.status(400).json({ success: false, error: 'Invalid parent_id', message: 'Parent region does not exist', code: 'PARENT_NOT_FOUND' });
+            if (Number(parentItem.level) !== Number(level) - 1) {
+                return res.status(400).json({ success: false, error: 'Invalid parent level', message: 'Parent level must be exactly level-1', code: 'PARENT_LEVEL_INVALID' });
+            }
+            if (b.parent_id === regionId) {
+                return res.status(400).json({ success: false, error: 'Invalid parent_id', message: 'Region cannot be its own parent', code: 'SELF_PARENT' });
+            }
+        }
+
+        // Duplicate check by (level, parent_id, name or name_ar) using GSIs when possible
+        try {
+            let dupItems = [];
+            if (b.parent_id) {
+                // Query by parent_id (and optionally level prefix on SK)
+                const qParams = {
+                    TableName: REGIONS_TABLE,
+                    IndexName: REGIONS_GSI_PARENT_LEVEL_NAME,
+                    KeyConditionExpression: '#pid = :pid',
+                    ExpressionAttributeNames: { '#pid': 'parent_id' },
+                    ExpressionAttributeValues: { ':pid': b.parent_id },
+                    Limit: 1000
+                };
+                if (typeof level === 'number') {
+                    qParams.KeyConditionExpression += ' AND begins_with(#lvlname, :lvlprefix)';
+                    qParams.ExpressionAttributeNames['#lvlname'] = 'level_name';
+                    qParams.ExpressionAttributeValues[':lvlprefix'] = `L#${Number(level)}#`;
+                }
+                try {
+                    const q = await dynamoDB.send(new QueryCommand(qParams));
+                    dupItems = q.Items || [];
+                } catch (qe) {
+                    console.warn('Duplicate check GSI1 query failed, falling back to Scan:', qe?.name || qe?.message);
+                }
+            }
+            if (!dupItems.length) {
+                // Fallback to level GSI
+                try {
+                    const q = await dynamoDB.send(new QueryCommand({
+                        TableName: REGIONS_TABLE,
+                        IndexName: REGIONS_GSI_LEVEL,
+                        KeyConditionExpression: '#lvl = :lvl',
+                        ExpressionAttributeNames: { '#lvl': 'level' },
+                        ExpressionAttributeValues: { ':lvl': Number(level) },
+                        Limit: 2000
+                    }));
+                    dupItems = q.Items || [];
+                } catch (qe2) {
+                    console.warn('Duplicate check GSI2 query failed, falling back to Scan:', qe2?.name || qe2?.message);
+                }
+            }
+            if (!dupItems.length) {
+                // Last resort: table scan
+                const dupScan = await dynamoDB.send(new ScanCommand({
+                    TableName: REGIONS_TABLE,
+                    ProjectionExpression: 'regionId, #lvl, parent_id, #nm, name_ar',
+                    ExpressionAttributeNames: { '#lvl': 'level', '#nm': 'name' }
+                }));
+                dupItems = dupScan.Items || [];
+            }
+            const dup = (dupItems || []).find(r => {
+                if (r.regionId === regionId) return false; // skip self when editing
+                if (Number(r.level) !== Number(level)) return false;
+                if ((r.parent_id || null) !== (b.parent_id || null)) return false;
+                const nm1 = String(r.name || '').trim().toLowerCase();
+                const ar1 = String(r.name_ar || '').trim().toLowerCase();
+                const nm2 = String(b.name || b.regionName || '').trim().toLowerCase();
+                const ar2 = String(b.name_ar || b.regionNameArabic || '').trim().toLowerCase();
+                return (nm1 && nm1 === nm2) || (ar1 && ar1 === ar2);
+            });
+            if (dup) {
+                return res.status(409).json({ success: false, error: 'Duplicate region', message: 'A region with the same name exists under the same parent and level', duplicateOf: dup.regionId, code: 'DUPLICATE' });
+            }
+        } catch (dupErr) {
+            console.warn('Duplicate check failed (continuing):', dupErr?.message);
+        }
+
+        // Build item
         const item = {
-            // PK
             regionId,
-            // Names
             name: b.name || b.regionName || `Region ${regionId}`,
             name_ar: b.name_ar || b.regionNameArabic || '',
-            // Hierarchy
-            level: (typeof level === 'number' ? level : 3),
+            level,
             parent_id: b.parent_id || null,
-            // Status
             is_active: isActive,
-            // Optional business fields
             governorate_id: b.governorate_id || b.governorate || undefined,
             service_config: b.service_config || b.serviceTypes || undefined,
             delivery_config: b.delivery_config || (b.deliveryFee || b.minimumOrder || b.estimatedDeliveryTime ? {
@@ -944,22 +1140,45 @@ app.post('/api/regions', async (req, res) => {
                 active_drivers: b.activeDrivers || 0,
                 total_orders: b.totalOrders || 0
             } : undefined),
-            // Geo
             coordinates: normCoords,
             boundary: b.boundary,
-            // Timestamps
-            createdAt: b.createdAt || b.created_at || now,
+            createdAt: b.createdAt || b.created_at || null, // will be set below
             updatedAt: now,
             updated_at: now
         };
 
-        // Persist
-        await dynamoDB.send(new PutCommand({ TableName: REGIONS_TABLE, Item: item }));
+        // Helper attributes for GSIs
+        const nameLower = String(item.name || '').trim().toLowerCase();
+        if (nameLower) item.name_lower = nameLower;
+        if (item.name_ar) item.name_ar_lower = String(item.name_ar).trim().toLowerCase();
+        item.level_name = `L#${item.level}#N#${nameLower}`; // for GSI1 sort key
+        item.level_updated_at = `L#${item.level}#U#${item.updated_at}`; // for GSI3 sort key
 
-        res.json({ success: true, message: 'Region saved to DynamoDB', region: item, source: 'dynamodb' });
+        // Create vs Update
+        if (!clientProvidedId) {
+            item.createdAt = now;
+            await dynamoDB.send(new PutCommand({
+                TableName: REGIONS_TABLE,
+                Item: item,
+                ConditionExpression: 'attribute_not_exists(regionId)'
+            }));
+            return res.json({ success: true, message: 'Region created', region: item, source: 'dynamodb' });
+        } else {
+            const existing = await dynamoDB.send(new GetCommand({ TableName: REGIONS_TABLE, Key: { regionId } }));
+            if (!existing.Item) return res.status(404).json({ success: false, error: 'Region not found', message: 'Cannot update non-existing region', code: 'NOT_FOUND' });
+            item.createdAt = existing.Item.createdAt || existing.Item.created_at || now;
+            // Recompute level_updated_at for update time
+            item.level_updated_at = `L#${item.level}#U#${item.updated_at}`;
+            await dynamoDB.send(new PutCommand({ TableName: REGIONS_TABLE, Item: item }));
+            return res.json({ success: true, message: 'Region updated', region: item, source: 'dynamodb' });
+        }
     } catch (error) {
         console.error('❌ Error saving region to DynamoDB:', error);
         if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions', error);
+        const code = error?.name || error?.code;
+        if (code === 'ConditionalCheckFailedException') {
+            return res.status(409).json({ success: false, error: 'Duplicate or conflict', message: 'Region already exists with the same id', code: 'CONDITIONAL_FAILED' });
+        }
         res.status(500).json({ error: 'Failed to save region', message: error.message, source: 'dynamodb-error' });
     }
 });
@@ -1086,6 +1305,27 @@ app.get('/api/regions/:id', async (req, res) => {
         console.error('❌ Error fetching region details from DynamoDB:', error);
         if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id', error);
         res.status(500).json({ success: false, error: 'Failed to fetch region details from DynamoDB', message: error.message, source: 'dynamodb-error' });
+    }
+});
+
+// DELETE /api/regions/:id - Delete region by regionId with conditional existence check
+app.delete('/api/regions/:id', async (req, res) => {
+    try {
+        const regionId = req.params.id;
+        console.log(`🗑️ Deleting region: ${regionId}`);
+        await dynamoDB.send(new DeleteCommand({
+            TableName: REGIONS_TABLE,
+            Key: { regionId },
+            ConditionExpression: 'attribute_exists(regionId)'
+        }));
+        res.json({ success: true, message: 'Region deleted', regionId, source: 'dynamodb', timestamp: new Date().toISOString() });
+    } catch (error) {
+        console.error('❌ Error deleting region from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id [DELETE]', error);
+        if ((error.name || error.code) === 'ConditionalCheckFailedException') {
+            return res.status(404).json({ success: false, error: 'Region not found', message: 'No region with the provided id', source: 'dynamodb' });
+        }
+        res.status(500).json({ success: false, error: 'Failed to delete region', message: error.message, source: 'dynamodb-error' });
     }
 });
 

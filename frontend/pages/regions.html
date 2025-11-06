@@ -887,6 +887,88 @@
             margin: 0;
             font-size: 0.875rem;
         }
+
+        /* Regions Map Card */
+        .regions-map-card {
+            background: var(--md-sys-color-surface);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--md-sys-shape-corner-large);
+            overflow: hidden;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .regions-map-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--md-sys-color-outline-variant);
+            background: var(--md-sys-color-surface-container-lowest);
+            color: var(--md-sys-color-on-surface-variant);
+            font-weight: 600;
+        }
+        #regionsMap {
+            height: 420px;
+            width: 100%;
+        }
+        @media (max-width: 768px) {
+            #regionsMap { height: 320px; }
+        }
+        .region-info-panel {
+            position: absolute;
+            right: 12px;
+            top: 52px;
+            max-width: 360px;
+            background: var(--md-sys-color-surface);
+            border: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: var(--md-sys-shape-corner-large);
+            box-shadow: var(--md-sys-elevation-2);
+            padding: 0.75rem 0.75rem 0.5rem 0.75rem;
+            z-index: 1200; /* Increased to sit above Leaflet panes/controls */
+            pointer-events: auto; /* Ensure interactive */
+            user-select: text; /* Allow copying text */
+        }
+        .region-info-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            margin-bottom: .5rem;
+        }
+        .region-info-title {
+            font-weight: 600;
+            color: var(--md-sys-color-on-surface);
+        }
+        .region-info-close {
+            background: transparent;
+            border: none;
+            color: var(--md-sys-color-on-surface-variant);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .region-info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: .35rem .75rem;
+            font-size: .85rem;
+            color: var(--md-sys-color-on-surface-variant);
+        }
+        .region-info-label { opacity: .9; }
+        .region-info-value { color: var(--md-sys-color-on-surface); }
+        .region-info-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            padding: .15rem .5rem;
+            border-radius: 999px;
+            font-size: .7rem;
+            font-weight: 700;
+        }
+        .region-info-badge.active {
+            background: var(--md-sys-color-tertiary-container);
+            color: var(--md-sys-color-on-tertiary-container);
+        }
+        .region-info-badge.inactive {
+            background: var(--md-sys-color-error-container);
+            color: var(--md-sys-color-on-error-container);
+        }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -953,6 +1035,15 @@
 
             <!-- Main Regions Interface -->
             <div class="regions-container">
+                <!-- Regions Map -->
+                <div class="regions-map-card" id="regionsMapCard">
+                    <div class="regions-map-header">
+                        <i class="fas fa-map"></i> Service Regions Map
+                    </div>
+                    <div id="regionInfoPanel" class="region-info-panel" style="display:none;"></div>
+                    <div id="regionsMap"></div>
+                </div>
+
                 <!-- Regions List -->
                 <div class="regions-list">
                     <div class="regions-header">
