@@ -1,0 +1,35 @@
+🚀 START SERVER AND OPEN IN SAFARI
+=====================================
+
+Copy and paste this ONE COMMAND into your Terminal:
+
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform && pkill -f "node local-dev-server.js"; sleep 1; node local-dev-server.js > server.log 2>&1 & sleep 3; open -a Safari http://localhost:3000/pages/regions.html
+
+What this does:
+1. Navigate to the project directory
+2. Kill any old server processes
+3. Wait 1 second
+4. Start the Node.js server in background
+5. Wait 3 seconds for server to start
+6. Open Safari with the regions page
+
+=====================================
+
+ALTERNATIVE: Start server ONLY (see output)
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform && pkill -f "node local-dev-server.js"; sleep 1; node local-dev-server.js
+
+Then manually open Safari and go to:
+http://localhost:3000/pages/regions.html
+
+=====================================
+
+TO CHECK IF SERVER IS RUNNING:
+lsof -i:3000
+
+TO VIEW SERVER LOGS:
+cat /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform/server.log
+
+TO STOP SERVER:
+pkill -f "node local-dev-server.js"
+
+=====================================

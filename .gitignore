@@ -5,6 +5,19 @@ yarn-debug.log*
 yarn-error.log*
 .dart_tool/
 
+# Mapbox Configuration (contains access token)
+.env.mapbox
+*.mapbox.env
+mapbox-token.txt
+
+# Google Maps Configuration (contains API key)
+google-maps-config.js
+.google-maps-key
+*.api-key
+.env
+.env.local
+.env.production
+
 # Runtime data
 pids
 *.pid

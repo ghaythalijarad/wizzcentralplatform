@@ -8,7 +8,8 @@
     "start:backend": "cd backend && npm run dev",
     "build": "vite build frontend",
     "preview": "vite preview frontend",
-    "local": "node local-dev-server.js"
+    "local": "node local-dev-server.js",
+    "playground": "node regions-api/server.js"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",

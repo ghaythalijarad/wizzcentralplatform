@@ -1,0 +1,107 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║              🔑 GOOGLE API KEY SETUP INSTRUCTIONS                ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 STEP-BY-STEP GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Open Google Cloud Console
+   ✅ Browser should have opened automatically
+   URL: https://console.cloud.google.com/apis/credentials
+   Project: wizz-business
+
+Step 2: Enable Places API
+   1. Click "+ ENABLE APIS AND SERVICES"
+   2. Search: "Places API"
+   3. Click "Places API"
+   4. Click "ENABLE"
+   5. Wait for it to enable (takes a few seconds)
+
+Step 3: Create API Key
+   1. Go to: Credentials page
+   2. Click "+ CREATE CREDENTIALS"
+   3. Select "API Key"
+   4. ✅ COPY THE KEY (starts with AIzaSy...)
+   5. Keep the popup open!
+
+Step 4: Restrict Key (IMPORTANT!)
+   1. Click "RESTRICT KEY" in the popup
+   
+   2. Set Name:
+      WhizzCentral-Regions-Places-API
+   
+   3. API Restrictions:
+      • Select "Restrict key"
+      • Check ONLY: ✅ Places API
+   
+   4. Application Restrictions:
+      • Select "HTTP referrers (web sites)"
+      • Add these URLs:
+        http://localhost:3000/*
+        http://localhost:*
+        https://*.amplifyapp.com/*
+   
+   5. Click "SAVE"
+
+Step 5: Copy Your Key
+   Your API key looks like:
+   AIzaSyXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxXxX
+   
+   ⚠️ Keep it safe!
+   ⚠️ Never share publicly!
+   ⚠️ Never commit to GitHub!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ AFTER YOU HAVE THE KEY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tell me your API key and I'll add it to the project automatically!
+
+Or add it manually:
+
+1. Edit file:
+   frontend/pages/regions-management.html
+
+2. Find line:
+   <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY...
+
+3. Replace YOUR_API_KEY with your actual key:
+   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyXxXxXx...
+
+4. Save file
+
+5. Open page:
+   http://localhost:3000/pages/regions-management.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔒 SECURITY REMINDERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ API key is restricted to Places API only
+✅ API key is restricted to your domains
+✅ API key is protected in .gitignore
+✅ You have 100,000 free requests/month
+
+⚠️ DO NOT:
+   ❌ Share key publicly
+   ❌ Commit to GitHub
+   ❌ Use in production without restrictions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📞 NEED HELP?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+If you get stuck:
+   1. Check console.cloud.google.com/apis/dashboard
+   2. Verify Places API is enabled
+   3. Check API key restrictions
+   4. Wait 5 minutes for changes to propagate
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ready! Once you have your API key, tell me and I'll add it! 🚀
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

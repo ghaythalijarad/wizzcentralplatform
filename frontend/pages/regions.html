@@ -8,6 +8,11 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Leaflet Map Library -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
@@ -723,7 +728,7 @@
             color: var(--md-sys-color-on-surface-variant);
             cursor: pointer;
             padding: 0.25rem;
-            border-radius: var(--md-sys-shape-corner-small);
+            border-radius: var (--md-sys-shape-corner-small);
             transition: background-color 0.2s ease;
         }
 
@@ -906,6 +911,10 @@
                     <i class="fas fa-sync"></i>
                     Refresh
                 </button>
+                <button class="btn-secondary" onclick="window.location.reload(true)" style="margin-left: 0.5rem;">
+                    <i class="fas fa-redo"></i>
+                    Hard Reload
+                </button>
             </div>
         </div>
 
@@ -944,7 +953,13 @@
                 <!-- Regions List -->
                 <div class="regions-list">
                     <div class="regions-header">
-                        <!-- UI cleanup completed: Service Regions heading, Card/Table View buttons, and Add Region button removed on 2025-09-25 -->
+                        <h3>Service Regions</h3>
+                        <div class="regions-header-actions">
+                            <button class="btn-add-region" onclick="openAddRegionModal()">
+                                <i class="fas fa-plus"></i>
+                                Add Region
+                            </button>
+                        </div>
                     </div>
                     
                     <!-- Card View Container -->
@@ -1107,7 +1122,10 @@
     <script src="../assets/js/navigation.js"></script>
     <script src="../config.js"></script>
     <script src="../assets/js/auth-utils.js"></script>
-    <script src="../assets/js/aws-utils.js"></script>        <script src="../regions-management-iraq.js?v=20250926.5"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    
+    <!-- Regions Management Script - Loads comprehensive Najaf regions from API -->
+    <script src="../regions.js"></script>
     
     <script>
         // Initialize page with direct sidebar loading approach
@@ -1149,19 +1167,12 @@
                             // Sidebar functionality is now handled by navigation.js
                         }
                         
-                        // Initialize Iraq regions management after sidebar is loaded
-                        if (typeof IraqRegionsManager !== 'undefined') {
-                            regionsManager = new IraqRegionsManager();
-                            regionsManager.init().then(() => {
-                                console.log('✅ Iraq Regions Management initialized');
-                            }).catch(error => {
-                                console.error('❌ Failed to initialize Iraq Regions Management:', error);
-                            });
-                            
-                            // Make available globally for HTML onclick handlers
+                        // Regions management is automatically initialized by regions.js
+                                               if (typeof regionsManager !== 'undefined') {
+                            console.log('✅ Regions Management loaded and ready');
                             window.regionsManager = regionsManager;
                         } else {
-                            console.error('❌ IraqRegionsManager not loaded');
+                            console.error('❌ RegionsManager not loaded - check if regions.js is included');
                         }
                     })
                     .catch(error => {

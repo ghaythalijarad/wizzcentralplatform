@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Debug Test</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            background: #2e2e2e;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #00ff00;
+        }
+        .error { color: #ff0000; }
+        .success { color: #00ff00; }
+        .warning { color: #ffaa00; }
+        .info { color: #00aaff; }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            overflow-x: auto;
+        }
+        button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #00cc00;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Dashboard Real Data Debug Test</h1>
+    
+    <div class="section">
+        <h2>Test Controls</h2>
+        <button onclick="runAllTests()">Run All Tests</button>
+        <button onclick="testAWSCredentials()">Test AWS Credentials</button>
+        <button onclick="testDataService()">Test DataService</button>
+        <button onclick="testDynamoDBAccess()">Test DynamoDB Access</button>
+        <button onclick="manuallyLoadStats()">Manually Load Stats</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <!-- Load AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
+    
+    <!-- Load required scripts -->
+    <script src="../config.js"></script>
+    <script src="../assets/js/aws-utils.js"></script>
+    <script src="../data-service.js"></script>
+
+    <script>
+        let testResults = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            testResults.push({ timestamp, message, type });
+            updateDisplay();
+            console.log(`[${type}] ${message}`);
+        }
+
+        function updateDisplay() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = testResults.map(result => `
+                <div class="section">
+                    <span class="${result.type}">[${result.timestamp}] [${result.type.toUpperCase()}]</span>
+                    <pre>${result.message}</pre>
+                </div>
+            `).join('');
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function clearResults() {
+            testResults = [];
+            updateDisplay();
+        }
+
+        async function testAWSCredentials() {
+            log('═══════════════════════════════════════', 'info');
+            log('TEST 1: AWS Credentials', 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            try {
+                // Check if AWS SDK is loaded
+                if (typeof AWS === 'undefined') {
+                    log('❌ AWS SDK not loaded!', 'error');
+                    return false;
+                }
+                log('✅ AWS SDK loaded', 'success');
+
+                // Check AWS config
+                if (!AWS.config.credentials) {
+                    log('⚠️ AWS credentials not set', 'warning');
+                    log('Attempting to initialize...', 'info');
+                    
+                    if (typeof window.AWSUtils !== 'undefined') {
+                        await window.AWSUtils.initialize();
+                        log('✅ AWSUtils initialized', 'success');
+                    }
+                }
+
+                // Test STS call
+                log('Testing AWS STS GetCallerIdentity...', 'info');
+                const sts = new AWS.STS();
+                const identity = await sts.getCallerIdentity().promise();
+                log('✅ AWS Credentials Valid!', 'success');
+                log(`Account: ${identity.Account}`, 'success');
+                log(`User ARN: ${identity.Arn}`, 'success');
+                return true;
+
+            } catch (error) {
+                log(`❌ AWS Credentials Test Failed: ${error.message}`, 'error');
+                log(`Error details: ${JSON.stringify(error, null, 2)}`, 'error');
+                return false;
+            }
+        }
+
+        async function testDataService() {
+            log('═══════════════════════════════════════', 'info');
+            log('TEST 2: DataService', 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            try {
+                // Check if dataService exists
+                if (typeof window.dataService === 'undefined') {
+                    log('❌ window.dataService not found!', 'error');
+                    log('Make sure data-service.js is loaded', 'error');
+                    return false;
+                }
+                log('✅ window.dataService exists', 'success');
+
+                // Initialize dataService
+                log('Initializing dataService...', 'info');
+                await window.dataService.initialize();
+                log('✅ dataService initialized', 'success');
+
+                return true;
+
+            } catch (error) {
+                log(`❌ DataService Test Failed: ${error.message}`, 'error');
+                log(`Error details: ${JSON.stringify(error, null, 2)}`, 'error');
+                return false;
+            }
+        }
+
+        async function testDynamoDBAccess() {
+            log('═══════════════════════════════════════', 'info');
+            log('TEST 3: DynamoDB Table Access', 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            const tables = {
+                'Merchants': 'WhizzMerchants_Businesses',
+                'Drivers': 'WhizzDrivers_dev',
+                'Discounts': 'WhizzMerchants_Discounts',
+                'Orders': 'WizzOrders',
+                'Customers': 'WizzUser_users_dev'
+            };
+
+            let allSuccess = true;
+
+            for (const [name, tableName] of Object.entries(tables)) {
+                try {
+                    log(`Testing ${name} (${tableName})...`, 'info');
+                    const result = await window.dataService.scan(tableName, { Select: 'COUNT', Limit: 1 });
+                    const count = result?.Count || 0;
+                    log(`✅ ${name}: ${count} records`, 'success');
+                } catch (error) {
+                    log(`❌ ${name} Failed: ${error.message}`, 'error');
+                    allSuccess = false;
+                }
+            }
+
+            return allSuccess;
+        }
+
+        async function manuallyLoadStats() {
+            log('═══════════════════════════════════════', 'info');
+            log('TEST 4: Manual Statistics Loading', 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            try {
+                // Ensure dataService is initialized
+                await window.dataService.initialize();
+
+                const stats = {
+                    customersCount: 0,
+                    merchantsCount: 0,
+                    driversCount: 0,
+                    ordersCount: 0,
+                    promotionsCount: 0
+                };
+
+                // Get merchants count
+                log('Getting merchants count...', 'info');
+                const merchantsResult = await window.dataService.scan('WhizzMerchants_Businesses', { Select: 'COUNT' });
+                stats.merchantsCount = merchantsResult?.Count || 0;
+                log(`✅ Merchants: ${stats.merchantsCount}`, 'success');
+
+                // Get drivers count
+                log('Getting drivers count...', 'info');
+                const driversResult = await window.dataService.scan('WhizzDrivers_dev', { Select: 'COUNT' });
+                stats.driversCount = driversResult?.Count || 0;
+                log(`✅ Drivers: ${stats.driversCount}`, 'success');
+
+                // Get promotions count
+                log('Getting promotions count...', 'info');
+                const promotionsResult = await window.dataService.scan('WhizzMerchants_Discounts', { Select: 'COUNT' });
+                stats.promotionsCount = promotionsResult?.Count || 0;
+                log(`✅ Promotions: ${stats.promotionsCount}`, 'success');
+
+                // Get orders count
+                log('Getting orders count...', 'info');
+                const ordersResult = await window.dataService.scan('WizzOrders', { Select: 'COUNT' });
+                stats.ordersCount = ordersResult?.Count || 0;
+                log(`✅ Orders: ${stats.ordersCount}`, 'success');
+
+                // Get customers count
+                log('Getting customers count...', 'info');
+                const customersResult = await window.dataService.scan('WizzUser_users_dev', { Select: 'COUNT' });
+                stats.customersCount = customersResult?.Count || 0;
+                log(`✅ Customers: ${stats.customersCount}`, 'success');
+
+                log('═══════════════════════════════════════', 'success');
+                log('FINAL STATISTICS:', 'success');
+                log(`Customers:  ${stats.customersCount}`, 'success');
+                log(`Merchants:  ${stats.merchantsCount}`, 'success');
+                log(`Drivers:    ${stats.driversCount}`, 'success');
+                log(`Orders:     ${stats.ordersCount}`, 'success');
+                log(`Promotions: ${stats.promotionsCount}`, 'success');
+                log('═══════════════════════════════════════', 'success');
+
+                return stats;
+
+            } catch (error) {
+                log(`❌ Manual Stats Loading Failed: ${error.message}`, 'error');
+                log(`Error stack: ${error.stack}`, 'error');
+                return null;
+            }
+        }
+
+        async function runAllTests() {
+            clearResults();
+            log('🚀 Starting Complete Dashboard Debug Tests', 'info');
+            log('═══════════════════════════════════════', 'info');
+
+            const test1 = await testAWSCredentials();
+            if (!test1) {
+                log('⚠️ AWS Credentials test failed. Stopping.', 'warning');
+                return;
+            }
+
+            const test2 = await testDataService();
+            if (!test2) {
+                log('⚠️ DataService test failed. Stopping.', 'warning');
+                return;
+            }
+
+            const test3 = await testDynamoDBAccess();
+            if (!test3) {
+                log('⚠️ Some DynamoDB tables are inaccessible.', 'warning');
+            }
+
+            const stats = await manuallyLoadStats();
+            if (stats) {
+                log('🎉 ALL TESTS COMPLETED SUCCESSFULLY!', 'success');
+                log('═══════════════════════════════════════', 'success');
+                
+                // Check if stats match expected values
+                if (stats.merchantsCount === 3 && stats.driversCount === 3 && stats.promotionsCount === 5) {
+                    log('✅ Statistics match expected values!', 'success');
+                    log('✅ Merchants = 3 (CORRECT)', 'success');
+                    log('✅ Drivers = 3 (CORRECT)', 'success');
+                    log('✅ Promotions = 5 (CORRECT)', 'success');
+                } else {
+                    log('⚠️ Statistics do not match expected values:', 'warning');
+                    log(`   Expected: Merchants=3, Drivers=3, Promotions=5`, 'warning');
+                    log(`   Got: Merchants=${stats.merchantsCount}, Drivers=${stats.driversCount}, Promotions=${stats.promotionsCount}`, 'warning');
+                }
+            } else {
+                log('❌ TESTS FAILED', 'error');
+            }
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', () => {
+            log('Page loaded. Click "Run All Tests" to start.', 'info');
+        });
+    </script>
+</body>
+</html>

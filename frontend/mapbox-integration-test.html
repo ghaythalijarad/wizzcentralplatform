@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WizzCentral Regions - Mapbox Integration Test</title>
+    
+    <!-- Mapbox GL JS -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    
+    <!-- Mapbox Draw Plugin -->
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.2/mapbox-gl-draw.css' type='text/css' />
+    
+    <!-- Mapbox Geocoder Plugin -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f3f4f6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #1f2937;
+            margin-bottom: 10px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .map-container {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            height: 600px;
+            position: relative;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .controls h3 {
+            color: #1f2937;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .info-panel {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .info-panel h4 {
+            color: #374151;
+            margin-bottom: 10px;
+        }
+        
+        .info-panel code {
+            background: #1f2937;
+            color: #10b981;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .legend-text {
+            font-size: 14px;
+            color: #374151;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🗺️ WizzCentral Regions - Mapbox Integration Test</h1>
+            <p style="color: #6b7280; margin-top: 8px;">
+                Testing Mapbox GL JS with real data from Iraq regions
+            </p>
+            <div style="margin-top: 15px;">
+                <span class="status-badge success" id="status-badge">✓ Mapbox Connected</span>
+                <span class="status-badge" id="token-badge" style="margin-left: 10px;">Token: Loaded</span>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map"></div>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <h4 style="margin: 0 0 10px 0; color: #1f2937;">Region Status</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span class="legend-text">Active</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span class="legend-text">Inactive</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span class="legend-text">Maintenance</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="controls">
+            <h3>Quick Navigation</h3>
+            <button class="btn btn-primary" onclick="flyToBaghdad()">📍 Baghdad</button>
+            <button class="btn btn-primary" onclick="flyToBasra()">📍 Basra</button>
+            <button class="btn btn-primary" onclick="flyToErbil()">📍 Erbil</button>
+            <button class="btn btn-primary" onclick="flyToNajaf()">📍 Najaf</button>
+            <button class="btn btn-secondary" onclick="resetView()">🔄 Reset View</button>
+            <button class="btn btn-success" onclick="addTestMarker()">➕ Add Test Marker</button>
+        </div>
+        
+        <!-- Info Panel -->
+        <div class="info-panel">
+            <h4>✅ Integration Status</h4>
+            <p style="color: #6b7280; margin-bottom: 10px;">Your Mapbox token is successfully configured and the map is ready!</p>
+            <ul style="color: #6b7280; padding-left: 20px;">
+                <li>Mapbox GL JS: <code>v2.15.0</code></li>
+                <li>Mapbox Draw: <code>v1.4.2</code></li>
+                <li>Geocoder: <code>v5.0.0</code></li>
+                <li>Default Center: <code>Baghdad (33.3152, 44.3661)</code></li>
+                <li>Token Status: <code id="token-status">Active</code></li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Mapbox Config -->
+    <script src="mapbox-config.js"></script>
+    
+    <script>
+        // Error handling and debugging
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('Error:', msg, 'at', url, ':', lineNo);
+            document.body.innerHTML += '<div style="color: red; padding: 20px; background: #fee2e2; margin: 20px; border-radius: 8px;"><h3>Error Detected:</h3><pre>' + msg + '\n' + url + ':' + lineNo + '</pre></div>';
+            return false;
+        };
+        
+        // Check if Mapbox is loaded
+        if (typeof mapboxgl === 'undefined') {
+            console.error('❌ Mapbox GL JS not loaded!');
+            document.body.innerHTML = '<div style="color: red; padding: 40px; text-align: center;"><h1>Error: Mapbox GL JS not loaded</h1><p>Please check your internet connection and try again.</p></div>';
+        }
+        
+        // Check if config is loaded
+        if (typeof MapboxConfig === 'undefined') {
+            console.error('❌ MapboxConfig not loaded!');
+            document.body.innerHTML = '<div style="color: red; padding: 40px; text-align: center;"><h1>Error: MapboxConfig not loaded</h1><p>The mapbox-config.js file could not be found.</p></div>';
+        }
+        
+        console.log('✅ Mapbox GL loaded:', typeof mapboxgl);
+        console.log('✅ MapboxConfig loaded:', typeof MapboxConfig);
+        
+        // Initialize Mapbox with your token
+        mapboxgl.accessToken = MapboxConfig.accessToken;
+        
+        console.log('🗺️  Initializing Mapbox with token:', MapboxConfig.accessToken.substring(0, 20) + '...');
+        
+        // Create map instance
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: MapboxConfig.style,
+            center: [MapboxConfig.defaultCenter.lng, MapboxConfig.defaultCenter.lat],
+            zoom: MapboxConfig.defaultZoom,
+            maxBounds: [
+                [MapboxConfig.bounds.southwest.lng, MapboxConfig.bounds.southwest.lat], // Southwest
+                [MapboxConfig.bounds.northeast.lng, MapboxConfig.bounds.northeast.lat]  // Northeast
+            ]
+        });
+        
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+        
+        // Add fullscreen control
+        map.addControl(new mapboxgl.FullscreenControl(), 'top-left');
+        
+        // Add geocoder (search)
+        const geocoder = new MapboxGeocoder({
+            accessToken: mapboxgl.accessToken,
+            mapboxgl: mapboxgl,
+            countries: 'IQ',
+            language: 'ar,en',
+            placeholder: 'Search for places in Iraq...'
+        });
+        map.addControl(geocoder, 'top-right');
+        
+        // Add scale control
+        map.addControl(new mapboxgl.ScaleControl({
+            maxWidth: 100,
+            unit: 'metric'
+        }), 'bottom-right');
+        
+        // Map load event
+        map.on('load', function() {
+            console.log('✅ Map loaded successfully!');
+            document.getElementById('status-badge').textContent = '✓ Map Loaded';
+            document.getElementById('token-status').textContent = 'Verified & Active';
+            
+            // Add sample markers for Iraqi cities
+            addCityMarkers();
+        });
+        
+        // Error handling
+        map.on('error', function(e) {
+            console.error('❌ Map error:', e);
+            document.getElementById('status-badge').textContent = '✗ Map Error';
+            document.getElementById('status-badge').className = 'status-badge error';
+        });
+        
+        // Add markers for major Iraqi cities
+        function addCityMarkers() {
+            const cities = [
+                { name: 'Baghdad', coords: [44.3661, 33.3152], status: 'ACTIVE' },
+                { name: 'Basra', coords: [47.7804, 30.5034], status: 'ACTIVE' },
+                { name: 'Erbil', coords: [44.0093, 36.1911], status: 'ACTIVE' },
+                { name: 'Najaf', coords: [44.3358, 32.0252], status: 'INACTIVE' },
+                { name: 'Karbala', coords: [44.0247, 32.6160], status: 'ACTIVE' }
+            ];
+            
+            cities.forEach(city => {
+                const color = city.status === 'ACTIVE' ? '#10b981' : '#ef4444';
+                
+                // Create marker
+                const marker = new mapboxgl.Marker({ color: color })
+                    .setLngLat(city.coords)
+                    .setPopup(new mapboxgl.Popup().setHTML(`
+                        <h3 style="margin: 0 0 8px 0;">${city.name}</h3>
+                        <p style="margin: 0; color: #6b7280;">
+                            Status: <strong style="color: ${color};">${city.status}</strong>
+                        </p>
+                    `))
+                    .addTo(map);
+                
+                console.log(`📍 Added marker for ${city.name}`);
+            });
+        }
+        
+        // Navigation functions
+        function flyToBaghdad() {
+            map.flyTo({
+                center: [44.3661, 33.3152],
+                zoom: 11,
+                duration: 2000
+            });
+        }
+        
+        function flyToBasra() {
+            map.flyTo({
+                center: [47.7804, 30.5034],
+                zoom: 11,
+                duration: 2000
+            });
+        }
+        
+        function flyToErbil() {
+            map.flyTo({
+                center: [44.0093, 36.1911],
+                zoom: 11,
+                duration: 2000
+            });
+        }
+        
+        function flyToNajaf() {
+            map.flyTo({
+                center: [44.3358, 32.0252],
+                zoom: 12,
+                duration: 2000
+            });
+        }
+        
+        function resetView() {
+            map.flyTo({
+                center: [MapboxConfig.defaultCenter.lng, MapboxConfig.defaultCenter.lat],
+                zoom: MapboxConfig.defaultZoom,
+                duration: 2000
+            });
+        }
+        
+        function addTestMarker() {
+            const center = map.getCenter();
+            new mapboxgl.Marker({ color: '#3b82f6' })
+                .setLngLat([center.lng, center.lat])
+                .setPopup(new mapboxgl.Popup().setHTML('<h4>Test Marker</h4><p>Click to remove</p>'))
+                .addTo(map);
+            console.log('➕ Added test marker at:', center);
+        }
+        
+        // Log map events
+        map.on('click', function(e) {
+            console.log('🖱️  Map clicked at:', e.lngLat);
+        });
+        
+        map.on('zoom', function() {
+            console.log('🔍 Current zoom:', map.getZoom().toFixed(2));
+        });
+    </script>
+</body>
+</html>

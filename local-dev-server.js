@@ -9,8 +9,8 @@ const cors = require('cors');
 const path = require('path');
 
 // Use specific AWS SDK v3 clients instead of full v2 SDK to avoid conflicts
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBClient, DescribeTableCommand } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 // Configure AWS SDK v3 client
 const ddbClient = new DynamoDBClient({
@@ -23,6 +23,30 @@ const ddbClient = new DynamoDBClient({
 
 const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
+// Cache for table key schemas
+const tableKeySchemaCache = new Map();
+
+async function getTableKeySchema(tableName) {
+    if (tableKeySchemaCache.has(tableName)) return tableKeySchemaCache.get(tableName);
+    const cmd = new DescribeTableCommand({ TableName: tableName });
+    const res = await ddbClient.send(cmd);
+    const ks = res?.Table?.KeySchema || [];
+    tableKeySchemaCache.set(tableName, ks);
+    return ks;
+}
+
+function buildKeyFromItem(item, keySchema) {
+    const key = {};
+    for (const k of keySchema) {
+        const attr = k.AttributeName;
+        if (!(attr in item)) {
+            throw new Error(`Missing key attribute '${attr}' in item`);
+        }
+        key[attr] = item[attr];
+    }
+    return key;
+}
+
 // Import condition engine handler
 const { handler: conditionEngineHandler } = require('./backend/lambda/condition-engine-api.js');
 
@@ -33,12 +57,15 @@ const API_PORT = process.env.API_PORT || 3001;
 // Set AWS environment variables for local development
 process.env.AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 process.env.AWS_PROFILE = process.env.AWS_PROFILE || 'wizz-drivers-ghayth-dev';
+process.env.AWS_SDK_LOAD_CONFIG = process.env.AWS_SDK_LOAD_CONFIG || '1';
 
 console.log('🔧 AWS Configuration:');
 console.log(`   Region: ${process.env.AWS_REGION}`);
 console.log(`   Profile: ${process.env.AWS_PROFILE}`);
-console.log(`   Using Real DynamoDB: ✅`);
 console.log('');
+
+// Add flag to guard debug routes in non-dev environments
+const ENABLE_REGIONS_DEBUG = process.env.ENABLE_REGIONS_DEBUG === 'true';
 
 // ============================================
 // MIDDLEWARE SETUP
@@ -125,6 +152,47 @@ const handleLambdaResponse = async (handler, req, res) => {
     }
 };
 
+// Helper: Detect AWS credential/auth issues and respond with 401 + guidance
+function isAwsCredentialsError(error) {
+    const code = error?.name || error?.Code || error?.code;
+    const msg = (error?.message || '').toLowerCase();
+    const credentialCodes = new Set([
+        'UnrecognizedClientException',
+        'CredentialsProviderError',
+        'ExpiredToken',
+        'ExpiredTokenException',
+        'AccessDeniedException',
+        'AuthFailure',
+        'SignatureDoesNotMatch',
+        'InvalidSignatureException'
+    ]);
+    if (code && credentialCodes.has(code)) return true;
+    return (
+        msg.includes('could not load credentials') ||
+        msg.includes('no credentials') ||
+        msg.includes('expired') ||
+        msg.includes('sso') ||
+        msg.includes('not authorized') ||
+        msg.includes('access denied')
+    );
+}
+
+function sendAwsAuthError(res, context, error) {
+    const profile = process.env.AWS_PROFILE || 'default';
+    const region = process.env.AWS_REGION || 'us-east-1';
+    return res.status(401).json({
+        success: false,
+        error: 'aws-credentials',
+        message: 'AWS credentials missing or expired for DynamoDB access',
+        context,
+        profile,
+        region,
+        howToFix: `Run: aws sso login --profile ${profile}`,
+        source: 'dynamodb-auth',
+        details: process.env.NODE_ENV === 'development' ? (error?.message || String(error)) : undefined
+    });
+}
+
 // ============================================
 // REAL DYNAMODB DATA ACCESS (AWS SDK v3)
 // ============================================
@@ -136,6 +204,8 @@ const BUSINESSES_TABLE = 'WhizzMerchants_Businesses';
 const CONDITIONS_TABLE = 'WizzCentral_Campaign_Conditions';
 const CAMPAIGNS_TABLE = 'WizzCentral_Campaigns';
 const ORDERS_TABLE = 'WizzOrders_dev';
+// Add regions table for regions management (DynamoDB exclusive source)
+const REGIONS_TABLE = 'WizzCentral_Regions';
 
 // Real DynamoDB helper functions (updated for AWS SDK v3)
 const getUserFromDynamoDB = async (userId) => {
@@ -335,6 +405,7 @@ app.get('/analytics', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching analytics from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/analytics', error);
         res.status(500).json({
             error: 'Failed to fetch analytics',
             message: error.message
@@ -366,6 +437,7 @@ app.get('/campaigns', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching campaigns from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/campaigns', error);
         res.status(500).json({
             error: 'Failed to fetch campaigns',
             message: error.message
@@ -399,6 +471,7 @@ app.post('/campaigns', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error creating campaign in DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/campaigns', error);
         res.status(500).json({
             error: 'Failed to create campaign',
             message: error.message
@@ -441,6 +514,7 @@ app.get('/orders', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching orders from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/orders', error);
         res.status(500).json({
             error: 'Failed to fetch orders',
             message: error.message
@@ -482,6 +556,7 @@ app.get('/orders/:orderId', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching order:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/orders/:orderId', error);
         res.status(500).json({
             error: 'Failed to fetch order',
             message: error.message
@@ -517,6 +592,7 @@ app.get('/dev/users/:userId', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching user data:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/dev/users/:userId', error);
         res.status(500).json({
             error: 'Failed to fetch user data',
             message: error.message
@@ -554,6 +630,7 @@ app.get('/dev/users', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error listing users:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/dev/users', error);
         res.status(500).json({
             error: 'Failed to list users',
             message: error.message
@@ -581,6 +658,7 @@ app.get('/dev/businesses/:businessId', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching business data:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/dev/businesses/:businessId', error);
         res.status(500).json({
             error: 'Failed to fetch business data',
             message: error.message
@@ -617,6 +695,7 @@ app.get('/businesses', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error fetching businesses from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/businesses', error);
         res.status(500).json({
             error: 'Failed to fetch businesses',
             message: error.message,
@@ -695,6 +774,7 @@ app.post('/dev/test-conditions', async (req, res) => {
         res.status(result.statusCode).json(body);
     } catch (error) {
         console.error('❌ Test Condition Error:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/dev/test-conditions', error);
         res.status(500).json({ 
             error: 'Test condition evaluation failed',
             message: error.message,
@@ -704,1509 +784,308 @@ app.post('/dev/test-conditions', async (req, res) => {
 });
 
 // ============================================
-// REGIONS MANAGEMENT API - COMPREHENSIVE IRAQI DATASET
+// REGIONS MANAGEMENT API - DYNAMODB INTEGRATION
 // ============================================
 
-// Comprehensive Iraqi Regions Data (All 18 Governorates)
-const comprehensiveIraqiRegions = [
-    // Country Level
-    {
-        id: 'iraq',
-        name: 'Iraq',
-        name_ar: 'العراق',
-        level: 'country',
-        parent_id: null,
-        governorate_id: null,
-        coordinates: { lat: 33.2232, lng: 43.6793, radius: 1000000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 40222493, area_km2: 438317, total_orders: 125680, active_drivers: 456 }
-    },
+// DEBUG routes guarded by flag
+if (ENABLE_REGIONS_DEBUG) {
+    // DEBUG: Inspect regions table key schema
+    app.get('/api/regions/_schema', async (req, res) => {
+        try {
+            const schema = await getTableKeySchema(REGIONS_TABLE);
+            res.json({ success: true, table: REGIONS_TABLE, keySchema: schema });
+        } catch (e) {
+            if (isAwsCredentialsError(e)) return sendAwsAuthError(res, '/api/regions/_schema', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
 
-    // ALL 18 GOVERNORATES OF IRAQ
-    {
-        id: 'baghdad',
-        name: 'Baghdad',
-        name_ar: 'بغداد',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3152, lng: 44.3661, radius: 50000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 9000000, area_km2: 5072, total_orders: 45230, active_drivers: 234 }
-    },
-    {
-        id: 'basra',
-        name: 'Basra',
-        name_ar: 'البصرة',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5085, lng: 47.7804, radius: 45000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 2500000, area_km2: 19070, total_orders: 12450, active_drivers: 89 }
-    },
-    {
-        id: 'nineveh',
-        name: 'Nineveh',
-        name_ar: 'نينوى',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'nineveh',
-        coordinates: { lat: 36.3407, lng: 43.1186, radius: 60000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 3270000, area_km2: 37323, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'erbil',
-        name: 'Erbil',
-        name_ar: 'أربيل',
-        name_ku: 'هەولێر',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.1911, lng: 44.0093, radius: 35000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1612700, area_km2: 15074, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'sulaymaniyah',
-        name: 'Sulaymaniyah',
-        name_ar: 'السليمانية',
-        name_ku: 'سلێمانی',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'sulaymaniyah',
-        coordinates: { lat: 35.5650, lng: 45.4377, radius: 40000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1950000, area_km2: 17023, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'duhok',
-        name: 'Duhok',
-        name_ar: 'دهوك',
-        name_ku: 'دهۆک',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'duhok',
-        coordinates: { lat: 36.8617, lng: 42.9977, radius: 30000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1292535, area_km2: 6553, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'kirkuk',
-        name: 'Kirkuk',
-        name_ar: 'كركوك',
-        name_ku: 'کەرکووک',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'kirkuk',
-        coordinates: { lat: 35.4681, lng: 44.3922, radius: 35000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1395614, area_km2: 9679, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'anbar',
-        name: 'Anbar',
-        name_ar: 'الأنبار',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'anbar',
-        coordinates: { lat: 33.4224, lng: 41.8818, radius: 80000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1561000, area_km2: 138501, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'najaf',
-        name: 'Najaf',
-        name_ar: 'النجف',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'najaf',
-        coordinates: { lat: 31.9996, lng: 44.3267, radius: 30000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 1285500, area_km2: 28824, total_orders: 3240, active_drivers: 23 }
-    },
-    {
-        id: 'karbala',
-        name: 'Karbala',
-        name_ar: 'كربلاء',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'karbala',
-        coordinates: { lat: 32.6169, lng: 44.0252, radius: 25000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 1066600, area_km2: 5034, total_orders: 2890, active_drivers: 19 }
-    },
-    {
-        id: 'babylon',
-        name: 'Babylon',
-        name_ar: 'بابل',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'babylon',
-        coordinates: { lat: 32.5422, lng: 44.4267, radius: 35000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 2025500, area_km2: 5119, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'diyala',
-        name: 'Diyala',
-        name_ar: 'ديالى',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'diyala',
-        coordinates: { lat: 33.7500, lng: 44.9300, radius: 45000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1443200, area_km2: 17685, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'saladin',
-        name: 'Saladin',
-        name_ar: 'صلاح الدين',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'saladin',
-        coordinates: { lat: 34.2000, lng: 43.6700, radius: 50000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1408200, area_km2: 24751, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'wasit',
-        name: 'Wasit',
-        name_ar: 'واسط',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'wasit',
-        coordinates: { lat: 32.4500, lng: 45.8300, radius: 40000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1250000, area_km2: 17153, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'maysan',
-        name: 'Maysan',
-        name_ar: 'ميسان',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'maysan',
-        coordinates: { lat: 31.9300, lng: 47.1500, radius: 45000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1065000, area_km2: 16072, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'dhi_qar',
-        name: 'Dhi Qar',
-        name_ar: 'ذي قار',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'dhi_qar',
-        coordinates: { lat: 31.0570, lng: 46.2580, radius: 50000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1999500, area_km2: 12900, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'muthanna',
-        name: 'Muthanna',
-        name_ar: 'المثنى',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'muthanna',
-        coordinates: { lat: 29.7594, lng: 45.3711, radius: 55000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 734000, area_km2: 51740, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'qadisiyyah',
-        name: 'Qadisiyyah',
-        name_ar: 'القادسية',
-        level: 'governorate',
-        parent_id: 'iraq',
-        governorate_id: 'qadisiyyah',
-        coordinates: { lat: 31.9833, lng: 45.0500, radius: 35000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1228000, area_km2: 8153, total_orders: 0, active_drivers: 0 }
-    },
+    // DEBUG: Find a region item by id/regionId and show its keys
+    app.get('/api/regions/_find/:id', async (req, res) => {
+        try {
+            const requestedId = req.params.id;
+            const scan = await dynamoDB.send(new ScanCommand({
+                TableName: REGIONS_TABLE,
+                FilterExpression: '#rid = :v OR #id = :v',
+                ExpressionAttributeNames: { '#rid': 'regionId', '#id': 'id' },
+                ExpressionAttributeValues: { ':v': requestedId }
+            }));
+            const item = scan.Items?.[0];
+            const keySchema = await getTableKeySchema(REGIONS_TABLE);
+            res.json({
+                success: true,
+                requestedId,
+                found: !!item,
+                item,
+                itemKeys: item ? Object.keys(item) : [],
+                keySchema
+            });
+        } catch (e) {
+            if (isAwsCredentialsError(e)) return sendAwsAuthError(res, '/api/regions/_find/:id', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
+    });
+}
 
-    // MAJOR DISTRICTS
-    {
-        id: 'al_karkh',
-        name: 'Al-Karkh',
-        name_ar: 'الكرخ',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3007, lng: 44.3225, radius: 15000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 2800000, area_km2: 860, total_orders: 18500, active_drivers: 95 }
-    },
-    {
-        id: 'al_rusafa',
-        name: 'Al-Rusafa',
-        name_ar: 'الرصافة',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3406, lng: 44.4009, radius: 15000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 3100000, area_km2: 920, total_orders: 19800, active_drivers: 105 }
-    },
-    {
-        id: 'basra_central',
-        name: 'Basra Central',
-        name_ar: 'مركز البصرة',
-        level: 'district',
-        parent_id: 'basra',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5085, lng: 47.7804, radius: 12000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 850000, area_km2: 140, total_orders: 6780, active_drivers: 42 }
-    },
-
-    // MAJOR NEIGHBORHOODS IN BAGHDAD
-    {
-        id: 'al_karrada',
-        name: 'Al-Karrada',
-        name_ar: 'الكرادة',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3089, lng: 44.4161, radius: 5000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 450000, area_km2: 25, total_orders: 5600, active_drivers: 32 }
-    },
-    {
-        id: 'al_mansour',
-        name: 'Al-Mansour',
-        name_ar: 'المنصور',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2930, lng: 44.3353, radius: 6000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 520000, area_km2: 32, total_orders: 6200, active_drivers: 38 }
-    },
-    {
-        id: 'sadr_city',
-        name: 'Sadr City',
-        name_ar: 'مدينة الصدر',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3947, lng: 44.4658, radius: 8000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 2500000, area_km2: 95, total_orders: 8900, active_drivers: 45 }
-    },
-
-    // MAJOR NEIGHBORHOODS IN BASRA
-    {
-        id: 'basra_old_city',
-        name: 'Basra Old City',
-        name_ar: 'البصرة القديمة',
-        level: 'neighborhood',
-        parent_id: 'basra_central',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5085, lng: 47.7804, radius: 4000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 280000, area_km2: 15, total_orders: 2890, active_drivers: 18 }
-    },
-    {
-        id: 'al_ashar',
-        name: 'Al-Ashar',
-        name_ar: 'العشار',
-        level: 'neighborhood',
-        parent_id: 'basra_central',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5200, lng: 47.7950, radius: 5000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 350000, area_km2: 28, total_orders: 3450, active_drivers: 22 }
-    },
-
-    // ==================== EXPANDED DISTRICTS ====================
-    
-    // BAGHDAD DISTRICTS (More detailed)
-    {
-        id: 'al_adhamiya',
-        name: 'Al-Adhamiya',
-        name_ar: 'الأعظمية',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3717, lng: 44.3842, radius: 8000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 650000, area_km2: 45, total_orders: 4200, active_drivers: 28 }
-    },
-    {
-        id: 'al_kadhimiya',
-        name: 'Al-Kadhimiya',
-        name_ar: 'الكاظمية',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3789, lng: 44.3396, radius: 9000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 750000, area_km2: 52, total_orders: 5800, active_drivers: 35 }
-    },
-    {
-        id: 'al_thawra',
-        name: 'Al-Thawra',
-        name_ar: 'الثورة',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3547, lng: 44.4547, radius: 12000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 2200000, area_km2: 85, total_orders: 7500, active_drivers: 40 }
-    },
-    {
-        id: 'new_baghdad',
-        name: 'New Baghdad',
-        name_ar: 'بغداد الجديدة',
-        level: 'district',
-        parent_id: 'baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2850, lng: 44.4500, radius: 10000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 580000, area_km2: 38, total_orders: 3900, active_drivers: 26 }
-    },
-
-    // BASRA DISTRICTS (More detailed)
-    {
-        id: 'al_maqal',
-        name: 'Al-Maqal',
-        name_ar: 'المعقل',
-        level: 'district',
-        parent_id: 'basra',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5200, lng: 47.7600, radius: 8000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 420000, area_km2: 35, total_orders: 2800, active_drivers: 18 }
-    },
-    {
-        id: 'al_hartha',
-        name: 'Al-Hartha',
-        name_ar: 'الهارثة',
-        level: 'district',
-        parent_id: 'basra',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.6150, lng: 47.8200, radius: 12000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 380000, area_km2: 55, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'abu_al_khasib',
-        name: 'Abu Al-Khasib',
-        name_ar: 'أبو الخصيب',
-        level: 'district',
-        parent_id: 'basra',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.0400, lng: 47.9300, radius: 15000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 290000, area_km2: 75, total_orders: 0, active_drivers: 0 }
-    },
-
-    // ERBIL DISTRICTS
-    {
-        id: 'erbil_center',
-        name: 'Erbil Center',
-        name_ar: 'مركز أربيل',
-        name_ku: 'ناوەندی هەولێر',
-        level: 'district',
-        parent_id: 'erbil',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.1911, lng: 44.0093, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 850000, area_km2: 45, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'ankawa',
-        name: 'Ankawa',
-        name_ar: 'عنكاوا',
-        name_ku: 'عەنکاوا',
-        level: 'district',
-        parent_id: 'erbil',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.2200, lng: 44.0400, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 150000, area_km2: 18, total_orders: 0, active_drivers: 0 }
-    },
-
-    // NAJAF DISTRICTS
-    {
-        id: 'najaf_center',
-        name: 'Najaf Center',
-        name_ar: 'مركز النجف',
-        level: 'district',
-        parent_id: 'najaf',
-        governorate_id: 'najaf',
-        coordinates: { lat: 31.9996, lng: 44.3267, radius: 8000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 650000, area_km2: 32, total_orders: 2100, active_drivers: 15 }
-    },
-    {
-        id: 'kufa',
-        name: 'Kufa',
-        name_ar: 'الكوفة',
-        level: 'district',
-        parent_id: 'najaf',
-        governorate_id: 'najaf',
-        coordinates: { lat: 32.0296, lng: 44.3731, radius: 10000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 220000, area_km2: 28, total_orders: 980, active_drivers: 8 }
-    },
-
-    // KARBALA DISTRICTS
-    {
-        id: 'karbala_center',
-        name: 'Karbala Center',
-        name_ar: 'مركز كربلاء',
-        level: 'district',
-        parent_id: 'karbala',
-        governorate_id: 'karbala',
-        coordinates: { lat: 32.6169, lng: 44.0252, radius: 8000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 580000, area_km2: 25, total_orders: 1900, active_drivers: 12 }
-    },
-    {
-        id: 'hindiya',
-        name: 'Hindiya',
-        name_ar: 'الهندية',
-        level: 'district',
-        parent_id: 'karbala',
-        governorate_id: 'karbala',
-        coordinates: { lat: 32.5567, lng: 44.2633, radius: 12000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 45, total_orders: 0, active_drivers: 0 }
-    },
-
-    // ==================== EXPANDED NEIGHBORHOODS ====================
-
-    // BAGHDAD NEIGHBORHOODS (Al-Karkh District)
-    {
-        id: 'al_yarmouk',
-        name: 'Al-Yarmouk',
-        name_ar: 'اليرموك',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2854, lng: 44.3425, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 280000, area_km2: 12, total_orders: 3200, active_drivers: 18 }
-    },
-    {
-        id: 'al_bayaa',
-        name: 'Al-Bayaa',
-        name_ar: 'البياع',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2545, lng: 44.3125, radius: 4000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 350000, area_km2: 18, total_orders: 4100, active_drivers: 22 }
-    },
-    {
-        id: 'al_amiriya',
-        name: 'Al-Amiriya',
-        name_ar: 'الأميرية',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3154, lng: 44.2987, radius: 5000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 420000, area_km2: 22, total_orders: 4800, active_drivers: 26 }
-    },
-    {
-        id: 'al_ghazaliya',
-        name: 'Al-Ghazaliya',
-        name_ar: 'الغزالية',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3567, lng: 44.2845, radius: 4500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 380000, area_km2: 20, total_orders: 3600, active_drivers: 20 }
-    },
-    {
-        id: 'al_dora',
-        name: 'Al-Dora',
-        name_ar: 'الدورة',
-        level: 'neighborhood',
-        parent_id: 'al_karkh',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2145, lng: 44.3687, radius: 6000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 450000, area_km2: 28, total_orders: 2900, active_drivers: 16 }
-    },
-
-    // BAGHDAD NEIGHBORHOODS (Al-Rusafa District)
-    {
-        id: 'al_jadriya',
-        name: 'Al-Jadriya',
-        name_ar: 'الجادرية',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2862, lng: 44.3777, radius: 3500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 120000, area_km2: 8, total_orders: 2800, active_drivers: 16 }
-    },
-    {
-        id: 'al_waziriya',
-        name: 'Al-Waziriya',
-        name_ar: 'الوزيرية',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3289, lng: 44.3945, radius: 2500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 85000, area_km2: 6, total_orders: 2200, active_drivers: 12 }
-    },
-    {
-        id: 'al_arasat',
-        name: 'Al-Arasat',
-        name_ar: 'الأراضي',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3240, lng: 44.3951, radius: 2000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 65000, area_km2: 4, total_orders: 1800, active_drivers: 10 }
-    },
-    {
-        id: 'al_sinaa',
-        name: 'Al-Sinaa',
-        name_ar: 'الصناع',
-        level: 'neighborhood',
-        parent_id: 'al_rusafa',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3425, lng: 44.4125, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 190000, area_km2: 11, total_orders: 2900, active_drivers: 15 }
-    },
-
-    // BAGHDAD NEIGHBORHOODS (Al-Adhamiya District)
-    {
-        id: 'al_adhamiya_center',
-        name: 'Al-Adhamiya Center',
-        name_ar: 'مركز الأعظمية',
-        level: 'neighborhood',
-        parent_id: 'al_adhamiya',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3717, lng: 44.3842, radius: 2500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 180000, area_km2: 8, total_orders: 2100, active_drivers: 12 }
-    },
-    {
-        id: 'al_salam',
-        name: 'Al-Salam',
-        name_ar: 'السلام',
-        level: 'neighborhood',
-        parent_id: 'al_adhamiya',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3856, lng: 44.3967, radius: 4000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 320000, area_km2: 16, total_orders: 1900, active_drivers: 11 }
-    },
-
-    // BAGHDAD NEIGHBORHOODS (Al-Kadhimiya District)
-    {
-        id: 'al_kadhimiya_center',
-        name: 'Al-Kadhimiya Center',
-        name_ar: 'مركز الكاظمية',
-        level: 'neighborhood',
-        parent_id: 'al_kadhimiya',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.3789, lng: 44.3396, radius: 2000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 150000, area_km2: 6, total_orders: 2600, active_drivers: 14 }
-    },
-    {
-        id: 'al_shula',
-        name: 'Al-Shula',
-        name_ar: 'الشعلة',
-        level: 'neighborhood',
-        parent_id: 'al_kadhimiya',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.4012, lng: 44.3225, radius: 5000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 580000, area_km2: 32, total_orders: 2800, active_drivers: 16 }
-    },
-
-    // BAGHDAD NEIGHBORHOODS (New Baghdad District)
-    {
-        id: 'new_baghdad_center',
-        name: 'New Baghdad Center',
-        name_ar: 'مركز بغداد الجديدة',
-        level: 'neighborhood',
-        parent_id: 'new_baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2850, lng: 44.4500, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: true, standard: true },
-        statistics: { population: 220000, area_km2: 12, total_orders: 1800, active_drivers: 11 }
-    },
-    {
-        id: 'al_zaafaraniya',
-        name: 'Al-Zaafaraniya',
-        name_ar: 'الزعفرانية',
-        level: 'neighborhood',
-        parent_id: 'new_baghdad',
-        governorate_id: 'baghdad',
-        coordinates: { lat: 33.2654, lng: 44.4713, radius: 4000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 360000, area_km2: 26, total_orders: 2100, active_drivers: 15 }
-    },
-
-    // BASRA NEIGHBORHOODS (Al-Maqal District)
-    {
-        id: 'al_maqal_center',
-        name: 'Al-Maqal Center',
-        name_ar: 'مركز المعقل',
-        level: 'neighborhood',
-        parent_id: 'al_maqal',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5200, lng: 47.7600, radius: 2500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 180000, area_km2: 10, total_orders: 1200, active_drivers: 8 }
-    },
-    {
-        id: 'al_jamhuriya',
-        name: 'Al-Jamhuriya',
-        name_ar: 'الجمهورية',
-        level: 'neighborhood',
-        parent_id: 'al_maqal',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5350, lng: 47.7750, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 240000, area_km2: 15, total_orders: 1600, active_drivers: 10 }
-    },
-
-    // BASRA NEIGHBORHOODS (Basra Central District)
-    {
-        id: 'al_hakimiya',
-        name: 'Al-Hakimiya',
-        name_ar: 'الحكيمية',
-        level: 'neighborhood',
-        parent_id: 'basra_central',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5150, lng: 47.7900, radius: 2500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 160000, area_km2: 8, total_orders: 1400, active_drivers: 9 }
-    },
-    {
-        id: 'al_tameemi',
-        name: 'Al-Tameemi',
-        name_ar: 'التميمي',
-        level: 'neighborhood',
-        parent_id: 'basra_central',
-        governorate_id: 'basra',
-        coordinates: { lat: 30.5050, lng: 47.8050, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: true, express: false, standard: true },
-        statistics: { population: 200000, area_km2: 12, total_orders: 1800, active_drivers: 11 }
-    },
-
-    // ERBIL NEIGHBORHOODS (Erbil Center District)
-    {
-        id: 'erbil_citadel',
-        name: 'Erbil Citadel',
-        name_ar: 'قلعة أربيل',
-        name_ku: 'قەڵای هەولێر',
-        level: 'neighborhood',
-        parent_id: 'erbil_center',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.1911, lng: 44.0093, radius: 1000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 5000, area_km2: 1, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'shorsh',
-        name: 'Shorsh',
-        name_ar: 'شورش',
-        name_ku: 'شۆڕش',
-        level: 'neighborhood',
-        parent_id: 'erbil_center',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.1850, lng: 44.0200, radius: 2500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 120000, area_km2: 8, total_orders: 0, active_drivers: 0 }
-    },
-
-    // NAJAF NEIGHBORHOODS (Najaf Center District)
-    {
-        id: 'najaf_old_city',
-        name: 'Najaf Old City',
-        name_ar: 'النجف القديمة',
-        level: 'neighborhood',
-        parent_id: 'najaf_center',
-        governorate_id: 'najaf',
-        coordinates: { lat: 31.9996, lng: 44.3267, radius: 2000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 180000, area_km2: 6, total_orders: 980, active_drivers: 7 }
-    },
-    {
-        id: 'al_maidan',
-        name: 'Al-Maidan',
-        name_ar: 'الميدان',
-        level: 'neighborhood',
-        parent_id: 'najaf_center',
-        governorate_id: 'najaf',
-        coordinates: { lat: 32.0050, lng: 44.3350, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 220000, area_km2: 12, total_orders: 1120, active_drivers: 8 }
-    },
-
-    // KARBALA NEIGHBORHOODS (Karbala Center District)
-    {
-        id: 'karbala_old_city',
-        name: 'Karbala Old City',
-        name_ar: 'كربلاء القديمة',
-        level: 'neighborhood',
-        parent_id: 'karbala_center',
-        governorate_id: 'karbala',
-        coordinates: { lat: 32.6169, lng: 44.0252, radius: 2000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 160000, area_km2: 5, total_orders: 890, active_drivers: 6 }
-    },
-    {
-        id: 'al_hur',
-        name: 'Al-Hur',
-        name_ar: 'الحر',
-        level: 'neighborhood',
-        parent_id: 'karbala_center',
-        governorate_id: 'karbala',
-        coordinates: { lat: 32.6250, lng: 44.0350, radius: 3500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 220000, area_km2: 15, total_orders: 1010, active_drivers: 6 }
-    },
-
-    // ==================== ADDITIONAL CITY DISTRICTS & NEIGHBORHOODS ====================
-
-    // NINEVEH GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'mosul_center',
-        name: 'Mosul Center',
-        name_ar: 'مركز الموصل',
-        level: 'district',
-        parent_id: 'nineveh',
-        governorate_id: 'nineveh',
-        coordinates: { lat: 36.3350, lng: 43.1189, radius: 12000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 1200000, area_km2: 180, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'tel_afar',
-        name: 'Tel Afar',
-        name_ar: 'تلعفر',
-        level: 'district',
-        parent_id: 'nineveh',
-        governorate_id: 'nineveh',
-        coordinates: { lat: 36.3742, lng: 42.4505, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 85, total_orders: 0, active_drivers: 0 }
-    },
-
-    // MOSUL NEIGHBORHOODS
-    {
-        id: 'mosul_right_bank',
-        name: 'Mosul Right Bank',
-        name_ar: 'الجانب الأيمن',
-        level: 'neighborhood',
-        parent_id: 'mosul_center',
-        governorate_id: 'nineveh',
-        coordinates: { lat: 36.3500, lng: 43.1400, radius: 5000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 600000, area_km2: 85, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'mosul_left_bank',
-        name: 'Mosul Left Bank',
-        name_ar: 'الجانب الأيسر',
-        level: 'neighborhood',
-        parent_id: 'mosul_center',
-        governorate_id: 'nineveh',
-        coordinates: { lat: 36.3400, lng: 43.1300, radius: 5000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 600000, area_km2: 95, total_orders: 0, active_drivers: 0 }
-    },
-
-    // SULAYMANIYAH GOVERNORATE - CITY DISTRICTS
-    {
-        id: 'sulaymaniyah_center',
-        name: 'Sulaymaniyah Center',
-        name_ar: 'مركز السليمانية',
-        name_ku: 'ناوەندی سلێمانی',
-        level: 'district',
-        parent_id: 'sulaymaniyah',
-        governorate_id: 'sulaymaniyah',
-        coordinates: { lat: 35.5650, lng: 45.4377, radius: 10000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 850000, area_km2: 120, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'halabja',
-        name: 'Halabja',
-        name_ar: 'هەڵەبجە',
-        name_ku: 'هەڵەبجە',
-        level: 'district',
-        parent_id: 'sulaymaniyah',
-        governorate_id: 'sulaymaniyah',
-        coordinates: { lat: 35.1765, lng: 45.9852, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 95000, area_km2: 55, total_orders: 0, active_drivers: 0 }
-    },
-
-    // SULAYMANIYAH NEIGHBORHOODS
-    {
-        id: 'sulaymaniyah_salim_street',
-        name: 'Salim Street',
-        name_ar: 'شارع سليم',
-        name_ku: 'شەقامی سەلیم',
-        level: 'neighborhood',
-        parent_id: 'sulaymaniyah_center',
-        governorate_id: 'sulaymaniyah',
-        coordinates: { lat: 35.5680, lng: 45.4310, radius: 2000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 120000, area_km2: 8, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'sulaymaniyah_sabunkaran',
-        name: 'Sabunkaran',
-        name_ar: 'صابونكاران',
-        name_ku: 'سابونکاران',
-        level: 'neighborhood',
-        parent_id: 'sulaymaniyah_center',
-        governorate_id: 'sulaymaniyah',
-        coordinates: { lat: 35.5620, lng: 45.4440, radius: 3000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 15, total_orders: 0, active_drivers: 0 }
-    },
-
-    // DUHOK GOVERNORATE - CITY DISTRICTS
-    {
-        id: 'duhok_center',
-        name: 'Duhok Center',
-        name_ar: 'مركز دهوك',
-        name_ku: 'ناوەندی دهۆک',
-        level: 'district',
-        parent_id: 'duhok',
-        governorate_id: 'duhok',
-        coordinates: { lat: 36.8617, lng: 42.9977, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 400000, area_km2: 65, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'zakho',
-        name: 'Zakho',
-        name_ar: 'زاخو',
-        name_ku: 'زاخۆ',
-        level: 'district',
-        parent_id: 'duhok',
-        governorate_id: 'duhok',
-        coordinates: { lat: 37.1431, lng: 42.6813, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 45, total_orders: 0, active_drivers: 0 }
-    },
-
-    // DUHOK NEIGHBORHOODS
-    {
-        id: 'duhok_university_area',
-        name: 'University Area',
-        name_ar: 'منطقة الجامعة',
-        name_ku: 'ناوچەی زانکۆ',
-        level: 'neighborhood',
-        parent_id: 'duhok_center',
-        governorate_id: 'duhok',
-        coordinates: { lat: 36.8700, lng: 42.9850, radius: 2500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 85000, area_km2: 12, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'duhok_newroz',
-        name: 'Newroz',
-        name_ar: 'نوروز',
-        name_ku: 'نەورۆز',
-        level: 'neighborhood',
-        parent_id: 'duhok_center',
-        governorate_id: 'duhok',
-        coordinates: { lat: 36.8580, lng: 43.0100, radius: 3000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 140000, area_km2: 18, total_orders: 0, active_drivers: 0 }
-    },
-
-    // KIRKUK GOVERNORATE - CITY DISTRICTS
-    {
-        id: 'kirkuk_center',
-        name: 'Kirkuk Center',
-        name_ar: 'مركز كركوك',
-        name_ku: 'ناوەندی کەرکووک',
-        level: 'district',
-        parent_id: 'kirkuk',
-        governorate_id: 'kirkuk',
-        coordinates: { lat: 35.4681, lng: 44.3922, radius: 10000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 750000, area_km2: 95, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'tuz_khurmatu',
-        name: 'Tuz Khurmatu',
-        name_ar: 'طوزخورماتو',
-        name_ku: 'تووزخورماتوو',
-        level: 'district',
-        parent_id: 'kirkuk',
-        governorate_id: 'kirkuk',
-        coordinates: { lat: 34.8833, lng: 44.6333, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 150000, area_km2: 42, total_orders: 0, active_drivers: 0 }
-    },
-
-    // KIRKUK NEIGHBORHOODS
-    {
-        id: 'kirkuk_citadel',
-        name: 'Kirkuk Citadel',
-        name_ar: 'قلعة كركوك',
-        name_ku: 'قەڵای کەرکووک',
-        level: 'neighborhood',
-        parent_id: 'kirkuk_center',
-        governorate_id: 'kirkuk',
-        coordinates: { lat: 35.4681, lng: 44.3922, radius: 1500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 45000, area_km2: 5, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'kirkuk_rahimawa',
-        name: 'Rahimawa',
-        name_ar: 'رحيماوة',
-        name_ku: 'ڕەحیماوە',
-        level: 'neighborhood',
-        parent_id: 'kirkuk_center',
-        governorate_id: 'kirkuk',
-        coordinates: { lat: 35.4750, lng: 44.4050, radius: 3000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 22, total_orders: 0, active_drivers: 0 }
-    },
-
-    // ANBAR GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'ramadi_center',
-        name: 'Ramadi Center',
-        name_ar: 'مركز الرمادي',
-        level: 'district',
-        parent_id: 'anbar',
-        governorate_id: 'anbar',
-        coordinates: { lat: 33.4224, lng: 43.3089, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 280000, area_km2: 55, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'fallujah',
-        name: 'Fallujah',
-        name_ar: 'الفلوجة',
-        level: 'district',
-        parent_id: 'anbar',
-        governorate_id: 'anbar',
-        coordinates: { lat: 33.3510, lng: 43.7844, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 220000, area_km2: 38, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'hit',
-        name: 'Hit',
-        name_ar: 'هيت',
-        level: 'district',
-        parent_id: 'anbar',
-        governorate_id: 'anbar',
-        coordinates: { lat: 33.6417, lng: 42.8261, radius: 5000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 120000, area_km2: 28, total_orders: 0, active_drivers: 0 }
-    },
-
-    // BABYLON GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'hillah_center',
-        name: 'Hillah Center',
-        name_ar: 'مركز الحلة',
-        level: 'district',
-        parent_id: 'babylon',
-        governorate_id: 'babylon',
-        coordinates: { lat: 32.4722, lng: 44.4267, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 580000, area_km2: 75, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'musayyib',
-        name: 'Musayyib',
-        name_ar: 'المسيب',
-        level: 'district',
-        parent_id: 'babylon',
-        governorate_id: 'babylon',
-        coordinates: { lat: 32.7833, lng: 44.2833, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 42, total_orders: 0, active_drivers: 0 }
-    },
-
-    // HILLAH NEIGHBORHOODS
-    {
-        id: 'hillah_old_city',
-        name: 'Hillah Old City',
-        name_ar: 'الحلة القديمة',
-        level: 'neighborhood',
-        parent_id: 'hillah_center',
-        governorate_id: 'babylon',
-        coordinates: { lat: 32.4722, lng: 44.4267, radius: 2500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 150000, area_km2: 12, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'hillah_industrial',
-        name: 'Hillah Industrial',
-        name_ar: 'المنطقة الصناعية',
-        level: 'neighborhood',
-        parent_id: 'hillah_center',
-        governorate_id: 'babylon',
-        coordinates: { lat: 32.4650, lng: 44.4400, radius: 3500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 85000, area_km2: 18, total_orders: 0, active_drivers: 0 }
-    },
-
-    // DIYALA GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'baqubah_center',
-        name: 'Baqubah Center',
-        name_ar: 'مركز بعقوبة',
-        level: 'district',
-        parent_id: 'diyala',
-        governorate_id: 'diyala',
-        coordinates: { lat: 33.7500, lng: 44.6500, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 380000, area_km2: 58, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'khanaqin',
-        name: 'Khanaqin',
-        name_ar: 'خانقين',
-        name_ku: 'خانەقین',
-        level: 'district',
-        parent_id: 'diyala',
-        governorate_id: 'diyala',
-        coordinates: { lat: 34.3667, lng: 45.4167, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 150000, area_km2: 35, total_orders: 0, active_drivers: 0 }
-    },
-
-    // SALADIN GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'tikrit_center',
-        name: 'Tikrit Center',
-        name_ar: 'مركز تكريت',
-        level: 'district',
-        parent_id: 'saladin',
-        governorate_id: 'saladin',
-        coordinates: { lat: 34.6056, lng: 43.6781, radius: 6000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 220000, area_km2: 45, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'samarra',
-        name: 'Samarra',
-        name_ar: 'سامراء',
-        level: 'district',
-        parent_id: 'saladin',
-        governorate_id: 'saladin',
-        coordinates: { lat: 34.1967, lng: 43.8744, radius: 5000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 180000, area_km2: 38, total_orders: 0, active_drivers: 0 }
-    },
-
-    // WASIT GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'kut_center',
-        name: 'Kut Center',
-        name_ar: 'مركز الكوت',
-        level: 'district',
-        parent_id: 'wasit',
-        governorate_id: 'wasit',
-        coordinates: { lat: 32.5128, lng: 45.8183, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 380000, area_km2: 65, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'amarah_center',
-        name: 'Amarah Center',
-        name_ar: 'مركز العمارة',
-        level: 'district',
-        parent_id: 'maysan',
-        governorate_id: 'maysan',
-        coordinates: { lat: 31.9300, lng: 47.1500, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 320000, area_km2: 55, total_orders: 0, active_drivers: 0 }
-    },
-
-    // DHI QAR GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'nasiriyah_center',
-        name: 'Nasiriyah Center',
-        name_ar: 'مركز الناصرية',
-        level: 'district',
-        parent_id: 'dhi_qar',
-        governorate_id: 'dhi_qar',
-        coordinates: { lat: 31.0570, lng: 46.2580, radius: 10000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 480000, area_km2: 82, total_orders: 0, active_drivers: 0 }
-    },
-
-    // MUTHANNA GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'samawah_center',
-        name: 'Samawah Center',
-        name_ar: 'مركز السماوة',
-        level: 'district',
-        parent_id: 'muthanna',
-        governorate_id: 'muthanna',
-        coordinates: { lat: 31.3317, lng: 45.2942, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 280000, area_km2: 58, total_orders: 0, active_drivers: 0 }
-    },
-
-    // QADISIYYAH GOVERNORATE - MAJOR CITIES AS DISTRICTS
-    {
-        id: 'diwaniya_center',
-        name: 'Diwaniya Center',
-        name_ar: 'مركز الديوانية',
-        level: 'district',
-        parent_id: 'qadisiyyah',
-        governorate_id: 'qadisiyyah',
-        coordinates: { lat: 31.9833, lng: 45.0500, radius: 8000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 420000, area_km2: 68, total_orders: 0, active_drivers: 0 }
-    },
-
-    // ADDITIONAL ERBIL NEIGHBORHOODS 
-    {
-        id: 'ankawa_center',
-        name: 'Ankawa Center',
-        name_ar: 'مركز عنكاوا',
-        name_ku: 'ناوەندی عەنکاوا',
-        level: 'neighborhood',
-        parent_id: 'ankawa',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.2200, lng: 44.0400, radius: 2000 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 85000, area_km2: 8, total_orders: 0, active_drivers: 0 }
-    },
-    {
-        id: 'erbil_german_village',
-        name: 'German Village',
-        name_ar: 'القرية الألمانية',
-        name_ku: 'گوندی ئەڵمانی',
-        level: 'neighborhood',
-        parent_id: 'erbil_center',
-        governorate_id: 'erbil',
-        coordinates: { lat: 36.1950, lng: 44.0150, radius: 1500 },
-        is_active: false,
-        service_config: { delivery: false, pickup: false, express: false, standard: false },
-        statistics: { population: 25000, area_km2: 3, total_orders: 0, active_drivers: 0 }
-    },
-
-    // ADDITIONAL KUFA NEIGHBORHOODS
-    {
-        id: 'kufa_old_city',
-        name: 'Kufa Old City',
-        name_ar: 'الكوفة القديمة',
-        level: 'neighborhood',
-        parent_id: 'kufa',
-        governorate_id: 'najaf',
-        coordinates: { lat: 32.0296, lng: 44.3731, radius: 2500 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 95000, area_km2: 8, total_orders: 420, active_drivers: 4 }
-    },
-    {
-        id: 'kufa_university_area',
-        name: 'University of Kufa Area',
-        name_ar: 'منطقة جامعة الكوفة',
-        level: 'neighborhood',
-        parent_id: 'kufa',
-        governorate_id: 'najaf',
-        coordinates: { lat: 32.0350, lng: 44.3800, radius: 3000 },
-        is_active: true,
-        service_config: { delivery: true, pickup: false, express: false, standard: true },
-        statistics: { population: 125000, area_km2: 12, total_orders: 560, active_drivers: 4 }
-    }
-];
-
-// GET /api/regions - Fetch all regions with comprehensive Iraqi data
+// GET /api/regions - Fetch all regions from DynamoDB
 app.get('/api/regions', async (req, res) => {
     try {
-        const { level, parent_id, governorate_id, active, search, limit = 50, offset = 0 } = req.query;
-        console.log('📍 API: Getting regions with filters:', { level, parent_id, governorate_id, active, search });
-        
-        // Use comprehensive Iraqi regions data
-        let regions = [...comprehensiveIraqiRegions];
-        
-        // Apply filters
-        if (level) {
-            regions = regions.filter(r => r.level === level);
+        const { level, parent_id, active, search, limit = 50, offset = 0 } = req.query;
+        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search });
+
+        const scanCommand = new ScanCommand({ TableName: REGIONS_TABLE });
+        const result = await dynamoDB.send(scanCommand);
+        let regions = result.Items || [];
+
+        // Filters
+        if (level !== undefined && level !== '') {
+            const levelNum = Number(level);
+            regions = regions.filter(r => Number(r.level) === levelNum);
         }
         if (parent_id) {
             regions = regions.filter(r => r.parent_id === parent_id);
         }
-        if (governorate_id) {
-            regions = regions.filter(r => r.governorate_id === governorate_id);
-        }
-        if (active !== undefined) {
-            const isActive = active === 'true';
-            regions = regions.filter(r => r.is_active === isActive);
+        if (active !== undefined && active !== '') {
+            const isActive = active === 'true' || active === true;
+            regions = regions.filter(r => Boolean(r.is_active) === isActive);
         }
         if (search) {
-            const searchLower = search.toLowerCase();
-            regions = regions.filter(r => 
-                r.name.toLowerCase().includes(searchLower) ||
-                r.name_ar.includes(search) ||
-                r.id.toLowerCase().includes(searchLower)
-            );
+            const searchLower = String(search).toLowerCase();
+            regions = regions.filter(r => (
+                (r.name && String(r.name).toLowerCase().includes(searchLower)) ||
+                (r.name_ar && String(r.name_ar).toLowerCase().includes(searchLower)) ||
+                (r.regionId && String(r.regionId).toLowerCase().includes(searchLower))
+            ));
         }
-        
+
+        // Level breakdown by numeric levels
+        const levelBreakdown = {
+            country: regions.filter(r => Number(r.level) === 0).length,
+            governorates: regions.filter(r => Number(r.level) === 1).length,
+            districts: regions.filter(r => Number(r.level) === 2).length,
+            neighborhoods: regions.filter(r => Number(r.level) === 3).length
+        };
+
         // Pagination
         const total = regions.length;
-        const paginatedRegions = regions.slice(parseInt(offset), parseInt(offset) + parseInt(limit));
-        
+        const start = parseInt(offset);
+        const end = start + parseInt(limit);
+        const paginatedRegions = regions.slice(start, end);
+
         res.json({
             success: true,
             data: paginatedRegions,
             pagination: {
                 total,
                 limit: parseInt(limit),
-                offset: parseInt(offset),
-                hasMore: parseInt(offset) + parseInt(limit) < total
+                offset: start,
+                hasMore: end < total
             },
-            filters: { level, parent_id, governorate_id, active, search },
-            source: 'comprehensive-iraqi-dataset',
-            summary: {
-                country: 1,
-                governorates: 18,
-                districts: 3,
-                neighborhoods: 6,
-                total: total
-            },
+            filters: { level, parent_id, active, search },
+            source: 'dynamodb',
+            summary: { ...levelBreakdown, total },
             timestamp: new Date().toISOString()
         });
-        
     } catch (error) {
-        console.error('❌ Error getting regions:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to load regions',
-            message: error.message
-        });
+        console.error('❌ Error getting regions from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions', error);
+        res.status(500).json({ success: false, error: 'Failed to load regions from DynamoDB', message: error.message, source: 'dynamodb-error' });
     }
 });
 
-// POST /api/regions - Create or update region
+// POST /api/regions - Create or update region (persist to DynamoDB)
 app.post('/api/regions', async (req, res) => {
     try {
-        console.log('📍 Creating/updating region...', req.body.name);
-        
-        const region = {
-            id: req.body.id || `region_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            ...req.body,
-            created_at: req.body.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            created_by: req.headers['x-user-id'] || 'dev-user'
+        const b = req.body || {};
+        // Normalize to table schema
+        const now = new Date().toISOString();
+        const regionId = b.regionId || b.id || `region_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Level normalization
+        let level = b.level;
+        if (typeof level === 'string') {
+            const map = { country: 0, governorate: 1, district: 2, neighborhood: 3 };
+            level = map[level.toLowerCase()] ?? b.level;
+        } else if (typeof b.region_type === 'string') {
+            const mapType = { COUNTRY: 0, GOVERNORATE: 1, DISTRICT: 2, NEIGHBORHOOD: 3 };
+            level = mapType[b.region_type.toUpperCase()] ?? level;
+        }
+
+        // Coordinates normalization
+        let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
+        const normCoords = {
+            lat: Number(coordinates.lat) || 33.3152,
+            lng: Number(coordinates.lng) || 44.3661,
+            radius: coordinates.radius || b.coordinates?.radius || 50000
         };
-        
-        // In a real implementation, this would save to DynamoDB
-        console.log('✅ Region processed:', region.id);
-        
-        res.json({
-            success: true,
-            message: 'Region saved successfully',
-            region,
-            source: 'local-processing'
-        });
+
+        const isActive = typeof b.is_active === 'boolean' ? b.is_active : (typeof b.isActive === 'boolean' ? b.isActive : (b.status ? String(b.status).toLowerCase() === 'active' : true));
+
+        const item = {
+            // PK
+            regionId,
+            // Names
+            name: b.name || b.regionName || `Region ${regionId}`,
+            name_ar: b.name_ar || b.regionNameArabic || '',
+            // Hierarchy
+            level: (typeof level === 'number' ? level : 3),
+            parent_id: b.parent_id || null,
+            // Status
+            is_active: isActive,
+            // Optional business fields
+            governorate_id: b.governorate_id || b.governorate || undefined,
+            service_config: b.service_config || b.serviceTypes || undefined,
+            delivery_config: b.delivery_config || (b.deliveryFee || b.minimumOrder || b.estimatedDeliveryTime ? {
+                base_fee: b.deliveryFee,
+                minimum_order: b.minimumOrder,
+                estimated_time_minutes: b.estimatedDeliveryTime
+            } : undefined),
+            statistics: b.statistics || (typeof b.activeDrivers === 'number' || typeof b.totalOrders === 'number' ? {
+                active_drivers: b.activeDrivers || 0,
+                total_orders: b.totalOrders || 0
+            } : undefined),
+            // Geo
+            coordinates: normCoords,
+            boundary: b.boundary,
+            // Timestamps
+            createdAt: b.createdAt || b.created_at || now,
+            updatedAt: now,
+            updated_at: now
+        };
+
+        // Persist
+        await dynamoDB.send(new PutCommand({ TableName: REGIONS_TABLE, Item: item }));
+
+        res.json({ success: true, message: 'Region saved to DynamoDB', region: item, source: 'dynamodb' });
     } catch (error) {
-        console.error('❌ Error saving region:', error);
-        res.status(500).json({
-            error: 'Failed to save region',
-            message: error.message
-        });
+        console.error('❌ Error saving region to DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions', error);
+        res.status(500).json({ error: 'Failed to save region', message: error.message, source: 'dynamodb-error' });
     }
 });
 
-// GET /api/regions/statistics - Get comprehensive regions statistics
+// PATCH /api/regions/:id/toggle - Toggle region active status using regionId PK
+app.patch('/api/regions/:id/toggle', async (req, res) => {
+    try {
+        const requestedId = req.params.id;
+        console.log(`🔄 Toggling region status (regionId PK): ${requestedId}`);
+
+        // Fetch current item
+        const { Item } = await dynamoDB.send(new GetCommand({
+            TableName: REGIONS_TABLE,
+            Key: { regionId: requestedId }
+        }));
+        if (!Item) {
+            return res.status(404).json({ success: false, error: 'Region not found', regionId: requestedId, source: 'dynamodb' });
+        }
+
+        const previous = Boolean(Item.is_active);
+        const newStatus = !previous;
+        const now = new Date().toISOString();
+
+        const updateRes = await dynamoDB.send(new UpdateCommand({
+            TableName: REGIONS_TABLE,
+            Key: { regionId: requestedId },
+            UpdateExpression: 'SET is_active = :s, updated_at = :u, updatedAt = :u',
+            ExpressionAttributeValues: { ':s': newStatus, ':u': now },
+            ReturnValues: 'ALL_NEW'
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                regionId: requestedId,
+                previousStatus: previous,
+                newStatus: Boolean(updateRes.Attributes?.is_active),
+                region: updateRes.Attributes
+            },
+            source: 'dynamodb',
+            timestamp: now
+        });
+    } catch (error) {
+        console.error('❌ Error toggling region status:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id/toggle', error);
+        res.status(500).json({ success: false, error: 'Failed to toggle region status', message: error.message, source: 'dynamodb-error' });
+    }
+});
+
+// GET /api/regions/statistics - Get regions statistics from DynamoDB
 app.get('/api/regions/statistics', async (req, res) => {
     try {
-        console.log('📍 Calculating comprehensive regions statistics...');
+        console.log('📍 Calculating regions statistics from DynamoDB...');
+        
+        // Fetch all regions from DynamoDB
+        const scanCommand = new ScanCommand({
+            TableName: REGIONS_TABLE
+        });
+        
+        const result = await dynamoDB.send(scanCommand);
+        const regions = result.Items || [];
         
         const stats = {
-            totalRegions: comprehensiveIraqiRegions.length,
-            activeRegions: comprehensiveIraqiRegions.filter(r => r.is_active).length,
-            inactiveRegions: comprehensiveIraqiRegions.filter(r => !r.is_active).length,
+            totalRegions: regions.length,
+            activeRegions: regions.filter(r => r.is_active).length,
+            inactiveRegions: regions.filter(r => !r.is_active).length,
             levelBreakdown: {
-                country: comprehensiveIraqiRegions.filter(r => r.level === 'country').length,
-                governorates: comprehensiveIraqiRegions.filter(r => r.level === 'governorate').length,
-                districts: comprehensiveIraqiRegions.filter(r => r.level === 'district').length,
-                neighborhoods: comprehensiveIraqiRegions.filter(r => r.level === 'neighborhood').length
+                country: regions.filter(r => Number(r.level) === 0).length,
+                governorates: regions.filter(r => Number(r.level) === 1).length,
+                districts: regions.filter(r => Number(r.level) === 2).length,
+                neighborhoods: regions.filter(r => Number(r.level) === 3).length
             },
             serviceStats: {
-                totalDrivers: comprehensiveIraqiRegions.reduce((sum, r) => sum + (r.statistics?.active_drivers || 0), 0),
-                totalOrders: comprehensiveIraqiRegions.reduce((sum, r) => sum + (r.statistics?.total_orders || 0), 0),
-                avgPopulation: Math.round(comprehensiveIraqiRegions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0) / comprehensiveIraqiRegions.length),
-                totalPopulation: comprehensiveIraqiRegions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0)
+                totalDrivers: regions.reduce((sum, r) => sum + (r.statistics?.active_drivers || 0), 0),
+                totalOrders: regions.reduce((sum, r) => sum + (r.statistics?.total_orders || 0), 0),
+                avgPopulation: regions.length > 0 ? Math.round(regions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0) / regions.length) : 0,
+                totalPopulation: regions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0)
             },
             coverage: {
                 serviceTypes: {
-                    delivery: comprehensiveIraqiRegions.filter(r => r.service_config?.delivery).length,
-                    pickup: comprehensiveIraqiRegions.filter(r => r.service_config?.pickup).length,
-                    express: comprehensiveIraqiRegions.filter(r => r.service_config?.express).length,
-                    standard: comprehensiveIraqiRegions.filter(r => r.service_config?.standard).length
+                    delivery: regions.filter(r => r.service_config?.delivery).length,
+                    pickup: regions.filter(r => r.service_config?.pickup).length,
+                    express: regions.filter(r => r.service_config?.express).length,
+                    standard: regions.filter(r => r.service_config?.standard).length
                 },
-                totalArea: comprehensiveIraqiRegions.reduce((sum, r) => sum + (r.statistics?.area_km2 || 0), 0)
+                totalArea: regions.reduce((sum, r) => sum + (r.statistics?.area_km2 || 0), 0)
             }
         };
 
         res.json({
             success: true,
             data: stats,
-            message: 'Comprehensive Iraqi regions statistics - All 18 governorates included',
+            message: `Regions statistics from DynamoDB - ${regions.length} regions found`,
             generatedAt: new Date().toISOString(),
-            source: 'comprehensive-iraqi-dataset'
+            source: 'dynamodb'
         });
     } catch (error) {
-        console.error('❌ Error calculating regions statistics:', error);
+        console.error('❌ Error calculating regions statistics from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/statistics', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to calculate regions statistics',
-            message: error.message
+            error: 'Failed to calculate regions statistics from DynamoDB',
+            message: error.message,
+            source: 'dynamodb-error'
         });
     }
 });
 
-// GET /api/regions/:id - Get individual region details
+// GET /api/regions/:id - Get individual region details from DynamoDB using regionId PK
 app.get('/api/regions/:id', async (req, res) => {
     try {
-        const regionId = req.params.id;
-        console.log(`🔍 Looking up region: ${regionId}`);
-        
-        const region = comprehensiveIraqiRegions.find(r => r.id === regionId);
-        
+        const requestedId = req.params.id;
+        console.log(`🔍 Looking up region by PK regionId: ${requestedId}`);
+        const result = await dynamoDB.send(new GetCommand({
+            TableName: REGIONS_TABLE,
+            Key: { regionId: requestedId }
+        }));
+        const region = result.Item;
         if (!region) {
-            return res.status(404).json({
-                success: false,
-                error: 'Region not found',
-                message: `Region with ID '${regionId}' not found`,
-                regionId: regionId
-            });
+            return res.status(404).json({ success: false, error: 'Region not found', message: `Region '${requestedId}' not found`, regionId: requestedId, source: 'dynamodb' });
         }
-
-        res.json({
-            success: true,
-            data: region,
-            message: `Region details for ${region.name}`,
-            timestamp: new Date().toISOString(),
-            source: 'comprehensive-iraqi-dataset'
-        });
+        res.json({ success: true, data: region, message: `Region details for ${region.name || region.regionName || requestedId}`, timestamp: new Date().toISOString(), source: 'dynamodb' });
     } catch (error) {
-        console.error('❌ Error fetching region details:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to fetch region details',
-            message: error.message
-        });
+        console.error('❌ Error fetching region details from DynamoDB:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch region details from DynamoDB', message: error.message, source: 'dynamodb-error' });
     }
 });
 
@@ -2222,14 +1101,38 @@ app.get('/regions-management-iraq.html', (req, res) => {
 });
 
 // Health check
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        features: ['condition-engine', 'regions-management', 'real-dynamodb'],
-        regionsCount: comprehensiveIraqiRegions.length
-    });
+app.get('/health', async (req, res) => {
+    try {
+        // Get region count from DynamoDB for health check
+        const scanCommand = new ScanCommand({
+            TableName: REGIONS_TABLE,
+            Select: 'COUNT'
+        });
+        
+        const result = await dynamoDB.send(scanCommand);
+        const regionsCount = result.Count || 0;
+        
+        res.json({
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            version: '2.0.0',
+            features: ['condition-engine', 'regions-management', 'real-dynamodb'],
+            dataSource: 'dynamodb',
+            regionsCount: regionsCount,
+            tableName: REGIONS_TABLE
+        });
+    } catch (error) {
+        console.error('❌ Health check error:', error);
+        res.status(200).json({
+            status: 'healthy-with-warnings',
+            timestamp: new Date().toISOString(),
+            version: '2.0.0',
+            features: ['condition-engine', 'regions-management', 'real-dynamodb'],
+            dataSource: 'dynamodb',
+            warning: 'Cannot connect to DynamoDB',
+            error: error.message
+        });
+    }
 });
 
 // ============================================
@@ -2261,7 +1164,7 @@ app.listen(PORT, () => {
     console.log(`🌐 Server running at: http://localhost:${PORT}`);
     console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📊 DynamoDB: Real AWS connection (${process.env.AWS_REGION})`);
-    console.log(`📍 Iraqi Regions: ${comprehensiveIraqiRegions.length} regions loaded`);
+    console.log(`📍 Data Source: DynamoDB (${REGIONS_TABLE})`);
     console.log('');
     console.log('🔗 Available Endpoints:');
     console.log(`   Dashboard: http://localhost:${PORT}/`);
@@ -2270,10 +1173,9 @@ app.listen(PORT, () => {
     console.log(`   Regions: http://localhost:${PORT}/pages/regions.html`);
     console.log(`   API Health: http://localhost:${PORT}/health`);
     console.log('');
-    console.log('📊 Regions Summary:');
-    console.log(`   Countries: ${comprehensiveIraqiRegions.filter(r => r.level === 'country').length}`);
-    console.log(`   Governorates: ${comprehensiveIraqiRegions.filter(r => r.level === 'governorate').length}`);
-    console.log(`   Districts: ${comprehensiveIraqiRegions.filter(r => r.level === 'district').length}`);
-    console.log(`   Neighborhoods: ${comprehensiveIraqiRegions.filter(r => r.level === 'neighborhood').length}`);
+    console.log('🔄 DynamoDB Integration:');
+    console.log(`   ✅ Regions API: Connected to ${REGIONS_TABLE}`);
+    console.log(`   ✅ Toggle API: PATCH /api/regions/:id/toggle`);
+    console.log(`   ✅ Statistics API: Real-time from DynamoDB`);
     console.log('===============================================');
 });

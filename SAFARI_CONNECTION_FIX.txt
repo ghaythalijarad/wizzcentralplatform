@@ -1,0 +1,128 @@
+═══════════════════════════════════════════════════════════════
+🚨 SAFARI CONNECTION ISSUE - QUICK FIX
+═══════════════════════════════════════════════════════════════
+
+The server needs to be started manually. Follow these steps:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1: OPEN TERMINAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Press: Cmd + Space
+Type: "Terminal"
+Press: Enter
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2: COPY & PASTE THIS EXACT COMMAND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform && chmod +x LAUNCH_NOW.sh && ./LAUNCH_NOW.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3: WAIT FOR THIS MESSAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+You should see:
+
+    🚀 WizzCentral Platform running on port 3000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4: OPEN SAFARI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In Safari, go to:
+
+    http://localhost:3000/pages/regions-simple.html
+
+OR try:
+
+    http://127.0.0.1:3000/pages/regions-simple.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 IF STILL NOT CONNECTING IN SAFARI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Check Safari Settings:
+
+1. Open Safari → Preferences → Advanced
+2. Enable "Show Develop menu in menu bar"
+3. Click Develop → Clear Caches
+4. Try again
+
+OR
+
+Try in Chrome/Firefox instead:
+- Chrome: http://localhost:3000/pages/regions-simple.html
+- Firefox: http://localhost:3000/pages/regions-simple.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 CHECK IF SERVER IS ACTUALLY RUNNING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+In Terminal, run:
+
+    lsof -i :3000
+
+If you see output with "node", server is running ✅
+If you see nothing, server is NOT running ❌
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔍 IF SERVER WON'T START
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Check Node.js is installed:
+   node --version
+
+2. Install dependencies:
+   cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+   npm install
+
+3. Try starting again:
+   npm run local
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🆘 ALTERNATIVE: USE CHROME OR FIREFOX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Safari sometimes has localhost connection issues.
+
+If Safari doesn't work:
+1. Use Google Chrome
+2. Use Firefox
+3. Use any other browser
+
+The URL is the same:
+http://localhost:3000/pages/regions-simple.html
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 COMMON SAFARI ISSUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Issue: Safari shows "Can't connect to the server"
+Solution: 
+  1. Make sure Terminal shows "running on port 3000"
+  2. Try http://127.0.0.1:3000 instead of localhost
+  3. Clear Safari cache (Develop → Clear Caches)
+  4. Restart Safari
+
+Issue: Safari shows blank page
+Solution:
+  1. Open Safari Developer Tools (Cmd+Opt+I)
+  2. Check Console tab for errors
+  3. Try hard refresh (Cmd+Shift+R)
+
+Issue: CORS errors in Safari
+Solution:
+  1. The server already has CORS enabled
+  2. Try different browser
+  3. Check Console for specific error
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ QUICK COPY-PASTE COMMAND (USE THIS):
+
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform && chmod +x LAUNCH_NOW.sh && ./LAUNCH_NOW.sh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Generated: November 5, 2025

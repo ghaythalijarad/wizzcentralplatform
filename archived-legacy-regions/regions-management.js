@@ -87,7 +87,11 @@ class RegionsManager {
                 regionName: 'Baghdad Central',
                 regionNameArabic: 'بغداد المركز',
                 governorate: 'Baghdad',
+                region_type: 'DISTRICT', // enum: PROVINCE, DISTRICT, NEIGHBORHOOD
+                parent_id: null,
                 isActive: true,
+                status: 'ACTIVE', // enum: ACTIVE, INACTIVE
+                gps_coordinates: { lat: 33.3152, lng: 44.3661 },
                 coordinates: {
                     center: { lat: 33.3152, lng: 44.3661 },
                     boundaries: [

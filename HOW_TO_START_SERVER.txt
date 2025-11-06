@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════════════
+  🚀 HOW TO START WHIZZCENTRAL PLATFORM SERVER
+═══════════════════════════════════════════════════════════════
+
+OPTION 1: Using the Start Script (Easiest) ✅
+───────────────────────────────────────────────────────────────
+Open your Terminal app and run:
+
+    cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+    chmod +x START_SERVER.sh
+    ./START_SERVER.sh
+
+
+OPTION 2: Using npm
+───────────────────────────────────────────────────────────────
+Open your Terminal app and run:
+
+    cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+    npm run local
+
+
+OPTION 3: Using Node directly
+───────────────────────────────────────────────────────────────
+Open your Terminal app and run:
+
+    cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+    node local-dev-server.js
+
+
+═══════════════════════════════════════════════════════════════
+  🌐 ACCESS THE APPLICATION
+═══════════════════════════════════════════════════════════════
+
+Once the server starts, open your browser and go to:
+
+📌 Main Dashboard:
+   http://localhost:3000
+
+📌 Simple Regions Management (NEW):
+   http://localhost:3000/pages/regions-simple.html
+
+📌 Login Page:
+   http://localhost:3000/login.html
+
+
+═══════════════════════════════════════════════════════════════
+  ✅ WHAT YOU SHOULD SEE
+═══════════════════════════════════════════════════════════════
+
+When the server starts successfully, you'll see:
+
+    🔧 AWS Configuration:
+       Region: us-east-1
+       Profile: wizz-drivers-ghayth-dev
+       Using Real DynamoDB: ✅
+
+    🚀 WizzCentral Platform running on port 3000
+       Frontend: http://localhost:3000
+
+
+═══════════════════════════════════════════════════════════════
+  ⚠️ TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+Problem: Port 3000 already in use
+Solution:
+    lsof -i :3000
+    kill -9 $(lsof -t -i:3000)
+    # Then try starting again
+
+Problem: Dependencies not installed
+Solution:
+    cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+    npm install
+    # Then try starting again
+
+Problem: AWS credentials error
+Solution:
+    aws sts get-caller-identity --profile wizz-drivers-ghayth-dev
+    # If error, configure AWS credentials
+
+Problem: Can't connect in browser
+Solution:
+    1. Check server is running in terminal
+    2. Make sure you see "running on port 3000"
+    3. Try http://127.0.0.1:3000 instead of localhost
+
+
+═══════════════════════════════════════════════════════════════
+  📝 QUICK NOTES
+═══════════════════════════════════════════════════════════════
+
+✅ Server is now ultra-clean (62 legacy files removed!)
+✅ Simple 2-level regions system (Governorates → Districts)
+✅ No Google Places API complexity
+✅ Using existing Mapbox ($0 cost)
+✅ Connected to real DynamoDB
+
+To stop the server: Press Ctrl+C in the terminal
+
+
+═══════════════════════════════════════════════════════════════
+
+Generated: November 5, 2025
+WhizzCentral Platform - Ultra-Simple Regions System
