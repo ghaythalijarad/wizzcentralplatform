@@ -872,6 +872,32 @@ function validatePolygonBoundary(raw) {
     return { type: 'Polygon', coordinates: [ring] };
 }
 
+// Helper: Compute centroid [lng, lat] of a simple polygon ring (no holes)
+function centroidOfRing(ring) {
+    try {
+        // ring is array of [lng, lat], may be closed
+        const pts = ring.slice();
+        if (pts.length < 3) return null;
+        // ensure not double-closing
+        if (pts.length > 2) {
+            const f = pts[0], l = pts[pts.length - 1];
+            if (f[0] === l[0] && f[1] === l[1]) pts.pop();
+        }
+        let area = 0, cx = 0, cy = 0;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            const [x1, y1] = pts[j];
+            const [x2, y2] = pts[i];
+            const f = (x1 * y2 - x2 * y1);
+            area += f;
+            cx += (x1 + x2) * f;
+            cy += (y1 + y2) * f;
+        }
+        area *= 0.5;
+        if (!area) return null;
+        return [cx / (6 * area), cy / (6 * area)];
+    } catch { return null; }
+}
+
 // DEBUG routes guarded by flag
 if (ENABLE_REGIONS_DEBUG) {
     // DEBUG: Inspect regions table key schema
@@ -1103,13 +1129,24 @@ app.post('/api/regions', async (req, res) => {
             catch (e) { return res.status(400).json({ success: false, error: 'Invalid boundary', message: e.message, code: e.code || 'BOUNDARY_INVALID' }); }
         }
 
-        // Coordinates normalization
+        // Coordinates normalization (keep for map marker center)
         let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
-        const normCoords = {
+        let normCoords = {
             lat: Number(coordinates.lat) || 33.3152,
             lng: Number(coordinates.lng) || 44.3661,
             radius: coordinates.radius || b.coordinates?.radius || 50000
         };
+        // If a valid polygon boundary exists, prefer centroid for center and omit radius
+        if (normalizedBoundary) {
+            const ring = normalizedBoundary.coordinates?.[0] || [];
+            const c = centroidOfRing(ring);
+            if (Array.isArray(c)) {
+                normCoords = { lat: c[1], lng: c[0] }; // no radius when polygon is present
+            } else {
+                // Fallback: keep incoming lat/lng without radius
+                normCoords = { lat: normCoords.lat, lng: normCoords.lng };
+            }
+        }
 
         const isActive = typeof b.is_active === 'boolean' ? b.is_active : (typeof b.isActive === 'boolean' ? b.isActive : (b.status ? String(b.status).toLowerCase() === 'active' : true));
 
