@@ -157,6 +157,26 @@ async function backfillAttributes() {
   console.log(`\n✅ Backfill complete. Items processed: ${total}`);
 }
 
+// Optional verification: check expected GSIs exist on Regions table
+// GSIs used by API: GSI1_ParentLevelName, GSI2_Level, GSI3_IsActive
+async function verifyRegionsGSIs(ddb, tableName) {
+  const { DescribeTableCommand } = require('@aws-sdk/client-dynamodb');
+  try {
+    const res = await ddb.send(new DescribeTableCommand({ TableName: tableName }));
+    const gsis = (res.Table?.GlobalSecondaryIndexes || []).map(g => g.IndexName);
+    const expected = ['GSI1_ParentLevelName', 'GSI2_Level', 'GSI3_IsActive'];
+    const missing = expected.filter(x => !gsis.includes(x));
+    console.log('Regions GSIs present:', gsis);
+    if (missing.length) {
+      console.warn('Missing GSIs:', missing);
+    } else {
+      console.log('All expected GSIs are present.');
+    }
+  } catch (e) {
+    console.warn('Failed to verify GSIs:', e.message);
+  }
+}
+
 (async () => {
   console.log(`🚀 Upgrading table ${TABLE_NAME} in ${REGION}`);
   if (BACKFILL_ONLY) {
@@ -177,3 +197,5 @@ async function backfillAttributes() {
   }
   process.exit(1);
 });
+
+module.exports = { verifyRegionsGSIs };

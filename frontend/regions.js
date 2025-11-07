@@ -355,6 +355,7 @@ class RegionsManager {
             this._drawnItems.clearLayers();
         }
         this._updateDrawSummary();
+        // Re-enable coordinate inputs without changing their values
         this._toggleCoordinateInputsForBoundary();
     }
 
@@ -363,7 +364,8 @@ class RegionsManager {
             this.showError('Draw a shape first');
             return;
         }
-        // Do not auto-fill lat/lng/radius; polygons take precedence
+        // Do not touch lat/lng/radius when a polygon is selected
+        // Simply close modal, show success, and disable inputs
         this.closeDrawRegionModal();
         this.showSuccess('Area selected from map');
         this._updateDrawSummary();
@@ -794,15 +796,10 @@ class RegionsManager {
         if (levelEl) {
             levelEl.addEventListener('change', () => this.populateParentOptions());
         }
-        
-        // Prefill coordinates with map center
-        const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+
         const latEl = document.getElementById('coordLat');
         const lngEl = document.getElementById('coordLng');
         const radEl = document.getElementById('coordRadius');
-        if (latEl && !latEl.value) latEl.value = (c.lat || 33.3152).toFixed(6);
-        if (lngEl && !lngEl.value) lngEl.value = (c.lng || 44.3661).toFixed(6);
-        if (radEl && !radEl.value) radEl.value = 3000;
 
         // Prefill if editing
         if (regionId) {
@@ -824,22 +821,30 @@ class RegionsManager {
                 if (svcDel) svcDel.checked = !!(r.serviceTypes?.delivery ?? true);
                 if (svcPck) svcPck.checked = !!(r.serviceTypes?.pickup ?? false);
                 if (svcDine) svcDine.checked = !!(r.serviceTypes?.dineIn ?? false);
-                // Also keep selectedRegion and boundary for editing in draw modal
+                // Keep selectedRegion and boundary for editing in draw modal
                 this.selectedRegion = r;
                 this._drawnBoundary = r.boundary || null;
-                // Prefill coordinates with region center if present
-                try {
-                    if (latEl && r.coordinates?.center?.lat) latEl.value = Number(r.coordinates.center.lat).toFixed(6);
-                    if (lngEl && r.coordinates?.center?.lng) lngEl.value = Number(r.coordinates.center.lng).toFixed(6);
-                } catch {}
+
+                // Only prefill coords when NO polygon boundary exists
+                if (!this._drawnBoundary) {
+                    const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+                    if (latEl && !latEl.value) latEl.value = (r.coordinates?.center?.lat ?? c.lat).toFixed(6);
+                    if (lngEl && !lngEl.value) lngEl.value = (r.coordinates?.center?.lng ?? c.lng).toFixed(6);
+                    if (radEl && !radEl.value) radEl.value = 3000;
+                }
             }
         } else {
             this.selectedRegion = null;
             // Clear any previous drawn boundary when creating a new region
             this._drawnBoundary = null;
+            // No boundary yet: prefill coordinates with map center
+            const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+            if (latEl && !latEl.value) latEl.value = (c.lat || 33.3152).toFixed(6);
+            if (lngEl && !lngEl.value) lngEl.value = (c.lng || 44.3661).toFixed(6);
+            if (radEl && !radEl.value) radEl.value = 3000;
         }
 
-        // Reflect the current boundary state on coordinate inputs
+        // Reflect the current boundary state on coordinate inputs (disables inputs if polygon exists)
         this._toggleCoordinateInputsForBoundary();
 
         modal.style.display = 'flex';

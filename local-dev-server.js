@@ -898,6 +898,34 @@ function centroidOfRing(ring) {
     } catch { return null; }
 }
 
+// Helper: Bounding box for a polygon ring
+function ringBBox(ring) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [x, y] of ring) {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    return [minX, minY, maxX, maxY];
+}
+
+// Helper: Point-in-Polygon (ray casting). ring is array of [lng, lat]
+function pointInPolygon(lng, lat, ring) {
+    if (!Array.isArray(ring) || ring.length < 3) return false;
+    // Remove duplicated last point if closed
+    const pts = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring.slice();
+    // BBox quick reject
+    const [minX, minY, maxX, maxY] = ringBBox(pts);
+    if (lng < minX || lng > maxX || lat < minY || lat > maxY) return false;
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i][0], yi = pts[i][1];
+        const xj = pts[j][0], yj = pts[j][1];
+        const intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi + 0.0) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 // DEBUG routes guarded by flag
 if (ENABLE_REGIONS_DEBUG) {
     // DEBUG: Inspect regions table key schema
@@ -941,10 +969,16 @@ if (ENABLE_REGIONS_DEBUG) {
 // GET /api/regions - Fetch all regions from DynamoDB
 app.get('/api/regions', async (req, res) => {
     try {
-        const { level, parent_id, active, search, limit = 50, offset = 0, nextToken, pageMode } = req.query;
-        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search, limit, offset, nextToken, pageMode });
+        const { level, parent_id, active, search, limit = 50, offset = 0, nextToken, pageMode, contains } = req.query;
+        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search, limit, offset, nextToken, pageMode, contains });
 
         const useServerPaging = Boolean(nextToken) || String(pageMode || '').toLowerCase() === 'server';
+        const containsPt = (() => {
+            if (!contains) return null;
+            const parts = String(contains).split(',').map(s => Number(s.trim()));
+            if (parts.length !== 2 || parts.some(n => !Number.isFinite(n))) return null;
+            return { lat: parts[0], lng: parts[1] };
+        })();
 
         // Build a query plan that prefers GSIs, with graceful fallback to Scan
         const buildQueryPlan = () => {
@@ -1019,8 +1053,13 @@ app.get('/api/regions', async (req, res) => {
                     (r.regionId && String(r.regionId).toLowerCase().includes(s))
                 ));
             }
-            if (parent_id && (level === undefined || level === '')) {
-                // If parent selected without level, optionally filter by level if a UI default exists
+            if (containsPt) {
+                items = items.filter(r => {
+                    const b = r.boundary;
+                    if (!b || b.type !== 'Polygon') return false;
+                    const ring = b.coordinates?.[0] || [];
+                    return pointInPolygon(containsPt.lng, containsPt.lat, ring);
+                });
             }
             const leKey = result.LastEvaluatedKey || null;
             const token = leKey ? encodeToken(leKey) : null;
@@ -1073,6 +1112,14 @@ app.get('/api/regions', async (req, res) => {
                 (r.name_ar && String(r.name_ar).toLowerCase().includes(searchLower)) ||
                 (r.regionId && String(r.regionId).toLowerCase().includes(searchLower))
             ));
+        }
+        if (containsPt) {
+            regions = regions.filter(r => {
+                const b = r.boundary;
+                if (!b || b.type !== 'Polygon') return false;
+                const ring = b.coordinates?.[0] || [];
+                return pointInPolygon(containsPt.lng, containsPt.lat, ring);
+            });
         }
 
         // Level breakdown by numeric levels
@@ -1129,24 +1176,13 @@ app.post('/api/regions', async (req, res) => {
             catch (e) { return res.status(400).json({ success: false, error: 'Invalid boundary', message: e.message, code: e.code || 'BOUNDARY_INVALID' }); }
         }
 
-        // Coordinates normalization (keep for map marker center)
+        // Coordinates normalization (keep for non-polygon cases only)
         let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
-        let normCoords = {
+        const normCoords = {
             lat: Number(coordinates.lat) || 33.3152,
             lng: Number(coordinates.lng) || 44.3661,
             radius: coordinates.radius || b.coordinates?.radius || 50000
         };
-        // If a valid polygon boundary exists, prefer centroid for center and omit radius
-        if (normalizedBoundary) {
-            const ring = normalizedBoundary.coordinates?.[0] || [];
-            const c = centroidOfRing(ring);
-            if (Array.isArray(c)) {
-                normCoords = { lat: c[1], lng: c[0] }; // no radius when polygon is present
-            } else {
-                // Fallback: keep incoming lat/lng without radius
-                normCoords = { lat: normCoords.lat, lng: normCoords.lng };
-            }
-        }
 
         const isActive = typeof b.is_active === 'boolean' ? b.is_active : (typeof b.isActive === 'boolean' ? b.isActive : (b.status ? String(b.status).toLowerCase() === 'active' : true));
 
@@ -1254,7 +1290,8 @@ app.post('/api/regions', async (req, res) => {
                 active_drivers: b.activeDrivers || 0,
                 total_orders: b.totalOrders || 0
             } : undefined),
-            coordinates: normCoords,
+            // If a polygon boundary exists, do NOT store coordinates at all
+            ...(normalizedBoundary ? {} : { coordinates: normCoords }),
             boundary: normalizedBoundary || undefined,
             createdAt: b.createdAt || b.created_at || null, // will be set below
             updatedAt: now,

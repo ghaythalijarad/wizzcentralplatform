@@ -6,6 +6,18 @@
     "condition": null
   },
   {
+    "source": "/frontend/pages/<*>",
+    "target": "/pages/<*>",
+    "status": "200",
+    "condition": null
+  },
+  {
+    "source": "/frontend/<*>",
+    "target": "/<*>",
+    "status": "200",
+    "condition": null
+  },
+  {
     "source": "/pages/<*>",
     "target": "/pages/<*>",
     "status": "200",
