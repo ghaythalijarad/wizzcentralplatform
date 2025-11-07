@@ -901,10 +901,14 @@ class RegionsManager {
         const radEl = document.getElementById('coordRadius');
 
         // Find region data if editing
+        // Search in allRegionsForDropdown first (complete list), then fall back to this.regions
         let regionData = null;
         if (regionId) {
-            regionData = this.regions.find(x => x.regionId === regionId);
-            console.log('🔧 Editing region:', regionData);
+            regionData = (this.allRegionsForDropdown.length > 0 
+                ? this.allRegionsForDropdown 
+                : this.regions
+            ).find(x => x.regionId === regionId);
+            console.log('🔧 Editing region:', regionData, 'Found in:', this.allRegionsForDropdown.length > 0 ? 'allRegionsForDropdown' : 'this.regions');
         }
 
         // Set level FIRST (before populateParentOptions)
