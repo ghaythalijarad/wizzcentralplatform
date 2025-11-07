@@ -1,0 +1,435 @@
+/**
+ * WizzCentral Platform - Regions API Lambda Handler
+ * Handles all CRUD operations for service regions with polygon boundaries
+ */
+
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+
+// Configure AWS SDK
+const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
+const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
+
+const REGIONS_TABLE = process.env.REGIONS_TABLE || 'WizzCentral_Regions';
+
+// CORS headers
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
+    'Access-Control-Max-Age': '86400',
+    'Content-Type': 'application/json'
+};
+
+// Response helper
+function response(statusCode, body) {
+    return {
+        statusCode,
+        headers: CORS_HEADERS,
+        body: JSON.stringify(body)
+    };
+}
+
+// Validate polygon boundary
+function validatePolygonBoundary(boundary) {
+    if (!boundary || typeof boundary !== 'object') {
+        return { valid: false, error: 'BOUNDARY_MISSING', message: 'boundary field is required' };
+    }
+    if (boundary.type !== 'Polygon') {
+        return { valid: false, error: 'BOUNDARY_TYPE_INVALID', message: 'boundary.type must be "Polygon"' };
+    }
+    if (!Array.isArray(boundary.coordinates) || boundary.coordinates.length === 0) {
+        return { valid: false, error: 'BOUNDARY_COORDS_INVALID', message: 'boundary.coordinates must be a non-empty array' };
+    }
+    
+    const ring = boundary.coordinates[0];
+    if (!Array.isArray(ring) || ring.length < 4) {
+        return { valid: false, error: 'BOUNDARY_RING_TOO_SHORT', message: 'Polygon ring must have at least 4 points (3 unique + closing point)' };
+    }
+    
+    // Validate each point
+    for (let i = 0; i < ring.length; i++) {
+        const pt = ring[i];
+        if (!Array.isArray(pt) || pt.length !== 2) {
+            return { valid: false, error: 'BOUNDARY_POINT_INVALID', message: `Point ${i} must be [lng, lat]` };
+        }
+        const [lng, lat] = pt;
+        if (typeof lng !== 'number' || typeof lat !== 'number') {
+            return { valid: false, error: 'BOUNDARY_COORDS_TYPE', message: `Point ${i} coordinates must be numbers` };
+        }
+        if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+            return { valid: false, error: 'BOUNDARY_COORDS_RANGE', message: `Point ${i} coordinates out of range` };
+        }
+    }
+    
+    // Verify ring is closed
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+        return { valid: false, error: 'BOUNDARY_RING_NOT_CLOSED', message: 'Polygon ring must be closed (first point === last point)' };
+    }
+    
+    return { valid: true };
+}
+
+// Point-in-polygon test
+function pointInPolygon(lat, lng, boundary) {
+    if (!boundary || boundary.type !== 'Polygon') return false;
+    const ring = boundary.coordinates[0];
+    if (!ring || ring.length < 4) return false;
+    
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
+        const intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// Parse path and method from Lambda event
+function parseRequest(event) {
+    // Handle different event formats (ALB, API Gateway, Function URL)
+    const httpMethod = event.httpMethod || event.requestContext?.http?.method || 'GET';
+    const rawPath = event.path || event.rawPath || event.requestContext?.http?.path || '/';
+    const queryParams = event.queryStringParameters || {};
+    const body = event.body ? (typeof event.body === 'string' ? JSON.parse(event.body) : event.body) : {};
+    
+    // Extract path segments
+    const pathMatch = rawPath.match(/^\/(?:api\/)?regions\/?(.*)$/);
+    const pathSegments = pathMatch ? pathMatch[1].split('/').filter(Boolean) : [];
+    
+    return { httpMethod, pathSegments, queryParams, body };
+}
+
+// Main handler
+exports.handler = async (event, context) => {
+    console.log('Regions API invoked:', JSON.stringify({ 
+        httpMethod: event.httpMethod || event.requestContext?.http?.method,
+        path: event.path || event.rawPath,
+        queryParams: event.queryStringParameters 
+    }));
+    
+    try {
+        // Handle OPTIONS preflight
+        if (event.requestContext?.http?.method === 'OPTIONS' || event.httpMethod === 'OPTIONS') {
+            return response(200, { message: 'CORS OK' });
+        }
+        
+        const { httpMethod, pathSegments, queryParams, body } = parseRequest(event);
+        
+        // Route handling
+        if (httpMethod === 'GET' && pathSegments.length === 0) {
+            return await listRegions(queryParams);
+        } else if (httpMethod === 'POST' && pathSegments.length === 0) {
+            return await createRegion(body);
+        } else if (httpMethod === 'GET' && pathSegments.length === 1) {
+            return await getRegion(pathSegments[0]);
+        } else if (httpMethod === 'PUT' && pathSegments.length === 1) {
+            return await updateRegion(pathSegments[0], body);
+        } else if (httpMethod === 'DELETE' && pathSegments.length === 1) {
+            return await deleteRegion(pathSegments[0]);
+        } else if (httpMethod === 'PATCH' && pathSegments.length === 2 && pathSegments[1] === 'toggle') {
+            return await toggleRegion(pathSegments[0]);
+        }
+        
+        return response(404, { error: 'NOT_FOUND', message: 'Route not found' });
+        
+    } catch (error) {
+        console.error('Handler error:', error);
+        return response(500, { 
+            error: 'INTERNAL_ERROR', 
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+};
+
+// List regions with pagination and filtering
+async function listRegions(queryParams) {
+    const { pageMode, limit: limitStr, nextToken, contains, level, parent_id, is_active, search } = queryParams;
+    const limit = parseInt(limitStr) || 10;
+    
+    let items = [];
+    let lastKey = null;
+    
+    // Server-side pagination mode
+    if (pageMode === 'server') {
+        const scanParams = {
+            TableName: REGIONS_TABLE,
+            Limit: limit
+        };
+        
+        if (nextToken) {
+            try {
+                scanParams.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+            } catch (e) {
+                return response(400, { error: 'INVALID_TOKEN', message: 'Invalid nextToken' });
+            }
+        }
+        
+        const result = await dynamoDB.send(new ScanCommand(scanParams));
+        items = result.Items || [];
+        lastKey = result.LastEvaluatedKey;
+    } else {
+        // Fetch all (client-side pagination)
+        let scanResult;
+        do {
+            const scanParams = { TableName: REGIONS_TABLE };
+            if (scanResult?.LastEvaluatedKey) {
+                scanParams.ExclusiveStartKey = scanResult.LastEvaluatedKey;
+            }
+            scanResult = await dynamoDB.send(new ScanCommand(scanParams));
+            items = items.concat(scanResult.Items || []);
+        } while (scanResult.LastEvaluatedKey);
+    }
+    
+    // Apply filters
+    if (level !== undefined) {
+        const levelNum = parseInt(level);
+        items = items.filter(r => r.level === levelNum || r.level_n === levelNum);
+    }
+    
+    if (parent_id) {
+        items = items.filter(r => r.parent_id === parent_id);
+    }
+    
+    if (is_active !== undefined) {
+        const activeVal = is_active === 'true';
+        items = items.filter(r => r.is_active === activeVal);
+    }
+    
+    if (search) {
+        const searchLower = search.toLowerCase();
+        items = items.filter(r => 
+            (r.name || '').toLowerCase().includes(searchLower) ||
+            (r.name_ar || '').toLowerCase().includes(searchLower)
+        );
+    }
+    
+    // Point-in-polygon filter
+    if (contains) {
+        const [latStr, lngStr] = contains.split(',');
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        if (!isNaN(lat) && !isNaN(lng)) {
+            items = items.filter(r => pointInPolygon(lat, lng, r.boundary));
+        }
+    }
+    
+    // Build response
+    const responseData = {
+        items,
+        total: items.length
+    };
+    
+    if (pageMode === 'server' && lastKey) {
+        responseData.nextToken = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+    }
+    
+    return response(200, responseData);
+}
+
+// Get single region
+async function getRegion(regionId) {
+    const result = await dynamoDB.send(new GetCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId }
+    }));
+    
+    if (!result.Item) {
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+    }
+    
+    return response(200, result.Item);
+}
+
+// Create region
+async function createRegion(data) {
+    const { regionId, name, name_ar, level, parent_id, boundary, service_config, delivery_config } = data;
+    
+    // Validate required fields
+    if (!regionId || !name) {
+        return response(400, { error: 'MISSING_FIELDS', message: 'regionId and name are required' });
+    }
+    
+    if (level === undefined || level === null) {
+        return response(400, { error: 'MISSING_LEVEL', message: 'level is required' });
+    }
+    
+    // Validate boundary
+    const validation = validatePolygonBoundary(boundary);
+    if (!validation.valid) {
+        return response(400, { error: validation.error, message: validation.message });
+    }
+    
+    // Check for duplicate
+    const existing = await dynamoDB.send(new GetCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId }
+    }));
+    
+    if (existing.Item) {
+        return response(409, { error: 'ALREADY_EXISTS', message: 'Region with this ID already exists' });
+    }
+    
+    // Create item
+    const now = new Date().toISOString();
+    const nameLower = name.toLowerCase();
+    const item = {
+        regionId,
+        name,
+        name_ar: name_ar || '',
+        level,
+        level_n: level,
+        parent_id: parent_id || null,
+        boundary,
+        is_active: true,
+        is_active_s: 'true',
+        name_lower: nameLower,
+        name_ar_lower: (name_ar || '').toLowerCase(),
+        level_name: `L#${level}#N#${nameLower}`,
+        level_updated_at: `L#${level}#U#${now}`,
+        service_config: service_config || {},
+        delivery_config: delivery_config || {},
+        createdAt: now,
+        updatedAt: now,
+        updated_at: now
+    };
+    
+    await dynamoDB.send(new PutCommand({
+        TableName: REGIONS_TABLE,
+        Item: item
+    }));
+    
+    return response(201, item);
+}
+
+// Update region
+async function updateRegion(regionId, data) {
+    // Get existing region
+    const existing = await dynamoDB.send(new GetCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId }
+    }));
+    
+    if (!existing.Item) {
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+    }
+    
+    // If boundary is being updated, validate it
+    if (data.boundary) {
+        const validation = validatePolygonBoundary(data.boundary);
+        if (!validation.valid) {
+            return response(400, { error: validation.error, message: validation.message });
+        }
+    }
+    
+    // Build update expression
+    const now = new Date().toISOString();
+    const updateExpr = [];
+    const exprNames = {};
+    const exprValues = {};
+    
+    const updatableFields = ['name', 'name_ar', 'level', 'parent_id', 'boundary', 'is_active', 'service_config', 'delivery_config'];
+    
+    for (const field of updatableFields) {
+        if (data[field] !== undefined) {
+            updateExpr.push(`#${field} = :${field}`);
+            exprNames[`#${field}`] = field;
+            exprValues[`:${field}`] = data[field];
+        }
+    }
+    
+    // Update helper attributes if relevant fields changed
+    if (data.name) {
+        const nameLower = data.name.toLowerCase();
+        updateExpr.push('#name_lower = :name_lower');
+        exprNames['#name_lower'] = 'name_lower';
+        exprValues[':name_lower'] = nameLower;
+        
+        if (data.level !== undefined) {
+            updateExpr.push('#level_name = :level_name');
+            exprNames['#level_name'] = 'level_name';
+            exprValues[':level_name'] = `L#${data.level}#N#${nameLower}`;
+        }
+    }
+    
+    if (data.level !== undefined) {
+        updateExpr.push('#level_n = :level_n', '#level_updated_at = :level_updated_at');
+        exprNames['#level_n'] = 'level_n';
+        exprNames['#level_updated_at'] = 'level_updated_at';
+        exprValues[':level_n'] = data.level;
+        exprValues[':level_updated_at'] = `L#${data.level}#U#${now}`;
+    }
+    
+    if (data.is_active !== undefined) {
+        updateExpr.push('#is_active_s = :is_active_s');
+        exprNames['#is_active_s'] = 'is_active_s';
+        exprValues[':is_active_s'] = data.is_active ? 'true' : 'false';
+    }
+    
+    updateExpr.push('#updatedAt = :updatedAt', '#updated_at = :updated_at');
+    exprNames['#updatedAt'] = 'updatedAt';
+    exprNames['#updated_at'] = 'updated_at';
+    exprValues[':updatedAt'] = now;
+    exprValues[':updated_at'] = now;
+    
+    const result = await dynamoDB.send(new UpdateCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId },
+        UpdateExpression: `SET ${updateExpr.join(', ')}`,
+        ExpressionAttributeNames: exprNames,
+        ExpressionAttributeValues: exprValues,
+        ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response(200, result.Attributes);
+}
+
+// Delete region
+async function deleteRegion(regionId) {
+    await dynamoDB.send(new DeleteCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId }
+    }));
+    
+    return response(200, { message: 'Region deleted successfully' });
+}
+
+// Toggle region active status
+async function toggleRegion(regionId) {
+    const existing = await dynamoDB.send(new GetCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId }
+    }));
+    
+    if (!existing.Item) {
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+    }
+    
+    const newStatus = !existing.Item.is_active;
+    const now = new Date().toISOString();
+    
+    const result = await dynamoDB.send(new UpdateCommand({
+        TableName: REGIONS_TABLE,
+        Key: { regionId },
+        UpdateExpression: 'SET is_active = :status, is_active_s = :status_s, #level_updated_at = :level_updated_at, #updatedAt = :updatedAt, #updated_at = :updated_at',
+        ExpressionAttributeNames: {
+            '#level_updated_at': 'level_updated_at',
+            '#updatedAt': 'updatedAt',
+            '#updated_at': 'updated_at'
+        },
+        ExpressionAttributeValues: {
+            ':status': newStatus,
+            ':status_s': newStatus ? 'true' : 'false',
+            ':level_updated_at': `L#${existing.Item.level}#U#${now}`,
+            ':updatedAt': now,
+            ':updated_at': now
+        },
+        ReturnValues: 'ALL_NEW'
+    }));
+    
+    return response(200, result.Attributes);
+}
