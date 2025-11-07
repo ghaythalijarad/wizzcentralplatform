@@ -941,14 +941,31 @@ class RegionsManager {
         if (!levelEl || !parentEl) return;
         const level = parseInt(levelEl.value || '3', 10);
         const neededParentLevel = level - 1;
+        
+        console.log('🔍 populateParentOptions called:', { 
+            selectedLevel: level, 
+            neededParentLevel, 
+            totalRegions: this.regions.length 
+        });
+        
         let options = '<option value="">None</option>';
         if (neededParentLevel >= 0) {
             const parents = this.regions.filter(r => r.level === neededParentLevel);
+            console.log('📋 Found parent options:', { 
+                count: parents.length, 
+                neededLevel: neededParentLevel,
+                sample: parents.slice(0, 3).map(p => ({ id: p.regionId, name: p.regionName, level: p.level }))
+            });
+            
+            // Sort parents alphabetically by name
+            parents.sort((a, b) => (a.regionName || '').localeCompare(b.regionName || ''));
+            
             parents.forEach(p => {
                 options += `<option value="${p.regionId}">${p.regionName} (${p.regionId})</option>`;
             });
         }
         parentEl.innerHTML = options;
+        console.log('✅ Parent dropdown populated with', parents?.length || 0, 'options');
     }
 
     closeRegionModal() {
