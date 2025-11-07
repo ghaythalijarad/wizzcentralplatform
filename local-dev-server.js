@@ -813,6 +813,65 @@ app.post('/dev/test-conditions', async (req, res) => {
 // REGIONS MANAGEMENT API - DYNAMODB INTEGRATION
 // ============================================
 
+// Helper: Validate and normalize a GeoJSON Polygon boundary
+function validatePolygonBoundary(raw) {
+    if (!raw) return null;
+    const type = raw.type || raw.geometry?.type;
+    const coords = raw.coordinates || raw.geometry?.coordinates;
+    if (type !== 'Polygon') {
+        const err = new Error('Only Polygon boundaries are supported');
+        err.code = 'BOUNDARY_TYPE_INVALID';
+        throw err;
+    }
+    if (!Array.isArray(coords) || !Array.isArray(coords[0])) {
+        const err = new Error('Invalid GeoJSON polygon coordinates');
+        err.code = 'BOUNDARY_COORDS_INVALID';
+        throw err;
+    }
+    // Use first linear ring (outer)
+    let ring = coords[0];
+    // Ensure all points are [lng, lat] numbers
+    ring = ring.map((pt, i) => {
+        if (!Array.isArray(pt) || pt.length < 2) {
+            const err = new Error(`Invalid coordinate at index ${i}`);
+            err.code = 'BOUNDARY_POINT_INVALID';
+            throw err;
+        }
+        const lng = Number(pt[0]);
+        const lat = Number(pt[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            const err = new Error(`Non-numeric coordinate at index ${i}`);
+            err.code = 'BOUNDARY_POINT_NAN';
+            throw err;
+        }
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            const err = new Error(`Coordinate out of bounds at index ${i}`);
+            err.code = 'BOUNDARY_POINT_RANGE';
+            throw err;
+        }
+        return [lng, lat];
+    });
+    // Minimum 3 vertices (excluding closing point)
+    const uniqueVertices = new Set(ring.slice(0, -1).map(p => `${p[0].toFixed(6)},${p[1].toFixed(6)}`));
+    const distinctCount = uniqueVertices.size || ring.length;
+    if (distinctCount < 3) {
+        const err = new Error('Polygon must have at least 3 distinct vertices');
+        err.code = 'BOUNDARY_TOO_FEW_POINTS';
+        throw err;
+    }
+    // Ensure closed ring
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    const closed = first && last && first[0] === last[0] && first[1] === last[1];
+    if (!closed) ring = [...ring, [...first]];
+    if (ring.length < 4) {
+        const err = new Error('Polygon must be closed (first point equals last)');
+        err.code = 'BOUNDARY_NOT_CLOSED';
+        throw err;
+    }
+    return { type: 'Polygon', coordinates: [ring] };
+}
+
 // DEBUG routes guarded by flag
 if (ENABLE_REGIONS_DEBUG) {
     // DEBUG: Inspect regions table key schema
@@ -1037,6 +1096,13 @@ app.post('/api/regions', async (req, res) => {
         }
         level = typeof level === 'number' && !Number.isNaN(level) ? level : 3;
 
+        // Validate/normalize boundary (polygons only); prefer boundary if both provided
+        let normalizedBoundary = null;
+        if (b.boundary) {
+            try { normalizedBoundary = validatePolygonBoundary(b.boundary); }
+            catch (e) { return res.status(400).json({ success: false, error: 'Invalid boundary', message: e.message, code: e.code || 'BOUNDARY_INVALID' }); }
+        }
+
         // Coordinates normalization
         let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
         const normCoords = {
@@ -1152,7 +1218,7 @@ app.post('/api/regions', async (req, res) => {
                 total_orders: b.totalOrders || 0
             } : undefined),
             coordinates: normCoords,
-            boundary: b.boundary,
+            boundary: normalizedBoundary || undefined,
             createdAt: b.createdAt || b.created_at || null, // will be set below
             updatedAt: now,
             updated_at: now
