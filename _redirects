@@ -1,32 +1,7 @@
-[
-  {
-    "source": "/",
-    "target": "/index.html",
-    "status": "200",
-    "condition": null
-  },
-  {
-    "source": "/frontend/pages/<*>",
-    "target": "/pages/<*>",
-    "status": "200",
-    "condition": null
-  },
-  {
-    "source": "/frontend/<*>",
-    "target": "/<*>",
-    "status": "200",
-    "condition": null
-  },
-  {
-    "source": "/pages/<*>",
-    "target": "/pages/<*>",
-    "status": "200",
-    "condition": null
-  },
-  {
-    "source": "/<*>",
-    "target": "/index.html",
-    "status": "404-200",
-    "condition": null
-  }
-]
+# Amplify redirects configuration
+# Frontend path rewrites
+/frontend/pages/*  /pages/:splat  200
+/frontend/*        /:splat        200
+
+# SPA fallback - serve index.html for all unmatched routes
+/*                 /index.html    404
