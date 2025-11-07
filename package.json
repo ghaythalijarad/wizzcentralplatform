@@ -10,7 +10,9 @@
     "preview": "vite preview frontend",
     "local": "node local-dev-server.js",
     "playground": "node regions-api/server.js",
-    "regions:upgrade-gsis": "node backend/upgrade-regions-indexes.js"
+    "regions:upgrade-gsis": "node backend/upgrade-regions-indexes.js",
+    "regions:seed-iraq": "node backend/seed-iraq-regions.js",
+    "regions:migrate-polygons": "node backend/migrate-center-radius-to-polygons.js"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",
