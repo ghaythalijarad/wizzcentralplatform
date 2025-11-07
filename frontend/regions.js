@@ -143,69 +143,6 @@ class RegionsManager {
         }
     }
 
-    async loadAllRegionsForDropdown() {
-        try {
-            console.log('📋 Loading all regions for dropdown...');
-            const url = `${this._apiBase}/regions?limit=1000`;
-            
-            let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
-            
-            if (!response.ok) {
-                await this.maybeHandleAwsAuthError?.(response, url);
-                const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
-                if (idToken) {
-                    response = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }});
-                }
-            }
-            
-            if (!response.ok) {
-                console.warn('Failed to load all regions for dropdown, using empty list');
-                this.allRegionsForDropdown = [];
-                return;
-            }
-            
-            const result = await response.json();
-            const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
-            
-            if (!Array.isArray(list)) {
-                console.warn('Unexpected regions list shape for dropdown');
-                this.allRegionsForDropdown = [];
-                return;
-            }
-            
-            // Transform regions
-            const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
-            const findGovernorateName = (rid) => {
-                let cursor = rawById.get(rid);
-                let steps = 0;
-                while (cursor && steps < 10) {
-                    const lvl = Number(cursor.level);
-                    if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
-                    if (!cursor.parent_id) break;
-                    cursor = rawById.get(cursor.parent_id);
-                    steps++;
-                }
-                return undefined;
-            };
-            
-            this.allRegionsForDropdown = list.map(r => this.transformRegionData(r, findGovernorateName));
-            console.log('✅ Loaded', this.allRegionsForDropdown.length, 'regions for dropdown');
-            
-            // Log level distribution
-            const byLevel = {};
-            this.allRegionsForDropdown.forEach(r => {
-                const lvl = r.level;
-                if (!byLevel[lvl]) byLevel[lvl] = 0;
-                byLevel[lvl]++;
-            });
-            console.log('📊 Dropdown regions by level:', byLevel);
-            
-        } catch (e) {
-            console.error('loadAllRegionsForDropdown failed:', e);
-            this.allRegionsForDropdown = [];
-        }
-    }
-
     initializeMap() {
         // Guard if no map container or Leaflet
         const mapContainer = document.getElementById('regionsMap');
@@ -462,6 +399,69 @@ class RegionsManager {
             return { lng: m[0] / pts.length, lat: m[1] / pts.length };
         }
         return null;
+    }
+
+    async loadAllRegionsForDropdown() {
+        try {
+            console.log('📋 Loading all regions for dropdown...');
+            const url = `${this._apiBase}/regions?limit=1000`;
+            
+            let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
+            
+            if (!response.ok) {
+                await this.maybeHandleAwsAuthError?.(response, url);
+                const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
+                if (idToken) {
+                    response = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }});
+                }
+            }
+            
+            if (!response.ok) {
+                console.warn('Failed to load all regions for dropdown, using empty list');
+                this.allRegionsForDropdown = [];
+                return;
+            }
+            
+            const result = await response.json();
+            const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
+            
+            if (!Array.isArray(list)) {
+                console.warn('Unexpected regions list shape for dropdown');
+                this.allRegionsForDropdown = [];
+                return;
+            }
+            
+            // Transform regions
+            const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
+            const findGovernorateName = (rid) => {
+                let cursor = rawById.get(rid);
+                let steps = 0;
+                while (cursor && steps < 10) {
+                    const lvl = Number(cursor.level);
+                    if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
+                    if (!cursor.parent_id) break;
+                    cursor = rawById.get(cursor.parent_id);
+                    steps++;
+                }
+                return undefined;
+            };
+            
+            this.allRegionsForDropdown = list.map(r => this.transformRegionData(r, findGovernorateName));
+            console.log('✅ Loaded', this.allRegionsForDropdown.length, 'regions for dropdown');
+            
+            // Log level distribution
+            const byLevel = {};
+            this.allRegionsForDropdown.forEach(r => {
+                const lvl = r.level;
+                if (!byLevel[lvl]) byLevel[lvl] = 0;
+                byLevel[lvl]++;
+            });
+            console.log('📊 Dropdown regions by level:', byLevel);
+            
+        } catch (e) {
+            console.error('loadAllRegionsForDropdown failed:', e);
+            this.allRegionsForDropdown = [];
+        }
     }
 
     async loadRegions() {
@@ -904,10 +904,8 @@ class RegionsManager {
         // Search in allRegionsForDropdown first (complete list), then fall back to this.regions
         let regionData = null;
         if (regionId) {
-            regionData = (this.allRegionsForDropdown.length > 0 
-                ? this.allRegionsForDropdown 
-                : this.regions
-            ).find(x => x.regionId === regionId);
+            const sourceList = this.allRegionsForDropdown.length > 0 ? this.allRegionsForDropdown : this.regions;
+            regionData = sourceList.find(x => x.regionId === regionId);
             console.log('🔧 Editing region:', regionData, 'Found in:', this.allRegionsForDropdown.length > 0 ? 'allRegionsForDropdown' : 'this.regions');
         }
 
@@ -1016,7 +1014,7 @@ class RegionsManager {
         // Use allRegionsForDropdown (complete list) instead of this.regions (paginated)
         const sourceList = this.allRegionsForDropdown.length > 0 ? this.allRegionsForDropdown : this.regions;
         
-        console.log('🔍 populateParentOptions called:', { 
+        console.log('🔍 populateParentOptions:', { 
             selectedLevel: level, 
             neededParentLevel, 
             sourceListCount: sourceList.length,
@@ -1024,17 +1022,15 @@ class RegionsManager {
         });
         
         let options = '<option value="">None</option>';
-        let parentsCount = 0;
         if (neededParentLevel >= 0) {
             const parents = sourceList.filter(r => r.level === neededParentLevel);
-            parentsCount = parents.length;
             console.log('📋 Found parent options:', { 
                 count: parents.length, 
                 neededLevel: neededParentLevel,
                 sample: parents.slice(0, 3).map(p => ({ id: p.regionId, name: p.regionName, level: p.level }))
             });
             
-            // Sort parents alphabetically by name
+            // Sort parents alphabetically
             parents.sort((a, b) => (a.regionName || '').localeCompare(b.regionName || ''));
             
             parents.forEach(p => {
@@ -1042,7 +1038,7 @@ class RegionsManager {
             });
         }
         parentEl.innerHTML = options;
-        console.log('✅ Parent dropdown populated with', parentsCount, 'options');
+        console.log('✅ Parent dropdown populated with', (options.match(/<option/g) || []).length - 1, 'options');
     }
 
     closeRegionModal() {
@@ -1120,7 +1116,7 @@ class RegionsManager {
                 },
                 // delivery_config only when delivery enabled
                 ...(svcDelivery ? { delivery_config: { estimated_time_minutes: isNaN(estimated) ? 30 : estimated } } : {}),
-                coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lng, radius: isNaN(radiusVal) ? 3000 : radiusVal }
+                coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lngVal, radius: isNaN(radiusVal) ? 3000 : radiusVal }
             };
 
             // If a polygon boundary exists, validate and send only boundary (no center/radius)
@@ -1130,6 +1126,72 @@ class RegionsManager {
                     this.showError('Only Polygon boundaries are allowed');
                     return;
                 }
+                const ring = (b.coordinates[0] || []).map(pt => [Number(pt[0]), Number(pt[1])]);
+                if (ring.length < 3) {
+                    this.showError('Polygon must have at least 3 points');
+                    return;
+                }
+                // Ensure closure for GeoJSON
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+                if (ring.length < 4) {
+                    this.showError('Polygon must be closed (first point equals last)');
+                    return;
+                }
+                payload.boundary = { type: 'Polygon', coordinates: [ring] };
+                // Remove legacy center/radius when polygon is present
+                delete payload.coordinates;
+            }
+
+            // Persist to backend
+            const resp = await this.saveRegionToBackend(payload);
+            if (resp?.success || (resp && (resp.regionId || resp.id) && (resp.name || resp.name_ar))) {
+                const created = resp.region || resp.data || resp || payload;
+                // Update in-memory list and refresh UI
+                const newItem = this.transformRegionData(created);
+                const existingIdx = this.regions.findIndex(x => x.regionId === newItem.regionId);
+                if (existingIdx >= 0) {
+                    this.regions.splice(existingIdx, 1, newItem);
+                } else {
+                    this.regions.unshift(newItem);
+                }
+                this.closeRegionModal();
+                this.renderRegionsList();
+                this.renderMapMarkers?.();
+                this.updateStatistics?.();
+                this.showSuccess('Region saved successfully');
+            } else {
+                // Handle known backend validation errors for better UX
+                const code = resp?.code || resp?.error || '';
+                const msg = resp?.message || 'Failed to save region';
+                if (resp?.status === 409 || String(code).toUpperCase().includes('DUPLICATE')) {
+                    this.showError('Duplicate region: a region with the same name exists under the same parent/level');
+                } else if (resp?.status === 400) {
+                    if (code === 'PARENT_NOT_FOUND') this.showError('Parent region does not exist');
+                    else if (code === 'PARENT_LEVEL_INVALID') this.showError('Parent level must be exactly level-1');
+                    else if (code === 'SELF_PARENT') this.showError('Region cannot be its own parent');
+                    else this.showError(msg);
+                } else {
+                    this.showError(msg);
+                }
+            }
+        } catch (e) {
+            console.error('saveRegion error:', e);
+            this.showError(e.message || 'Failed to save region');
+        } finally {
+            if (btnText) btnText.textContent = 'Save Region';
+            if (btnSpin) btnSpin.style.display = 'none';
+        }
+    }
+
+    async saveRegionToBackend(region) {
+        try {
+            const url = `${this._apiBase}/regions`;
+            let response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(region)
             });
             if (!response.ok) {
                 await this.maybeHandleAwsAuthError(response, `${url} [POST]`);
