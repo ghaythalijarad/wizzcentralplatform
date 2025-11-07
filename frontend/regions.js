@@ -429,7 +429,7 @@ class RegionsManager {
             const statusEl = document.getElementById('statusFilter');
             const searchEl = document.getElementById('regionSearch');
             if (levelEl && levelEl.value !== '') params.set('level', String(parseInt(levelEl.value, 10)));
-            if (statusEl && statusEl.value !== '') params.set('active', statusEl.value);
+            if (statusEl && statusEl.value !== '') params.set('is_active', statusEl.value); // backend expects is_active
             if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
 
             if (this.pageMode === 'server') {
@@ -444,27 +444,30 @@ class RegionsManager {
             }
 
             const url = `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
-            const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
+            console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode, token: this.tokenStack[this.serverPageIndex] || null });
+            const t0 = performance.now();
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
-            if (!response.ok) {
-                await this.maybeHandleAwsAuthError(response, url);
-                const idToken = sessionStorage.getItem('idToken');
-                if (idToken) {
-                    response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' }});
-                }
-            }
+            console.log('⏱️ Regions initial response status:', response.status, 'time(ms):', (performance.now()-t0).toFixed(0));
+
             if (!response.ok) {
                 const msg = await response.text();
+                const fullMsg = `Failed to load regions (${response.status}). ${msg || ''}`;
                 if (!isLocal && typeof showApiErrorBanner === 'function') {
-                    showApiErrorBanner(`Failed to load regions (${response.status}). ${url} ${msg ? '- ' + msg : ''}`);
+                    showApiErrorBanner(fullMsg);
                 }
-                throw new Error(`HTTP ${response.status}: ${msg}`);
+                this.showError(fullMsg);
+                throw new Error(fullMsg);
             }
             const result = await response.json();
+            console.log('📦 Raw regions payload keys:', Object.keys(result || {}));
             // Support multiple backend response shapes: legacy {data|regions|pagination.nextToken} and new Lambda {items,total,nextToken}
             const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
             this.lastNextToken = result?.nextToken || result?.pagination?.nextToken || null;
             console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
+            if (!Array.isArray(list)) {
+                console.warn('Unexpected regions list shape:', result);
+                throw new Error('Regions payload malformed');
+            }
 
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
             const findGovernorateName = (rid) => {
@@ -484,6 +487,7 @@ class RegionsManager {
             return transformed;
         } catch (e) {
             console.error('fetchRegionsFromBackend failed:', e);
+            if (typeof showApiErrorBanner === 'function') showApiErrorBanner(e.message || 'Failed to load regions');
             throw e;
         }
     }
