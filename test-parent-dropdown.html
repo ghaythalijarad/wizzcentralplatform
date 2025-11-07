@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Parent Dropdown</title>
+</head>
+<body>
+    <h1>Parent Dropdown Test</h1>
+    <div id="results"></div>
+    
+    <script src="config.js"></script>
+    <script>
+        async function testParentDropdown() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Loading regions...</p>';
+            
+            try {
+                const response = await fetch(`${CONFIG.REGIONS_API_URL}/regions?limit=1000`);
+                const data = await response.json();
+                const regions = data.items || data.data || data.regions || [];
+                
+                resultsDiv.innerHTML = `<p>Total regions: ${regions.length}</p>`;
+                
+                // Group by level
+                const byLevel = {};
+                regions.forEach(r => {
+                    const level = Number(r.level);
+                    if (!byLevel[level]) byLevel[level] = [];
+                    byLevel[level].push(r);
+                });
+                
+                resultsDiv.innerHTML += '<h2>Regions by Level:</h2>';
+                Object.keys(byLevel).sort().forEach(level => {
+                    const count = byLevel[level].length;
+                    resultsDiv.innerHTML += `<p><strong>Level ${level}:</strong> ${count} regions</p>`;
+                    resultsDiv.innerHTML += '<ul>';
+                    byLevel[level].slice(0, 5).forEach(r => {
+                        resultsDiv.innerHTML += `<li>${r.name || r.regionName} (${r.regionId || r.id}) - level: ${r.level}</li>`;
+                    });
+                    if (byLevel[level].length > 5) {
+                        resultsDiv.innerHTML += `<li>... and ${byLevel[level].length - 5} more</li>`;
+                    }
+                    resultsDiv.innerHTML += '</ul>';
+                });
+                
+                // Test what happens for District level (2)
+                resultsDiv.innerHTML += '<h2>Test: Parents for District (level 2)</h2>';
+                const neededParentLevel = 2 - 1; // = 1 (Governorates)
+                const parents = regions.filter(r => Number(r.level) === neededParentLevel);
+                resultsDiv.innerHTML += `<p>Found ${parents.length} governorates (level 1) as parents:</p>`;
+                resultsDiv.innerHTML += '<ul>';
+                parents.forEach(p => {
+                    resultsDiv.innerHTML += `<li>${p.name || p.regionName} (${p.regionId || p.id})</li>`;
+                });
+                resultsDiv.innerHTML += '</ul>';
+                
+            } catch (e) {
+                resultsDiv.innerHTML = `<p style="color:red">Error: ${e.message}</p>`;
+                console.error(e);
+            }
+        }
+        
+        testParentDropdown();
+    </script>
+</body>
+</html>

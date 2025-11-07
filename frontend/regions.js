@@ -51,6 +51,11 @@ class RegionsManager {
     // ===== Notification helpers (in-page banners + console fallbacks) =====
     showNotification(message, type = 'info') {
         try {
+            // If a modal is open, prefer toast overlay so it is visible above the form
+            if (this.currentModal) {
+                this._showToast(message, type);
+                return;
+            }
             const banner = document.getElementById('apiErrorBanner');
             if (banner) {
                 banner.style.display = 'block';
@@ -66,6 +71,54 @@ class RegionsManager {
                 console.log(`[${type.toUpperCase()}]`, message);
             }
         } catch (e) { console.log(message); }
+    }
+
+    _ensureToastContainer() {
+        let c = document.getElementById('toastContainer');
+        if (!c) {
+            c = document.createElement('div');
+            c.id = 'toastContainer';
+            c.style.position = 'fixed';
+            c.style.top = '20px';
+            c.style.right = '20px';
+            c.style.display = 'flex';
+            c.style.flexDirection = 'column';
+            c.style.gap = '10px';
+            c.style.zIndex = '9999';
+            c.style.pointerEvents = 'none';
+            document.body.appendChild(c);
+        }
+        return c;
+    }
+
+    _showToast(message, type) {
+        const container = this._ensureToastContainer();
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.fontSize = '0.85rem';
+        toast.style.fontWeight = '500';
+        toast.style.padding = '10px 14px';
+        toast.style.borderRadius = '12px';
+        toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        toast.style.background = type === 'error' ? 'var(--md-sys-color-error-container, #b00020)' : 'var(--md-sys-color-surface-container-high, #333)';
+        toast.style.color = type === 'error' ? 'var(--md-sys-color-on-error-container, #fff)' : 'var(--md-sys-color-on-surface, #fff)';
+        toast.style.border = '1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,0.15))';
+        toast.style.pointerEvents = 'auto';
+        toast.style.cursor = 'default';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-6px)';
+        toast.style.transition = 'opacity .25s ease, transform .25s ease';
+        container.appendChild(toast);
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+        const ttl = type === 'error' ? 6000 : 3500;
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-6px)';
+            setTimeout(() => { try { container.removeChild(toast); } catch {} }, 300);
+        }, ttl);
     }
 
     showError(message) { this.showNotification(message, 'error'); }
@@ -1078,32 +1131,33 @@ class RegionsManager {
                 return;
             }
 
-            // Validate parent level relationship
+            // Editing vs creating
+            const isEdit = !!(this.selectedRegion && this.selectedRegion.regionId);
+
+            // Validate parent level relationship using full list (not paginated table)
             if (selectedLevel > 0 && !parentRegionId) {
                 this.showError('Please select a parent region for this level');
                 return;
             }
             if (parentRegionId) {
-                const parent = this.regions.find(r => r.regionId === parentRegionId);
-                if (!parent || parent.level !== selectedLevel - 1) {
+                const sourceList = this.allRegionsForDropdown.length > 0 ? this.allRegionsForDropdown : this.regions;
+                const parent = sourceList.find(r => r.regionId === parentRegionId);
+                if (!parent || Number(parent.level) !== selectedLevel - 1) {
                     this.showError('Invalid parent region for selected level');
                     return;
                 }
             }
 
-            // Map governorate label to an existing level-1 regionId if possible
-            let parentId = null;
-            const gov = this.regions.find(r => r.level === 1 && (
-                (r.regionName && r.regionName.toLowerCase() === governorateLabel.toLowerCase()) ||
-                (r.regionNameArabic && r.regionNameArabic === governorateLabel) ||
-                (r.governorate && r.governorate.toLowerCase() === governorateLabel.toLowerCase())
-            ));
-            if (gov) parentId = gov.regionId;
+            // For create, enforce polygon boundary (backend create requires it)
+            if (!isEdit && !this._drawnBoundary) {
+                this.showError('Please draw a polygon boundary for the new region');
+                return;
+            }
 
             // Build payload matching server normalization
             const payload = {
                 // If editing, include regionId to update existing item
-                ...(this.selectedRegion ? { regionId: this.selectedRegion.regionId } : {}),
+                ...(isEdit ? { regionId: this.selectedRegion.regionId } : { regionId: `R${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}` }),
                 name,
                 name_ar: nameAr,
                 level: selectedLevel,
@@ -1142,10 +1196,17 @@ class RegionsManager {
                 payload.boundary = { type: 'Polygon', coordinates: [ring] };
                 // Remove legacy center/radius when polygon is present
                 delete payload.coordinates;
+            } else if (!isEdit) {
+                // For create without polygon, already prevented above; this is a safety net
+                this.showError('Boundary is required when creating a new region');
+                return;
             }
 
-            // Persist to backend
-            const resp = await this.saveRegionToBackend(payload);
+            // Persist to backend: PUT for edits, POST for creates
+            const resp = isEdit
+                ? await this.updateRegionInBackend(this.selectedRegion.regionId, payload)
+                : await this.saveRegionToBackend(payload);
+
             if (resp?.success || (resp && (resp.regionId || resp.id) && (resp.name || resp.name_ar))) {
                 const created = resp.region || resp.data || resp || payload;
                 // Update in-memory list and refresh UI
@@ -1156,6 +1217,8 @@ class RegionsManager {
                 } else {
                     this.regions.unshift(newItem);
                 }
+                // Refresh master dropdown list to keep it up to date
+                try { await this.loadAllRegionsForDropdown(); } catch {}
                 this.closeRegionModal();
                 this.renderRegionsList();
                 this.renderMapMarkers?.();
@@ -1171,6 +1234,7 @@ class RegionsManager {
                     if (code === 'PARENT_NOT_FOUND') this.showError('Parent region does not exist');
                     else if (code === 'PARENT_LEVEL_INVALID') this.showError('Parent level must be exactly level-1');
                     else if (code === 'SELF_PARENT') this.showError('Region cannot be its own parent');
+                    else if (code && code.startsWith('BOUNDARY_')) this.showError(msg);
                     else this.showError(msg);
                 } else {
                     this.showError(msg);
@@ -1215,6 +1279,39 @@ class RegionsManager {
             return body || { success: true };
         } catch (error) {
             console.warn('Failed to save to backend:', error);
+            return { success: false, status: 0, message: error.message || 'Network error' };
+        }
+    }
+
+    async updateRegionInBackend(regionId, region) {
+        try {
+            const url = `${this._apiBase}/regions/${encodeURIComponent(regionId)}`;
+            let response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(region)
+            });
+            if (!response.ok) {
+                await this.maybeHandleAwsAuthError(response, `${url} [PUT]`);
+                const idToken = sessionStorage.getItem('idToken');
+                if (idToken) {
+                    response = await fetch(url, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(region)
+                    });
+                }
+            }
+            const status = response.status;
+            const ct = response.headers.get('content-type') || '';
+            let body = null;
+            try { body = ct.includes('application/json') ? await response.json() : { message: await response.text() }; } catch {}
+            if (!response.ok) {
+                return { success: false, status, ...(body || {}) };
+            }
+            return body || { success: true };
+        } catch (error) {
+            console.warn('Failed to update region:', error);
             return { success: false, status: 0, message: error.message || 'Network error' };
         }
     }
