@@ -423,6 +423,9 @@ class RegionsManager {
             const tbody = document.getElementById('regionsTableBody');
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
 
+            // Safe env detection for hosted vs local
+            const isLocal = (typeof window !== 'undefined') && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
             // Build query params based on current filters + server/client mode
             const params = new URLSearchParams();
             const levelEl = document.getElementById('levelFilter');

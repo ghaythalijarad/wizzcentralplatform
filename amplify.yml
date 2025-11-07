@@ -17,10 +17,12 @@ frontend:
         - cp frontend/index.html dist/index.html
         - echo "Adding redirects configuration..."
         - cp frontend/public/_redirects dist/_redirects 2>/dev/null || cp _redirects dist/_redirects 2>/dev/null || echo "No redirects file found"
+        - echo "Injecting API_BASE_URL env into config.js if provided by Amplify"
+        - if [ -n "$API_BASE_URL" ]; then sed -i '' "s|window.__API_BASE_URL__|'$API_BASE_URL'|" dist/config.js || true; fi
         - echo "Listing build contents..."
         - ls -la dist/
         - echo "--- Verifying config.js content in build folder ---"
-        - cat dist/config.js | grep "COGNITO_CLIENT_ID" || echo "config.js or CLIENT_ID not found"
+        - cat dist/config.js | grep "API_BASE_URL" || echo "config.js not found or missing API_BASE_URL"
         - echo "----------------------------------------------------"
         - echo "Build completed successfully"
     postBuild:

@@ -3,7 +3,7 @@ window.WIZZCENTRAL_CONFIG = {
     // API Configuration
     // API Gateway URL (can be overridden via Amplify Console env var 'API_BASE_URL')
     // Using Lambda Function URL for RegionDashboardAPI with CORS enabled
-    API_BASE_URL: window.__API_BASE_URL__ || 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws',
+    API_BASE_URL: (typeof window !== 'undefined' && typeof window.__API_BASE_URL__ !== 'undefined' && window.__API_BASE_URL__) || 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws',
 
     // Frontend Configuration
     APP_NAME: 'WizzCentral Platform',
@@ -55,7 +55,8 @@ if (window.location.protocol === 'file:' || window.location.hostname === 'localh
     window.WIZZCENTRAL_CONFIG.API_BASE_URL = `http://${window.location.hostname || 'localhost'}:3000/${window.WIZZCENTRAL_CONFIG.STAGE}`;
 }
 
-// Note: For local development use, use the built-in override or set window.__API_BASE_URL__ before loading scripts
+// Note: For Amplify Hosting, set Environment variable API_BASE_URL to your API Gateway/Lambda URL.
+// The build will inject it into window.__API_BASE_URL__ if provided.
 
 // Environment Detection
 if (typeof module !== 'undefined' && module.exports) {
