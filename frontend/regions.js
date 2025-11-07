@@ -803,6 +803,20 @@ class RegionsManager {
         return this._formEl || (this._formEl = document.getElementById('regionForm'));
     }
 
+    _toggleDeliveryFields() {
+        const svcDel = document.getElementById('serviceDelivery');
+        const etaWrapper = document.getElementById('estimatedDeliveryWrapper') || document.getElementById('estimatedDelivery')?.parentElement;
+        const etaInput = document.getElementById('estimatedDelivery');
+        if (!svcDel) return;
+        const enabled = svcDel.checked;
+        if (etaWrapper) {
+            etaWrapper.style.opacity = enabled ? '1' : '0.4';
+        }
+        if (etaInput) {
+            etaInput.disabled = !enabled;
+        }
+    }
+
     openRegionModal(regionId = null) {
         const modal = this.modalEl;
         const form = this.formEl;
@@ -810,64 +824,112 @@ class RegionsManager {
 
         // Reset form
         form.reset();
-        document.getElementById('modalTitle').textContent = regionId ? 'Edit Region' : 'Add New Region';
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) modalTitle.textContent = regionId ? 'Edit Region' : 'Add New Region';
 
-        // Populate parent regions based on selected level
-        this.populateParentOptions();
         const levelEl = document.getElementById('regionLevel');
-        if (levelEl) {
-            levelEl.addEventListener('change', () => this.populateParentOptions());
-        }
-
+        const parentEl = document.getElementById('parentRegion');
         const latEl = document.getElementById('coordLat');
         const lngEl = document.getElementById('coordLng');
         const radEl = document.getElementById('coordRadius');
 
-        // Prefill if editing
+        // Find region data if editing
+        let regionData = null;
         if (regionId) {
-            const r = this.regions.find(x => x.regionId === regionId);
-            if (r) {
-                const name = document.getElementById('regionName');
-                const nameAr = document.getElementById('regionNameArabic');
-                const gov = document.getElementById('governorate');
-                const est = document.getElementById('estimatedDelivery');
-                const status = document.getElementById('regionStatus');
-                const svcDel = document.getElementById('serviceDelivery');
-                const svcPck = document.getElementById('servicePickup');
-                const svcDine = document.getElementById('serviceDineIn');
-                if (name) name.value = r.regionName || '';
-                if (nameAr) nameAr.value = r.regionNameArabic || '';
-                if (gov) gov.value = r.governorate && r.governorate !== '—' ? r.governorate : '';
-                if (est) est.value = r.estimatedDeliveryTime || 30;
-                if (status) status.value = r.isActive ? 'active' : 'inactive';
-                if (svcDel) svcDel.checked = !!(r.serviceTypes?.delivery ?? true);
-                if (svcPck) svcPck.checked = !!(r.serviceTypes?.pickup ?? false);
-                if (svcDine) svcDine.checked = !!(r.serviceTypes?.dineIn ?? false);
-                // Keep selectedRegion and boundary for editing in draw modal
-                this.selectedRegion = r;
-                this._drawnBoundary = r.boundary || null;
-
-                // Only prefill coords when NO polygon boundary exists
-                if (!this._drawnBoundary) {
-                    const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
-                    if (latEl && !latEl.value) latEl.value = (r.coordinates?.center?.lat ?? c.lat).toFixed(6);
-                    if (lngEl && !lngEl.value) lngEl.value = (r.coordinates?.center?.lng ?? c.lng).toFixed(6);
-                    if (radEl && !radEl.value) radEl.value = 3000;
-                }
-            }
-        } else {
-            this.selectedRegion = null;
-            // Clear any previous drawn boundary when creating a new region
-            this._drawnBoundary = null;
-            // No boundary yet: prefill coordinates with map center
-            const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
-            if (latEl && !latEl.value) latEl.value = (c.lat || 33.3152).toFixed(6);
-            if (lngEl && !lngEl.value) lngEl.value = (c.lng || 44.3661).toFixed(6);
-            if (radEl && !radEl.value) radEl.value = 3000;
+            regionData = this.regions.find(x => x.regionId === regionId);
+            console.log('🔧 Editing region:', regionData);
         }
 
-        // Reflect the current boundary state on coordinate inputs (disables inputs if polygon exists)
+        // Set level FIRST (before populateParentOptions)
+        if (regionData && levelEl) {
+            levelEl.value = String(regionData.level);
+            console.log('✅ Set level to:', regionData.level);
+        } else if (levelEl && !regionId) {
+            levelEl.value = '3'; // Default for new regions
+        }
+
+        // Populate parent options based on the level
+        this.populateParentOptions();
+        
+        // Bind level change listener (only once)
+        if (levelEl && !levelEl._changeBound) {
+            levelEl.addEventListener('change', () => {
+                this.populateParentOptions();
+                if (parentEl) parentEl.value = '';
+            });
+            levelEl._changeBound = true;
+        }
+
+        // Prefill ALL fields if editing
+        if (regionData) {
+            const name = document.getElementById('regionName');
+            const nameAr = document.getElementById('regionNameArabic');
+            const gov = document.getElementById('governorate');
+            const est = document.getElementById('estimatedDelivery');
+            const status = document.getElementById('regionStatus');
+            const svcDel = document.getElementById('serviceDelivery');
+            const svcPck = document.getElementById('servicePickup');
+            const svcDine = document.getElementById('serviceDineIn');
+            
+            if (name) name.value = regionData.regionName || '';
+            if (nameAr) nameAr.value = regionData.regionNameArabic || '';
+            
+            // Set governorate dropdown value
+            if (gov) {
+                const govValue = regionData.governorate && regionData.governorate !== '—' && regionData.governorate !== 'N/A' ? regionData.governorate : '';
+                gov.value = govValue;
+                console.log('✅ Set governorate to:', govValue);
+            }
+            
+            if (est) est.value = (regionData.deliveryConfig?.estimated_time_minutes) || 30;
+            if (status) status.value = regionData.isActive ? 'active' : 'inactive';
+            if (svcDel) svcDel.checked = !!(regionData.serviceTypes?.delivery ?? true);
+            if (svcPck) svcPck.checked = !!(regionData.serviceTypes?.pickup ?? false);
+            if (svcDine) svcDine.checked = !!(regionData.serviceTypes?.dineIn ?? false);
+            
+            // Set parent region dropdown (after options are populated)
+            if (parentEl && regionData.parent_id) {
+                parentEl.value = regionData.parent_id;
+                console.log('✅ Set parent_id to:', regionData.parent_id, 'Selected value:', parentEl.value);
+                
+                // Double-check if the option exists
+                const optionExists = Array.from(parentEl.options).some(opt => opt.value === regionData.parent_id);
+                if (!optionExists) {
+                    console.warn('⚠️ Parent option not found in dropdown:', regionData.parent_id);
+                }
+            }
+            
+            // Keep selectedRegion and boundary for editing
+            this.selectedRegion = regionData;
+            this._drawnBoundary = regionData.boundary || null;
+
+            // Prefill coords when NO polygon boundary exists
+            if (!this._drawnBoundary) {
+                const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+                if (latEl) latEl.value = (regionData.coordinates?.center?.lat ?? c.lat).toFixed(6);
+                if (lngEl) lngEl.value = (regionData.coordinates?.center?.lng ?? c.lng).toFixed(6);
+                if (radEl) radEl.value = (regionData.coordinates?.center?.radius || 3000);
+            }
+        } else {
+            // New region defaults
+            this.selectedRegion = null;
+            this._drawnBoundary = null;
+            const c = this.map ? this.map.getCenter() : { lat: 33.3152, lng: 44.3661 };
+            if (latEl) latEl.value = (c.lat || 33.3152).toFixed(6);
+            if (lngEl) lngEl.value = (c.lng || 44.3661).toFixed(6);
+            if (radEl) radEl.value = 3000;
+        }
+
+        // Update coordinate inputs state based on boundary
         this._toggleCoordinateInputsForBoundary();
+
+        // Setup delivery toggle
+        const svcDelChk = document.getElementById('serviceDelivery');
+        if (svcDelChk && !svcDelChk._boundDeliveryToggle) {
+            svcDelChk.addEventListener('change', () => this._toggleDeliveryFields());
+            svcDelChk._boundDeliveryToggle = true;
+        }
+        this._toggleDeliveryFields();
 
         modal.style.display = 'flex';
         this.currentModal = 'region';
@@ -962,9 +1024,8 @@ class RegionsManager {
                     pickup: svcPickup,
                     dineIn: svcDineIn
                 },
-                delivery_config: {
-                    estimated_time_minutes: isNaN(estimated) ? 30 : estimated
-                },
+                // delivery_config only when delivery enabled
+                ...(svcDelivery ? { delivery_config: { estimated_time_minutes: isNaN(estimated) ? 30 : estimated } } : {}),
                 coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lngVal, radius: isNaN(radiusVal) ? 3000 : radiusVal }
             };
 

@@ -22,7 +22,7 @@ mkdir -p "$DEPLOY_DIR"
 
 # Copy Lambda code
 echo "📦 Packaging Lambda function..."
-cp backend/lambda-regions-api.js "$DEPLOY_DIR/index.js"
+cp backend/lambda-regions-api.js "$DEPLOY_DIR/lambda-regions-api.js"
 cp backend/lambda-regions-api-package.json "$DEPLOY_DIR/package.json"
 
 # Install dependencies
@@ -50,7 +50,7 @@ if aws lambda get-function --function-name "$FUNCTION_NAME" --profile "$AWS_PROF
         --handler "$HANDLER" \
         --timeout 30 \
         --memory-size 512 \
-        --environment "Variables={REGIONS_TABLE=$TABLE_NAME,AWS_REGION=$REGION,NODE_ENV=production}" \
+        --environment "Variables={REGIONS_TABLE=$TABLE_NAME,NODE_ENV=production}" \
         --profile "$AWS_PROFILE" \
         --region "$REGION"
 else
@@ -132,7 +132,7 @@ EOF
         --zip-file fileb://lambda-regions-api.zip \
         --timeout 30 \
         --memory-size 512 \
-        --environment "Variables={REGIONS_TABLE=$TABLE_NAME,AWS_REGION=$REGION,NODE_ENV=production}" \
+        --environment "Variables={REGIONS_TABLE=$TABLE_NAME,NODE_ENV=production}" \
         --profile "$AWS_PROFILE" \
         --region "$REGION"
 fi
