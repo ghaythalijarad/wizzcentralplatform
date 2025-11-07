@@ -28,6 +28,8 @@ class RegionsManager {
         this.lastNextToken = null; // nextToken returned by last fetch
         this.lastPageCount = 0; // last page item count
         this._apiBase = this._detectApiBase();
+        // Enforce polygons-only when using the draw feature
+        this.polygonsOnly = true;
 
         console.log('🗺️ RegionsManager: Constructor called, readyState:', document.readyState);
 
@@ -229,7 +231,7 @@ class RegionsManager {
                 circle: false,
                 rectangle: false,
                 circlemarker: false,
-                polyline: { shapeOptions: { color: '#ff7f50' } },
+                polyline: false, // Disable polylines; polygons only
                 polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#1e88e5' } }
             },
             edit: { featureGroup: drawnItems, remove: true }
@@ -326,6 +328,26 @@ class RegionsManager {
         el.textContent = `Selected ${type} with ${count} points`;
     }
 
+    // Disable/enable lat/lng/radius inputs when polygon boundary exists, and show inline note
+    _toggleCoordinateInputsForBoundary() {
+        const hasPoly = !!(this._drawnBoundary && this._drawnBoundary.type === 'Polygon' && Array.isArray(this._drawnBoundary.coordinates) && (this._drawnBoundary.coordinates[0]?.length || 0) >= 4);
+        const latEl = document.getElementById('coordLat');
+        const lngEl = document.getElementById('coordLng');
+        const radEl = document.getElementById('coordRadius');
+        [latEl, lngEl, radEl].forEach(el => { if (el) { el.disabled = hasPoly; el.classList?.toggle('disabled', hasPoly); }});
+        let note = document.getElementById('coordInputsNote');
+        const anchor = radEl?.parentElement || latEl?.parentElement || lngEl?.parentElement || document.getElementById('regionForm');
+        if (!note && anchor) {
+            note = document.createElement('div');
+            note.id = 'coordInputsNote';
+            note.style.fontSize = '0.8rem';
+            note.style.marginTop = '6px';
+            note.style.color = 'var(--md-sys-color-on-surface-variant, #666)';
+            anchor.appendChild(note);
+        }
+        if (note) note.textContent = hasPoly ? 'Polygon selected. Center and radius will be ignored on save.' : '';
+    }
+
     clearDrawnBoundary() {
         this._drawnBoundary = null;
         this._drawnLayer = null;
@@ -333,6 +355,7 @@ class RegionsManager {
             this._drawnItems.clearLayers();
         }
         this._updateDrawSummary();
+        this._toggleCoordinateInputsForBoundary();
     }
 
     applyDrawnBoundary() {
@@ -340,19 +363,11 @@ class RegionsManager {
             this.showError('Draw a shape first');
             return;
         }
-        // Optional: compute centroid to prefill center
-        try {
-            const centroid = this._computeCentroid(this._drawnBoundary);
-            if (centroid) {
-                const latEl = document.getElementById('coordLat');
-                const lngEl = document.getElementById('coordLng');
-                if (latEl) latEl.value = centroid.lat.toFixed(6);
-                if (lngEl) lngEl.value = centroid.lng.toFixed(6);
-            }
-        } catch {}
+        // Do not auto-fill lat/lng/radius; polygons take precedence
         this.closeDrawRegionModal();
         this.showSuccess('Area selected from map');
         this._updateDrawSummary();
+        this._toggleCoordinateInputsForBoundary();
     }
 
     _computeCentroid(boundary) {
@@ -824,6 +839,9 @@ class RegionsManager {
             this._drawnBoundary = null;
         }
 
+        // Reflect the current boundary state on coordinate inputs
+        this._toggleCoordinateInputsForBoundary();
+
         modal.style.display = 'flex';
         this.currentModal = 'region';
     }
@@ -923,9 +941,29 @@ class RegionsManager {
                 coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lngVal, radius: isNaN(radiusVal) ? 3000 : radiusVal }
             };
 
-            // Attach boundary if provided via draw modal
+            // If a polygon boundary exists, validate and send only boundary (no center/radius)
             if (this._drawnBoundary) {
-                payload.boundary = this._drawnBoundary;
+                const b = this._drawnBoundary;
+                if (b.type !== 'Polygon' || !Array.isArray(b.coordinates)) {
+                    this.showError('Only Polygon boundaries are allowed');
+                    return;
+                }
+                const ring = (b.coordinates[0] || []).map(pt => [Number(pt[0]), Number(pt[1])]);
+                if (ring.length < 3) {
+                    this.showError('Polygon must have at least 3 points');
+                    return;
+                }
+                // Ensure closure for GeoJSON
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) ring.push([...first]);
+                if (ring.length < 4) {
+                    this.showError('Polygon must be closed (first point equals last)');
+                    return;
+                }
+                payload.boundary = { type: 'Polygon', coordinates: [ring] };
+                // Remove legacy center/radius when polygon is present
+                delete payload.coordinates;
             }
 
             // Persist to backend
