@@ -461,8 +461,9 @@ class RegionsManager {
                 throw new Error(`HTTP ${response.status}: ${msg}`);
             }
             const result = await response.json();
-            const list = result?.data || result?.regions || (Array.isArray(result) ? result : []);
-            this.lastNextToken = result?.pagination?.nextToken || null;
+            // Support multiple backend response shapes: legacy {data|regions|pagination.nextToken} and new Lambda {items,total,nextToken}
+            const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
+            this.lastNextToken = result?.nextToken || result?.pagination?.nextToken || null;
             console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
 
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
@@ -973,8 +974,8 @@ class RegionsManager {
 
             // Persist to backend
             const resp = await this.saveRegionToBackend(payload);
-            if (resp?.success) {
-                const created = resp.region || resp.data || payload;
+            if (resp?.success || (resp && (resp.regionId || resp.id) && (resp.name || resp.name_ar))) {
+                const created = resp.region || resp.data || resp || payload;
                 // Update in-memory list and refresh UI
                 const newItem = this.transformRegionData(created);
                 const existingIdx = this.regions.findIndex(x => x.regionId === newItem.regionId);
@@ -1038,6 +1039,7 @@ class RegionsManager {
             if (!response.ok) {
                 return { success: false, status, ...(body || {}) };
             }
+            // On success, return the parsed body directly (may be the created item)
             return body || { success: true };
         } catch (error) {
             console.warn('Failed to save to backend:', error);
