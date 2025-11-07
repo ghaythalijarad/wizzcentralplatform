@@ -12,12 +12,8 @@ const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
 const REGIONS_TABLE = process.env.REGIONS_TABLE || 'WizzCentral_Regions';
 
-// CORS headers
+// CORS headers - minimal for Lambda Function URL (CORS already configured at Function URL level)
 const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,PATCH,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Requested-With',
-    'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json'
 };
 
