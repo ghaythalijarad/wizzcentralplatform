@@ -453,7 +453,20 @@ class RegionsManager {
             console.log('⏱️ Regions initial response status:', response.status, 'time(ms):', (performance.now()-t0).toFixed(0));
 
             if (!response.ok) {
-                const msg = await response.text();
+                await this.maybeHandleAwsAuthError?.(response, url);
+                const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
+                if (idToken) {
+                    console.log('🔐 Retrying regions fetch with Authorization Bearer');
+                    const t1 = performance.now();
+                    response = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }});
+                    console.log('⏱️ Regions auth retry status:', response.status, 'time(ms):', (performance.now()-t1).toFixed(0));
+                }
+            }
+
+            if (!response.ok) {
+                const ct = response.headers?.get?.('content-type') || '';
+                let msg = '';
+                try { msg = ct.includes('application/json') ? JSON.stringify(await response.clone().json()) : await response.text(); } catch {}
                 const fullMsg = `Failed to load regions (${response.status}). ${msg || ''}`;
                 if (!isLocal && typeof showApiErrorBanner === 'function') {
                     showApiErrorBanner(fullMsg);
@@ -461,6 +474,7 @@ class RegionsManager {
                 this.showError(fullMsg);
                 throw new Error(fullMsg);
             }
+
             const result = await response.json();
             console.log('📦 Raw regions payload keys:', Object.keys(result || {}));
             // Support multiple backend response shapes: legacy {data|regions|pagination.nextToken} and new Lambda {items,total,nextToken}
