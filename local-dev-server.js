@@ -118,8 +118,12 @@ const lambdaMiddleware = (req, res, next) => {
         queryStringParameters: req.query,
         headers: req.headers,
         body: Object.keys(req.body).length > 0 ? JSON.stringify(req.body) : null,
+        // Provide fields expected by Lambda Function URL/APIGW v2 style handlers
+        path: req.path,
+        rawPath: req.path,
         requestContext: {
             requestId: `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            http: { method: req.method, path: req.path },
             authorizer: {
                 claims: {
                     sub: req.headers['x-user-id'] || req.headers['user-id'] || 'dev-user-123',
@@ -130,7 +134,6 @@ const lambdaMiddleware = (req, res, next) => {
             }
         }
     };
-    
     req.lambdaEvent = event;
     next();
 };
@@ -154,6 +157,10 @@ const handleLambdaResponse = async (handler, req, res) => {
         res.status(result.statusCode).json(body);
     } catch (error) {
         console.error('❌ Lambda Handler Error:', error);
+        // Surface AWS credentials issues to the client as 401 for better UX
+        if (isAwsCredentialsError(error)) {
+            return sendAwsAuthError(res, { route: req.path, method: req.method }, error);
+        }
         res.status(500).json({ 
             error: 'Internal server error',
             message: error.message,
@@ -591,6 +598,63 @@ app.get('/orders/:orderId', async (req, res) => {
 });
 
 // ============================================
+// REGIONS API ROUTES (proxy to Lambda handler)
+// ============================================
+const { handler: regionsHandler } = require('./backend/lambda-regions-api.js');
+
+// List regions (supports server-side pagination and filters)
+app.get('/api/regions', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'GET';
+    req.lambdaEvent.path = '/api/regions';
+    req.lambdaEvent.rawPath = '/api/regions';
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// Create region
+app.post('/api/regions', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'POST';
+    req.lambdaEvent.path = '/api/regions';
+    req.lambdaEvent.rawPath = '/api/regions';
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// Get single region
+app.get('/api/regions/:id', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'GET';
+    req.lambdaEvent.path = `/api/regions/${req.params.id}`;
+    req.lambdaEvent.rawPath = req.lambdaEvent.path;
+    req.lambdaEvent.pathParameters = { id: req.params.id };
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// Update region
+app.put('/api/regions/:id', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'PUT';
+    req.lambdaEvent.path = `/api/regions/${req.params.id}`;
+    req.lambdaEvent.rawPath = req.lambdaEvent.path;
+    req.lambdaEvent.pathParameters = { id: req.params.id };
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// Delete region
+app.delete('/api/regions/:id', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'DELETE';
+    req.lambdaEvent.path = `/api/regions/${req.params.id}`;
+    req.lambdaEvent.rawPath = req.lambdaEvent.path;
+    req.lambdaEvent.pathParameters = { id: req.params.id };
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// Toggle region status
+app.patch('/api/regions/:id/toggle', async (req, res) => {
+    req.lambdaEvent.httpMethod = 'PATCH';
+    req.lambdaEvent.path = `/api/regions/${req.params.id}/toggle`;
+    req.lambdaEvent.rawPath = req.lambdaEvent.path;
+    req.lambdaEvent.pathParameters = { id: req.params.id };
+    await handleLambdaResponse(regionsHandler, req, res);
+});
+
+// ============================================
 // DEVELOPMENT UTILITIES - Real DynamoDB Data
 // ============================================
 
@@ -806,679 +870,6 @@ app.post('/dev/test-conditions', async (req, res) => {
             message: error.message,
             source: 'real-dynamodb-error'
         });
-    }
-});
-
-// ============================================
-// REGIONS MANAGEMENT API - DYNAMODB INTEGRATION
-// ============================================
-
-// Helper: Validate and normalize a GeoJSON Polygon boundary
-function validatePolygonBoundary(raw) {
-    if (!raw) return null;
-    const type = raw.type || raw.geometry?.type;
-    const coords = raw.coordinates || raw.geometry?.coordinates;
-    if (type !== 'Polygon') {
-        const err = new Error('Only Polygon boundaries are supported');
-        err.code = 'BOUNDARY_TYPE_INVALID';
-        throw err;
-    }
-    if (!Array.isArray(coords) || !Array.isArray(coords[0])) {
-        const err = new Error('Invalid GeoJSON polygon coordinates');
-        err.code = 'BOUNDARY_COORDS_INVALID';
-        throw err;
-    }
-    // Use first linear ring (outer)
-    let ring = coords[0];
-    // Ensure all points are [lng, lat] numbers
-    ring = ring.map((pt, i) => {
-        if (!Array.isArray(pt) || pt.length < 2) {
-            const err = new Error(`Invalid coordinate at index ${i}`);
-            err.code = 'BOUNDARY_POINT_INVALID';
-            throw err;
-        }
-        const lng = Number(pt[0]);
-        const lat = Number(pt[1]);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-            const err = new Error(`Non-numeric coordinate at index ${i}`);
-            err.code = 'BOUNDARY_POINT_NAN';
-            throw err;
-        }
-        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-            const err = new Error(`Coordinate out of bounds at index ${i}`);
-            err.code = 'BOUNDARY_POINT_RANGE';
-            throw err;
-        }
-        return [lng, lat];
-    });
-    // Minimum 3 vertices (excluding closing point)
-    const uniqueVertices = new Set(ring.slice(0, -1).map(p => `${p[0].toFixed(6)},${p[1].toFixed(6)}`));
-    const distinctCount = uniqueVertices.size || ring.length;
-    if (distinctCount < 3) {
-        const err = new Error('Polygon must have at least 3 distinct vertices');
-        err.code = 'BOUNDARY_TOO_FEW_POINTS';
-        throw err;
-    }
-    // Ensure closed ring
-    const first = ring[0];
-    const last = ring[ring.length - 1];
-    const closed = first && last && first[0] === last[0] && first[1] === last[1];
-    if (!closed) ring = [...ring, [...first]];
-    if (ring.length < 4) {
-        const err = new Error('Polygon must be closed (first point equals last)');
-        err.code = 'BOUNDARY_NOT_CLOSED';
-        throw err;
-    }
-    return { type: 'Polygon', coordinates: [ring] };
-}
-
-// Helper: Compute centroid [lng, lat] of a simple polygon ring (no holes)
-function centroidOfRing(ring) {
-    try {
-        // ring is array of [lng, lat], may be closed
-        const pts = ring.slice();
-        if (pts.length < 3) return null;
-        // ensure not double-closing
-        if (pts.length > 2) {
-            const f = pts[0], l = pts[pts.length - 1];
-            if (f[0] === l[0] && f[1] === l[1]) pts.pop();
-        }
-        let area = 0, cx = 0, cy = 0;
-        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-            const [x1, y1] = pts[j];
-            const [x2, y2] = pts[i];
-            const f = (x1 * y2 - x2 * y1);
-            area += f;
-            cx += (x1 + x2) * f;
-            cy += (y1 + y2) * f;
-        }
-        area *= 0.5;
-        if (!area) return null;
-        return [cx / (6 * area), cy / (6 * area)];
-    } catch { return null; }
-}
-
-// Helper: Bounding box for a polygon ring
-function ringBBox(ring) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const [x, y] of ring) {
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-    }
-    return [minX, minY, maxX, maxY];
-}
-
-// Helper: Point-in-Polygon (ray casting). ring is array of [lng, lat]
-function pointInPolygon(lng, lat, ring) {
-    if (!Array.isArray(ring) || ring.length < 3) return false;
-    // Remove duplicated last point if closed
-    const pts = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring.slice();
-    // BBox quick reject
-    const [minX, minY, maxX, maxY] = ringBBox(pts);
-    if (lng < minX || lng > maxX || lat < minY || lat > maxY) return false;
-    let inside = false;
-    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-        const xi = pts[i][0], yi = pts[i][1];
-        const xj = pts[j][0], yj = pts[j][1];
-        const intersect = ((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi + 0.0) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-// DEBUG routes guarded by flag
-if (ENABLE_REGIONS_DEBUG) {
-    // DEBUG: Inspect regions table key schema
-    app.get('/api/regions/_schema', async (req, res) => {
-        try {
-            const schema = await getTableKeySchema(REGIONS_TABLE);
-            res.json({ success: true, table: REGIONS_TABLE, keySchema: schema });
-        } catch (e) {
-            if (isAwsCredentialsError(e)) return sendAwsAuthError(res, '/api/regions/_schema', e);
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-
-    // DEBUG: Find a region item by id/regionId and show its keys
-    app.get('/api/regions/_find/:id', async (req, res) => {
-        try {
-            const requestedId = req.params.id;
-            const scan = await dynamoDB.send(new ScanCommand({
-                TableName: REGIONS_TABLE,
-                FilterExpression: '#rid = :v OR #id = :v',
-                ExpressionAttributeNames: { '#rid': 'regionId', '#id': 'id' },
-                ExpressionAttributeValues: { ':v': requestedId }
-            }));
-            const item = scan.Items?.[0];
-            const keySchema = await getTableKeySchema(REGIONS_TABLE);
-            res.json({
-                success: true,
-                requestedId,
-                found: !!item,
-                item,
-                itemKeys: item ? Object.keys(item) : [],
-                keySchema
-            });
-        } catch (e) {
-            if (isAwsCredentialsError(e)) return sendAwsAuthError(res, '/api/regions/_find/:id', e);
-            res.status(500).json({ success: false, error: e.message });
-        }
-    });
-}
-
-// GET /api/regions - Fetch all regions from DynamoDB
-app.get('/api/regions', async (req, res) => {
-    try {
-        const { level, parent_id, active, search, limit = 50, offset = 0, nextToken, pageMode, contains } = req.query;
-        console.log('📍 API: Getting regions from DynamoDB with filters:', { level, parent_id, active, search, limit, offset, nextToken, pageMode, contains });
-
-        const useServerPaging = Boolean(nextToken) || String(pageMode || '').toLowerCase() === 'server';
-        const containsPt = (() => {
-            if (!contains) return null;
-            const parts = String(contains).split(',').map(s => Number(s.trim()));
-            if (parts.length !== 2 || parts.some(n => !Number.isFinite(n))) return null;
-            return { lat: parts[0], lng: parts[1] };
-        })();
-
-        // Build a query plan that prefers GSIs, with graceful fallback to Scan
-        const buildQueryPlan = () => {
-            // Prefer most selective first
-            if (parent_id) {
-                const params = {
-                    TableName: REGIONS_TABLE,
-                    IndexName: REGIONS_GSI_PARENT_LEVEL_NAME,
-                    KeyConditionExpression: '#pid = :pid',
-                    ExpressionAttributeNames: { '#pid': 'parent_id' },
-                    ExpressionAttributeValues: { ':pid': parent_id },
-                    Limit: Number(limit) || 50
-                };
-                if (level !== undefined && level !== '') {
-                    params.KeyConditionExpression += ' AND begins_with(#lvlname, :lvlprefix)';
-                    params.ExpressionAttributeNames['#lvlname'] = 'level_name';
-                    params.ExpressionAttributeValues[':lvlprefix'] = `L#${Number(level)}#`;
-                }
-                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
-                return { type: 'Query', params };
-            }
-            if (level !== undefined && level !== '') {
-                const params = {
-                    TableName: REGIONS_TABLE,
-                    IndexName: REGIONS_GSI_LEVEL,
-                    KeyConditionExpression: '#lvl = :lvl',
-                    ExpressionAttributeNames: { '#lvl': 'level_n' },
-                    ExpressionAttributeValues: { ':lvl': Number(level) },
-                    Limit: Number(limit) || 50
-                };
-                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
-                return { type: 'Query', params };
-            }
-            if (active !== undefined && active !== '') {
-                const params = {
-                    TableName: REGIONS_TABLE,
-                    IndexName: REGIONS_GSI_IS_ACTIVE,
-                    KeyConditionExpression: '#act = :act',
-                    ExpressionAttributeNames: { '#act': 'is_active_s' },
-                    ExpressionAttributeValues: { ':act': (active === 'true' || active === true) ? 'true' : 'false' },
-                    Limit: Number(limit) || 50
-                };
-                if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
-                return { type: 'Query', params };
-            }
-            // Fallback
-            const params = { TableName: REGIONS_TABLE };
-            if (nextToken) params.ExclusiveStartKey = decodeToken(nextToken);
-            params.Limit = Number(limit) || 50;
-            return { type: 'Scan', params };
-        };
-
-        // Server-side pagination mode: single page fetch using GSI when possible
-        if (useServerPaging) {
-            const plan = buildQueryPlan();
-            let result;
-            try {
-                if (plan.type === 'Query') result = await dynamoDB.send(new QueryCommand(plan.params));
-                else result = await dynamoDB.send(new ScanCommand(plan.params));
-            } catch (e) {
-                // Index might not exist, fall back to Scan once
-                console.warn('Query plan failed, falling back to Scan:', e?.name || e?.message);
-                result = await dynamoDB.send(new ScanCommand({ TableName: REGIONS_TABLE, Limit: Number(limit) || 50, ExclusiveStartKey: plan.params?.ExclusiveStartKey }));
-            }
-            let items = result.Items || [];
-            // Apply light in-memory filters that cannot be in KeyCondition
-            if (search) {
-                const s = String(search).toLowerCase();
-                items = items.filter(r => (
-                    (r.name && String(r.name).toLowerCase().includes(s)) ||
-                    (r.name_ar && String(r.name_ar).toLowerCase().includes(s)) ||
-                    (r.regionId && String(r.regionId).toLowerCase().includes(s))
-                ));
-            }
-            if (containsPt) {
-                items = items.filter(r => {
-                    const b = r.boundary;
-                    if (!b || b.type !== 'Polygon') return false;
-                    const ring = b.coordinates?.[0] || [];
-                    return pointInPolygon(containsPt.lng, containsPt.lat, ring);
-                });
-            }
-            const leKey = result.LastEvaluatedKey || null;
-            const token = leKey ? encodeToken(leKey) : null;
-            return res.json({
-                success: true,
-                data: items,
-                pagination: { limit: Number(limit) || 50, nextToken: token },
-                filters: { level, parent_id, active, search },
-                source: plan.type === 'Query' ? 'dynamodb-gsi' : 'dynamodb-scan',
-                timestamp: new Date().toISOString()
-            });
-        }
-
-        // Default behavior: prefer GSI-backed Query to fetch all matching rows; avoid full table scan
-        const plan = buildQueryPlan();
-        let regions = [];
-        try {
-            if (plan.type === 'Query') {
-                // Drain all pages (cap to prevent runaway)
-                let lastKey = undefined;
-                let pageCount = 0;
-                const maxPages = 50;
-                do {
-                    const pageParams = { ...plan.params, ExclusiveStartKey: lastKey, Limit: 1000 };
-                    const page = await dynamoDB.send(new QueryCommand(pageParams));
-                    regions.push(...(page.Items || []));
-                    lastKey = page.LastEvaluatedKey;
-                    pageCount++;
-                } while (lastKey && pageCount < maxPages);
-            } else {
-                // Fallback single scan (unchanged)
-                const scanCommand = new ScanCommand({ TableName: REGIONS_TABLE });
-                const result = await dynamoDB.send(scanCommand);
-                regions = result.Items || [];
-            }
-        } catch (e) {
-            console.warn('Query-all failed, falling back to single Scan:', e?.name || e?.message);
-            const result = await dynamoDB.send(new ScanCommand({ TableName: REGIONS_TABLE }));
-            regions = result.Items || [];
-        }
-
-        // Extra in-memory filters
-        if (level !== undefined && level !== '') regions = regions.filter(r => Number(r.level_n ?? r.level) === Number(level));
-        if (parent_id) regions = regions.filter(r => r.parent_id === parent_id);
-        if (active !== undefined && active !== '') regions = regions.filter(r => ((r.is_active === true || r.is_active === 'true') === (active === 'true' || active === true)));
-        if (search) {
-            const searchLower = String(search).toLowerCase();
-            regions = regions.filter(r => (
-                (r.name && String(r.name).toLowerCase().includes(searchLower)) ||
-                (r.name_ar && String(r.name_ar).toLowerCase().includes(searchLower)) ||
-                (r.regionId && String(r.regionId).toLowerCase().includes(searchLower))
-            ));
-        }
-        if (containsPt) {
-            regions = regions.filter(r => {
-                const b = r.boundary;
-                if (!b || b.type !== 'Polygon') return false;
-                const ring = b.coordinates?.[0] || [];
-                return pointInPolygon(containsPt.lng, containsPt.lat, ring);
-            });
-        }
-
-        // Level breakdown by numeric levels
-        const levelBreakdown = {
-            country: regions.filter(r => Number(r.level_n ?? r.level) === 0).length,
-            governorates: regions.filter(r => Number(r.level_n ?? r.level) === 1).length,
-            districts: regions.filter(r => Number(r.level_n ?? r.level) === 2).length,
-            neighborhoods: regions.filter(r => Number(r.level_n ?? r.level) === 3).length
-        };
-
-        // Pagination (offset based, client-side within the result set)
-        const total = regions.length;
-        const start = parseInt(offset);
-        const end = start + parseInt(limit);
-        const paginatedRegions = regions.slice(start, end);
-
-        res.json({
-            success: true,
-            data: paginatedRegions,
-            pagination: { total, limit: parseInt(limit), offset: start, hasMore: end < total },
-            filters: { level, parent_id, active, search },
-            source: plan.type === 'Query' ? 'dynamodb-gsi' : 'dynamodb-scan',
-            summary: { ...levelBreakdown, total },
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('❌ Error getting regions from DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions', error);
-        res.status(500).json({ success: false, error: 'Failed to load regions from DynamoDB', message: error.message, source: 'dynamodb-error' });
-    }
-});
-
-// POST /api/regions - Create or update region (persist to DynamoDB)
-app.post('/api/regions', async (req, res) => {
-    try {
-        const b = req.body || {};
-        // Normalize to table schema
-        const now = new Date().toISOString();
-        const clientProvidedId = !!b.regionId;
-        const regionId = b.regionId || b.id || `region_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-        // Level normalization
-        let level = b.level;
-        if (typeof level === 'string') {
-            const map = { country: 0, governorate: 1, district: 2, neighborhood: 3, '0': 0, '1': 1, '2': 2, '3': 3 };
-            level = map[level.toLowerCase?.() ?? String(level)] ?? Number(level);
-        }
-        level = typeof level === 'number' && !Number.isNaN(level) ? level : 3;
-
-        // Validate/normalize boundary (polygons only); prefer boundary if both provided
-        let normalizedBoundary = null;
-        if (b.boundary) {
-            try { normalizedBoundary = validatePolygonBoundary(b.boundary); }
-            catch (e) { return res.status(400).json({ success: false, error: 'Invalid boundary', message: e.message, code: e.code || 'BOUNDARY_INVALID' }); }
-        }
-
-        // Coordinates normalization (keep for non-polygon cases only)
-        let coordinates = b.coordinates?.center || b.gps_coordinates || b.coordinates || {};
-        const normCoords = {
-            lat: Number(coordinates.lat) || 33.3152,
-            lng: Number(coordinates.lng) || 44.3661,
-            radius: coordinates.radius || b.coordinates?.radius || 50000
-        };
-
-        const isActive = typeof b.is_active === 'boolean' ? b.is_active : (typeof b.isActive === 'boolean' ? b.isActive : (b.status ? String(b.status).toLowerCase() === 'active' : true));
-
-        // Parent validation (if provided)
-        let parentItem = null;
-        if (b.parent_id) {
-            const parentRes = await dynamoDB.send(new GetCommand({ TableName: REGIONS_TABLE, Key: { regionId: b.parent_id } }));
-            parentItem = parentRes.Item || null;
-            if (!parentItem) return res.status(400).json({ success: false, error: 'Invalid parent_id', message: 'Parent region does not exist', code: 'PARENT_NOT_FOUND' });
-            const parentLevel = Number(parentItem.level_n ?? parentItem.level);
-            if (parentLevel !== Number(level) - 1) {
-                return res.status(400).json({ success: false, error: 'Invalid parent level', message: 'Parent level must be exactly level-1', code: 'PARENT_LEVEL_INVALID' });
-            }
-            if (b.parent_id === regionId) {
-                return res.status(400).json({ success: false, error: 'Invalid parent_id', message: 'Region cannot be its own parent', code: 'SELF_PARENT' });
-            }
-        }
-
-        // Duplicate check by (level, parent_id, name or name_ar) using GSIs when possible
-        try {
-            let dupItems = [];
-            if (b.parent_id) {
-                // Query by parent_id (and optionally level prefix on SK)
-                const qParams = {
-                    TableName: REGIONS_TABLE,
-                    IndexName: REGIONS_GSI_PARENT_LEVEL_NAME,
-                    KeyConditionExpression: '#pid = :pid',
-                    ExpressionAttributeNames: { '#pid': 'parent_id' },
-                    ExpressionAttributeValues: { ':pid': b.parent_id },
-                    Limit: 1000
-                };
-                if (typeof level === 'number') {
-                    qParams.KeyConditionExpression += ' AND begins_with(#lvlname, :lvlprefix)';
-                    qParams.ExpressionAttributeNames['#lvlname'] = 'level_name';
-                    qParams.ExpressionAttributeValues[':lvlprefix'] = `L#${Number(level)}#`;
-                }
-                try {
-                    const q = await dynamoDB.send(new QueryCommand(qParams));
-                    dupItems = q.Items || [];
-                } catch (qe) {
-                    console.warn('Duplicate check GSI1 query failed, falling back to Scan:', qe?.name || qe?.message);
-                }
-            }
-            if (!dupItems.length) {
-                // Fallback to level_n GSI
-                try {
-                    const q = await dynamoDB.send(new QueryCommand({
-                        TableName: REGIONS_TABLE,
-                        IndexName: REGIONS_GSI_LEVEL,
-                        KeyConditionExpression: '#lvl = :lvl',
-                        ExpressionAttributeNames: { '#lvl': 'level_n' },
-                        ExpressionAttributeValues: { ':lvl': Number(level) },
-                        Limit: 2000
-                    }));
-                    dupItems = q.Items || [];
-                } catch (qe2) {
-                    console.warn('Duplicate check GSI2 query failed, falling back to Scan:', qe2?.name || qe2?.message);
-                }
-            }
-            if (!dupItems.length) {
-                // Last resort: table scan
-                const dupScan = await dynamoDB.send(new ScanCommand({
-                    TableName: REGIONS_TABLE,
-                    ProjectionExpression: 'regionId, #lvl, level_n, parent_id, #nm, name_ar',
-                    ExpressionAttributeNames: { '#lvl': 'level', '#nm': 'name' }
-                }));
-                dupItems = dupScan.Items || [];
-            }
-            const dup = (dupItems || []).find(r => {
-                if (r.regionId === regionId) return false; // skip self when editing
-                const rLevel = Number(r.level_n ?? r.level);
-                if (rLevel !== Number(level)) return false;
-                if ((r.parent_id || null) !== (b.parent_id || null)) return false;
-                const nm1 = String(r.name || '').trim().toLowerCase();
-                const ar1 = String(r.name_ar || '').trim().toLowerCase();
-                const nm2 = String(b.name || b.regionName || '').trim().toLowerCase();
-                const ar2 = String(b.name_ar || b.regionNameArabic || '').trim().toLowerCase();
-                return (nm1 && nm1 === nm2) || (ar1 && ar1 === ar2);
-            });
-            if (dup) {
-                return res.status(409).json({ success: false, error: 'Duplicate region', message: 'A region with the same name exists under the same parent and level', duplicateOf: dup.regionId, code: 'DUPLICATE' });
-            }
-        } catch (dupErr) {
-            console.warn('Duplicate check failed (continuing):', dupErr?.message);
-        }
-
-        // Build item
-        const item = {
-            regionId,
-            name: b.name || b.regionName || `Region ${regionId}`,
-            name_ar: b.name_ar || b.regionNameArabic || '',
-            level, // keep for backward compatibility
-            level_n: Number(level), // helper for GSI2
-            parent_id: b.parent_id || null,
-            is_active: isActive,
-            is_active_s: isActive ? 'true' : 'false', // helper for GSI3
-            governorate_id: b.governorate_id || b.governorate || undefined,
-            service_config: b.service_config || b.serviceTypes || undefined,
-            delivery_config: b.delivery_config || (b.deliveryFee || b.minimumOrder || b.estimatedDeliveryTime ? {
-                base_fee: b.deliveryFee,
-                minimum_order: b.minimumOrder,
-                estimated_time_minutes: b.estimatedDeliveryTime
-            } : undefined),
-            statistics: b.statistics || (typeof b.activeDrivers === 'number' || typeof b.totalOrders === 'number' ? {
-                active_drivers: b.activeDrivers || 0,
-                total_orders: b.totalOrders || 0
-            } : undefined),
-            // If a polygon boundary exists, do NOT store coordinates at all
-            ...(normalizedBoundary ? {} : { coordinates: normCoords }),
-            boundary: normalizedBoundary || undefined,
-            createdAt: b.createdAt || b.created_at || null, // will be set below
-            updatedAt: now,
-            updated_at: now
-        };
-
-        // Helper attributes for GSIs
-        const nameLower = String(item.name || '').trim().toLowerCase();
-        if (nameLower) item.name_lower = nameLower;
-        if (item.name_ar) item.name_ar_lower = String(item.name_ar).trim().toLowerCase();
-        item.level_name = `L#${item.level_n ?? item.level}#N#${nameLower}`; // for GSI1 sort key
-        item.level_updated_at = `L#${item.level_n ?? item.level}#U#${item.updated_at}`; // for GSI3 sort key
-
-        // Create vs Update
-        if (!clientProvidedId) {
-            item.createdAt = now;
-            await dynamoDB.send(new PutCommand({
-                TableName: REGIONS_TABLE,
-                Item: item,
-                ConditionExpression: 'attribute_not_exists(regionId)'
-            }));
-            return res.json({ success: true, message: 'Region created', region: item, source: 'dynamodb' });
-        } else {
-            const existing = await dynamoDB.send(new GetCommand({ TableName: REGIONS_TABLE, Key: { regionId } }));
-            if (!existing.Item) return res.status(404).json({ success: false, error: 'Region not found', message: 'Cannot update non-existing region', code: 'NOT_FOUND' });
-            item.createdAt = existing.Item.createdAt || existing.Item.created_at || now;
-            // Recompute level_updated_at for update time
-            item.level_updated_at = `L#${item.level_n ?? item.level}#U#${item.updated_at}`;
-            await dynamoDB.send(new PutCommand({ TableName: REGIONS_TABLE, Item: item }));
-            return res.json({ success: true, message: 'Region updated', region: item, source: 'dynamodb' });
-        }
-    } catch (error) {
-        console.error('❌ Error saving region to DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions', error);
-        const code = error?.name || error?.code;
-        if (code === 'ConditionalCheckFailedException') {
-            return res.status(409).json({ success: false, error: 'Duplicate or conflict', message: 'Region already exists with the same id', code: 'CONDITIONAL_FAILED' });
-        }
-        res.status(500).json({ error: 'Failed to save region', message: error.message, source: 'dynamodb-error' });
-    }
-});
-
-// PATCH /api/regions/:id/toggle - Toggle region active status using regionId PK
-app.patch('/api/regions/:id/toggle', async (req, res) => {
-    try {
-        const requestedId = req.params.id;
-        console.log(`🔄 Toggling region status (regionId PK): ${requestedId}`);
-
-        // Fetch current item
-        const { Item } = await dynamoDB.send(new GetCommand({
-            TableName: REGIONS_TABLE,
-            Key: { regionId: requestedId }
-        }));
-        if (!Item) {
-            return res.status(404).json({ success: false, error: 'Region not found', regionId: requestedId, source: 'dynamodb' });
-        }
-
-        const previous = (Item.is_active === true || Item.is_active === 'true');
-        const newStatus = !previous;
-        const now = new Date().toISOString();
-        const levelNum = Number(Item.level_n ?? Item.level);
-        const newLevelUpdated = `L#${levelNum}#U#${now}`;
-
-        const updateRes = await dynamoDB.send(new UpdateCommand({
-            TableName: REGIONS_TABLE,
-            Key: { regionId: requestedId },
-            UpdateExpression: 'SET is_active = :s, is_active_s = :ss, updated_at = :u, updatedAt = :u, level_updated_at = :lua',
-            ExpressionAttributeValues: { ':s': newStatus, ':ss': newStatus ? 'true' : 'false', ':u': now, ':lua': newLevelUpdated },
-            ReturnValues: 'ALL_NEW'
-        }));
-
-        res.json({
-            success: true,
-            data: {
-                regionId: requestedId,
-                previousStatus: previous,
-                newStatus: (updateRes.Attributes?.is_active === true || updateRes.Attributes?.is_active === 'true'),
-                region: updateRes.Attributes
-            },
-            source: 'dynamodb',
-            timestamp: now
-        });
-    } catch (error) {
-        console.error('❌ Error toggling region status:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id/toggle', error);
-        res.status(500).json({ success: false, error: 'Failed to toggle region status', message: error.message, source: 'dynamodb-error' });
-    }
-});
-
-// GET /api/regions/statistics - Get regions statistics from DynamoDB
-app.get('/api/regions/statistics', async (req, res) => {
-    try {
-        console.log('📍 Calculating regions statistics from DynamoDB...');
-        
-        // Fetch all regions from DynamoDB
-        const scanCommand = new ScanCommand({
-            TableName: REGIONS_TABLE
-        });
-        
-        const result = await dynamoDB.send(scanCommand);
-        const regions = result.Items || [];
-        
-        const stats = {
-            totalRegions: regions.length,
-            activeRegions: regions.filter(r => (r.is_active === true || r.is_active === 'true')).length,
-            inactiveRegions: regions.filter(r => (r.is_active === false || r.is_active === 'false')).length,
-            levelBreakdown: {
-                country: regions.filter(r => Number(r.level_n ?? r.level) === 0).length,
-                governorates: regions.filter(r => Number(r.level_n ?? r.level) === 1).length,
-                districts: regions.filter(r => Number(r.level_n ?? r.level) === 2).length,
-                neighborhoods: regions.filter(r => Number(r.level_n ?? r.level) === 3).length
-            },
-            serviceStats: {
-                totalDrivers: regions.reduce((sum, r) => sum + (r.statistics?.active_drivers || 0), 0),
-                totalOrders: regions.reduce((sum, r) => sum + (r.statistics?.total_orders || 0), 0),
-                avgPopulation: regions.length > 0 ? Math.round(regions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0) / regions.length) : 0,
-                totalPopulation: regions.reduce((sum, r) => sum + (r.statistics?.population || 0), 0)
-            },
-            coverage: {
-                serviceTypes: {
-                    delivery: regions.filter(r => r.service_config?.delivery).length,
-                    pickup: regions.filter(r => r.service_config?.pickup).length,
-                    express: regions.filter(r => r.service_config?.express).length,
-                    standard: regions.filter(r => r.service_config?.standard).length
-                },
-                totalArea: regions.reduce((sum, r) => sum + (r.statistics?.area_km2 || 0), 0)
-            }
-        };
-
-        res.json({
-            success: true,
-            data: stats,
-            message: `Regions statistics from DynamoDB - ${regions.length} regions found`,
-            generatedAt: new Date().toISOString(),
-            source: 'dynamodb'
-        });
-    } catch (error) {
-        console.error('❌ Error calculating regions statistics from DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/statistics', error);
-        res.status(500).json({
-            success: false,
-            error: 'Failed to calculate regions statistics from DynamoDB',
-            message: error.message,
-            source: 'dynamodb-error'
-        });
-    }
-});
-
-// GET /api/regions/:id - Get individual region details from DynamoDB using regionId PK
-app.get('/api/regions/:id', async (req, res) => {
-    try {
-        const requestedId = req.params.id;
-        console.log(`🔍 Looking up region by PK regionId: ${requestedId}`);
-        const result = await dynamoDB.send(new GetCommand({
-            TableName: REGIONS_TABLE,
-            Key: { regionId: requestedId }
-        }));
-        const region = result.Item;
-        if (!region) {
-            return res.status(404).json({ success: false, error: 'Region not found', message: `Region '${requestedId}' not found`, regionId: requestedId, source: 'dynamodb' });
-        }
-        res.json({ success: true, data: region, message: `Region details for ${region.name || region.regionName || requestedId}`, timestamp: new Date().toISOString(), source: 'dynamodb' });
-    } catch (error) {
-        console.error('❌ Error fetching region details from DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch region details from DynamoDB', message: error.message, source: 'dynamodb-error' });
-    }
-});
-
-// DELETE /api/regions/:id - Delete region by regionId with conditional existence check
-app.delete('/api/regions/:id', async (req, res) => {
-    try {
-        const regionId = req.params.id;
-        console.log(`🗑️ Deleting region: ${regionId}`);
-        await dynamoDB.send(new DeleteCommand({
-            TableName: REGIONS_TABLE,
-            Key: { regionId },
-            ConditionExpression: 'attribute_exists(regionId)'
-        }));
-        res.json({ success: true, message: 'Region deleted', regionId, source: 'dynamodb', timestamp: new Date().toISOString() });
-    } catch (error) {
-        console.error('❌ Error deleting region from DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/regions/:id [DELETE]', error);
-        if ((error.name || error.code) === 'ConditionalCheckFailedException') {
-            return res.status(404).json({ success: false, error: 'Region not found', message: 'No region with the provided id', source: 'dynamodb' });
-        }
-        res.status(500).json({ success: false, error: 'Failed to delete region', message: error.message, source: 'dynamodb-error' });
     }
 });
 

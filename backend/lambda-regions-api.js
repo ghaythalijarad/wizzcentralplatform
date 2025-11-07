@@ -154,24 +154,93 @@ async function listRegions(queryParams) {
     let items = [];
     let lastKey = null;
     
+    // Build FilterExpression for DynamoDB
+    const filterParts = [];
+    const expressionAttributeNames = {};
+    const expressionAttributeValues = {};
+    
+    if (level !== undefined) {
+        const levelNum = parseInt(level);
+        filterParts.push('(#level = :level OR level_n = :level)');
+        expressionAttributeNames['#level'] = 'level';
+        expressionAttributeValues[':level'] = levelNum;
+    }
+    
+    if (parent_id) {
+        filterParts.push('parent_id = :parent_id');
+        expressionAttributeValues[':parent_id'] = parent_id;
+    }
+    
+    if (is_active !== undefined) {
+        const activeVal = is_active === 'true';
+        filterParts.push('is_active = :is_active');
+        expressionAttributeValues[':is_active'] = activeVal;
+    }
+    
     // Server-side pagination mode
     if (pageMode === 'server') {
-        const scanParams = {
-            TableName: REGIONS_TABLE,
-            Limit: limit
-        };
-        
+        // Decode start key if provided
+        let exclusiveStartKey = null;
         if (nextToken) {
             try {
-                scanParams.ExclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
+                exclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
             } catch (e) {
                 return response(400, { error: 'INVALID_TOKEN', message: 'Invalid nextToken' });
             }
         }
-        
-        const result = await dynamoDB.send(new ScanCommand(scanParams));
-        items = result.Items || [];
-        lastKey = result.LastEvaluatedKey;
+
+        // Accumulate items matching all filters (including search/contains) until we reach `limit` or the table is exhausted
+        const pageItems = [];
+        let safety = 0; // guard against excessive loops
+        let lastEvaluatedKey = exclusiveStartKey || null;
+
+        // Pre-parse contains if present
+        let containsLatLng = null;
+        if (contains) {
+            const [latStr, lngStr] = String(contains).split(',');
+            const lat = parseFloat(latStr);
+            const lng = parseFloat(lngStr);
+            if (!isNaN(lat) && !isNaN(lng)) containsLatLng = { lat, lng };
+        }
+
+        while (pageItems.length < limit && safety < 50) {
+            const scanParams = { TableName: REGIONS_TABLE, Limit: Math.max(limit, 25) };
+            if (lastEvaluatedKey) scanParams.ExclusiveStartKey = lastEvaluatedKey;
+            if (filterParts.length > 0) {
+                scanParams.FilterExpression = filterParts.join(' AND ');
+                if (Object.keys(expressionAttributeNames).length > 0) {
+                    scanParams.ExpressionAttributeNames = expressionAttributeNames;
+                }
+                scanParams.ExpressionAttributeValues = expressionAttributeValues;
+            }
+            const result = await dynamoDB.send(new ScanCommand(scanParams));
+            const batch = (result.Items || []).filter(r => {
+                // Apply search filter if provided
+                if (search) {
+                    const s = String(search).toLowerCase();
+                    const n1 = String(r.name || '').toLowerCase();
+                    const n2 = String(r.name_ar || '').toLowerCase();
+                    if (!(n1.includes(s) || n2.includes(s))) return false;
+                }
+                // Apply point-in-polygon filter if provided
+                if (containsLatLng) {
+                    if (!pointInPolygon(containsLatLng.lat, containsLatLng.lng, r.boundary)) return false;
+                }
+                return true;
+            });
+
+            for (const r of batch) {
+                pageItems.push(r);
+                if (pageItems.length >= limit) break;
+            }
+
+            lastEvaluatedKey = result.LastEvaluatedKey || null;
+            if (!lastEvaluatedKey) break; // no more data
+            safety++;
+        }
+
+        items = pageItems;
+        lastKey = (items.length >= limit) ? lastEvaluatedKey : null;
     } else {
         // Fetch all (client-side pagination)
         let scanResult;
@@ -183,24 +252,25 @@ async function listRegions(queryParams) {
             scanResult = await dynamoDB.send(new ScanCommand(scanParams));
             items = items.concat(scanResult.Items || []);
         } while (scanResult.LastEvaluatedKey);
+        
+        // Apply filters client-side for fetch-all mode
+        if (level !== undefined) {
+            const levelNum = parseInt(level);
+            items = items.filter(r => r.level === levelNum || r.level_n === levelNum);
+        }
+        
+        if (parent_id) {
+            items = items.filter(r => r.parent_id === parent_id);
+        }
+        
+        if (is_active !== undefined) {
+            const activeVal = is_active === 'true';
+            items = items.filter(r => r.is_active === activeVal);
+        }
     }
     
-    // Apply filters
-    if (level !== undefined) {
-        const levelNum = parseInt(level);
-        items = items.filter(r => r.level === levelNum || r.level_n === levelNum);
-    }
-    
-    if (parent_id) {
-        items = items.filter(r => r.parent_id === parent_id);
-    }
-    
-    if (is_active !== undefined) {
-        const activeVal = is_active === 'true';
-        items = items.filter(r => r.is_active === activeVal);
-    }
-    
-    if (search) {
+    // Apply client-side only filters (search and point-in-polygon) when not in server mode
+    if (pageMode !== 'server' && search) {
         const searchLower = search.toLowerCase();
         items = items.filter(r => 
             (r.name || '').toLowerCase().includes(searchLower) ||
@@ -208,8 +278,7 @@ async function listRegions(queryParams) {
         );
     }
     
-    // Point-in-polygon filter
-    if (contains) {
+    if (pageMode !== 'server' && contains) {
         const [latStr, lngStr] = contains.split(',');
         const lat = parseFloat(latStr);
         const lng = parseFloat(lngStr);
