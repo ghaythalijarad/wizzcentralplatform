@@ -927,14 +927,12 @@ class RegionsManager {
         const svcDel = document.getElementById('serviceDelivery');
         const etaWrapper = document.getElementById('estimatedDeliveryWrapper') || document.getElementById('estimatedDelivery')?.parentElement;
         const etaInput = document.getElementById('estimatedDelivery');
+        const feeWrapper = document.getElementById('deliveryBaseFeeWrapper');
+        const feeInput = document.getElementById('deliveryBaseFee');
         if (!svcDel) return;
         const enabled = svcDel.checked;
-        if (etaWrapper) {
-            etaWrapper.style.opacity = enabled ? '1' : '0.4';
-        }
-        if (etaInput) {
-            etaInput.disabled = !enabled;
-        }
+        [etaWrapper, feeWrapper].forEach(w => { if (w) w.style.opacity = enabled ? '1' : '0.4'; });
+        [etaInput, feeInput].forEach(i => { if (i) i.disabled = !enabled; });
     }
 
     openRegionModal(regionId = null) {
@@ -988,6 +986,7 @@ class RegionsManager {
             const nameAr = document.getElementById('regionNameArabic');
             const gov = document.getElementById('governorate');
             const est = document.getElementById('estimatedDelivery');
+            const fee = document.getElementById('deliveryBaseFee');
             const status = document.getElementById('regionStatus');
             const svcDel = document.getElementById('serviceDelivery');
             const svcPck = document.getElementById('servicePickup');
@@ -1004,6 +1003,7 @@ class RegionsManager {
             }
             
             if (est) est.value = (regionData.deliveryConfig?.estimated_time_minutes) || 30;
+            if (fee) fee.value = (regionData.deliveryConfig?.base_fee != null ? regionData.deliveryConfig.base_fee : '');
             if (status) status.value = regionData.isActive ? 'active' : 'inactive';
             if (svcDel) svcDel.checked = !!(regionData.serviceTypes?.delivery ?? true);
             if (svcPck) svcPck.checked = !!(regionData.serviceTypes?.pickup ?? false);
@@ -1040,6 +1040,8 @@ class RegionsManager {
             if (latEl) latEl.value = (c.lat || 33.3152).toFixed(6);
             if (lngEl) lngEl.value = (c.lng || 44.3661).toFixed(6);
             if (radEl) radEl.value = 3000;
+            const fee = document.getElementById('deliveryBaseFee');
+            if (fee) fee.value = '';
         }
 
         // Update coordinate inputs state based on boundary
@@ -1116,6 +1118,8 @@ class RegionsManager {
             const nameAr = document.getElementById('regionNameArabic')?.value?.trim();
             const governorateLabel = document.getElementById('governorate')?.value || '';
             const estimated = parseInt(document.getElementById('estimatedDelivery')?.value || '30', 10);
+            const baseFeeRaw = document.getElementById('deliveryBaseFee')?.value || '';
+            const baseFee = baseFeeRaw.trim() === '' ? null : parseFloat(baseFeeRaw);
             const status = document.getElementById('regionStatus')?.value || 'active';
             const svcDelivery = document.getElementById('serviceDelivery')?.checked ?? true;
             const svcPickup = document.getElementById('servicePickup')?.checked ?? false;
@@ -1168,8 +1172,7 @@ class RegionsManager {
                     pickup: svcPickup,
                     dineIn: svcDineIn
                 },
-                // delivery_config only when delivery enabled
-                ...(svcDelivery ? { delivery_config: { estimated_time_minutes: isNaN(estimated) ? 30 : estimated } } : {}),
+                ...(svcDelivery ? { delivery_config: { estimated_time_minutes: isNaN(estimated) ? 30 : estimated, ...(baseFee != null && !isNaN(baseFee) ? { base_fee: baseFee } : {}) } } : {}),
                 coordinates: { lat: isNaN(latVal) ? 33.3152 : latVal, lng: isNaN(lngVal) ? 44.3661 : lngVal, radius: isNaN(radiusVal) ? 3000 : radiusVal }
             };
 
@@ -1209,6 +1212,12 @@ class RegionsManager {
 
             if (resp?.success || (resp && (resp.regionId || resp.id) && (resp.name || resp.name_ar))) {
                 const created = resp.region || resp.data || resp || payload;
+                // Preserve existing base_fee if editing and user left blank
+                if (isEdit && baseFee == null && this.selectedRegion?.deliveryConfig?.base_fee != null) {
+                    if (created.delivery_config && created.delivery_config.base_fee == null) {
+                        created.delivery_config.base_fee = this.selectedRegion.deliveryConfig.base_fee;
+                    }
+                }
                 // Update in-memory list and refresh UI
                 const newItem = this.transformRegionData(created);
                 const existingIdx = this.regions.findIndex(x => x.regionId === newItem.regionId);

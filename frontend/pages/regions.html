@@ -1229,9 +1229,15 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group" id="estimatedDeliveryWrapper">
                             <label class="form-label">Estimated Delivery (minutes)</label>
                             <input type="number" class="form-input" id="estimatedDelivery" placeholder="30" required>
+                        </div>
+                        <!-- New: Base Delivery Fee -->
+                        <div class="form-group" id="deliveryBaseFeeWrapper">
+                            <label class="form-label">Base Delivery Fee</label>
+                            <input type="number" step="0.01" min="0" class="form-input" id="deliveryBaseFee" placeholder="0.00">
+                            <div style="font-size:0.65rem; margin-top:4px; color:var(--md-sys-color-on-surface-variant);">Optional. If blank while editing, existing fee is preserved.</div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Status</label>
