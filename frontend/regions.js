@@ -189,11 +189,83 @@ class RegionsManager {
             if (useShapeBtn) useShapeBtn.addEventListener('click', () => this.applyDrawnBoundary());
             if (clearShapeBtn) clearShapeBtn.addEventListener('click', () => this.clearDrawnBoundary());
 
+            // Fallback: ensure Delivery Fee & Minimum Order fields exist even if HTML not updated
+            this._ensureMinimumOrderField();
+
             console.log('✅ RegionsManager: Initialized successfully');
         } catch (error) {
             console.error('❌ RegionsManager initialization failed:', error);
             this.showError('Failed to initialize regions management');
         }
+    }
+
+    _ensureMinimumOrderField() {
+        try {
+            const form = document.getElementById('regionForm');
+            if (!form) return;
+
+            // Find an anchor row: prefer the row that contains Estimated Delivery
+            const etaWrapper = document.getElementById('estimatedDeliveryWrapper') || document.getElementById('estimatedDelivery')?.closest?.('.form-row') || null;
+            let anchorRow = etaWrapper ? (etaWrapper.classList?.contains('form-row') ? etaWrapper : etaWrapper.parentElement) : null;
+
+            // If still not found, try to find any form-row that contains Status to insert before it
+            const statusEl = document.getElementById('regionStatus');
+            const statusGroup = statusEl ? statusEl.closest?.('.form-group') : null;
+            const statusRow = statusGroup ? statusGroup.parentElement : null;
+
+            if (!anchorRow) {
+                // Create a new row and insert before statusRow or append at end
+                anchorRow = document.createElement('div');
+                anchorRow.className = 'form-row';
+                if (statusRow && statusRow.parentElement === statusRow.parentElement) {
+                    statusRow.parentElement?.insertBefore(anchorRow, statusRow);
+                } else {
+                    form.appendChild(anchorRow);
+                }
+            }
+
+            // Ensure Base Delivery Fee
+            let feeWrapper = document.getElementById('deliveryBaseFeeWrapper');
+            if (!feeWrapper) {
+                feeWrapper = document.createElement('div');
+                feeWrapper.className = 'form-group';
+                feeWrapper.id = 'deliveryBaseFeeWrapper';
+                feeWrapper.innerHTML = `
+                    <label class="form-label">Base Delivery Fee</label>
+                    <input type="number" step="0.01" min="0" class="form-input" id="deliveryBaseFee" placeholder="0.00">
+                    <div style="font-size:0.65rem; margin-top:4px; color:var(--md-sys-color-on-surface-variant);">Optional. If blank while editing, existing fee is preserved.</div>
+                `;
+                // Place after ETA wrapper if present, else append to anchor row
+                if (etaWrapper && !etaWrapper.classList.contains('form-row')) {
+                    anchorRow.appendChild(feeWrapper);
+                } else {
+                    anchorRow.appendChild(feeWrapper);
+                }
+            }
+
+            // Ensure Minimum Order
+            let minWrapper = document.getElementById('deliveryMinimumOrderWrapper');
+            if (!minWrapper) {
+                minWrapper = document.createElement('div');
+                minWrapper.className = 'form-group';
+                minWrapper.id = 'deliveryMinimumOrderWrapper';
+                minWrapper.innerHTML = `
+                    <label class="form-label">Minimum Order</label>
+                    <input type="number" step="0.01" min="0" class="form-input" id="deliveryMinimumOrder" placeholder="0.00">
+                    <div style="font-size:0.65rem; margin-top:4px; color:var(--md-sys-color-on-surface-variant);">Optional. If blank while editing, existing minimum is preserved.</div>
+                `;
+                anchorRow.appendChild(minWrapper);
+            }
+
+            // If we inserted in a single column layout (no .form-row), ensure they are visible by appending directly before Status group
+            if (!anchorRow.classList.contains('form-row') && statusGroup && feeWrapper && minWrapper) {
+                statusRow?.parentElement?.insertBefore(feeWrapper, statusGroup);
+                statusRow?.parentElement?.insertBefore(minWrapper, statusGroup);
+            }
+
+            // Sync enabled/disabled state with Delivery toggle
+            this._toggleDeliveryFields();
+        } catch (e) { console.error('Inject delivery fields failed:', e); }
     }
 
     initializeMap() {
@@ -942,6 +1014,9 @@ class RegionsManager {
         const form = this.formEl;
         if (!modal || !form) return;
 
+        // Ensure delivery extra fields are in DOM before prefilling
+        this._ensureMinimumOrderField();
+
         // Reset form
         form.reset();
         const modalTitle = document.getElementById('modalTitle');
@@ -1503,26 +1578,51 @@ class RegionsManager {
 }
 
 // Global functions for HTML onclick handlers
-window.selectRegion = (regionId) => regionsManager.selectRegion(regionId);
-window.toggleRegionStatus = (regionId, event) => regionsManager.toggleRegionStatus(regionId, event);
-window.editRegion = (regionId, event) => regionsManager.editRegion(regionId, event);
-window.deleteRegion = (regionId, event) => regionsManager.deleteRegion(regionId, event);
-window.viewRegionDetails = (regionId, event) => regionsManager.viewRegionDetails(regionId, event);
-window.openAddRegionModal = () => regionsManager.openRegionModal();
-window.closeRegionModal = () => regionsManager.closeRegionModal();
-window.saveRegion = () => regionsManager.saveRegion();
-window.refreshRegionsData = () => regionsManager.refreshRegions();
+// Initialize a singleton instance and expose helpers on window
+(function() {
+    try {
+        if (!window.regionsManager) {
+            window.regionsManager = new RegionsManager();
+        }
+        const mgr = window.regionsManager;
 
-// Table view functions
-window.toggleView = (viewType) => regionsManager.toggleView(viewType);
-window.sortTable = (field) => regionsManager.handleSort(field);
-window.changePage = (page) => regionsManager.changePage(page);
-window.previousPage = () => regionsManager.previousPage();
-window.nextPage = () => regionsManager.nextPage();
-window.viewRegionDetails = (regionId, event) => regionsManager.viewRegionDetails(regionId, event);
-window.goToPage = (page) => regionsManager.goToPage(page);
+        // Sorting
+        if (!window.sortTable) {
+            window.sortTable = function(field) {
+                try { mgr.handleSort(field); } catch (e) { console.error('sortTable failed:', e); }
+            };
+        }
 
-// Initialize the regions manager
-const regionsManager = new RegionsManager();
+        // Pagination helpers (both server and client modes)
+        if (!window.changePage) {
+            window.changePage = function(delta) {
+                try {
+                    if (!mgr) return;
+                    if (mgr.pageMode === 'server') {
+                        if (delta === -1) mgr.previousServerPage();
+                        else if (delta === 1) mgr.nextServerPage();
+                    } else {
+                        const target = (typeof delta === 'number' && Math.abs(delta) === 1) ? (mgr.currentPage + delta) : 1;
+                        mgr.goToPage(target);
+                    }
+                } catch (e) { console.error('changePage failed:', e); }
+            };
+        }
+        if (!window.goToPage) {
+            window.goToPage = function(page) { try { mgr.goToPage(page); } catch (e) { console.error('goToPage failed:', e); } };
+        }
 
-console.log('🗺️ Regions management system loaded');
+        // CRUD/UI wrappers referenced in onclick attributes
+        if (!window.openAddRegionModal) window.openAddRegionModal = function() { try { mgr.openRegionModal(); } catch (e) { console.error(e); } };
+        if (!window.closeRegionModal) window.closeRegionModal = function() { try { mgr.closeRegionModal(); } catch (e) { console.error(e); } };
+        if (!window.saveRegion) window.saveRegion = function() { try { mgr.saveRegion(); } catch (e) { console.error(e); } };
+        if (!window.refreshRegionsData) window.refreshRegionsData = function() { try { mgr.refreshRegions(); } catch (e) { console.error(e); } };
+
+        if (!window.viewRegionDetails) window.viewRegionDetails = function(id, ev) { try { mgr.viewRegionDetails(id, ev); } catch (e) { console.error(e); } };
+        if (!window.editRegion) window.editRegion = function(id, ev) { try { mgr.editRegion(id, ev); } catch (e) { console.error(e); } };
+        if (!window.toggleRegionStatus) window.toggleRegionStatus = function(id, ev) { try { mgr.toggleRegionStatus(id, ev); } catch (e) { console.error(e); } };
+        if (!window.deleteRegion) window.deleteRegion = function(id, ev) { try { mgr.deleteRegion(id, ev); } catch (e) { console.error(e); } };
+    } catch (e) {
+        console.error('Failed to bootstrap RegionsManager globals:', e);
+    }
+})();
