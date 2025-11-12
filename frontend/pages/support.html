@@ -1542,9 +1542,14 @@
 
                 // Send session end message via appropriate WebSocket
                 const endMessage = {
-                    action: 'session_closed',
-                    type: 'session_closed',
+                    action: 'chat_session_close',  // ✅ Fixed: Backend expects this action type
+                    type: 'chat_session_close',
                     sessionId: sessionId,
+                    payload: {
+                        sessionId: sessionId,
+                        userType: 'agent',
+                        userId: 'support_agent_' + Date.now()
+                    },
                     closedByUserType: 'agent',
                     closedByUserId: 'support_agent_' + Date.now(),
                     senderType: 'agent',
