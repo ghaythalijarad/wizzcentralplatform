@@ -1494,31 +1494,64 @@
                 }
                 messageInput.focus();
             }, 500);
-        };
-
-            // End chat session function
-            window.endChatSession = function (sessionId) {
+        };        // End chat session function
+        window.endChatSession = function (sessionId) {
             if (!sessionId) sessionId = currentSessionId;
             if (!sessionId) return;
 
             const session = activeChatSessions.get(sessionId);
             if (!session) return;
 
-            if (confirm(`Are you sure you want to end the chat session with ${session.customer}?`)) {
+            const customerName = session.customer || session.merchantName || 'user';
+            
+            if (confirm(`Are you sure you want to end the chat session with ${customerName}?`)) {
                 // Determine if this is a merchant session
                 const isMerchantSession = session.userType === 'merchant';
 
+                // 🆕 Add system message BEFORE removing session
+                const systemMessage = {
+                    id: `close_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    text: 'Session ended by agent',
+                    sender: 'system',
+                    timestamp: new Date(),
+                    senderName: 'System'
+                };
+
+                // Add to session history
+                if (!session.messages) {
+                    session.messages = [];
+                }
+                session.messages.push(systemMessage);
+                session.lastMessage = systemMessage.text;
+                session.time = formatTimestamp(systemMessage.timestamp);
+
+                // If currently viewing this session, show the system message
+                if (currentSessionId === sessionId) {
+                    appendMessageToChat(systemMessage);
+                    console.log(`✅ Added system message: "Session ended by agent"`);
+                }
+
+                // 🆕 Add closure metadata
+                session.status = 'closed';
+                session.closedAt = new Date().toISOString();
+                session.closedByUserType = 'agent';
+
+                // 🆕 Move to closed sessions archive (keep for 2 hours)
+                closedSessions.set(sessionId, session);
+                console.log(`📁 Moved session to closed sessions archive`);
+
                 // Send session end message via appropriate WebSocket
                 const endMessage = {
-                    action: 'chat_session_close',
-                    type: 'chat_session_close',
+                    action: 'session_closed',
+                    type: 'session_closed',
                     sessionId: sessionId,
                     closedByUserType: 'agent',
                     closedByUserId: 'support_agent_' + Date.now(),
                     senderType: 'agent',
                     agentId: 'support_agent',
                     reason: 'ended_by_agent',
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    closedAt: new Date().toISOString()
                 };
 
                 if (isMerchantSession && merchantChatWS && merchantChatWS.readyState === WebSocket.OPEN) {
@@ -1526,52 +1559,63 @@
                     merchantChatWS.send(JSON.stringify(endMessage));
                     console.log('📤 Sent merchant session end message:', endMessage);
 
-                    // Remove from merchant sessions too
+                    // Remove from merchant sessions
                     merchantSessions.delete(sessionId);
                 } else if (wsManager) {
-                // Send via regular driver/customer WebSocket
+                    // Send via regular driver/customer WebSocket
                     wsManager.send(endMessage);
                     console.log('📤 Sent session end message:', endMessage);
                 }
 
-                // Remove from local sessions
+                // Remove from active sessions
                 activeChatSessions.delete(sessionId);
                     
-                // Clear chat view if this was the active session
+                // Update chat view if this was the active session
                 if (currentSessionId === sessionId) {
-                    currentSessionId = null;
-                    const chatMessages = document.getElementById('chatMessages');
                     const chatInputArea = document.getElementById('chatInputArea');
                     const chatTitle = document.getElementById('chatTitle');
                     const endSessionBtn = document.getElementById('endSessionBtn');
 
-                    if (chatMessages) {
-                        chatMessages.innerHTML = `
-                            <div class="empty-state">
-                                <i class="fas fa-comment-dots"></i>
-                                <h3>Select a conversation</h3>
-                                <p>Choose a conversation from the left to start helping customers</p>
-                            </div>
-                        `;
-                    }
-
+                    // Disable input (session is closed)
                     if (chatInputArea) {
                         chatInputArea.style.display = 'none';
                     }
 
                     if (chatTitle) {
-                        chatTitle.textContent = 'Select a conversation';
+                        chatTitle.innerHTML = `<i class="fas fa-lock"></i> ${customerName} - Closed`;
                     }
 
                     if (endSessionBtn) {
                         endSessionBtn.style.display = 'none';
                     }
+
+                    // Clear current session after delay to allow viewing the message
+                    setTimeout(() => {
+                        if (currentSessionId === sessionId) {
+                            currentSessionId = null;
+                            const chatMessages = document.getElementById('chatMessages');
+                            if (chatMessages) {
+                                chatMessages.innerHTML = `
+                                    <div class="empty-state">
+                                        <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                                        <h3>Session Ended</h3>
+                                        <p>You closed this chat session</p>
+                                        <p style="color: #666; font-size: 14px;">Select another conversation from the left</p>
+                                    </div>
+                                `;
+                            }
+                        }
+                    }, 2000); // Give user 2 seconds to see the system message
                 }
 
-                // Update sessions list
+                // Update sessions lists
                 updateSessionsList();
+                updateClosedSessionsList();
 
-                console.log('✅ Session ended:', sessionId);
+                // Show notification
+                showNotification('Session Ended', `You closed the chat with ${customerName}`);
+
+                console.log('✅ Session ended by agent:', sessionId);
             }
         };
 
