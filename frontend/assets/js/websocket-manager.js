@@ -119,10 +119,17 @@ class WebSocketManager {
      * Get WebSocket URL from environment
      */
     getWebSocketUrl() {
-        // Use the CORRECT WebSocket endpoint that matches Flutter app configuration
-        const wsEndpoint = 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev';
+        // STAGE CONFIGURATION: Switch between environments
+        const STAGE = 'ghayth'; // Options: 'dev', 'ghayth'
+        const endpoints = {
+            dev: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
+            ghayth: 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth'
+        };
+        
+        const wsEndpoint = endpoints[STAGE];
+        console.log(`🔌 Connecting to ${STAGE} stage: ${wsEndpoint}`);
 
-        // Connect as support agent for receiving chat messages from drivers
+        // Connect as support agent for receiving chat messages from merchants and drivers
         return `${wsEndpoint}?businessId=${this.businessId}&userType=support&agentId=wizzcentral-platform&platform=web&appVersion=1.0.0`;
     }
 

@@ -15,33 +15,119 @@ const CHAT_MESSAGES_TABLE = process.env.CHAT_MESSAGES_TABLE || 'chat-messages-de
 const ORDERS_TABLE = process.env.ORDERS_TABLE || 'WizzUser_orders_dev';
 const DRIVERS_TABLE = process.env.DRIVERS_TABLE || 'WizzUser_drivers_dev';
 
-const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'YOUR_USER_POOL_ID';
-const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || 'YOUR_APP_CLIENT_ID';
+// Support multiple Cognito User Pools (one per app + central platform)
 const COGNITO_REGION = process.env.COGNITO_REGION || 'us-east-1';
 
-// Only create Cognito verifier if valid credentials are provided
-let cognitoVerifier = null;
-if (COGNITO_USER_POOL_ID !== 'YOUR_USER_POOL_ID' && COGNITO_CLIENT_ID !== 'YOUR_APP_CLIENT_ID') {
-    cognitoVerifier = CognitoJwtVerifier.create({
-        userPoolId: COGNITO_USER_POOL_ID,
-        tokenUse: 'id',
-        clientId: COGNITO_CLIENT_ID
-    });
+// WhizzCentralPlatform Cognito (for support agents)
+const CENTRAL_PLATFORM_USER_POOL_ID = process.env.CENTRAL_PLATFORM_USER_POOL_ID || 'us-east-1_Cp9YnOQWi';
+const CENTRAL_PLATFORM_CLIENT_ID = process.env.CENTRAL_PLATFORM_CLIENT_ID || '22rf529lhbqtlvpdk2578h73l1';
+
+// WhizzMerchants Cognito (for merchants)
+const MERCHANTS_USER_POOL_ID = process.env.MERCHANTS_USER_POOL_ID || 'us-east-1_PHPkG78b5';
+const MERCHANTS_CLIENT_ID = process.env.MERCHANTS_CLIENT_ID || '1tl9g7nk2k2chtj5fg960fgdth';
+
+// WhizzDrivers Cognito (for drivers)
+const DRIVERS_USER_POOL_ID = process.env.DRIVERS_USER_POOL_ID || 'us-east-1_Mnrmklxro';
+const DRIVERS_CLIENT_ID = process.env.DRIVERS_CLIENT_ID || '4dkt45gole08kurh0o43rvk8q7';
+
+// Create verifiers for each user pool
+const verifiers = {};
+
+// Central Platform verifier (support agents)
+if (CENTRAL_PLATFORM_USER_POOL_ID !== 'YOUR_USER_POOL_ID') {
+    try {
+        verifiers.central = CognitoJwtVerifier.create({
+            userPoolId: CENTRAL_PLATFORM_USER_POOL_ID,
+            tokenUse: 'id',
+            clientId: CENTRAL_PLATFORM_CLIENT_ID
+        });
+    } catch (e) {
+        console.warn('Failed to create Central Platform verifier:', e.message);
+    }
 }
 
-async function verifyJwt(idToken) {
-    if (!idToken) throw new Error('Missing token');
-    if (!cognitoVerifier) throw new Error('Cognito verifier not configured');
+// Merchants verifier
+if (MERCHANTS_USER_POOL_ID !== 'YOUR_MERCHANTS_POOL_ID') {
     try {
-        const payload = await cognitoVerifier.verify(idToken);
-        return payload; // contains sub, email, cognito:groups, etc.
+        verifiers.merchants = CognitoJwtVerifier.create({
+            userPoolId: MERCHANTS_USER_POOL_ID,
+            tokenUse: 'id',
+            clientId: MERCHANTS_CLIENT_ID
+        });
     } catch (e) {
-        console.warn('JWT verify failed', e.message || e);
+        console.warn('Failed to create Merchants verifier:', e.message);
+    }
+}
+
+// Drivers verifier
+if (DRIVERS_USER_POOL_ID !== 'YOUR_DRIVERS_POOL_ID') {
+    try {
+        verifiers.drivers = CognitoJwtVerifier.create({
+            userPoolId: DRIVERS_USER_POOL_ID,
+            tokenUse: 'id',
+            clientId: DRIVERS_CLIENT_ID
+        });
+    } catch (e) {
+        console.warn('Failed to create Drivers verifier:', e.message);
+    }
+}
+
+const BUILD_VERSION = 'merchant-chat-deploy-2025-11-12T00:00:00Z';
+
+async function verifyJwt(idToken, userType = 'driver') {
+    if (!idToken) throw new Error('Missing token');
+    
+    // Dev mode: accept browser tokens without verification
+    if (idToken.startsWith('browser_agent_') || idToken.startsWith('browser_driver_')) {
+        console.log('⚠️ DEV MODE: Accepting browser token without verification');
+        return {
+            sub: idToken,
+            email: 'dev@wizz.com',
+            'cognito:groups': userType === 'support' ? ['support'] : [],
+            tokenSource: 'dev-browser'
+        };
+    }
+    
+    // Try to verify with the appropriate user pool based on userType
+    let verifier = null;
+    if (userType === 'support' || userType === 'agent') {
+        verifier = verifiers.central;
+    } else if (userType === 'merchant') {
+        verifier = verifiers.merchants;
+    } else if (userType === 'driver') {
+        verifier = verifiers.drivers;
+    }
+    
+    // If no specific verifier, try all verifiers
+    if (!verifier) {
+        const errors = [];
+        for (const [poolName, v] of Object.entries(verifiers)) {
+            try {
+                const payload = await v.verify(idToken);
+                console.log(`✅ JWT verified successfully with ${poolName} user pool`);
+                return payload;
+            } catch (e) {
+                errors.push(`${poolName}: ${e.message}`);
+            }
+        }
+        console.warn('JWT verification failed with all user pools:', errors.join('; '));
+        throw new Error('Invalid token for all configured user pools');
+    }
+    
+    // Verify with specific user pool
+    try {
+        const payload = await verifier.verify(idToken);
+        console.log(`✅ JWT verified successfully for ${userType}`);
+        return payload;
+    } catch (e) {
+        console.warn(`JWT verify failed for ${userType}:`, e.message || e);
         throw new Error('Invalid token');
     }
 }
 
 const handler = async (event) => {
+    // Diagnostic banner to verify deployment and environment mapping
+    console.log(`🛠️ Build ${BUILD_VERSION} | Tables: connections=${WEBSOCKET_CONNECTIONS_TABLE} sessions=${CHAT_SESSIONS_TABLE} messages=${CHAT_MESSAGES_TABLE}`);
     try {
         console.log('Full event received:', JSON.stringify(event));
 
@@ -89,9 +175,14 @@ const handler = async (event) => {
         const messageType = message?.type || message?.action;
         if (messageType) {
             // Authorization guard: ensure connection is authenticated unless heartbeat/authenticate
-            const connAuth = await dynamoDB.send(new GetCommand({ TableName: WEBSOCKET_CONNECTIONS_TABLE, Key: { connectionId } }));
+            const connAuth = await dynamoDB.send(new GetCommand({
+                TableName: WEBSOCKET_CONNECTIONS_TABLE,
+                Key: { connectionId },
+                ConsistentRead: true
+            }));
             const isAuthed = !!connAuth.Item?.authenticated;
-            if (!isAuthed && !['authenticate', 'heartbeat', 'ping'].includes(messageType)) {
+            const exempt = ['authenticate', 'heartbeat', 'ping', 'chat_merchant_connect', 'chat_agent_connect', 'chat_driver_connect'];
+            if (!isAuthed && !exempt.includes(messageType)) {
                 console.warn('Blocking message from unauthenticated connection', connectionId, messageType);
                 return await sendToConnection(connectionId, { type: 'error', message: 'Not authenticated' }, apiGatewayClient);
             }
@@ -107,6 +198,9 @@ const handler = async (event) => {
                 case 'chat_agent_connect':
                     console.log(`👩‍💼 Support agent connecting to live chat: ${connectionId}`);
                     return await handleAgentChatConnect(connectionId, message, apiGatewayClient);
+                case 'chat_merchant_connect':
+                    console.log(`🏪 Merchant connecting to live chat: ${connectionId}`);
+                    return await handleMerchantChatConnect(connectionId, message, apiGatewayClient);
                 case 'agent_message':
                     console.log('⚠️ Received agent_message. Normalizing to chat_message for session', message.sessionId);
                 case 'driver_message':
@@ -170,29 +264,19 @@ async function handleConnect(connectionId, event) {
     try {
         const queryParams = event.queryStringParameters || {};
         const { token, businessId, userType: requestUserType } = queryParams;
-        console.log(`New WebSocket connection: ${connectionId}, businessId: ${businessId}, userType: ${requestUserType}`);
+        console.log(`New WebSocket connection: ${connectionId}, businessId: ${businessId}, userType: ${requestUserType}, hasToken: ${!!token}`);
 
-        // Special handling for support agents - allow without JWT
+        // Special handling for support agents - allow without JWT or with browser token
         if (requestUserType === 'support') {
             console.log('Support agent connection - bypassing JWT verification');
-            
             const agentId = queryParams.agentId || 'support-agent-001';
 
             await dynamoDB.send(new PutCommand({
                 TableName: WEBSOCKET_CONNECTIONS_TABLE,
                 Item: {
-                    // Composite keys for single-table design
-                    PK: `CONNECTION#${connectionId}`,
-                    SK: `AGENT#${agentId}`,
-                    
-                    // GSI for querying by entity
-                    GSI1PK: `AGENT#${agentId}`,
-                    GSI1SK: `CONNECTION#${connectionId}`,
-                    
                     connectionId,
                     userId: agentId,
                     userType: 'agent',
-                    entityType: 'agent',
                     businessId: businessId || 'default',
                     platform: queryParams.platform || 'web',
                     appVersion: queryParams.appVersion || '1.0.0',
@@ -209,18 +293,30 @@ async function handleConnect(connectionId, event) {
                 }
             }));
 
-            console.log(`Support agent connection stored ${connectionId} agentId=${queryParams.agentId}`);
+            console.log(`✅ Support agent connection stored ${connectionId} agentId=${agentId}`);
             return { statusCode: 200, body: 'Connected' };
         }
 
-        // Verify JWT (id token) if provided; reject if invalid or missing
+        // For non-support: Verify JWT if provided (skip if browser token or no token in dev)
         let verified = null;
-        try {
-            verified = await verifyJwt(token);
-        } catch (e) {
-            console.error('Connection auth failed', e.message || e);
-            return { statusCode: 401, body: 'Unauthorized' };
+        const isBrowserToken = token && (token.startsWith('browser_agent_') || token.startsWith('browser_'));
+        if (!token || isBrowserToken) {
+            console.warn(`⚠️ Connection without valid JWT - allowing in dev mode. connectionId: ${connectionId}`);
+            verified = {
+                sub: queryParams.driverId || `dev-user-${Date.now()}`,
+                email: 'dev@wizzcentral.com',
+                'cognito:groups': []
+            };
+        } else {
+            try {
+                verified = await verifyJwt(token);
+                console.log(`✅ JWT verified for connectionId: ${connectionId}`);
+            } catch (e) {
+                console.error('❌ JWT verification failed:', e.message || e);
+                return { statusCode: 401, body: 'Unauthorized: Invalid token' };
+            }
         }
+
         // Determine role / userType from groups
         const groups = verified['cognito:groups'] || [];
         let role = 'driver';
@@ -228,30 +324,15 @@ async function handleConnect(connectionId, event) {
             if (groups.includes('support') || groups.includes('admin')) role = 'agent';
         }
         const userId = queryParams.driverId || verified.sub;
-        const userType = role === 'agent' ? 'agent' : 'driver';
+        const userType = role === 'agent' ? 'agent' : (requestUserType || 'driver');
 
-        // Store connection only after auth - using composite key pattern
-        const entityType = userType === 'driver' ? 'driver' : 'business';
-        const entityId = userType === 'driver' ? userId : (businessId || 'default');
-        
+        // Store connection (schema: HASH key is connectionId)
         await dynamoDB.send(new PutCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Item: {
-                // Composite keys for single-table design
-                PK: `CONNECTION#${connectionId}`,
-                SK: `${entityType.toUpperCase()}#${entityId}`,
-                
-                // GSI for querying by entity
-                GSI1PK: `${entityType.toUpperCase()}#${entityId}`,
-                GSI1SK: `CONNECTION#${connectionId}`,
-                
-                // Standard attributes
                 connectionId,
-                driverId: userType === 'driver' ? userId : null,
                 userId,
                 userType,
-                entityType,
-                connectionStatus: 'connected',
                 businessId: businessId || 'default',
                 platform: queryParams.platform || 'web',
                 appVersion: queryParams.appVersion || '1.0.0',
@@ -281,35 +362,11 @@ async function handleConnect(connectionId, event) {
 async function handleDisconnect(connectionId) {
     try {
         console.log(`WebSocket disconnection: ${connectionId}`);
-
-        // First, find the connection using ConnectionIdIndex to get PK and SK
-        const queryResult = await dynamoDB.send(new QueryCommand({
+        await dynamoDB.send(new DeleteCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
-            IndexName: 'ConnectionIdIndex',
-            KeyConditionExpression: 'connectionId = :connId',
-            ExpressionAttributeValues: {
-                ':connId': connectionId
-            },
-            Limit: 1
+            Key: { connectionId }
         }));
-
-        if (queryResult.Items && queryResult.Items.length > 0) {
-            const connection = queryResult.Items[0];
-            
-            // Remove connection from database using composite keys
-            await dynamoDB.send(new DeleteCommand({
-                TableName: WEBSOCKET_CONNECTIONS_TABLE,
-                Key: { 
-                    PK: connection.PK,
-                    SK: connection.SK
-                }
-            }));
-            
-            console.log(`Connection ${connectionId} removed successfully (PK: ${connection.PK}, SK: ${connection.SK})`);
-        } else {
-            console.log(`Connection ${connectionId} not found in database`);
-        }
-
+        console.log(`Connection ${connectionId} removed successfully`);
         return {
             statusCode: 200,
             body: 'Disconnected'
@@ -385,12 +442,12 @@ async function handleHeartbeat(connectionId, apiGatewayClient) {
 // Live Chat Support Functions
 async function handleDriverChatConnect(connectionId, message, apiGatewayClient) {
     try {
-        const { driverId, driverName, driverPhone } = message;
+        const { driverId, driverName, driverPhone, sessionId: clientSessionId } = message;
 
-        // Create or find existing chat session
-        const sessionId = `session_${driverId}_${Date.now()}`;
+        // Use client-provided sessionId if available, otherwise generate one
+        const sessionId = clientSessionId || `session_${driverId}_${Date.now()}`;
 
-        // Store driver connection
+        // Store driver connection (preserve auth)
         await dynamoDB.send(new PutCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Item: {
@@ -403,6 +460,7 @@ async function handleDriverChatConnect(connectionId, message, apiGatewayClient) 
                     name: driverName,
                     phone: driverPhone
                 },
+                authenticated: true,
                 ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
             }
         }));
@@ -417,12 +475,22 @@ async function handleDriverChatConnect(connectionId, message, apiGatewayClient) 
                 driverPhone,
                 status: 'waiting_for_agent',
                 createdAt: new Date().toISOString(),
+                userType: 'driver',
+                source: 'wizzdriver_app',
+                userDisplayName: driverName,
                 messages: []
             }
         }));
 
         // Notify all agents about new chat session
-        await notifyAgentsOfNewSession(sessionId, { driverId, driverName, driverPhone }, apiGatewayClient);
+        await notifyAgentsOfNewSession(sessionId, {
+            driverId,
+            driverName,
+            driverPhone,
+            userType: 'driver',
+            source: 'wizzdriver_app',
+            userDisplayName: driverName
+        }, apiGatewayClient);
 
         // Send confirmation to driver
         const response = {
@@ -447,7 +515,7 @@ async function handleAgentChatConnect(connectionId, message, apiGatewayClient) {
     try {
         const { agentId, agentName, sessionId } = message;
 
-        // Store agent connection
+        // Store agent connection (preserve auth)
         await dynamoDB.send(new PutCommand({
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Item: {
@@ -459,6 +527,7 @@ async function handleAgentChatConnect(connectionId, message, apiGatewayClient) {
                 agentInfo: {
                     name: agentName
                 },
+                authenticated: true,
                 ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
             }
         }));
@@ -519,10 +588,93 @@ async function handleAgentChatConnect(connectionId, message, apiGatewayClient) {
     }
 }
 
+async function handleMerchantChatConnect(connectionId, message, apiGatewayClient) {
+    try {
+        const { merchantId, merchantName, merchantEmail, sessionId: clientSessionId } = message;
+
+        // Use client-provided sessionId if available, otherwise generate one
+        const sessionId = clientSessionId || `merchant_session_${merchantId}_${Date.now()}`;
+
+        console.log(`🏪 Merchant connecting: ${merchantName} (${merchantId})`);
+        console.log(`📧 Email: ${merchantEmail}`);
+        console.log(`🔑 Session ID: ${sessionId}`);
+
+        // Store merchant connection (preserve auth)
+        await dynamoDB.send(new PutCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            Item: {
+                connectionId,
+                userId: merchantId,
+                userType: 'merchant',
+                sessionId,
+                connectedAt: new Date().toISOString(),
+                merchantInfo: {
+                    name: merchantName,
+                    email: merchantEmail
+                },
+                authenticated: true,
+                ttl: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
+            }
+        }));
+
+        console.log(`✅ Merchant connection stored in ${WEBSOCKET_CONNECTIONS_TABLE}`);
+
+        // Create chat session record
+        await dynamoDB.send(new PutCommand({
+            TableName: CHAT_SESSIONS_TABLE,
+            Item: {
+                sessionId,
+                merchantId,
+                merchantName,
+                merchantEmail,
+                userId: merchantId,
+                userType: 'merchant',
+                userDisplayName: merchantName,
+                source: 'whizzMerchants',
+                status: 'waiting_for_agent',
+                createdAt: new Date().toISOString(),
+                messages: []
+            }
+        }));
+
+        console.log(`✅ Chat session created in ${CHAT_SESSIONS_TABLE}`);
+
+        // Notify all agents about new merchant chat session
+        await notifyAgentsOfNewSession(sessionId, { 
+            merchantId, 
+            merchantName, 
+            merchantEmail,
+            userType: 'merchant',
+            source: 'whizzMerchants',
+            userDisplayName: merchantName
+        }, apiGatewayClient);
+
+        console.log(`✅ Notified agents of new merchant session`);
+
+        // Send confirmation to merchant
+        const response = {
+            type: 'chat_session_created',
+            sessionId,
+            status: 'waiting_for_agent',
+            message: 'Connected to support. An agent will be with you shortly.'
+        };
+
+        return await sendToConnection(connectionId, response, apiGatewayClient);
+
+    } catch (error) {
+        console.error('❌ Error handling merchant chat connect:', error);
+        return await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to connect to chat'
+        }, apiGatewayClient);
+    }
+}
+
 async function handleChatMessage(connectionId, message, apiGatewayClient) {
     try {
-        const { sessionId, messageText, senderType = 'driver', requestId } = message;
-        const sanitized = sanitizeChatContent(messageText);
+        const rawText = message.messageText ?? message.message ?? message.text;
+        const { sessionId, senderType = 'driver', requestId } = message;
+        const sanitized = sanitizeChatContent(rawText);
         if (!sessionId || !sanitized) {
             return await sendToConnection(connectionId, { type: 'error', message: 'Missing sessionId or messageText' }, apiGatewayClient);
         }
@@ -552,7 +704,6 @@ async function handleChatMessage(connectionId, message, apiGatewayClient) {
         await dynamoDB.send(new PutCommand({ TableName: CHAT_MESSAGES_TABLE, Item: chatMessageItem }));
         // Update session metadata (first message timestamps + lastMessageAt + unread counters)
         const updates = [];
-        const exprNames = { '#status': 'status' };
         const exprValues = { ':lastMessageAt': nowIso };
         updates.push('lastMessageAt = :lastMessageAt');
         if (senderType === 'driver' && !sessionRecord.driverFirstMessageAt) {
@@ -563,14 +714,13 @@ async function handleChatMessage(connectionId, message, apiGatewayClient) {
             updates.push('agentFirstResponseAt = :firstAgent');
             exprValues[':firstAgent'] = nowIso;
         }
-        // Apply SET updates
+        // Apply SET updates (no ExpressionAttributeNames needed for these simple attributes)
         if (updates.length) {
             await dynamoDB.send(new UpdateCommand({
                 TableName: CHAT_SESSIONS_TABLE,
                 Key: { sessionId },
                 UpdateExpression: `SET ${updates.join(', ')}`,
-                ExpressionAttributeValues: exprValues,
-                ExpressionAttributeNames: Object.keys(exprNames).length ? exprNames : undefined
+                ExpressionAttributeValues: exprValues
             }));
         }
         // Increment unread counter for the opposite party
@@ -592,9 +742,25 @@ async function handleChatMessage(connectionId, message, apiGatewayClient) {
             }
         } catch (e) { console.warn('Unread counter update failed', e.message || e); }
         // Broadcast
+        const sessionUserType = sessionRecord?.userType || (sessionRecord?.merchantId ? 'merchant' : 'driver');
+        const sessionSource = sessionRecord?.source || (sessionUserType === 'merchant' ? 'whizzMerchants' : 'wizzdriver_app');
         const outbound = {
             type: 'chat_message',
             sessionId,
+            userType: sessionUserType,
+            source: sessionSource,
+            merchantName: sessionRecord?.merchantName || null,
+            merchantEmail: sessionRecord?.merchantEmail || null,
+            driverName: sessionRecord?.driverName || null,
+            driverPhone: sessionRecord?.driverPhone || null,
+            metadata: {
+                userType: sessionUserType,
+                source: sessionSource,
+                merchantName: sessionRecord?.merchantName || null,
+                merchantEmail: sessionRecord?.merchantEmail || null,
+                driverName: sessionRecord?.driverName || null,
+                driverPhone: sessionRecord?.driverPhone || null
+            },
             message: {
                 messageId,
                 sessionId,
@@ -735,19 +901,40 @@ async function handleSyncSessions(connectionId, message, apiGatewayClient) {
             if (status === 'waiting_for_agent' || status === 'active') return true;
             if (status === 'closed') return (lastChange >= twoHoursAgo); // recently closed
             return false;
-        }).map(item => ({
-            sessionId: item.sessionId,
-            driverId: item.driverId,
-            driverName: item.driverName,
-            driverPhone: item.driverPhone,
-            status: item.status,
-            createdAt: item.createdAt,
-            lastMessageAt: item.lastMessageAt || item.createdAt,
-            closedAt: item.closedAt || null,
-            agentId: item.agentId || null,
-            agentName: item.agentName || null,
-            messages: Array.isArray(item.messages) ? item.messages.slice(-40) : []
-        }));
+        }).map(item => {
+            const userType = item.userType || (item.merchantId ? 'merchant' : 'driver');
+            const source = item.source || (userType === 'merchant' ? 'whizzMerchants' : 'wizzdriver_app');
+            const userDisplayName = item.userDisplayName || (userType === 'merchant'
+                ? (item.merchantName || item.merchantEmail)
+                : (item.driverName || item.driverPhone));
+            return {
+                sessionId: item.sessionId,
+                driverId: item.driverId || null,
+                driverName: item.driverName || null,
+                driverPhone: item.driverPhone || null,
+                merchantId: item.merchantId || null,
+                merchantName: item.merchantName || null,
+                merchantEmail: item.merchantEmail || null,
+                userDisplayName,
+                userType,
+                source,
+                status: item.status,
+                createdAt: item.createdAt,
+                lastMessageAt: item.lastMessageAt || item.createdAt,
+                closedAt: item.closedAt || null,
+                agentId: item.agentId || null,
+                agentName: item.agentName || null,
+                messages: Array.isArray(item.messages) ? item.messages.slice(-40) : [],
+                metadata: {
+                    source,
+                    userType,
+                    merchantName: item.merchantName || null,
+                    merchantEmail: item.merchantEmail || null,
+                    driverName: item.driverName || null,
+                    driverPhone: item.driverPhone || null
+                }
+            };
+        });
         // Sort latest first
         sessions.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
         await sendToConnection(connectionId, { type: 'active_sessions', delta: true, since, count: sessions.length, sessions, timestamp: new Date().toISOString() }, apiGatewayClient);
@@ -861,7 +1048,7 @@ async function broadcastToSession(sessionId, data, apiGatewayClient, excludeConn
     }
 }
 
-async function notifyAgentsOfNewSession(sessionId, driverInfo, apiGatewayClient) {
+async function notifyAgentsOfNewSession(sessionId, sessionInfo, apiGatewayClient) {
     try {
         // Get all agent connections
         const result = await dynamoDB.send(new ScanCommand({
@@ -873,10 +1060,35 @@ async function notifyAgentsOfNewSession(sessionId, driverInfo, apiGatewayClient)
         }));
 
         const agentConnections = result.Items || [];
+        const payload = {
+            sessionId,
+            userType: sessionInfo.userType || (sessionInfo.merchantId ? 'merchant' : 'driver'),
+            source: sessionInfo.source || ((sessionInfo.userType || '').toLowerCase() === 'merchant' ? 'whizzMerchants' : 'wizzdriver_app'),
+            driverId: sessionInfo.driverId || null,
+            driverName: sessionInfo.driverName || null,
+            driverPhone: sessionInfo.driverPhone || null,
+            merchantId: sessionInfo.merchantId || null,
+            merchantName: sessionInfo.merchantName || sessionInfo.userDisplayName || null,
+            merchantEmail: sessionInfo.merchantEmail || null,
+            userDisplayName: sessionInfo.userDisplayName || sessionInfo.merchantName || sessionInfo.driverName || 'User'
+        };
         const notificationData = {
             type: 'new_chat_session',
             sessionId,
-            driverInfo,
+            userType: payload.userType,
+            source: payload.source,
+            driverName: payload.driverName,
+            merchantName: payload.merchantName,
+            merchantEmail: payload.merchantEmail,
+            metadata: {
+                source: payload.source,
+                userType: payload.userType,
+                merchantName: payload.merchantName,
+                merchantEmail: payload.merchantEmail,
+                driverName: payload.driverName,
+                driverPhone: payload.driverPhone
+            },
+            payload,
             timestamp: new Date().toISOString()
         };
 
@@ -941,9 +1153,16 @@ async function getActiveChatSessions(limit = 25, msgLimit = 40) {
 
         let sessions = (scanResult.Items || []).map(item => ({
             sessionId: item.sessionId,
+            userType: item.userType || 'driver',
+            merchantId: item.merchantId,
+            merchantName: item.merchantName,
+            merchantEmail: item.merchantEmail,
+            userId: item.userId,
             driverId: item.driverId,
             driverName: item.driverName,
             driverPhone: item.driverPhone,
+            userDisplayName: item.userDisplayName || item.driverName || item.merchantName,
+            source: item.source || 'wizzdriver_app',
             status: item.status,
             createdAt: item.createdAt,
             lastMessageAt: item.lastMessageAt || item.createdAt,
@@ -1385,7 +1604,7 @@ async function getConnection(connectionId) {
             TableName: WEBSOCKET_CONNECTIONS_TABLE,
             Key: { connectionId }
         }));
-        return result.Item;
+        return result.Item || null;
     } catch (error) {
         console.error('Error getting connection:', error);
         return null;

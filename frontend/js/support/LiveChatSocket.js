@@ -288,9 +288,10 @@
 
       console.log('✅ LiveChatSocket connected successfully');
 
-      // Send agent connect message (using 'chat_init' action as that's what the AWS handler supports)
+      // Send agent connect message (using 'chat_agent_connect' action to align with AWS handler)
       this.send({
-        action: 'chat_init',
+        action: 'chat_agent_connect',
+        type: 'chat_agent_connect',
         userType: 'agent',
         agentId: this.agentId,
         agentName: this.agentName,

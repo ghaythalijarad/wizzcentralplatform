@@ -59,6 +59,8 @@
     <!-- Load AWS SDK -->
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1544.0.min.js"></script>
     
+    <!-- XSS Protection -->
+    <script src="../assets/js/security-utils.js"></script>
     <!-- Load required scripts -->
     <script src="../config.js"></script>
     <script src="../assets/js/aws-utils.js"></script>
@@ -76,12 +78,23 @@
 
         function updateDisplay() {
             const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = testResults.map(result => `
-                <div class="section">
-                    <span class="${result.type}">[${result.timestamp}] [${result.type.toUpperCase()}]</span>
-                    <pre>${result.message}</pre>
-                </div>
-            `).join('');
+
+            // XSS Protection: Sanitize test results display
+            const rows = testResults.map(result => {
+                const safeTimestamp = SecurityUtils.escapeHTML(result.timestamp || '');
+                const safeType = SecurityUtils.escapeHTML(result.type || 'info');
+                const safeTypeUpper = SecurityUtils.escapeHTML((result.type || 'info').toUpperCase());
+                const safeMessage = SecurityUtils.escapeHTML(result.message || '');
+
+                return `
+                    <div class="section">
+                        <span class="${safeType}">[${safeTimestamp}] [${safeTypeUpper}]</span>
+                        <pre>${safeMessage}</pre>
+                    </div>
+                `;
+            }).join('');
+
+            resultsDiv.innerHTML = SecurityUtils.sanitizeHTML(rows);
             resultsDiv.scrollTop = resultsDiv.scrollHeight;
         }
 

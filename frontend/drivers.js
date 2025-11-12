@@ -356,49 +356,70 @@ function renderDriversTable(driversList = drivers) {
     const tbody = document.getElementById('driversTableBody');
     if (!tbody) return;
 
-    tbody.innerHTML = driversList.map(driver => `
+    // Build rows with escaped user data (structure is trusted, values sanitized)
+    const rows = driversList.map(driver => {
+        const safeName = SecurityUtils.escapeHTML(driver.name || 'N/A');
+        const safePhone = SecurityUtils.escapeHTML(driver.phone || 'N/A');
+        const safeLocation = SecurityUtils.escapeHTML(driver.location || 'N/A');
+        const safeAvatar = SecurityUtils.sanitizeURL(driver.avatar || '');
+        const safeId = SecurityUtils.escapeHTML(driver.id || '');
+        const rawStatus = driver.status || 'offline';
+        const safeStatus = SecurityUtils.escapeHTML(rawStatus);
+        const ordersCompleted = Number(driver.ordersCompleted || 0);
+        const ratingValue = Number(driver.rating || 0).toFixed(1);
+        const earningsValue = Number(driver.earnings || 0).toFixed(2);
+
+        // Build actions without relying on inline JS sanitization stripping
+        const viewAction = `<button class="btn-action" data-driver-id="${safeId}" data-action="view" title="View Details"><i class="fas fa-eye"></i></button>`;
+        const editAction = `<button class="btn-action" data-driver-id="${safeId}" data-action="edit" title="Edit" data-write-only><i class="fas fa-edit"></i></button>`;
+        const toggleActionIcon = (rawStatus === 'online' || rawStatus === 'approved') ? 'fa-pause' : 'fa-check';
+        const toggleActionTitle = (rawStatus === 'online' || rawStatus === 'approved') ? 'Suspend Driver' : 'Approve Driver';
+        const toggleAction = `<button class="btn-toggle-status ${(rawStatus === 'online' || rawStatus === 'approved') ? 'approved' : 'pending'}" data-driver-id="${safeId}" data-current-status="${safeStatus}" title="${toggleActionTitle}" data-write-only><i class="fas ${toggleActionIcon}"></i></button>`;
+
+        return `
         <tr>
             <td>
                 <div class="driver-info">
-                    <div class="driver-avatar">
-                        <img src="${driver.avatar}" alt="${driver.name}">
-                    </div>
+                    <div class="driver-avatar">${safeAvatar ? `<img src="${safeAvatar}" alt="${safeName}">` : '<i class="fas fa-user"></i>'}</div>
                     <div>
-                        <div class="driver-name">${driver.name}</div>
-                        <div class="driver-id">#${driver.id}</div>
+                        <div class="driver-name">${safeName}</div>
+                        <div class="driver-id">#${safeId}</div>
                     </div>
                 </div>
             </td>
-            <td>${driver.phone}</td>
-            <td><span class="status-badge ${driver.status}">${capitalizeFirst(driver.status)}</span></td>
-            <td>${driver.location}</td>
-            <td>${driver.ordersCompleted}</td>
+            <td>${safePhone}</td>
+            <td><span class="status-badge ${safeStatus}">${capitalizeFirst(safeStatus)}</span></td>
+            <td>${safeLocation}</td>
+            <td>${ordersCompleted}</td>
             <td>
                 <div class="rating">
-                    <span class="rating-stars">
-                        ${generateStars(driver.rating)}
-                    </span>
-                    <span class="rating-value">${driver.rating}</span>
+                    <span class="rating-stars">${generateStars(Number(ratingValue))}</span>
+                    <span class="rating-value">${ratingValue}</span>
                 </div>
             </td>
-            <td>$${driver.earnings.toFixed(2)}</td>
+            <td>$${earningsValue}</td>
             <td>
-                <div class="actions">
-                    <button class="btn-action" onclick="viewDriver('${driver.id}')" title="View Details">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn-action" onclick="editDriver('${driver.id}')" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn-toggle-status ${driver.status === 'online' ? 'approved' : 'pending'}" 
-                            onclick="toggleDriverStatus('${driver.id}', '${driver.status}')" 
-                            title="${driver.status === 'online' ? 'Suspend Driver' : 'Approve Driver'}">
-                        <i class="fas ${driver.status === 'online' ? 'fa-pause' : 'fa-check'}"></i>
-                    </button>
-                </div>
+                <div class="actions">${viewAction}${editAction}${toggleAction}</div>
             </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
+
+    // Direct assignment (structure trusted, values escaped)
+    tbody.innerHTML = rows || `<tr><td colspan="8" class="text-center" style="padding:2rem;">No drivers found</td></tr>`;
+
+    // Attach event listeners for actions (delegation)
+    tbody.addEventListener('click', function(e){
+        const btn = e.target.closest('button');
+        if(!btn) return;
+        const id = btn.getAttribute('data-driver-id');
+        const action = btn.getAttribute('data-action');
+        if(action === 'view') { viewDriver(id); return; }
+        if(action === 'edit') { editDriver(id); return; }
+        if(btn.classList.contains('btn-toggle-status')) {
+            const currentStatus = btn.getAttribute('data-current-status');
+            toggleDriverStatus(id, currentStatus);
+        }
+    }, { once: true });
 }
 
 function generateStars(rating) {
@@ -646,17 +667,21 @@ function displayViewDriverDocuments(driver) {
     
     let html = '';
     
+    // SECURITY: Sanitize URLs to prevent XSS
+    const safeLicenseUrl = driver.drivingLicenseUrl ? SecurityUtils.sanitizeURL(driver.drivingLicenseUrl) : null;
+    const safeRegistrationUrl = driver.registrationPaperUrl ? SecurityUtils.sanitizeURL(driver.registrationPaperUrl) : null;
+    
     // Driving License
-    if (driver.drivingLicenseUrl) {
+    if (safeLicenseUrl) {
         html += `
             <div class="document-card">
                 <h4>
                     <i class="fas fa-id-card"></i> Driving License
                 </h4>
-                <a href="${driver.drivingLicenseUrl}" target="_blank">
+                <a href="${safeLicenseUrl}" target="_blank">
                     <i class="fas fa-external-link-alt"></i> Open in New Tab
                 </a>
-                <img src="${driver.drivingLicenseUrl}" 
+                <img src="${safeLicenseUrl}" 
                      alt="Driving License" 
                      onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
             </div>
@@ -673,16 +698,16 @@ function displayViewDriverDocuments(driver) {
     }
     
     // Registration Paper
-    if (driver.registrationPaperUrl) {
+    if (safeRegistrationUrl) {
         html += `
             <div class="document-card">
                 <h4>
                     <i class="fas fa-file-alt"></i> Registration Paper
                 </h4>
-                <a href="${driver.registrationPaperUrl}" target="_blank">
+                <a href="${safeRegistrationUrl}" target="_blank">
                     <i class="fas fa-external-link-alt"></i> Open in New Tab
                 </a>
-                <img src="${driver.registrationPaperUrl}" 
+                <img src="${safeRegistrationUrl}" 
                      alt="Registration Paper" 
                      onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
             </div>
@@ -698,7 +723,7 @@ function displayViewDriverDocuments(driver) {
         `;
     }
     
-    documentsSection.innerHTML = html;
+    documentsSection.innerHTML = SecurityUtils.sanitizeHTML(html);
 }
 
 function openViewDriverModal() {

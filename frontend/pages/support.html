@@ -9,6 +9,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../styles/dashboard.css">
+    <!-- Security utilities -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
+    <script src="../assets/js/rbac-early-check.js"></script>
     <style>
         .support-header {
             display: flex;
@@ -125,6 +131,25 @@
             background: #eff6ff;
             border-color: #3b82f6;
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        
+        /* Closed session styles */
+        .session-card.closed-session {
+            opacity: 0.8;
+            background: #f9fafb;
+            border-color: #e5e7eb;
+        }
+        
+        .session-card.closed-session:hover {
+            opacity: 1;
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        
+        .session-card.closed-session.active {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            opacity: 1;
         }
         
         .session-info {
@@ -512,6 +537,22 @@
                         <p>New conversations will appear here when customers start chatting</p>
                     </div>
                 </div>
+                <!-- Closed Sessions Section -->
+                <div class="sessions-header" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                    <div class="section-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-archive" style="font-size: 0.875rem;"></i>
+                        <span>Closed Sessions (Last 2h)</span>
+                        <span id="closedSessionsCount"
+                            style="background: #6c757d; color: white; padding: 0.125rem 0.5rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 600;">0</span>
+                    </div>
+                </div>
+                
+                <div class="sessions-list" id="closedSessionsList" style="max-height: 300px; overflow-y: auto;">
+                    <div class="empty-state-small" style="padding: 2rem; text-align: center; color: #999;">
+                        <i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">No recently closed sessions</p>
+                    </div>
+                </div>
             </div>
             
             <!-- Main Chat Area -->
@@ -522,7 +563,7 @@
                     <h2 id="chatTitle">Select a conversation</h2>
                 </div>
                 <div class="chat-actions">
-                    <button class="btn btn-secondary" onclick="endChatSession()" id="endSessionBtn" style="display: none;">
+                    <button class="btn btn-secondary" onclick="endChatSession()" id="endSessionBtn" style="display: none;" data-write-only>
                         <i class="fas fa-times"></i> End Session
                     </button>
                 </div>
@@ -534,7 +575,7 @@
                     <p>Select an active conversation from the sidebar to start helping customers</p>
                 </div>
             </div>
-            <div class="chat-input" id="chatInputArea" style="display: none;">
+            <div class="chat-input" id="chatInputArea" style="display: none;" data-write-only>
                 <div class="input-container">
                     <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
                     <button class="send-button" id="sendButton">
@@ -552,10 +593,30 @@
     <script src="/js/auto-session-filter.js"></script>
 
     <script>
+        (function () {
+            try {
+                // New RBAC system - auto-detects page name
+                window.RBAC.enforcePage();
+
+                // Apply read-only if needed (automatic in new system)
+                if (window.RBAC.isReadOnly()) {
+                    document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+                }
+            } catch (e) { console.warn('RBAC init failed', e); }
+        })();
+    </script>
+
+    <script>
         // Global variables
         let activeChatSessions = new Map();
         let currentSessionId = null;
         let wsManager = null;
+            let merchantChatWS = null;
+            let merchantSessions = new Map();
+            let closedSessions = new Map();  // Store recently closed sessions
+
+            // Session retention period (2 hours in milliseconds)
+            const CLOSED_SESSION_RETENTION_MS = 2 * 60 * 60 * 1000;
 
             // Initialize support page when DOM is ready
             document.addEventListener('DOMContentLoaded', function () {
@@ -566,6 +627,9 @@
             
             // Initialize real live chat system only - no mock fallback
             initializeRealLiveChatSystem();
+
+                // Initialize merchant chat system
+                initializeMerchantChatSystem();
         });
 
             // Request notification permission
@@ -596,42 +660,61 @@
                     attempts++;
                 }
 
-                // Initialize LiveChatSocket for support agents                    if (window.LiveChatSocket) {
-                const liveChatSocket = new window.LiveChatSocket({
-                    businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
-                    endpoint: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
-                    userId: 'support_dashboard_' + Date.now(),
-                    agentId: 'support_agent_' + Date.now(),
-                    agentName: 'WizzCentral Support Agent'
-                });
+                // Initialize LiveChatSocket for support agents
+                if (window.LiveChatSocket) {
+                    const liveChatSocket = new window.LiveChatSocket({
+                        businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
+                        endpoint: 'wss://7ysrz3rspi.execute-api.us-east-1.amazonaws.com/dev',
+                        userId: 'support_dashboard_' + Date.now(),
+                        agentId: 'support_agent_' + Date.now(),
+                        agentName: 'WizzCentral Support Agent'
+                    });
 
-                // Add message listener for debugging
-                liveChatSocket.ws?.addEventListener('message', (event) => {
-                    console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
-                    try {
-                        const msg = JSON.parse(event.data);
-                        console.log('🔍 DEBUG: Parsed message type:', msg.type);
-                        if (msg.type === 'driver_message' || msg.type === 'chat_message') {
-                            console.log('🚗 DEBUG: Driver message detected!', msg);
+                    // Wire handler so existing logic processes messages
+                    liveChatSocket.onConnectionStateChange?.((info) => {
+                        if (info.state === 'connected') {
+                            updateConnectionStatus('connected', 'Connected to live chat as support agent');
+                        } else if (info.state === 'connecting') {
+                            updateConnectionStatus('connecting', 'Connecting to live chat...');
+                        } else if (info.state === 'error' || info.state === 'disconnected') {
+                            updateConnectionStatus('disconnected', 'Disconnected from live chat');
                         }
-                    } catch (e) {
-                        console.log('🔍 DEBUG: Raw message (not JSON):', event.data);
-                    }
-                });
+                    });
 
-                // Initialize the socket
-                liveChatSocket.init();
+                    const originalOnMessage = liveChatSocket.onMessage?.bind(liveChatSocket);
+                    liveChatSocket.onMessage = function (event) {
+                        try { handleIncomingChatMessage(event.data); } catch (e) { console.warn('Message handler error', e); }
+                        if (originalOnMessage) originalOnMessage(event);
+                    };
 
-                // Connect to the WebSocket
-                const connected = await liveChatSocket.connect();
-                    
+                    // Add message listener for debugging
+                    liveChatSocket.ws?.addEventListener('message', (event) => {
+                        console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
+                        try {
+                            const msg = JSON.parse(event.data);
+                            console.log('🔍 DEBUG: Parsed message type:', msg.type);
+                            if (msg.type === 'driver_message' || msg.type === 'chat_message') {
+                                console.log('🚗 DEBUG: Driver message detected!', msg);
+                            }
+                        } catch (e) {
+                            console.log('🔍 DEBUG: Raw message (not JSON):', event.data);
+                        }
+                    });
+
+                    // Initialize the socket
+                    liveChatSocket.init();
+
+                    // Connect to the WebSocket
+                    const connected = await liveChatSocket.connect();
+
                     if (connected) {
                         console.log('✅ LiveChatSocket connected successfully as support agent');
                         updateConnectionStatus('connected', 'Connected to live chat as support agent');
-                        
+
                         // Store reference globally
                         window.liveChatSocket = liveChatSocket;
-                        
+                        wsManager = liveChatSocket; // ensure send() calls work
+
                         // Load active chat sessions
                         loadActiveChatSessions();
                     } else {
@@ -643,7 +726,7 @@
                     console.error('Available on window:', Object.keys(window).filter(key => key.includes('Chat')));
                     throw new Error('LiveChatSocket not available after ' + maxAttempts + ' attempts - check if LiveChatSocket.js is loaded correctly');
                 }
-                        
+
             } catch (error) {
                 console.error('❌ Failed to initialize live chat system:', error);
                 updateConnectionStatus('disconnected', 'Connection failed: ' + error.message);
@@ -709,18 +792,29 @@
             }
         }
 
-            // Handle new chat session (only real sessions from WizzDriver app)
+                    // Handle new chat session (from WizzDriver app or WhizzMerchants app)
             function handleNewChatSession(data) {
-                // Apply session filtering - only allow genuine WizzDriver sessions
+                // Apply session filtering - only allow genuine app sessions
                 if (isTestSession(data) || !isAllowedDriverSession(data)) {
                     console.log('🚫 Filtered out test/mock session:', data.sessionId || data.id);
                     return;
                 }
 
             const sessionId = data.sessionId || data.id || 'session_' + Date.now();
+                const userType = data.userType || data.payload?.userType || 'user';
+
+                // Determine display name based on user type
+                let displayName;
+                if (userType === 'merchant') {
+                    displayName = data.merchantName || data.payload?.merchantName || 'Merchant';
+                } else {
+                    displayName = data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'WizzDriver User';
+                }
+                
             const session = {
                 id: sessionId,
-                customer: data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'WizzDriver User',
+                customer: displayName,
+                userType: userType,
                 lastMessage: 'New chat session started',
                 time: 'Just now',
                 unread: true,
@@ -730,10 +824,10 @@
             activeChatSessions.set(sessionId, session);
             updateSessionsList();
 
-            console.log('📱 New genuine WizzDriver session:', session);
+                console.log('📱 New genuine app session:', session);
         }
 
-            // Handle chat message (only from real sessions)
+                    // Handle chat message (from driver or merchant sessions)
             function handleChatMessage(data) {
                 const sessionId = data.sessionId || data.payload?.sessionId;
                 let session = activeChatSessions.get(sessionId);
@@ -746,9 +840,18 @@
                     return;
                 }
 
+                const userType = data.userType || data.payload?.userType || 'user';
+                let displayName;
+                if (userType === 'merchant') {
+                    displayName = data.merchantName || data.payload?.merchantName || 'Merchant';
+                } else {
+                    displayName = data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'User';
+                }
+
                 session = {
                     id: sessionId,
-                    customer: data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'WizzDriver User',
+                    customer: displayName,
+                    userType: userType,
                     lastMessage: '',
                     time: 'Just now',
                     unread: true,
@@ -841,9 +944,9 @@
                     const source = meta.source || sessionData.source || 'unknown';
                     const userType = sessionData.userType || sessionData.payload?.userType || 'unknown';
 
-                    // Only allow WizzDriver Flutter app sessions
-                    const allowedSources = ['wizzdriver_app', 'flutter_app', 'mobile_app'];
-                    const allowedUserTypes = ['driver', 'customer', 'user'];
+                    // Allow WizzDriver Flutter app AND WhizzMerchants app sessions
+                    const allowedSources = ['wizzdriver_app', 'flutter_app', 'mobile_app', 'whizzMerchants'];
+                    const allowedUserTypes = ['driver', 'customer', 'user', 'merchant'];
 
                     const hasValidSource = allowedSources.includes(source);
                     const hasValidUserType = allowedUserTypes.includes(userType);
@@ -862,15 +965,24 @@
                     let addedCount = 0;
 
                     data.payload.sessions.forEach(sessionData => {
-                        // Apply filtering to only show genuine WizzDriver sessions
+                        // Apply filtering to only show genuine app sessions
                         if (isTestSession(sessionData) || !isAllowedDriverSession(sessionData)) {
-                            console.log('🚫 Filtered out session:', sessionData.sessionId, sessionData.driverName || 'Unknown');
+                            console.log('🚫 Filtered out session:', sessionData.sessionId, sessionData.driverName || sessionData.merchantName || 'Unknown');
                             return;
                         }
         
+                        const userType = sessionData.userType || 'user';
+                        let displayName;
+                        if (userType === 'merchant') {
+                            displayName = sessionData.merchantName || sessionData.userId || 'Merchant';
+                        } else {
+                            displayName = sessionData.customerName || sessionData.driverName || sessionData.userId || 'User';
+                        }
+                        
                     const session = {
                         id: sessionData.sessionId,
-                        customer: sessionData.customerName || sessionData.driverName || sessionData.userId,
+                        customer: displayName,
+                        userType: userType,
                         lastMessage: sessionData.lastMessage || 'Active session',
                         time: sessionData.lastMessageTime || 'Active',
                         unread: sessionData.unread || false,
@@ -881,7 +993,7 @@
                     addedCount++;
                 });
 
-                            console.log(`📋 Loaded ${addedCount} verified WizzDriver sessions (filtered ${data.payload.sessions.length - addedCount} test/mock sessions)`);
+                    console.log(`📋 Loaded ${addedCount} verified app sessions (filtered ${data.payload.sessions.length - addedCount} test/mock sessions)`);
                         }
 
                         updateSessionsList();
@@ -922,7 +1034,7 @@
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
                         <h3>No active conversations</h3>
-                        <p>New conversations will appear here when genuine WizzDriver users start chatting</p>
+                        <p>New conversations will appear here when drivers or merchants start chatting</p>
                     </div>
                 `;
                 return;
@@ -949,12 +1061,16 @@
 
                 const customerInitials = session.customer.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
 
+                // Sanitize user-generated content to prevent XSS
+                const safeCustomerName = escapeHtml(session.customer);
+                const safeMessagePreview = escapeHtml(messagePreview);
+
                 sessionElement.innerHTML = `
                     <div class="session-info">
                         <div class="customer-avatar">${customerInitials}</div>
                         <div class="session-details">
-                            <div class="customer-name">${session.customer}</div>
-                            <div class="last-message">${messagePreview}</div>
+                            <div class="customer-name">${safeCustomerName}</div>
+                            <div class="last-message">${safeMessagePreview}</div>
                         </div>
                         <div class="session-meta">
                             <div class="message-time">${session.time}</div>
@@ -973,6 +1089,101 @@
             }
         }
 
+            // Update closed sessions list UI
+            function updateClosedSessionsList() {
+                const closedSessionsList = document.getElementById('closedSessionsList');
+                const closedSessionsCount = document.getElementById('closedSessionsCount');
+
+                if (!closedSessionsList) {
+                    // Panel not in DOM yet, skip
+                    return;
+                }
+
+                const count = closedSessions.size;
+
+                // Update counter badge
+                if (closedSessionsCount) {
+                    closedSessionsCount.textContent = count.toString();
+                }
+
+                // If no closed sessions, show empty state
+                if (count === 0) {
+                    closedSessionsList.innerHTML = `
+                    <div class="empty-state-small" style="padding: 2rem; text-align: center; color: #999;">
+                        <i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;">No recently closed sessions</p>
+                    </div>
+                `;
+                    return;
+                }
+
+                closedSessionsList.innerHTML = '';
+
+                // Sort by closed time (most recent first)
+                const sortedSessions = Array.from(closedSessions.values())
+                    .sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt));
+
+                sortedSessions.forEach(session => {
+                    const sessionElement = document.createElement('div');
+                    sessionElement.className = 'session-card closed-session';
+                    sessionElement.dataset.sessionId = session.id;
+                    sessionElement.onclick = () => viewClosedSession(session);
+
+                    const closedTime = formatTimestamp(new Date(session.closedAt));
+                    const safeCustomerName = escapeHtml(session.customer);
+                    const closedBy = session.closedByUserType || 'unknown';
+
+                    // Calculate time ago
+                    const now = Date.now();
+                    const closedTimestamp = new Date(session.closedAt).getTime();
+                    const minutesAgo = Math.floor((now - closedTimestamp) / 60000);
+                    const timeAgo = minutesAgo < 60
+                        ? `${minutesAgo} min ago`
+                        : `${Math.floor(minutesAgo / 60)} hr ago`;
+
+                    sessionElement.innerHTML = `
+                    <div class="session-info">
+                        <div class="customer-avatar" style="background: #6c757d;">
+                            <i class="fas fa-archive"></i>
+                        </div>
+                        <div class="session-details">
+                            <div class="customer-name">${safeCustomerName}</div>
+                            <div class="last-message" style="font-size: 0.75rem; color: #999;">
+                                <i class="fas fa-times-circle" style="margin-right: 4px;"></i>
+                                Closed by ${closedBy}
+                            </div>
+                        </div>
+                        <div class="session-meta">
+                            <div class="message-time" style="font-size: 0.75rem;">${timeAgo}</div>
+                        </div>
+                    </div>
+                `;
+
+                    closedSessionsList.appendChild(sessionElement);
+                });
+            }
+
+            // View closed session (read-only mode)
+            function viewClosedSession(session) {
+                console.log('📁 Viewing closed session:', session.customer);
+
+                // Update current session (but mark as read-only)
+                currentSessionId = session.id;
+
+                // Update active state in UI
+                document.querySelectorAll('.session-card').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
+                if (sessionElement) {
+                    sessionElement.classList.add('active');
+                }
+
+                // Update chat view (read-only)
+                updateChatView(session, true);  // true = read-only mode
+            }
+
             // Select a chat session
             function selectChatSession(session) {
             console.log('📱 Selecting chat session:', session.customer);
@@ -980,6 +1191,24 @@
             // Update current session
             const previousSessionId = currentSessionId;
             currentSessionId = session.id;
+
+                // 🔧 FIX: If this is a merchant session, sync messages from merchantSessions
+                if (session.userType === 'merchant') {
+                    const merchantSession = merchantSessions.get(session.id);
+                    if (merchantSession && merchantSession.messages) {
+                        console.log(`🔄 Syncing ${merchantSession.messages.length} messages from merchant session store`);
+                        // Convert merchant messages to UI format
+                        session.messages = merchantSession.messages.map(msg => ({
+                            id: msg.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                            text: msg.text,
+                            sender: msg.senderType === 'agent' ? 'agent' : 'customer',
+                            timestamp: msg.timestamp || new Date(msg.createdAt || Date.now()),
+                            senderName: msg.senderName || (msg.senderType === 'agent' ? 'Support Agent' : merchantSession.merchantName)
+                        }));
+                        // Update activeChatSessions with synced messages
+                        activeChatSessions.set(session.id, session);
+                    }
+                }
 
             // Update active session UI
             document.querySelectorAll('.session-card').forEach(item => {
@@ -1018,14 +1247,24 @@
         }
 
             // Update chat view
-            function updateChatView(session) {
+                function updateChatView(session, readOnly = false) {
                 const chatTitle = document.getElementById('chatTitle');
                 const chatMessages = document.getElementById('chatMessages');
                 const chatInputArea = document.getElementById('chatInputArea');
                 const endSessionBtn = document.getElementById('endSessionBtn');
 
             if (chatTitle) {
-                chatTitle.textContent = session.customer;
+                // Add indicator if session is closed
+                if (readOnly || session.status === 'closed') {
+                    chatTitle.innerHTML = `
+                        <span>${escapeHtml(session.customer)}</span>
+                        <span style="font-size: 0.75rem; color: #999; margin-left: 8px;">
+                            <i class="fas fa-archive"></i> Closed
+                        </span>
+                    `;
+                } else {
+                    chatTitle.textContent = session.customer;
+                }
             }
 
             if (chatMessages) {
@@ -1033,13 +1272,23 @@
                 scrollToBottom();
             }
 
+                // Hide input area if session is closed (read-only)
             if (chatInputArea) {
-                chatInputArea.style.display = 'block';
-                setupMessageInput();
+                if (readOnly || session.status === 'closed') {
+                    chatInputArea.style.display = 'none';
+                } else {
+                    chatInputArea.style.display = 'block';
+                    setupMessageInput();
+                }
             }
 
+                // Hide end session button if session is closed
             if (endSessionBtn) {
-                endSessionBtn.style.display = 'block';
+                if (readOnly || session.status === 'closed') {
+                    endSessionBtn.style.display = 'none';
+                } else {
+                    endSessionBtn.style.display = 'block';
+                }
             }
         }
 
@@ -1204,22 +1453,34 @@
             messageInput.value = '';
             messageInput.style.height = 'auto';
 
-            // Send via WebSocket
-            if (wsManager) {
-                const chatMessage = {
-                    action: 'chat_message',
-                    type: 'chat_message',
-                    sessionId: currentSessionId,
-                    messageText: message,
-                    text: message,
-                    senderType: 'agent',
-                    senderName: 'Support Agent',
-                    agentId: 'support_agent_' + Date.now(),
-                    timestamp: new Date().toISOString()
-                };
+                // Check if this is a merchant session and route appropriately
+                if (session.userType === 'merchant') {
+                    // Send via merchant chat WebSocket
+                    console.log('🏪 Sending message to merchant session');
+                    const success = sendMerchantMessage(currentSessionId, message);
+                    if (!success) {
+                        // Revert optimistic update if send failed
+                        session.messages.pop();
+                        alert('Failed to send message to merchant. Please try again.');
+                    }
+                } else {
+                    // Send via regular WebSocket for driver/customer sessions
+                    if (wsManager) {
+                        const chatMessage = {
+                            action: 'chat_message',
+                            type: 'chat_message',
+                            sessionId: currentSessionId,
+                            messageText: message,
+                            text: message,
+                            senderType: 'agent',
+                            senderName: 'Support Agent',
+                            agentId: 'support_agent_' + Date.now(),
+                            timestamp: new Date().toISOString()
+                        };
 
-                wsManager.send(chatMessage);
-                console.log('📤 Sent chat message:', chatMessage);
+                    wsManager.send(chatMessage);
+                    console.log('📤 Sent chat message:', chatMessage);
+                }
             }
 
             // Update sessions list
@@ -1244,18 +1505,31 @@
             if (!session) return;
 
             if (confirm(`Are you sure you want to end the chat session with ${session.customer}?`)) {
-                // Send session end message via WebSocket
-                if (wsManager) {
-                    const endMessage = {
-                        action: 'chat_session_close',
-                        type: 'chat_session_close',
-                        sessionId: sessionId,
-                        senderType: 'agent',
-                        agentId: 'support_agent',
-                        reason: 'ended_by_agent',
-                        timestamp: new Date().toISOString()
-                    };
+                // Determine if this is a merchant session
+                const isMerchantSession = session.userType === 'merchant';
 
+                // Send session end message via appropriate WebSocket
+                const endMessage = {
+                    action: 'chat_session_close',
+                    type: 'chat_session_close',
+                    sessionId: sessionId,
+                    closedByUserType: 'agent',
+                    closedByUserId: 'support_agent_' + Date.now(),
+                    senderType: 'agent',
+                    agentId: 'support_agent',
+                    reason: 'ended_by_agent',
+                    timestamp: new Date().toISOString()
+                };
+
+                if (isMerchantSession && merchantChatWS && merchantChatWS.readyState === WebSocket.OPEN) {
+                    // Send via merchant WebSocket
+                    merchantChatWS.send(JSON.stringify(endMessage));
+                    console.log('📤 Sent merchant session end message:', endMessage);
+
+                    // Remove from merchant sessions too
+                    merchantSessions.delete(sessionId);
+                } else if (wsManager) {
+                // Send via regular driver/customer WebSocket
                     wsManager.send(endMessage);
                     console.log('📤 Sent session end message:', endMessage);
                 }
@@ -1514,7 +1788,331 @@
                         handleIncomingChatMessage(message);
                     }
 
-            console.log('✅ Production Support page loaded - ready for genuine WizzDriver sessions only');
+                    // ========================================
+                    // MERCHANT CHAT SYSTEM
+                    // ========================================
+
+                    // Initialize merchant chat WebSocket system
+                    function initializeMerchantChatSystem() {
+                        console.log('🏪 Initializing merchant chat system...');
+
+                        const MERCHANT_WS_URL = 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth';
+                        const AGENT_ID = 'agent_' + Date.now();
+                        const AGENT_NAME = 'Support Agent';
+
+                        merchantChatWS = new WebSocket(MERCHANT_WS_URL);
+
+                        merchantChatWS.onopen = () => {
+                            console.log('✅ Merchant chat WebSocket connected');
+                            sendMerchantAgentConnect();
+                        };
+
+                        merchantChatWS.onmessage = (event) => {
+                            try {
+                                const data = JSON.parse(event.data);
+                                console.log('📥 Merchant chat message:', data.type);
+                                handleMerchantChatMessage(data);
+                            } catch (e) {
+                                console.error('❌ Error parsing merchant message:', e);
+                            }
+                        };
+
+                        merchantChatWS.onerror = (error) => {
+                            console.error('❌ Merchant chat WebSocket error:', error);
+                        };
+
+                        merchantChatWS.onclose = () => {
+                            console.log('🔌 Merchant chat WebSocket disconnected - reconnecting...');
+                            setTimeout(initializeMerchantChatSystem, 3000);
+                        };
+
+                        // Send agent connect message
+                        function sendMerchantAgentConnect() {
+                            const msg = {
+                                action: 'chat_agent_connect',
+                                type: 'chat_agent_connect',
+                                agentId: AGENT_ID,
+                                agentName: AGENT_NAME
+                            };
+                            merchantChatWS.send(JSON.stringify(msg));
+                            console.log('📤 Sent merchant agent_connect');
+                        }
+                    }
+
+                    // Handle incoming merchant chat messages
+                    function handleMerchantChatMessage(data) {
+                        switch (data.type) {
+                            case 'agent_connected':
+                                console.log('✅ Merchant agent connected successfully');
+                                break;
+
+                            case 'active_sessions':
+                                console.log(`📊 Received ${data.sessions.length} active merchant sessions`);
+                                data.sessions.forEach(session => {
+                                    if (!session.messages) session.messages = [];
+                                    merchantSessions.set(session.sessionId, session);
+
+                                    // Add to main session list
+                                    addMerchantSessionToUI(session);
+                                });
+                                updateSessionsList();
+                                break;
+
+                            case 'new_chat_session':
+                                console.log(`🆕 New merchant session: ${data.sessionId}`);
+                                const newSession = {
+                                    sessionId: data.sessionId,
+                                    userType: 'merchant',
+                                    merchantName: data.merchantName || data.payload?.merchantName || 'Merchant',
+                                    merchantEmail: data.merchantEmail || data.payload?.merchantEmail,
+                                    status: 'waiting_for_agent',
+                                    createdAt: new Date().toISOString(),
+                                    messages: []
+                                };
+                                merchantSessions.set(newSession.sessionId, newSession);
+                                addMerchantSessionToUI(newSession);
+                                updateSessionsList();
+                                break;
+
+                            case 'chat_message':
+                                console.log(`💬 Merchant message in session: ${data.sessionId}`);
+                                let session = merchantSessions.get(data.sessionId);
+
+                                if (!session) {
+                                    // Create session if it doesn't exist
+                                    session = {
+                                        sessionId: data.sessionId,
+                                        userType: 'merchant',
+                                        merchantName: data.merchantName || 'Merchant',
+                                        merchantEmail: data.merchantEmail,
+                                        status: 'active',
+                                        messages: []
+                                    };
+                                    merchantSessions.set(data.sessionId, session);
+                                    addMerchantSessionToUI(session);
+                                }
+
+                                if (!session.messages) session.messages = [];
+
+                                // Add the message
+                                const message = {
+                                    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                    text: data.message?.text || data.message,
+                                    sender: data.message?.senderType === 'agent' ? 'agent' : 'customer',
+                                    senderType: data.message?.senderType || 'merchant',
+                                    timestamp: new Date(data.message?.createdAt || Date.now()),
+                                    senderName: data.message?.senderType === 'agent' ? 'Support Agent' : session.merchantName
+                                };
+
+                                session.messages.push(message);
+                                session.lastMessage = message.text;
+                                session.time = formatTimestamp(new Date());
+
+                                // 🔧 FIX: Also update activeChatSessions to keep in sync
+                                const activeSession = activeChatSessions.get(data.sessionId);
+                                if (activeSession) {
+                                    if (!activeSession.messages) activeSession.messages = [];
+                                    activeSession.messages.push(message);
+                                    activeSession.lastMessage = message.text;
+                                    activeSession.time = session.time;
+                                    if (currentSessionId !== data.sessionId) {
+                                        activeSession.unread = true;
+                                    }
+                                }
+
+                                // Update UI
+                                if (currentSessionId === data.sessionId) {
+                                    appendMessageToChat(message);
+                                }
+                                updateSessionsList();
+                                break;
+
+                            case 'session_closed':
+                            case 'chat_session_close_ack':
+                                console.log(`🔒 Merchant session closed: ${data.sessionId}`);
+
+                                // Get the session before deleting (need it for adding system message)
+                                const closingSession = activeChatSessions.get(data.sessionId);
+                                const closingMerchantSession = merchantSessions.get(data.sessionId);
+                                const targetSession = closingSession || closingMerchantSession;
+
+                                if (targetSession) {
+                                    // Add system message to chat history
+                                    const closedBy = data.closedByUserType || 'user';
+                                    const systemMessage = {
+                                        id: `close_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                        text: `Session ended by ${closedBy}`,
+                                        sender: 'system',
+                                        timestamp: data.closedAt ? new Date(data.closedAt) : new Date(),
+                                        senderName: 'System'
+                                    };
+
+                                    // Add to session history
+                                    if (!targetSession.messages) {
+                                        targetSession.messages = [];
+                                    }
+                                    targetSession.messages.push(systemMessage);
+
+                                    // Update last message preview
+                                    targetSession.lastMessage = systemMessage.text;
+                                    targetSession.time = formatTimestamp(systemMessage.timestamp);
+
+                                    // Add closure metadata
+                                    targetSession.status = 'closed';
+                                    targetSession.closedAt = data.closedAt || new Date().toISOString();
+                                    targetSession.closedByUserType = closedBy;
+
+                                    // If currently viewing this session, show the system message
+                                    if (currentSessionId === data.sessionId) {
+                                        appendMessageToChat(systemMessage);
+                                        console.log(`💬 Added system message to active chat view`);
+                                    }
+
+                                    console.log(`✅ Added system message: "${systemMessage.text}"`);
+
+                                    // Move to closed sessions (keep for 2 hours)
+                                    closedSessions.set(data.sessionId, targetSession);
+                                    console.log(`📁 Moved session to closed sessions archive`);
+
+                                    // Clean old closed sessions (older than 2 hours)
+                                    const now = Date.now();
+                                    let cleanedCount = 0;
+                                    for (const [id, closedSession] of closedSessions.entries()) {
+                                        const closedTime = new Date(closedSession.closedAt).getTime();
+                                        if (now - closedTime > CLOSED_SESSION_RETENTION_MS) {
+                                            closedSessions.delete(id);
+                                            cleanedCount++;
+                                        }
+                                    }
+                                    if (cleanedCount > 0) {
+                                        console.log(`🧹 Cleaned ${cleanedCount} old closed session(s)`);
+                                    }
+                                }
+
+                                // Remove from merchant sessions
+                                merchantSessions.delete(data.sessionId);
+
+                                // Remove from active sessions
+                                activeChatSessions.delete(data.sessionId);
+
+                                // If this is the current session, update the view
+                                if (currentSessionId === data.sessionId) {
+                                    const chatInputArea = document.getElementById('chatInputArea');
+                                    const chatTitle = document.getElementById('chatTitle');
+                                    const endSessionBtn = document.getElementById('endSessionBtn');
+
+                                    // Disable input (session is closed)
+                                    if (chatInputArea) {
+                                        chatInputArea.style.display = 'none';
+                                    }
+
+                                    if (chatTitle) {
+                                        chatTitle.textContent = 'Session Ended';
+                                    }
+
+                                    if (endSessionBtn) {
+                                        endSessionBtn.style.display = 'none';
+                                    }
+
+                                    // Clear current session after a delay to allow viewing the message
+                                    setTimeout(() => {
+                                        if (currentSessionId === data.sessionId) {
+                                            currentSessionId = null;
+                                            const chatMessages = document.getElementById('chatMessages');
+                                            if (chatMessages) {
+                                                chatMessages.innerHTML = `
+                                                <div class="empty-state">
+                                                    <i class="fas fa-check-circle" style="color: #28a745;"></i>
+                                                    <h3>Session Ended</h3>
+                                                    <p>This chat session has been closed</p>
+                                                    <p style="color: #666; font-size: 14px;">Select another conversation from the left</p>
+                                                </div>
+                                            `;
+                                            }
+                                        }
+                                    }, 2000); // Give user 2 seconds to see the system message
+                                }
+
+                                // Update sessions list
+                                updateSessionsList();
+                                updateClosedSessionsList();  // Update closed sessions panel
+
+                                // Show notification
+                                showNotification('Session Ended', `Chat session closed by ${data.closedByUserType || 'user'}`);
+                                break;
+                        }
+                    }
+
+                    // Add merchant session to UI
+                    function addMerchantSessionToUI(merchantSession) {
+                        // Check if session already exists in activeChatSessions
+                        const existingSession = activeChatSessions.get(merchantSession.sessionId);
+
+                        // Convert merchant session to the format used by activeChatSessions
+                        const session = {
+                            id: merchantSession.sessionId,
+                            customer: `🏪 ${merchantSession.merchantName}`,
+                            userType: 'merchant',
+                            lastMessage: merchantSession.messages?.length > 0
+                                ? merchantSession.messages[merchantSession.messages.length - 1].text
+                                : 'New merchant chat session',
+                            time: formatTimestamp(new Date(merchantSession.createdAt)),
+                            unread: existingSession ? existingSession.unread : true,
+                            messages: merchantSession.messages?.map(msg => ({
+                                id: msg.id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                                text: msg.text,
+                                sender: msg.senderType === 'agent' ? 'agent' : 'customer',
+                                timestamp: msg.timestamp || new Date(msg.createdAt || Date.now()),
+                                senderName: msg.senderName || (msg.senderType === 'agent' ? 'Support Agent' : merchantSession.merchantName)
+                            })) || []
+                        };
+
+                        console.log(`📝 Adding/updating merchant session UI with ${session.messages.length} messages`);
+                        activeChatSessions.set(session.id, session);
+                    }
+
+                    // Send message to merchant
+                    function sendMerchantMessage(sessionId, text) {
+                        if (!merchantChatWS || merchantChatWS.readyState !== WebSocket.OPEN) {
+                            console.error('❌ Merchant chat WebSocket not connected');
+                            alert('Merchant chat not connected. Please wait...');
+                            return false;
+                        }
+
+                        const msg = {
+                            action: 'chat_message',
+                            type: 'chat_message',
+                            sessionId: sessionId,
+                            message: text,
+                            senderType: 'agent',
+                            agentId: 'agent_' + Date.now(),
+                            agentName: 'Support Agent',
+                            timestamp: new Date().toISOString()
+                        };
+
+                        try {
+                            merchantChatWS.send(JSON.stringify(msg));
+                            console.log('✅ Merchant message sent successfully');
+
+                            // Update merchant session state (don't duplicate UI - already done in sendMessage)
+                            const session = merchantSessions.get(sessionId);
+                            if (session) {
+                                if (!session.messages) session.messages = [];
+                                session.messages.push({
+                                    text: text,
+                                    senderType: 'agent',
+                                    createdAt: new Date().toISOString()
+                                });
+                            }
+
+                            return true;
+                        } catch (error) {
+                            console.error('❌ Failed to send merchant message:', error);
+                            return false;
+                        }
+                    }
+
+                    console.log('✅ Production Support page loaded - ready for driver and merchant sessions');
         </script>
         </div> <!-- End support-container -->
         </div> <!-- End main-content -->

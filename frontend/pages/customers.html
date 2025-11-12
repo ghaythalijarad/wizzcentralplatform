@@ -12,6 +12,10 @@
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <!-- Security utilities -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
     <style>
         /* Material 3 Customers Page Enhancement */
         .customers-stats-grid {
@@ -578,7 +582,7 @@
                     style="font-size: 0.7rem; background-color: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant); padding: 2px 6px; border-radius: 8px; margin-left: 10px; font-weight: 500;"></span>
             </div>
             <div class="top-bar-actions">
-                <button class="btn-primary" onclick="refreshCustomerData()">
+                <button class="btn-primary" data-action="refresh-customer-data">
                     <i class="fas fa-sync"></i>
                     Refresh
                 </button>
@@ -647,11 +651,12 @@
                                 <option value="new">New</option>
                             </select>
                     </div>
-                    <button class="btn-secondary" onclick="refreshCustomerPoints()" title="Refresh customer points from latest order data">
+                    <button class="btn-secondary" data-action="refresh-customer-points"
+                        title="Refresh customer points from latest order data">
                         <i class="fas fa-sync-alt"></i>
                         Refresh Points
                     </button>
-                    <button class="btn-primary" onclick="exportCustomers()">
+                    <button class="btn-primary" data-action="export-customers">
                         <i class="fas fa-download"></i>
                         Export
                     </button>
@@ -697,7 +702,7 @@
         <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h2><i class="fas fa-edit" style="color: var(--md-sys-color-primary);"></i> Edit Customer</h2>
-                <button class="modal-close" onclick="closeEditCustomerModal()">
+                <button class="modal-close" data-action="close-edit-customer-modal">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -800,7 +805,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeEditCustomerModal()">
+                <button type="button" class="btn-secondary" data-action="close-edit-customer-modal">
                     <i class="fas fa-times"></i> Cancel
                 </button>
                 <button type="submit" class="btn-primary" form="editCustomerForm">
@@ -816,7 +821,7 @@
             <div class="modal-header" style="flex-direction: column; align-items: stretch; gap: 16px;">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <h2><i class="fas fa-user" style="color: var(--md-sys-color-primary);"></i> Customer Profile</h2>
-                    <button class="modal-close" onclick="closeViewCustomerModal()">
+                    <button class="modal-close" data-action="close-view-customer-modal">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
@@ -831,10 +836,10 @@
             <div class="modal-body" style="padding: 16px 24px 24px;">
                 <!-- Quick Action Buttons -->
                 <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-                    <button class="btn-primary" onclick="editCustomerFromView()" style="flex: 1;">
+                    <button class="btn-primary" data-action="edit-customer-from-view" style="flex: 1;">
                         <i class="fas fa-edit"></i> Edit Customer
                     </button>
-                    <button class="btn-secondary" onclick="window.print()" style="flex: 1;">
+                    <button class="btn-secondary" data-action="print-view" style="flex: 1;">
                         <i class="fas fa-print"></i> Print Profile
                     </button>
                 </div>
@@ -1200,6 +1205,39 @@
             loadSidebar();
         }
     </script>
+<script>
+    (async function () {
+        try {
+            await RBAC.ensure();
+            // Enforce RBAC - New system auto-detects page name
+            window.RBAC.enforcePage();
+            if (!RBAC.can('customers', 'write')) {
+                RBAC.applyReadOnly('body', 'customers');
+                document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+            }
+        } catch (e) { console.warn('RBAC init failed', e); }
+    })();
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const root = document.body;
+        root.addEventListener('click', function (e) {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const action = btn.getAttribute('data-action');
+            try {
+                switch (action) {
+                    case 'refresh-customer-data': if (typeof refreshCustomerData === 'function') refreshCustomerData(); break;
+                    case 'refresh-customer-points': if (typeof refreshCustomerPoints === 'function') refreshCustomerPoints(); break;
+                    case 'export-customers': if (typeof exportCustomers === 'function') exportCustomers(); break;
+                    case 'close-edit-customer-modal': if (typeof closeEditCustomerModal === 'function') closeEditCustomerModal(); break;
+                    case 'close-view-customer-modal': if (typeof closeViewCustomerModal === 'function') closeViewCustomerModal(); break;
+                    case 'edit-customer-from-view': if (typeof editCustomerFromView === 'function') editCustomerFromView(); break;
+                    case 'print-view': window.print(); break;
+                }
+            } catch (err) { console.warn('Customer action failed', action, err); }
+        });
+    });
+</script>
 </body>
 
 </html>

@@ -9,20 +9,77 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        /* UPDATED: Apply brand variables; maintain ~60% white surface surfaces */
+        body[data-page="financial"] {
+            background: linear-gradient(180deg, var(--wizz-primary-light) 0%, var(--wizz-primary-light) 20%, #ffffff 20%, #ffffff 80%, var(--wizz-secondary) 100%);
+            /* creates top accent + majority white area */
+            min-height: 100vh;
+        }
+        .financial-container { /* unchanged logic */ }
+        .financial-header {
+            background: linear-gradient(135deg, var(--wizz-primary) 0%, var(--wizz-secondary) 100%);
+            color: #fff;
+            padding: 16px 20px;
+        }
+        .financial-header h1 {
+            font-size: 1.8rem;
+            font-weight: 400;
+            margin: 0 0 4px 0;
+        }
+        .financial-header p {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+        .tab-navigation { display: flex; }
+        .tab-button.active {
+            color: var(--wizz-secondary);
+            background: #ffffff;
+        }
+        .tab-button:hover {
+            color: var(--wizz-primary);
+            background: rgba(0,0,0,0.03);
+        }
+        .tab-button.active::after {
+            background: var(--wizz-primary);
+        }
+        .section-card { /* keep white surface */ background:#ffffff; }
+        .section-title { color: var(--wizz-secondary); }
+        .section-title .icon {
+            background: var(--wizz-secondary);
+            color:#fff;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: var(--wizz-primary);
+            box-shadow: 0 0 0 3px rgba(253,197,0,0.15); /* slight glow using primary base */
+        }
+        .button-primary {
+            background: var(--wizz-primary);
+            color:#1C1B1F;
+            border: none;
+        }
+        .button-primary:hover { background: var(--wizz-primary-light); }
+        .button-primary:active { background: var(--wizz-primary-dark); }
+        .button-secondary {
+            background:#ffffff;
+            color: var(--wizz-secondary);
+            border:2px solid var(--wizz-secondary);
+        }
+        .button-secondary:hover {
+            background: var(--wizz-secondary);
+            color:#ffffff;
+        }
+        .rule-item { border-left:4px solid var(--wizz-secondary); }
+        .metric-card { border-left:4px solid var(--wizz-primary); }
+        .metric-value { color: var(--wizz-secondary); }
+        .error-message { border-left:4px solid var(--wizz-accent-red); }
+        .success-message { border-left:4px solid var(--wizz-accent-green); }
         .financial-container {
             max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             transition: margin-left 0.3s ease;
-        }
-
-        .financial-header {
-            background: linear-gradient(135deg, #00c2e8 0%, #009bb8 100%);
-            color: white;
-            padding: 30px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-            text-align: center;
         }
 
         .financial-header h1 {
@@ -64,26 +121,6 @@
             position: relative;
         }
 
-        .tab-button.active {
-            color: #00c2e8;
-            background: white;
-        }
-
-        .tab-button:hover {
-            color: #00c2e8;
-            background: rgba(0, 194, 232, 0.05);
-        }
-
-        .tab-button.active::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: #00c2e8;
-        }
-
         .tab-content {
             padding: 30px;
             display: none;
@@ -94,7 +131,6 @@
         }
 
         .section-card {
-            background: white;
             border-radius: 12px;
             padding: 25px;
             margin-bottom: 25px;
@@ -105,23 +141,10 @@
         .section-title {
             font-size: 1.3rem;
             font-weight: 600;
-            color: #2d3748;
             margin-bottom: 20px;
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .section-title .icon {
-            width: 24px;
-            height: 24px;
-            background: #00c2e8;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 12px;
         }
 
         .form-grid {
@@ -153,18 +176,7 @@
             transition: border-color 0.3s ease;
         }
 
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #00c2e8;
-            box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.1);
-        }
-
         .button-primary {
-            background: #00c2e8;
-            color: white;
-            border: none;
             padding: 12px 24px;
             border-radius: 8px;
             cursor: pointer;
@@ -173,26 +185,13 @@
             transition: all 0.3s ease;
         }
 
-        .button-primary:hover {
-            background: #009bb8;
-            transform: translateY(-1px);
-        }
-
         .button-secondary {
-            background: white;
-            color: #00c2e8;
-            border: 2px solid #00c2e8;
             padding: 10px 20px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 500;
             transition: all 0.3s ease;
-        }
-
-        .button-secondary:hover {
-            background: #667eea;
-            color: white;
         }
 
         .rules-list {
@@ -211,7 +210,6 @@
             margin-bottom: 10px;
             background: #f8f9fa;
             border-radius: 8px;
-            border-left: 4px solid #00c2e8;
         }
 
         .rule-info {
@@ -262,15 +260,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            border-left: 4px solid #00c2e8;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .metric-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 5px;
         }
 
         .metric-label {
@@ -308,7 +298,6 @@
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            border-left: 4px solid #dc3545;
         }
 
         .success-message {
@@ -317,7 +306,6 @@
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            border-left: 4px solid #28a745;
         }
 
         @media (max-width: 768px) {
@@ -347,7 +335,8 @@
                 <button class="menu-toggle" id="menuToggle">
                     <i class="fas fa-bars"></i>
                 </button>
-                <h1 class="page-title">Financial Management</h1>
+                <!-- Removed page title per request -->
+                <!-- <h1 class="page-title">Financial Management</h1> -->
             </div>
         </div>
         
@@ -368,76 +357,37 @@
 
             <!-- Overview Tab -->
             <div class="tab-content active" id="overview-tab">
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-value" id="total-commission-rules">0</div>
-                        <div class="metric-label">Commission Rules</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="active-commission-rules">0</div>
-                        <div class="metric-label">Active Commission Rules</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="total-delivery-rules">0</div>
-                        <div class="metric-label">Delivery Fee Rules</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="active-delivery-rules">0</div>
-                        <div class="metric-label">Active Delivery Rules</div>
-                    </div>
-                </div>
-
-                <div class="section-card">
-                    <div class="section-title">
-                        <span class="icon">🎯</span>
-                        Quick Actions
-                    </div>
+                <div class="section-card" style="margin-bottom:20px;">
+                    <div class="section-title"><span class="icon">🏪</span> Merchant Financial Explorer</div>
                     <div class="form-grid">
-                        <div>
-                            <button class="button-primary" onclick="calculateSampleCommission()">
-                                Calculate Sample Commission
-                            </button>
-                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 10px;">
-                                Test commission calculation with sample order data
-                            </p>
+                        <div class="form-group">
+                            <label for="overview-merchant-search">Search Merchant</label>
+                            <input type="text" id="overview-merchant-search" placeholder="Type at least 2 characters...">
+                            <div id="overview-merchant-results"
+                                style="position:relative;border:1px solid #e2e8f0;border-radius:6px;margin-top:6px;display:none;background:#fff;max-height:220px;overflow:auto;font-size:0.75rem;">
+                            </div>
                         </div>
-                        <div>
-                            <button class="button-primary" onclick="calculateSampleDeliveryFee()">
-                                Calculate Sample Delivery Fee
-                            </button>
-                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 10px;">
-                                Test delivery fee calculation for different zones
-                            </p>
+                        <div class="form-group">
+                            <label for="overview-start-date">Start Date</label>
+                            <input type="date" id="overview-start-date">
                         </div>
-                        <div>
-                            <button class="button-primary" onclick="window.open('/frontend/test-financial-with-real-merchants.html', '_blank')">
-                                🏪 Test with Real Merchants
-                            </button>
-                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 10px;">
-                                Test calculations with actual Iraqi merchants from DynamoDB
-                            </p>
+                        <div class="form-group">
+                            <label for="overview-end-date">End Date</label>
+                            <input type="date" id="overview-end-date">
                         </div>
-                        <div>
-                            <button class="button-primary" onclick="loadMerchantFinancials()">
-                                📊 Merchant Financial Overview
-                            </button>
-                            <p style="font-size: 0.9rem; color: #6c757d; margin-top: 10px;">
-                                View financial data for all registered merchants
-                            </p>
+                        <div class="form-group" style="display:flex;align-items:flex-end;gap:10px;">
+                            <button class="button-primary" id="overview-load-btn" disabled>Load Performance</button>
+                            <button class="button-secondary" id="overview-reset-btn">Reset</button>
                         </div>
+                        </div>
+                    <p style="font-size:0.75rem;color:#6c757d;margin-top:-10px;">Select a merchant and timeframe to view orders, revenue,
+                        commissions, delivery contribution and net payout.</p>
                     </div>
-                </div>
-
-                <div class="section-card">
-                    <div class="section-title">
-                        <span class="icon">📋</span>
-                        Recent Activity
-                    </div>
-                    <div id="recent-activity">
-                        <p style="color: #6c757d; text-align: center; padding: 20px;">
-                            Loading recent financial activity...
-                        </p>
-                    </div>
+                <div id="merchant-kpi-cards" class="metrics-grid" style="display:none;"></div>
+                <div id="merchant-financial-details" class="section-card" style="display:none;margin-top:20px;"></div>
+                <div class="section-card" id="recent-activity">
+                    <div class="section-title"><span class="icon">📋</span> Recent Activity</div>
+                    <p style="color:#6c757d;text-align:center;padding:20px;">Select a merchant to load activity...</p>
                 </div>
             </div>
 
@@ -452,7 +402,19 @@
                         <div class="form-grid">
                             <div class="form-group">
                                 <label for="commission-name">Rule Name</label>
-                                <input type="text" id="commission-name" placeholder="e.g., Premium Merchant Commission" required>
+                                <input type="text" id="commission-name" placeholder="e.g., سنونو Commission" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="commission-merchant-id">Merchant ID</label>
+                                    <input type="text" id="commission-merchant-id" placeholder="business_..." required>
+                                    <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+                                        <input type="text" id="merchant-search" placeholder="Search merchant by name/email/id"
+                                            style="flex:1; padding:8px 12px; border:1px solid #e2e8f0; border-radius:8px;">
+                                        <button type="button" id="merchant-search-btn" class="button-secondary">Search</button>
+                                    </div>
+                                    <div id="merchant-search-results"
+                                        style="margin-top:8px; border:1px solid #e2e8f0; border-radius:8px; max-height:220px; overflow:auto; display:none;">
+                                    </div>
                             </div>
                             <div class="form-group">
                                 <label for="commission-type">Commission Type</label>
@@ -464,51 +426,57 @@
                                     <option value="hybrid">Hybrid (Percentage + Flat)</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label for="commission-priority">Priority</label>
+                                <input type="number" id="commission-priority" min="1" max="100" value="1"
+                                    placeholder="Lower number = higher priority">
+                            </div>
                         </div>
 
                         <div id="commission-rates" class="form-grid">
                             <div class="form-group">
                                 <label for="commission-percentage">Percentage (%)</label>
-                                <input type="number" id="commission-percentage" min="0" max="100" step="0.1" placeholder="15.0">
+                                <input type="number" id="commission-percentage" min="0" max="100" step="0.1" placeholder="12.0">
                             </div>
                             <div class="form-group">
                                 <label for="commission-flat-fee">Flat Fee (IQD)</label>
-                                <input type="number" id="commission-flat-fee" min="0" step="100" placeholder="500">
+                                <input type="number" id="commission-flat-fee" min="0" step="50" placeholder="250">
                             </div>
                         </div>
 
                         <div class="form-grid">
                             <div class="form-group">
-                                <label for="merchant-type">Merchant Type</label>
-                                <select id="merchant-type">
-                                    <option value="all">All Merchants</option>
-                                    <option value="premium">Premium Merchants</option>
-                                    <option value="standard">Standard Merchants</option>
-                                    <option value="new">New Merchants</option>
-                                </select>
+                                <label for="commission-effective-from">Effective From</label>
+                                <input type="date" id="commission-effective-from" required>
                             </div>
                             <div class="form-group">
-                                <label for="commission-priority">Priority</label>
-                                <input type="number" id="commission-priority" min="1" max="100" value="10" 
-                                       placeholder="Lower number = higher priority">
+                                <label for="commission-effective-to">Effective To (optional)</label>
+                                <input type="date" id="commission-effective-to">
                             </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="commission-active" checked>
-                                Active Rule
-                            </label>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="commission-active" checked>
+                                    Active Rule
+                                </label>
+                            </div>
                         </div>
 
                         <button type="submit" class="button-primary">Create Commission Rule</button>
+                        <p style="font-size:0.75rem;color:#6c757d;margin-top:8px;">Merchant-specific only. A merchant can have multiple future
+                            rules (non-overlapping windows).</p>
                     </form>
                 </div>
 
                 <div class="section-card">
                     <div class="section-title">
                         <span class="icon">📋</span>
-                        Existing Commission Rules
+                        Existing Commission Rules (Merchant)
+                        </div>
+                        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                            <input type="text" id="commission-rules-merchant" placeholder="Enter Merchant ID to load rules"
+                                style="flex:1;min-width:260px;padding:10px 14px;border:2px solid #e2e8f0;border-radius:8px;">
+                            <button type="button" id="loadMerchantRulesBtn" class="button-secondary" style="white-space:nowrap;">Load
+                                Rules</button>
                     </div>
                     <div class="rules-list" id="commission-rules-list">
                         <div class="loading-spinner">Loading commission rules...</div>
@@ -621,11 +589,20 @@
                     </div>
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="report-type">Report Type</label>
-                            <select id="report-type">
-                                <option value="summary">Financial Summary</option>
-                                <option value="commission">Commission Report</option>
-                                <option value="delivery-fees">Delivery Fees Report</option>
+                            <label for="report-scope">Scope</label>
+                            <select id="report-scope">
+                                <option value="merchant">Merchant</option>
+                                <option value="region">Region</option>
+                            </select>
+                            </div>
+                            <div class="form-group" id="report-merchant-group">
+                                <label for="report-merchant-id">Merchant ID (optional)</label>
+                                <input type="text" id="report-merchant-id" placeholder="business_...">
+                            </div>
+                            <div class="form-group" id="report-region-group" style="display:none;">
+                                <label for="report-region">Region</label>
+                                <select id="report-region">
+                                    <option value="">Loading regions...</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -637,9 +614,15 @@
                             <input type="date" id="report-end-date">
                         </div>
                         <div class="form-group">
-                            <button class="button-primary" onclick="generateReport()" style="margin-top: 32px;">
-                                Generate Report
-                            </button>
+                            <label for="report-type">Report Type</label>
+                            <select id="report-type">
+                                <option value="summary">Financial Summary</option>
+                                <option value="commission">Commission Report</option>
+                                <option value="delivery-fees">Delivery Fees Report</option>
+                            </select>
+                            </div>
+                            <div class="form-group">
+                                <button class="button-primary" id="run-report-btn" style="margin-top: 32px;">Run Report</button>
                         </div>
                     </div>
                 </div>
@@ -651,7 +634,7 @@
                     </div>
                     <div id="report-results">
                         <p style="color: #6c757d; text-align: center; padding: 40px;">
-                            Select parameters above and click "Generate Report" to view financial data
+                            Select parameters above and click "Run Report" to view financial data
                         </p>
                     </div>
                 </div>
@@ -752,11 +735,50 @@
                         // Add active to financial
                         financialNavItem.classList.add('active');
                     }
+
+                    // Apply role-based visibility to sidebar items
+                    await applySidebarRBAC();
                 }
             } catch (error) {
                 console.error('❌ Failed to load sidebar:', error);
             }
         }
+
+            // Hide sidebar items based on roles from /api/me
+            async function applySidebarRBAC() {
+                try {
+                    const res = await fetch('/api/me');
+                    const json = await res.json();
+                    const roles = (json && json.data && Array.isArray(json.data.roles)) ? json.data.roles : [];
+                    const has = r => roles.includes(r) || roles.includes('admin');
+                    const pageRoles = {
+                        dashboard: ['financial_admin', 'support_admin', 'merchants_admin', 'drivers_admin', 'customers_admin', 'campaigns_admin', 'reporting_view'],
+                        drivers: ['drivers_admin', 'support_admin'],
+                        customers: ['customers_admin', 'support_admin'],
+                        merchants: ['merchants_admin', 'support_admin'],
+                        orders: ['support_admin', 'merchants_admin', 'drivers_admin'],
+                        promotions: ['campaigns_admin'],
+                        regions: ['merchants_admin'],
+                        financial: ['financial_admin', 'reporting_view'],
+                        support: ['support_admin']
+                    };
+                    document.querySelectorAll('.nav-item').forEach(item => {
+                        const page = item.getAttribute('data-page');
+                        if (!page) return;
+                        const allowed = pageRoles[page];
+                        if (Array.isArray(allowed) && !allowed.some(r => has(r))) {
+                            item.style.display = 'none';
+                        }
+                    });
+                    // Update sidebar user info if present
+                    const userNameEl = document.querySelector('.user-info .user-name');
+                    const userRoleEl = document.querySelector('.user-info .user-role');
+                    if (userNameEl) userNameEl.textContent = (json?.data?.email) || 'User';
+                    if (userRoleEl) userRoleEl.textContent = roles.join(', ') || 'guest';
+                } catch (e) {
+                    console.warn('RBAC sidebar gating failed:', e);
+                }
+            }
 
         // Load sidebar when page loads
         if (document.readyState === 'loading') {
@@ -779,6 +801,55 @@
                 window.location.href = '/frontend/index.html';
             }
         }
+    </script>
+    <!-- RBAC Frontend Enforcement -->
+    <script>
+        (async function initFinancialRBAC() {
+            try {
+                const res = await fetch('/api/me');
+                const json = await res.json();
+                const roles = (json && json.data && Array.isArray(json.data.roles)) ? json.data.roles : [];
+                sessionStorage.setItem('userRoles', JSON.stringify(roles));
+                const has = r => roles.includes(r);
+                const canWrite = has('admin') || has('financial_admin');
+                const canRead = canWrite || has('reporting_view');
+                if (!canRead) {
+                    document.body.innerHTML = '<div style="padding:60px;font-family:Roboto,Arial,sans-serif;text-align:center;max-width:640px;margin:0 auto;"><h2 style="margin-bottom:12px;">Access Denied</h2><p style="color:#666;">You do not have permission to view the Financial Center.</p><button onclick=\'window.location.href="/frontend/index.html"\' style="margin-top:25px;padding:10px 18px;border:0;border-radius:6px;background:#222;color:#fff;cursor:pointer;">Return to Login</button></div>';
+                    return;
+                }
+                if (!canWrite) {
+                    // Disable mutation forms (commission / delivery fee / settings not accessible)
+                    ['commission-form', 'delivery-fee-form'].forEach(id => {
+                        const form = document.getElementById(id);
+                        if (form) {
+                            form.querySelectorAll('input,select,textarea,button').forEach(el => { el.disabled = true; el.classList.add('rbac-disabled'); });
+                        }
+                    });
+                    // Hide settings tab & content
+                    const settingsBtn = document.querySelector('.tab-button[data-tab="settings"]');
+                    if (settingsBtn) settingsBtn.style.display = 'none';
+                    const settingsTab = document.getElementById('settings-tab');
+                    if (settingsTab) settingsTab.remove();
+                    // Add read-only badge
+                    const header = document.querySelector('.financial-header');
+                    if (header && !document.getElementById('readOnlyBadge')) {
+                        const badge = document.createElement('div');
+                        badge.id = 'readOnlyBadge';
+                        badge.style.cssText = 'margin-top:10px;font-size:0.70rem;background:#ffffff;color:#444;padding:6px 10px;border-radius:6px;display:inline-block;border:1px solid #e2e8f0;';
+                        badge.textContent = 'Read-only financial reporting access';
+                        header.appendChild(badge);
+                    }
+                    // Prevent submission just in case
+                    document.addEventListener('submit', e => {
+                        if (e.target && (e.target.id === 'commission-form' || e.target.id === 'delivery-fee-form')) {
+                            e.preventDefault();
+                        }
+                    }, true);
+                }
+            } catch (e) {
+                console.error('RBAC init failed:', e);
+            }
+        })();
     </script>
 </body>
 </html>

@@ -337,12 +337,22 @@ async function handleDriverChatConnect(connectionId, message, apiGatewayClient) 
                 driverPhone,
                 status: 'waiting_for_agent',
                 createdAt: new Date().toISOString(),
+                userType: 'driver',
+                source: 'wizzdriver_app',
+                userDisplayName: driverName,
                 messages: []
             }
         }));
 
         // Notify all agents about new chat session
-        await notifyAgentsOfNewSession(sessionId, { driverId, driverName, driverPhone }, apiGatewayClient);
+        await notifyAgentsOfNewSession(sessionId, {
+            driverId,
+            driverName,
+            driverPhone,
+            userType: 'driver',
+            source: 'wizzdriver_app',
+            userDisplayName: driverName
+        }, apiGatewayClient);
 
         // Send confirmation to driver
         const response = {

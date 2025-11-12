@@ -12,6 +12,10 @@
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <!-- Security utilities -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
     <style>
         /* Modal dialog styles */
         .modal {
@@ -848,7 +852,7 @@
 
         .validity-date i {
             font-size: 11px;
-            color: var(--md-sys-color-error);
+            color: var (--md-sys-color-error);
         }
 
         /* ===== END MERCHANT DISCOUNTS TABLE STYLES ===== */
@@ -1202,7 +1206,7 @@
                                 Total: <strong id="totalCampaigns" style="color: var(--md-sys-color-on-secondary-container);">0</strong>
                             </span>
                         </div>
-                        <button id="createCampaignBtn" class="btn-primary"
+                        <button id="createCampaignBtn" class="btn-primary" data-write-only
                             style="padding: 0.5rem 1rem; font-size: 0.9rem;">
                             <i class="fas fa-plus"></i> Create Campaign
                         </button>
@@ -1213,28 +1217,28 @@
                 <div class="campaign-types-grid"
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
                     <div class="campaign-type-card"
-                        onclick="window.campaignManager && window.campaignManager.createCampaignType('first-order')"
+                        onclick="window.campaignManager && window.campaignManager.createCampaignType('first-order')" data-write-only
                         style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-secondary)); color: var(--md-sys-color-on-primary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-star" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">First Order</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Welcome new customers with special discounts</p>
                     </div>
                     <div class="campaign-type-card"
-                        onclick="window.campaignManager && window.campaignManager.createCampaignType('restaurant-first')"
+                        onclick="window.campaignManager && window.campaignManager.createCampaignType('restaurant-first')" data-write-only
                         style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-secondary), var(--md-sys-color-primary)); color: var(--md-sys-color-on-secondary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-utensils" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">Restaurant First Order</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">First order from specific restaurants</p>
                     </div>
                     <div class="campaign-type-card"
-                        onclick="window.campaignManager && window.campaignManager.createCampaignType('new-customer')"
+                        onclick="window.campaignManager && window.campaignManager.createCampaignType('new-customer')" data-write-only
                         style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-tertiary), var(--md-sys-color-primary)); color: var(--md-sys-color-on-tertiary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-user-plus" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">New Customer</h4>
                         <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Exclusive offers for newly registered users</p>
                     </div>
                     <div class="campaign-type-card"
-                        onclick="window.campaignManager && window.campaignManager.createCampaignType('special-occasion')"
+                        onclick="window.campaignManager && window.campaignManager.createCampaignType('special-occasion')" data-write-only
                         style="cursor: pointer; padding: 1rem; background: linear-gradient(135deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary)); color: var(--md-sys-color-on-primary); border-radius: 8px; text-align: center; transition: transform 0.2s;">
                         <i class="fas fa-calendar-alt" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
                         <h4 style="margin: 0; margin-bottom: 0.5rem;">Special Occasions</h4>
@@ -1489,65 +1493,73 @@
                         return typeMap[type] || type || 'General';
                     };
 
-                    tbody.innerHTML = this.campaigns.map(campaign => `
-                        <tr class="campaign-row">
-                            <td class="campaign-name-cell">
-                                <div class="campaign-name">${campaign.name || 'Untitled Campaign'}</div>
-                                ${campaign.description ? `<div class="campaign-description">${campaign.description}</div>` : ''}
-                            </td>
-                            <td class="campaign-type-cell">
-                                <span class="type-badge type-${(campaign.type || 'general').replace(/[^a-z0-9]/gi, '-')}">${formatType(campaign.type)}</span>
-                            </td>
-                            <td class="campaign-target-cell">
-                                <span class="target-text">${formatTarget(campaign.targetAudience)}</span>
-                            </td>
-                            <td class="campaign-discount-cell">
-                                <div class="discount-value">
-                                    ${campaign.discountType === 'percentage' ? 
-                                        `<span class="discount-number">${campaign.discountValue}%</span>` : 
-                                        `<span class="discount-number">${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatCurrency(campaign.discountValue) : campaign.discountValue}</span>`}
-                                </div>
-                                ${campaign.minimumOrderValue ? `<div class="min-order">Min: ${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatCurrency(campaign.minimumOrderValue) : campaign.minimumOrderValue}</div>` : ''}
-                            </td>
-                            <td class="campaign-status-cell">
-                                <span class="status-badge status-${campaign.status || 'inactive'}">
-                                    <i class="fas fa-circle"></i> ${(campaign.status || 'inactive').toUpperCase()}
-                                </span>
-                            </td>
-                            <td class="campaign-usage-cell">
-                                <div class="usage-container">
-                                    <div class="usage-text">${campaign.usage || 0} / ${campaign.maxUsage || '∞'}</div>
-                                    ${campaign.maxUsage ? `
-                                        <div class="usage-bar">
-                                            <div class="usage-fill" style="width: ${Math.min(((campaign.usage || 0) / campaign.maxUsage) * 100, 100)}%"></div>
+                    tbody.innerHTML = SecurityUtils.sanitizeHTML(
+                        this.campaigns.map(campaign => {
+                            // Sanitize user-generated content to prevent XSS
+                            const safeName = SecurityUtils.escapeHTML(campaign.name || 'Untitled Campaign');
+                            const safeDescription = campaign.description ? SecurityUtils.escapeHTML(campaign.description) : '';
+
+                            return `
+                            <tr class="campaign-row">
+                                <td class="campaign-name-cell">
+                                    <div class="campaign-name">${safeName}</div>
+                                    ${safeDescription ? `<div class="campaign-description">${safeDescription}</div>` : ''}
+                                </td>
+                                <td class="campaign-type-cell">
+                                    <span class="type-badge type-${(campaign.type || 'general').replace(/[^a-z0-9]/gi, '-')}">${formatType(campaign.type)}</span>
+                                </td>
+                                <td class="campaign-target-cell">
+                                    <span class="target-text">${formatTarget(campaign.targetAudience)}</span>
+                                </td>
+                                <td class="campaign-discount-cell">
+                                    <div class="discount-value">
+                                        ${campaign.discountType === 'percentage' ?
+                                    `<span class="discount-number">${campaign.discountValue}%</span>` :
+                                    `<span class="discount-number">${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatCurrency(campaign.discountValue) : campaign.discountValue}</span>`}
+                                    </div>
+                                    ${campaign.minimumOrderValue ? `<div class="min-order">Min: ${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatCurrency(campaign.minimumOrderValue) : campaign.minimumOrderValue}</div>` : ''}
+                                </td>
+                                <td class="campaign-status-cell">
+                                    <span class="status-badge status-${campaign.status || 'inactive'}">
+                                        <i class="fas fa-circle"></i> ${(campaign.status || 'inactive').toUpperCase()}
+                                    </span>
+                                </td>
+                                <td class="campaign-usage-cell">
+                                    <div class="usage-container">
+                                        <div class="usage-text">${campaign.usage || 0} / ${campaign.maxUsage || '∞'}</div>
+                                        ${campaign.maxUsage ? `
+                                            <div class="usage-bar">
+                                                <div class="usage-fill" style="width: ${Math.min(((campaign.usage || 0) / campaign.maxUsage) * 100, 100)}%"></div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                                <td class="campaign-period-cell">
+                                    <div class="period-dates">
+                                        <div class="date-line">
+                                            <i class="fas fa-calendar-check"></i>
+                                            <span>${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatDate(campaign.startDate) : campaign.startDate}</span>
                                         </div>
-                                    ` : ''}
-                                </div>
-                            </td>
-                            <td class="campaign-period-cell">
-                                <div class="period-dates">
-                                    <div class="date-line">
-                                        <i class="fas fa-calendar-check"></i>
-                                        <span>${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatDate(campaign.startDate) : campaign.startDate}</span>
+                                        <div class="date-line">
+                                            <i class="fas fa-calendar-times"></i>
+                                            <span>${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatDate(campaign.endDate) : campaign.endDate}</span>
+                                        </div>
                                     </div>
-                                    <div class="date-line">
-                                        <i class="fas fa-calendar-times"></i>
-                                        <span>${window.WizzCampaignsAPI ? window.WizzCampaignsAPI.formatDate(campaign.endDate) : campaign.endDate}</span>
+                                </td>
+                                <td class="campaign-actions-cell">
+                                    <div class="action-buttons">
+                                        <button class="action-btn edit-btn" onclick="alert('Edit campaign: ${campaign.id}')" title="Edit Campaign" data-write-only>
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="action-btn delete-btn" onclick="alert('Delete campaign: ${campaign.id}')" title="Delete Campaign" data-write-only>
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
                                     </div>
-                                </div>
-                            </td>
-                            <td class="campaign-actions-cell">
-                                <div class="action-buttons">
-                                    <button class="action-btn edit-btn" onclick="alert('Edit campaign: ${campaign.id}')" title="Edit Campaign">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="action-btn delete-btn" onclick="alert('Delete campaign: ${campaign.id}')" title="Delete Campaign">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `).join('');
+                                </td>
+                            </tr>
+                        `;
+                        }).join('')
+                    );
                 }
                 
                 openCampaignModal() {
@@ -1904,62 +1916,74 @@
             return;
         }
 
-        tbody.innerHTML = merchantDiscounts.map(discount => `
-            <tr class="discount-row">
-                <td class="discount-name-cell">
-                    <div class="discount-code">${discount.discountCode || 'N/A'}</div>
-                    ${discount.description ? `<div class="discount-description">${discount.description}</div>` : ''}
-                </td>
-                <td class="merchant-name-cell">
-                    <div class="merchant-name">${discount.merchantName || 'Unknown Merchant'}</div>
-                    <div class="merchant-id">ID: ${discount.merchantId || 'N/A'}</div>
-                </td>
-                <td class="discount-type-cell">
-                    <span class="type-badge type-${discount.discountType}">
-                        ${discount.discountType === 'percentage' ? 'Percentage' : 'Fixed Amount'}
-                    </span>
-                </td>
-                <td class="discount-value-cell">
-                    <div class="discount-value">
-                        ${discount.discountType === 'percentage' ? 
-                            `<span class="discount-number">${discount.discountValue}%</span>` : 
-                            `<span class="discount-number">${window.WizzMerchantDiscountsAPI.formatCurrency(discount.discountValue)}</span>`}
-                    </div>
-                    ${discount.minimumOrderValue ? `<div class="min-order">Min: ${window.WizzMerchantDiscountsAPI.formatCurrency(discount.minimumOrderValue)}</div>` : ''}
-                </td>
-                <td class="discount-status-cell">
-                    <span class="status-badge status-${discount.status || 'inactive'}">
-                        <i class="fas fa-circle"></i> ${(discount.status || 'inactive').toUpperCase()}
-                    </span>
-                </td>
-                <td class="discount-usage-cell">
-                    <div class="usage-container">
-                        <div class="usage-text">${discount.usage || 0} / ${discount.maxUsage || '∞'}</div>
-                        ${discount.maxUsage ? `
-                            <div class="usage-bar">
-                                <div class="usage-fill" style="width: ${Math.min(((discount.usage || 0) / discount.maxUsage) * 100, 100)}%"></div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </td>
-                <td class="discount-validity-cell">
-                    <div class="validity-date">
-                        <i class="fas fa-calendar-times"></i>
-                        <span>${window.WizzMerchantDiscountsAPI.formatDate(discount.validUntil)}</span>
-                    </div>
-                </td>
-                <td class="discount-actions-cell">
-                    <div class="action-buttons">
-                        <button class="action-btn edit-btn" onclick="editMerchantDiscount('${discount.id}')" title="Edit Discount">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="action-btn delete-btn" onclick="deleteMerchantDiscount('${discount.id}')" title="Delete Discount">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = SecurityUtils.sanitizeHTML(
+            merchantDiscounts.map(discount => {
+                // Sanitize user-generated content to prevent XSS
+                const safeDiscountCode = SecurityUtils.escapeHTML(discount.discountCode || 'N/A');
+                const safeDescription = discount.description ? SecurityUtils.escapeHTML(discount.description) : '';
+                const safeMerchantName = SecurityUtils.escapeHTML(discount.merchantName || 'Unknown Merchant');
+                const safeMerchantId = SecurityUtils.escapeHTML(discount.merchantId || 'N/A');
+                const safeStatus = SecurityUtils.escapeHTML(discount.status || 'inactive');
+                const safeId = SecurityUtils.escapeHTML(discount.id || '');
+
+                return `
+                <tr class="discount-row">
+                    <td class="discount-name-cell">
+                        <div class="discount-code">${safeDiscountCode}</div>
+                        ${safeDescription ? `<div class="discount-description">${safeDescription}</div>` : ''}
+                    </td>
+                    <td class="merchant-name-cell">
+                        <div class="merchant-name">${safeMerchantName}</div>
+                        <div class="merchant-id">ID: ${safeMerchantId}</div>
+                    </td>
+                    <td class="discount-type-cell">
+                        <span class="type-badge type-${discount.discountType}">
+                            ${discount.discountType === 'percentage' ? 'Percentage' : 'Fixed Amount'}
+                        </span>
+                    </td>
+                    <td class="discount-value-cell">
+                        <div class="discount-value">
+                            ${discount.discountType === 'percentage' ?
+                        `<span class="discount-number">${discount.discountValue}%</span>` :
+                        `<span class="discount-number">${window.WizzMerchantDiscountsAPI.formatCurrency(discount.discountValue)}</span>`}
+                        </div>
+                        ${discount.minimumOrderValue ? `<div class="min-order">Min: ${window.WizzMerchantDiscountsAPI.formatCurrency(discount.minimumOrderValue)}</div>` : ''}
+                    </td>
+                    <td class="discount-status-cell">
+                        <span class="status-badge status-${safeStatus}">
+                            <i class="fas fa-circle"></i> ${SecurityUtils.escapeHTML((discount.status || 'inactive').toUpperCase())}
+                        </span>
+                    </td>
+                    <td class="discount-usage-cell">
+                        <div class="usage-container">
+                            <div class="usage-text">${discount.usage || 0} / ${discount.maxUsage || '∞'}</div>
+                            ${discount.maxUsage ? `
+                                <div class="usage-bar">
+                                    <div class="usage-fill" style="width: ${Math.min(((discount.usage || 0) / discount.maxUsage) * 100, 100)}%"></div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </td>
+                    <td class="discount-validity-cell">
+                        <div class="validity-date">
+                            <i class="fas fa-calendar-times"></i>
+                            <span>${window.WizzMerchantDiscountsAPI.formatDate(discount.validUntil)}</span>
+                        </div>
+                    </td>
+                    <td class="discount-actions-cell">
+                        <div class="action-buttons">
+                            <button class="action-btn edit-btn" onclick="editMerchantDiscount('${safeId}')" title="Edit Discount" data-write-only>
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn delete-btn" onclick="deleteMerchantDiscount('${safeId}')" title="Delete Discount" data-write-only>
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            }).join('')
+        );
     }
 
     // Update merchant discount statistics
@@ -2060,6 +2084,19 @@
         loadSidebar();
     }
 </script>
+    <script>
+        (async function () {
+            try {
+                await RBAC.ensure();
+                // Enforce RBAC - New system auto-detects page name
+                window.RBAC.enforcePage();
+                if (!RBAC.can('campaigns', 'write')) {
+                    RBAC.applyReadOnly('body', 'campaigns');
+                    document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+                }
+            } catch (e) { console.warn('RBAC init failed', e); }
+        })();
+    </script>
 </body>
 
 </html>

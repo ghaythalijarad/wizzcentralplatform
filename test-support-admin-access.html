@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Support Admin Access</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 Support Admin RBAC Access Test</h1>
+    
+    <div id="auth-status" class="test-result info">
+        <strong>Authentication Status:</strong> <span id="auth-text">Checking...</span>
+    </div>
+
+    <div id="user-info" class="test-result info">
+        <strong>User Info:</strong>
+        <pre id="user-info-text">Loading...</pre>
+    </div>
+
+    <div id="group-info" class="test-result info">
+        <strong>User Groups:</strong>
+        <pre id="group-info-text">Loading...</pre>
+    </div>
+
+    <div id="access-test" class="test-result info">
+        <strong>Page Access Tests:</strong>
+        <pre id="access-test-text">Loading...</pre>
+    </div>
+
+    <div>
+        <button onclick="window.location.href='frontend/pages/merchants.html'">Test Merchants Page</button>
+        <button onclick="window.location.href='frontend/pages/drivers.html'">Test Drivers Page</button>
+        <button onclick="window.location.href='frontend/pages/support.html'">Test Support Page</button>
+        <button onclick="window.location.href='frontend/pages/dashboard.html'">Test Dashboard</button>
+    </div>
+
+    <script src="frontend/assets/js/auth.js"></script>
+    <script src="frontend/assets/js/rbac.js"></script>
+    <script>
+        // Test script
+        console.log('🧪 Starting RBAC tests...');
+
+        function runTests() {
+            try {
+                // Check authentication
+                const idToken = sessionStorage.getItem('idToken');
+                const accessToken = sessionStorage.getItem('accessToken');
+                
+                if (!idToken || !accessToken) {
+                    document.getElementById('auth-text').textContent = '❌ Not authenticated - please login first';
+                    document.getElementById('auth-status').className = 'test-result error';
+                    return;
+                }
+
+                document.getElementById('auth-text').textContent = '✅ Authenticated';
+                document.getElementById('auth-status').className = 'test-result success';
+
+                // Get user info
+                const payload = JSON.parse(atob(idToken.split('.')[1]));
+                document.getElementById('user-info-text').textContent = JSON.stringify({
+                    email: payload.email,
+                    sub: payload.sub,
+                    groups: payload['cognito:groups']
+                }, null, 2);
+
+                // Get groups
+                const groups = window.RBAC.getUserGroups();
+                const primaryGroup = window.RBAC.getPrimaryGroup();
+                document.getElementById('group-info-text').textContent = JSON.stringify({
+                    allGroups: groups,
+                    primaryGroup: primaryGroup,
+                    displayName: window.RBAC.getRoleDisplayName()
+                }, null, 2);
+
+                // Test page access
+                const pagesToTest = [
+                    'dashboard.html',
+                    'support.html',
+                    'merchants.html',
+                    'drivers.html',
+                    'customers.html',
+                    'orders.html',
+                    'financial-management.html',
+                    'promotions.html',
+                    'regions.html'
+                ];
+
+                const accessResults = {};
+                pagesToTest.forEach(page => {
+                    const hasAccess = window.RBAC.hasPageAccess(page);
+                    accessResults[page] = hasAccess ? '✅ ALLOWED' : '❌ DENIED';
+                });
+
+                document.getElementById('access-test-text').textContent = JSON.stringify(accessResults, null, 2);
+
+                // Check if support_admin can access merchants and drivers
+                const isSupportAdmin = groups.includes('support_admin');
+                if (isSupportAdmin) {
+                    const merchantsAccess = window.RBAC.hasPageAccess('merchants.html');
+                    const driversAccess = window.RBAC.hasPageAccess('drivers.html');
+                    
+                    if (merchantsAccess && driversAccess) {
+                        document.getElementById('access-test').className = 'test-result success';
+                    } else {
+                        document.getElementById('access-test').className = 'test-result error';
+                        document.getElementById('access-test-text').textContent += '\n\n⚠️ WARNING: support_admin should have access to merchants and drivers pages!';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Test error:', error);
+                document.getElementById('auth-text').textContent = '❌ Error: ' + error.message;
+                document.getElementById('auth-status').className = 'test-result error';
+            }
+        }
+
+        // Run tests when RBAC is loaded
+        if (window.RBAC) {
+            runTests();
+        } else {
+            setTimeout(runTests, 1000);
+        }
+    </script>
+</body>
+</html>

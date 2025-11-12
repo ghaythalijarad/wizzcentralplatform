@@ -193,6 +193,8 @@
     <script src="../config.js"></script>
     <script src="../assets/js/auth-utils.js"></script>
     <script src="../assets/js/aws-utils.js"></script>
+    <!-- XSS Protection -->
+    <script src="../assets/js/security-utils.js"></script>
     <script src="../customer-points-service.js"></script>
     
     <script>
@@ -279,32 +281,49 @@
                 return;
             }
             
-            tbody.innerHTML = customers.map(customer => `
-                <tr>
-                    <td>
-                        <strong>${customer.name}</strong><br>
-                        <small style="color: #666;">ID: ${customer.id}</small>
-                    </td>
-                    <td>
-                        ${customer.email}<br>
-                        <small style="color: #666;">${customer.phone}</small>
-                    </td>
-                    <td>
-                        <span class="status-badge status-${customer.status}">
-                            ${customer.status.toUpperCase()}
-                        </span>
-                    </td>
-                    <td>${customer.totalOrders}</td>
-                    <td>${customer.totalSpent.toLocaleString()} IQD</td>
-                    <td>${customer.points.toLocaleString()}</td>
-                    <td>${customer.lastOrder}</td>
-                    <td>
-                        <span style="text-transform: capitalize; color: #666;">
-                            ${customer.segment}
-                        </span>
-                    </td>
-                </tr>
-            `).join('');
+            // XSS Protection: Sanitize all customer fields
+            const rows = customers.map(customer => {
+                const safeName = SecurityUtils.escapeHTML(customer.name || 'N/A');
+                const safeId = SecurityUtils.escapeHTML(customer.id || 'N/A');
+                const safeEmail = SecurityUtils.escapeHTML(customer.email || 'N/A');
+                const safePhone = SecurityUtils.escapeHTML(customer.phone || 'N/A');
+                const safeStatus = SecurityUtils.escapeHTML(customer.status || 'unknown');
+                const safeStatusUpper = SecurityUtils.escapeHTML((customer.status || 'unknown').toUpperCase());
+                const safeTotalOrders = SecurityUtils.escapeHTML(String(customer.totalOrders || 0));
+                const safeTotalSpent = SecurityUtils.escapeHTML((customer.totalSpent || 0).toLocaleString());
+                const safePoints = SecurityUtils.escapeHTML((customer.points || 0).toLocaleString());
+                const safeLastOrder = SecurityUtils.escapeHTML(customer.lastOrder || 'N/A');
+                const safeSegment = SecurityUtils.escapeHTML(customer.segment || 'regular');
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${safeName}</strong><br>
+                            <small style="color: #666;">ID: ${safeId}</small>
+                        </td>
+                        <td>
+                            ${safeEmail}<br>
+                            <small style="color: #666;">${safePhone}</small>
+                        </td>
+                        <td>
+                            <span class="status-badge status-${safeStatus}">
+                                ${safeStatusUpper}
+                            </span>
+                        </td>
+                        <td>${safeTotalOrders}</td>
+                        <td>${safeTotalSpent} IQD</td>
+                        <td>${safePoints}</td>
+                        <td>${safeLastOrder}</td>
+                        <td>
+                            <span style="text-transform: capitalize; color: #666;">
+                                ${safeSegment}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = SecurityUtils.sanitizeHTML(rows);
         }
         
         // Update statistics
@@ -320,12 +339,14 @@
         // Show error message
         function showError(message) {
             const tbody = document.getElementById('customersTableBody');
-            tbody.innerHTML = `
+            // XSS Protection: Sanitize error message
+            const safeMessage = SecurityUtils.escapeHTML(message);
+            tbody.innerHTML = SecurityUtils.sanitizeHTML(`
                 <tr>
                     <td colspan="8">
                         <div class="error-message">
                             <h3><i class="fas fa-exclamation-triangle"></i> Error Loading Customer Data</h3>
-                            <p><strong>Error:</strong> ${message}</p>
+                            <p><strong>Error:</strong> ${safeMessage}</p>
                             <p><strong>Possible causes:</strong></p>
                             <ul>
                                 <li>AWS credentials not configured</li>
@@ -339,7 +360,7 @@
                         </div>
                     </td>
                 </tr>
-            `;
+            `);
             
             // Update stats with error indicators
             ['totalCustomers', 'activeCustomers', 'vipCustomers', 'totalRevenue'].forEach(id => {

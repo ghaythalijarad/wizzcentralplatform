@@ -157,6 +157,8 @@ async function handleMessage(connectionId, body, apiGatewayClient) {
         switch (messageType) {
             case 'chat_init':
                 return await handleChatInit(connectionId, message, apiGatewayClient);
+            case 'chat_merchant_connect':
+                return await handleMerchantConnect(connectionId, message, apiGatewayClient);
             case 'chat_message':
                 return await handleChatMessage(connectionId, message, apiGatewayClient);
             case 'agent_connect':
@@ -250,6 +252,130 @@ async function handleChatInit(connectionId, message, apiGatewayClient) {
         await sendToConnection(connectionId, {
             type: 'error',
             message: 'Failed to initialize chat session'
+        }, apiGatewayClient);
+        return { statusCode: 500 };
+    }
+}
+
+/**
+ * Handle merchant connection for support chat
+ */
+async function handleMerchantConnect(connectionId, message, apiGatewayClient) {
+    console.log('🏪 Merchant connecting to support chat');
+    
+    const { merchantId, merchantName, merchantEmail, sessionId: providedSessionId } = message;
+    
+    if (!merchantId) {
+        console.warn('❌ Missing merchantId in merchant connect');
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'merchantId is required'
+        }, apiGatewayClient);
+        return { statusCode: 400 };
+    }
+    
+    // Generate or use provided session ID
+    const sessionId = providedSessionId || `chat_merchant_${merchantId}_${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    try {
+        // Check if session already exists
+        let session;
+        try {
+            const result = await dynamoDB.send(new GetCommand({
+                TableName: CHAT_SESSIONS_TABLE,
+                Key: { sessionId }
+            }));
+            session = result.Item;
+        } catch (err) {
+            console.log('Session not found, will create new one');
+        }
+        
+        // Create new session if doesn't exist
+        if (!session) {
+            await dynamoDB.send(new PutCommand({
+                TableName: CHAT_SESSIONS_TABLE,
+                Item: {
+                    sessionId,
+                    userId: merchantId,
+                    userType: 'merchant',
+                    userDisplayName: merchantName || `Merchant ${merchantId}`,
+                    merchantId,
+                    merchantName: merchantName || `Merchant ${merchantId}`,
+                    merchantEmail: merchantEmail || '',
+                    status: 'active',
+                    createdAt: now,
+                    lastMessageAt: now,
+                    agentId: null,
+                    agentName: null,
+                    unreadAgent: 0,
+                    unreadMerchant: 0,
+                    context: {
+                        app: 'whizzMerchants',
+                        merchantId,
+                        merchantName,
+                        merchantEmail
+                    }
+                }
+            }));
+            
+            console.log(`✅ Merchant chat session created: ${sessionId}`);
+            
+            // Notify all agents about new merchant session
+            await notifyAgents({
+                type: 'new_chat_session',
+                sessionId,
+                userType: 'merchant',
+                userDisplayName: merchantName || `Merchant ${merchantId}`,
+                merchantId,
+                merchantName,
+                createdAt: now
+            }, apiGatewayClient);
+        } else {
+            console.log(`✅ Merchant reconnected to existing session: ${sessionId}`);
+        }
+        
+        // Update connection info
+        await dynamoDB.send(new PutCommand({
+            TableName: WEBSOCKET_CONNECTIONS_TABLE,
+            Item: {
+                connectionId,
+                userType: 'merchant',
+                userId: merchantId,
+                merchantId,
+                merchantName,
+                sessionId,
+                connectedAt: now,
+                lastSeen: now,
+                status: 'connected'
+            }
+        }));
+        
+        // Send confirmation to merchant
+        await sendToConnection(connectionId, {
+            type: 'connection_confirmed',
+            sessionId,
+            merchantId,
+            status: 'connected',
+            timestamp: now
+        }, apiGatewayClient);
+        
+        // Send chat session created message
+        await sendToConnection(connectionId, {
+            type: 'chat_session_created',
+            sessionId,
+            merchantId,
+            status: 'active',
+            timestamp: now
+        }, apiGatewayClient);
+        
+        return { statusCode: 200 };
+    } catch (error) {
+        console.error('❌ Merchant connect error:', error);
+        await sendToConnection(connectionId, {
+            type: 'error',
+            message: 'Failed to connect merchant to support chat',
+            error: error.message
         }, apiGatewayClient);
         return { statusCode: 500 };
     }
@@ -709,9 +835,14 @@ async function sendActiveSessions(connectionId, apiGatewayClient) {
         
         const sessions = (result.Items || []).map(session => ({
             sessionId: session.sessionId,
+            userType: session.userType || 'driver',
             driverName: session.driverName || session.userDisplayName,
             driverId: session.driverId || session.userId,
             driverPhone: session.driverPhone || '',
+            merchantId: session.merchantId,
+            merchantName: session.merchantName,
+            merchantEmail: session.merchantEmail,
+            userId: session.userId,
             status: session.status,
             createdAt: session.createdAt,
             lastMessageAt: session.lastMessageAt || session.createdAt,

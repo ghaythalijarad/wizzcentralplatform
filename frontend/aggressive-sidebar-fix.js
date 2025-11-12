@@ -45,14 +45,21 @@ intervals.forEach(delay => {
 document.addEventListener('navigation:ready', aggressivelyForceExtended);
 
 // Override any attempts to add collapsed class
-const originalAdd = Element.prototype.classList.add;
-Element.prototype.classList.add = function(...classes) {
-    if ((this.id === 'sidebar' || this.id === 'mainContent') && 
-        (classes.includes('collapsed') || classes.includes('collapsed-sidebar'))) {
-        console.log('🛡️ BLOCKED attempt to add collapsed class to', this.id);
-        return; // Block the addition
+try {
+    if (window.Element && Element.prototype && Element.prototype.classList && Element.prototype.classList.add) {
+        const originalAdd = Element.prototype.classList.add;
+        Element.prototype.classList.add = function(...classes) {
+            try {
+                if (this instanceof Element && (this.id === 'sidebar' || this.id === 'mainContent')) {
+                    if (classes.includes('collapsed') || classes.includes('collapsed-sidebar')) {
+                        console.log('🛡️ BLOCKED attempt to add collapsed class to', this.id);
+                        return; // Block the addition
+                    }
+                }
+            } catch(_) { /* swallow */ }
+            return originalAdd.apply(this, classes);
+        };
     }
-    return originalAdd.apply(this, classes);
-};
+} catch (e) { console.warn('Aggressive sidebar patch: classList override skipped', e); }
 
 console.log('🛡️ Aggressive sidebar fix installed - blocking collapsed classes');

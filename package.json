@@ -12,11 +12,13 @@
     "playground": "node regions-api/server.js",
     "regions:upgrade-gsis": "node backend/upgrade-regions-indexes.js",
     "regions:seed-iraq": "node backend/seed-iraq-regions.js",
-    "regions:migrate-polygons": "node backend/migrate-center-radius-to-polygons.js"
+    "regions:migrate-polygons": "node backend/migrate-center-radius-to-polygons.js",
+    "test": "node --test"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.0.0",
     "@aws-amplify/backend-cli": "^1.0.0",
+    "supertest": "^7.1.4",
     "vite": "^5.0.0"
   },
   "dependencies": {
@@ -27,8 +29,12 @@
     "aws-amplify": "^6.0.0",
     "aws-sdk": "^2.1692.0",
     "cors": "^2.8.5",
+    "dompurify": "^3.3.0",
     "dotenv": "^17.2.1",
     "express": "^4.21.2",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "joi": "^17.13.3",
     "node-fetch": "^2.7.0",
     "ws": "^8.18.3"
   }

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Test Page</title>
+    <link rel="stylesheet" href="styles/material-3-design-system.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 40px;
+            font-family: 'Roboto', sans-serif;
+        }
+        .test-card {
+            background: var(--md-sys-color-surface-container);
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 CSS & Resources Test Page</h1>
+    
+    <div class="test-card">
+        <h2>Material 3 CSS Test</h2>
+        <p>If you see proper styling and rounded corners, Material 3 CSS is working.</p>
+    </div>
+
+    <div class="test-card">
+        <h2><i class="fas fa-check-circle"></i> Font Awesome Test</h2>
+        <p>If you see an icon above, Font Awesome is working.</p>
+    </div>
+
+    <div class="test-card">
+        <h2>Google Fonts Test</h2>
+        <p style="font-weight: 700;">This text should be in Roboto font (700 weight).</p>
+        <p style="font-weight: 300;">This text should be in Roboto font (300 weight).</p>
+    </div>
+
+    <script>
+        console.log('✅ JavaScript is working');
+        console.log('CSS Variables:', {
+            surface: getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-surface-container'),
+            primary: getComputedStyle(document.documentElement).getPropertyValue('--md-sys-color-primary')
+        });
+    </script>
+</body>
+</html>
