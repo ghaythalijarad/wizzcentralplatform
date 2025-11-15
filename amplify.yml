@@ -17,6 +17,8 @@ frontend:
         - cp frontend/index.html dist/index.html
         - echo "Adding redirects configuration..."
         - cp frontend/public/_redirects dist/_redirects 2>/dev/null || cp _redirects dist/_redirects 2>/dev/null || echo "No redirects file found"
+        - echo "Adding custom headers configuration..."
+        - cp frontend/public/customHeaders dist/customHeaders 2>/dev/null || echo "No customHeaders file found"
         - echo "Injecting API_BASE_URL env into config.js if provided by Amplify"
         - if [ -n "$API_BASE_URL" ]; then sed -i '' "s|window.__API_BASE_URL__|'$API_BASE_URL'|" dist/config.js || true; fi
         - echo "Listing build contents..."
