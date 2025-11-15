@@ -16,7 +16,7 @@
     }
     
     // Check authentication first
-    const idToken = sessionStorage.getItem('idToken');
+    const idToken = localStorage.getItem('idToken');
     if (!idToken) {
         console.warn('❌ No token, redirecting to login');
         window.location.href = '/index.html';

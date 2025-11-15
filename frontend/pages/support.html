@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>WizzCentral Platform - Live Support</title>
+    <title>منصة ويز المركزية - الدعم المباشر</title>
+    <!-- Support Internationalization -->
+    <script src="../assets/js/support-i18n.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -628,6 +630,24 @@
             }
         }
         
+        /* RTL-specific adjustments */
+        [dir="rtl"] .sessions-panel {
+            border-right: none;
+            border-left: 1px solid #e5e7eb;
+        }
+        
+        [dir="rtl"] .message {
+            direction: rtl;
+        }
+        
+        [dir="rtl"] .message.agent {
+            flex-direction: row;
+        }
+        
+        [dir="rtl"] .message:not(.agent) {
+            flex-direction: row-reverse;
+        }
+        
         @media (max-width: 768px) {
             .support-header {
                 padding: 1rem;
@@ -660,19 +680,24 @@
     <div class="main-content" id="mainContent">
         <div class="support-header">
             <div class="support-title">
-                <h1><i class="fas fa-headset"></i> Live Support</h1>
-                <p>Real-time customer assistance</p>
+                <h1><i class="fas fa-headset"></i> <span data-i18n="liveSupport">الدعم المباشر</span></h1>
+                <p data-i18n="realTimeAssistance">المساعدة الفورية للعملاء</p>
             </div>
             
             <div class="support-controls">
                 <div class="connection-status">
                     <div class="status-indicator" id="connectionIndicator"></div>
-                    <span id="connectionStatus">Connecting...</span>
+                    <span id="connectionStatus" data-i18n="connecting">جاري الاتصال...</span>
                 </div>
                 
+                <!-- Language switcher -->
+                <button class="quick-action-button" id="languageSwitcher" title="Switch Language / تبديل اللغة">
+                    <i class="fas fa-language"></i>
+                    <span id="currentLang">AR</span>
+                </button>
                 <!-- Reconnect button wired via JS to satisfy CSP -->
                 <button class="quick-action-button" id="reconnectBtn">
-                    <i class="fas fa-sync-alt"></i> Reconnect
+                    <i class="fas fa-sync-alt"></i> <span data-i18n="reconnect">إعادة الاتصال</span>
                 </button>
             </div>
         </div>
@@ -682,22 +707,22 @@
             <div class="sessions-panel">
                 <div class="sessions-header">
                     <div class="section-title">
-                        Active Conversations (<span id="activeSessions">0</span>)
+                        <span data-i18n="activeConversations">المحادثات النشطة</span> (<span id="activeSessions">0</span>)
                     </div>
                 </div>
                 
                 <div class="sessions-list" id="sessionsList">
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
-                        <h3>No active conversations</h3>
-                        <p>New conversations will appear here when customers start chatting</p>
+                        <h3 data-i18n="noActiveConversations">لا توجد محادثات نشطة</h3>
+                        <p data-i18n="noActiveConversationsDesc">ستظهر المحادثات الجديدة هنا عندما يبدأ العملاء بالدردشة</p>
                     </div>
                 </div>
                 <!-- Closed Sessions Section -->
                 <div class="sessions-header" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
                     <div class="section-title" style="display: flex; align-items: center; gap: 0.5rem;">
                         <i class="fas fa-archive" style="font-size: 0.875rem;"></i>
-                        <span>Closed Sessions (Last 2h)</span>
+                        <span data-i18n="closedSessions">الجلسات المغلقة (آخر ساعتين)</span>
                         <span id="closedSessionsCount"
                             style="background: #6c757d; color: white; padding: 0.125rem 0.5rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 600;">0</span>
                     </div>
@@ -706,7 +731,7 @@
                 <div class="sessions-list" id="closedSessionsList" style="max-height: 300px; overflow-y: auto;">
                     <div class="empty-state-small" style="padding: 2rem; text-align: center; color: #999;">
                         <i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
-                        <p style="margin: 0; font-size: 0.875rem;">No recently closed sessions</p>
+                        <p style="margin: 0; font-size: 0.875rem;" data-i18n="noClosedSessions">لا توجد جلسات مغلقة مؤخراً</p>
                     </div>
                 </div>
             </div>
@@ -716,24 +741,25 @@
             <div class="chat-header">
                 <div class="chat-title">
                     <i class="fas fa-user"></i>
-                    <h2 id="chatTitle">Select a conversation</h2>
+                    <h2 id="chatTitle" data-i18n="selectConversation">اختر محادثة</h2>
                 </div>
                 <div class="chat-actions">
                     <button class="btn btn-secondary" id="endSessionBtn" style="display: none;" data-write-only>
-                        <i class="fas fa-times"></i> End Session
+                        <i class="fas fa-times"></i> <span data-i18n="endSession">إنهاء الجلسة</span>
                     </button>
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages">
                 <div class="empty-state">
                     <i class="fas fa-comments"></i>
-                    <h3>Welcome to Support Dashboard</h3>
-                    <p>Select an active conversation from the sidebar to start helping customers</p>
+                    <h3 data-i18n="welcomeToSupport">مرحباً بك في لوحة الدعم</h3>
+                    <p data-i18n="selectConversationDesc">اختر محادثة نشطة من الشريط الجانبي لبدء مساعدة العملاء</p>
                 </div>
             </div>
             <div class="chat-input" id="chatInputArea" style="display: none;" data-write-only>
                 <div class="input-container">
-                    <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                    <textarea class="message-input" id="messageInput" data-i18n-placeholder="typeYourMessage" placeholder="اكتب رسالتك..."
+                        rows="1"></textarea>
                     <button class="send-button" id="sendButton">
                         <i class="fas fa-paper-plane"></i>
                     </button>
@@ -791,6 +817,38 @@
             // ▶️ De-dupe window to avoid echoing agent messages from server after optimistic append
             const DUPLICATE_WINDOW_MS = 3000;
 
+                // 🌐 Language switcher initialization
+                document.addEventListener('DOMContentLoaded', function () {
+                    const langSwitcher = document.getElementById('languageSwitcher');
+                    const currentLangSpan = document.getElementById('currentLang');
+
+                    // Update language indicator
+                    function updateLanguageIndicator() {
+                        if (currentLangSpan && window.SupportI18n) {
+                            currentLangSpan.textContent = window.SupportI18n.getLanguage().toUpperCase();
+                        }
+                    }
+
+                    // Language switcher click handler
+                    if (langSwitcher && window.SupportI18n) {
+                        langSwitcher.addEventListener('click', function () {
+                            const currentLang = window.SupportI18n.getLanguage();
+                            const newLang = currentLang === 'ar' ? 'en' : 'ar';
+                            window.SupportI18n.setLanguage(newLang);
+                            updateLanguageIndicator();
+
+                            // Update dynamic content
+                            updateConnectionStatus();
+                            updateSessionsList();
+                            updateClosedSessionsList();
+
+                            console.log(`🌐 Language switched to: ${newLang}`);
+                        });
+                    }
+
+                    updateLanguageIndicator();
+                });
+
             if (typeof window !== 'undefined') {
                 window.activeChatSessions = activeChatSessions;
                 try {
@@ -819,7 +877,7 @@
                 const delay = Math.floor(exp + jitter);
                 merchantReconnectAttempts++;
                 console.log(`🔄 Merchant WS reconnect in ${delay}ms (attempt ${merchantReconnectAttempts}) – reason: ${reason}`);
-                updateConnectionStatus('connecting', 'Reconnecting to live chat...');
+                updateConnectionStatus('connecting');
                 merchantReconnectTimer = setTimeout(() => {
                     initializeMerchantChatSystem();
                 }, delay);
@@ -891,11 +949,11 @@
                         if (!merchantChatWS) return;
                         const rs = merchantChatWS.readyState;
                         if (rs === WebSocket.OPEN) {
-                            updateConnectionStatus('connected', 'Connected to live chat as support agent');
+                            updateConnectionStatus('connected');
                         } else if (rs === WebSocket.CONNECTING) {
-                            updateConnectionStatus('connecting', 'Connecting to live chat...');
+                            updateConnectionStatus('connecting');
                         } else {
-                            updateConnectionStatus('disconnected', 'Reconnecting to live chat...');
+                            updateConnectionStatus('disconnected');
                         }
                     } catch (e) {
                         console.warn('Status watchdog error', e);
@@ -929,7 +987,7 @@
                     // Reset backoff and any pending timers
                     try { if (merchantReconnectTimer) clearTimeout(merchantReconnectTimer); } catch (_) { }
                     merchantReconnectAttempts = 0;
-                    updateConnectionStatus('connecting', 'Reconnecting to live chat...');
+                    updateConnectionStatus('connecting');
 
                 // Close current socket if present
                 if (merchantChatWS && merchantChatWS.readyState !== WebSocket.CLOSED) {
@@ -988,7 +1046,7 @@
                 };
 
                 // Update the UI status badge since this is the working connection
-                updateConnectionStatus('connected', 'Connected to live chat as support agent');
+                updateConnectionStatus('connected');
                 sendMerchantAgentConnect();
 
                 // Expose agent identity for subsequent join_channel actions
@@ -1008,14 +1066,14 @@
             merchantChatWS.onerror = (error) => {
                 console.error('❌ Merchant chat WebSocket error:', error);
                 // Briefly reflect error, then keep trying
-                updateConnectionStatus('connecting', 'Reconnecting to live chat...');
+                updateConnectionStatus('connecting');
                 scheduleMerchantReconnect('error');
             };
 
             merchantChatWS.onclose = (evt) => {
                 console.log('🔌 Merchant chat WebSocket disconnected – code:', evt?.code, 'reason:', evt?.reason);
                 // Update UI and schedule reconnect with backoff
-                updateConnectionStatus('disconnected', 'Reconnecting to live chat...');
+                updateConnectionStatus('disconnected');
                 scheduleMerchantReconnect('close');
             };
 
@@ -1041,10 +1099,21 @@
                 if (dot) {
                     dot.className = `status-indicator ${status}`;
                 }
-            if (text && typeof message === 'string') {
-                text.textContent = message;
+                if (text) {
+                    // Use i18n translation if message is a known key, otherwise use the provided message
+                    if (window.SupportI18n && !message) {
+                        // Map status to translation keys
+                        const statusKeyMap = {
+                            'connected': 'connected',
+                            'connecting': 'connecting',
+                            'disconnected': 'disconnected'
+                        };
+                        text.textContent = window.SupportI18n.t(statusKeyMap[status] || 'connecting');
+                    } else if (typeof message === 'string') {
+                        text.textContent = message;
+                    }
+                }
             }
-        }
 
             // Utility: safe HTML injection
             function safeText(text) {
@@ -1084,7 +1153,9 @@
                 if (items.length === 0) {
                     const empty = document.createElement('div');
                     empty.className = 'empty-state';
-                    empty.innerHTML = '<i class="fas fa-comments"></i><h3>No active conversations</h3><p>New conversations will appear here when customers start chatting</p>';
+                    const noActiveText = window.SupportI18n ? window.SupportI18n.t('noActiveConversations') : 'No active conversations';
+                    const noActiveDesc = window.SupportI18n ? window.SupportI18n.t('noActiveConversationsDesc') : 'New conversations will appear here when customers start chatting';
+                    empty.innerHTML = `<i class="fas fa-comments"></i><h3>${safeText(noActiveText)}</h3><p>${safeText(noActiveDesc)}</p>`;
                     list.appendChild(empty);
                 } else {
                     items.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
@@ -1105,10 +1176,11 @@
                                 <div class="message-time">${safeText(sess.time || '')}</div>
                             </div>
                         </div>`;
-                    list.appendChild(card);
-                });
+                        list.appendChild(card);
+                    });
+                }
+                if (activeCount) activeCount.textContent = String(merchantSessions.size);
             }
-            if (activeCount) activeCount.textContent = String(merchantSessions.size);
         }
 
             function selectSession(sessionId) {
@@ -1117,7 +1189,11 @@
                 const chatInputArea = document.getElementById('chatInputArea');
                 const endSessionBtn = document.getElementById('endSessionBtn');
                 const sess = merchantSessions.get(sessionId);
-                if (chatTitle) chatTitle.textContent = sess ? (sess.customer || sess.driverName || 'Conversation') : 'Select a conversation';
+
+                // Use i18n for chat title
+                const defaultTitle = window.SupportI18n ? window.SupportI18n.t('selectConversation') : 'Select a conversation';
+                if (chatTitle) chatTitle.textContent = sess ? (sess.customer || sess.driverName || 'Conversation') : defaultTitle;
+                
                 if (chatInputArea) chatInputArea.style.display = sess ? '' : 'none';
                 if (endSessionBtn) endSessionBtn.style.display = sess ? '' : 'none';
                 // Render existing messages if any
@@ -1126,7 +1202,10 @@
                 if (sess && Array.isArray(sess.messages)) {
                     sess.messages.forEach(m => appendMessageToChat(m));
                 } else if (chatMessages) {
-                    chatMessages.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><h3>Select a conversation</h3><p>Choose a conversation from the left to start helping customers</p></div>';
+                    // Use i18n for empty state
+                    const emptyTitle = window.SupportI18n ? window.SupportI18n.t('selectConversation') : 'Select a conversation';
+                    const emptyDesc = window.SupportI18n ? window.SupportI18n.t('selectConversationDesc') : 'Choose a conversation from the left to start helping customers';
+                    chatMessages.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>${emptyTitle}</h3><p>${emptyDesc}</p></div>`;
                 }
 
             // Join the session/channel on backend to receive history and mark assignment
@@ -1158,7 +1237,7 @@
             }
             if (type === 'agent_authenticated' || type === 'connection_confirmed') {
                 // Reflect connected status
-                updateConnectionStatus('connected', 'Connected to live chat as support agent');
+                updateConnectionStatus('connected');
                 return;
             }
 
@@ -1403,7 +1482,8 @@
                     const empty = document.createElement('div');
                     empty.className = 'empty-state-small';
                     empty.style.cssText = 'padding:2rem; text-align:center; color:#999;';
-                    empty.innerHTML = '<i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i><p style="margin: 0; font-size: 0.875rem;">No recently closed sessions</p>';
+                    const noClosedText = window.SupportI18n ? window.SupportI18n.t('noClosedSessions') : 'No recently closed sessions';
+                    empty.innerHTML = `<i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i><p style="margin: 0; font-size: 0.875rem;">${safeText(noClosedText)}</p>`;
                     list.appendChild(empty);
                 } else {
                     items.slice(0, 20).forEach(sess => {
@@ -1420,11 +1500,11 @@
                                 <div class="message-time">${safeText(new Date(sess.closedAt || Date.now()).toLocaleTimeString())}</div>
                             </div>
                         </div>`;
-                    list.appendChild(card);
-                });
+                        list.appendChild(card);
+                    });
+                }
+                if (countEl) countEl.textContent = String(items.length);
             }
-            if (countEl) countEl.textContent = String(items.length);
-        }
 </script>
     <script src="../aggressive-sidebar-fix.js"></script>
     <script src="../immediate-sidebar-fix.js"></script>

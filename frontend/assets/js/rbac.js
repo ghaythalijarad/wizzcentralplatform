@@ -63,7 +63,7 @@ window.RBAC_CONFIG = {
 window.RBAC = {
     getUserGroups() {
         try {
-            const idToken = sessionStorage.getItem('idToken');
+            const idToken = localStorage.getItem('idToken');
             if (!idToken) return [];
             const payload = JSON.parse(atob(idToken.split('.')[1]));
             return payload['cognito:groups'] || [];

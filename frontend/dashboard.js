@@ -464,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Show welcome message
 function showWelcomeMessage() {
-    const userEmail = sessionStorage.getItem('userEmail');
+    const userEmail = localStorage.getItem('userEmail');
 }
 
 // Show fallback statistics when data service is unavailable

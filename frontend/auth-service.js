@@ -71,12 +71,12 @@
                             refreshToken: result.getRefreshToken().getToken()
                         };
 
-                        // Store tokens in session storage
-                        sessionStorage.setItem('accessToken', tokens.accessToken);
-                        sessionStorage.setItem('idToken', tokens.idToken);
-                        sessionStorage.setItem('refreshToken', tokens.refreshToken);
-                        sessionStorage.setItem('userEmail', email);
-                        sessionStorage.setItem('isAuthenticated', 'true');
+                        // Store tokens in localStorage for persistence across sessions
+                        localStorage.setItem('accessToken', tokens.accessToken);
+                        localStorage.setItem('idToken', tokens.idToken);
+                        localStorage.setItem('refreshToken', tokens.refreshToken);
+                        localStorage.setItem('userEmail', email);
+                        localStorage.setItem('isAuthenticated', 'true');
 
                         resolve({
                             success: true,
@@ -181,12 +181,12 @@
                     currentUser.signOut();
                 }
                 
-                // Clear session storage
-                sessionStorage.removeItem('accessToken');
-                sessionStorage.removeItem('idToken');
-                sessionStorage.removeItem('refreshToken');
-                sessionStorage.removeItem('userEmail');
-                sessionStorage.removeItem('isAuthenticated');
+                // Clear localStorage
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('idToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('userEmail');
+                localStorage.removeItem('isAuthenticated');
                 
                 currentUser = null;
                 
@@ -207,16 +207,16 @@
 
     // Check if user is authenticated (also verify token not expired if possible)
     function isAuthenticated() {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         if (!idToken) return false;
         try {
             const payload = JSON.parse(atob(idToken.split('.')[1] || '')) || {};
             if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
                 // Expired
-                sessionStorage.removeItem('idToken');
-                sessionStorage.removeItem('accessToken');
-                sessionStorage.removeItem('refreshToken');
-                sessionStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('idToken');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('isAuthenticated');
                 return false;
             }
         } catch (_) {}
@@ -226,9 +226,9 @@
     // Get stored tokens
     function getTokens() {
         return {
-            accessToken: sessionStorage.getItem('accessToken'),
-            idToken: sessionStorage.getItem('idToken'),
-            refreshToken: sessionStorage.getItem('refreshToken')
+            accessToken: localStorage.getItem('accessToken'),
+            idToken: localStorage.getItem('idToken'),
+            refreshToken: localStorage.getItem('refreshToken')
         };
     }
 

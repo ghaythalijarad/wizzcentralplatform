@@ -28,9 +28,9 @@ window.AWSUtils = {
         try {
             const startTime = Date.now();
             const debugMode = sessionStorage.getItem('debugMode') === 'true';
-            const idToken = sessionStorage.getItem('idToken');
-            const accessToken = sessionStorage.getItem('accessToken');
-            const basicAuth = sessionStorage.getItem('isAuthenticated') === 'true' && !!sessionStorage.getItem('userEmail');
+            const idToken = localStorage.getItem('idToken');
+            const accessToken = localStorage.getItem('accessToken');
+            const basicAuth = localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('userEmail');
             // Allow forcing unauth credentials in debug via sessionStorage or query param
             const debugForceUnauth = debugMode && (
                 sessionStorage.getItem('debugForceUnauth') === 'true' ||
@@ -183,7 +183,7 @@ window.AWSUtils = {
             } catch (e) { }
             const onLogin = window.location.pathname.endsWith('/index.html');
             const loopBroken = sessionStorage.getItem('redirectLoop:broken') === 'true';
-            const basicAuth = sessionStorage.getItem('isAuthenticated') === 'true' && !!sessionStorage.getItem('userEmail');
+            const basicAuth = localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('userEmail');
             if (!this._redirectedThisLoad && !onLogin && !loopBroken && !basicAuth) {
                 this._redirectedThisLoad = true;
                 if (window.Auth && window.Auth.redirectToLogin) {

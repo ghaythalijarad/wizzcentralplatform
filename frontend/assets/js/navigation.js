@@ -505,8 +505,8 @@ class NavigationManager {
                 
                 try {
                     // First try: Get from sessionStorage directly
-                    userEmail = sessionStorage.getItem('userEmail') || '';
-                    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+                    userEmail = localStorage.getItem('userEmail') || '';
+                    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
                     
                     if (userEmail) {
                         userName = userEmail.split('@')[0]; // Use part before @
@@ -514,7 +514,7 @@ class NavigationManager {
                     }
                     
                     // Second try: Decode JWT token if available
-                    const token = sessionStorage.getItem('idToken');
+                    const token = localStorage.getItem('idToken');
                     if (token) {
                         try {
                             const payload = JSON.parse(atob(token.split('.')[1]));

@@ -10,7 +10,7 @@ window.RBAC = {
      */
     getUserGroups() {
         try {
-            const idToken = sessionStorage.getItem('idToken');
+            const idToken = localStorage.getItem('idToken');
             if (!idToken) {
                 console.warn('RBAC: No idToken found');
                 return [];

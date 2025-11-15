@@ -1145,7 +1145,7 @@
                 document.getElementById('dbg-build').textContent = build;
                 document.getElementById('dbg-path').textContent = location.pathname;
                 document.getElementById('dbg-drivers-src').textContent = s ? s.src : 'inline/unknown';
-                document.getElementById('dbg-auth').textContent = (sessionStorage.getItem('idToken') ? 'idToken=yes' : 'idToken=no') + ', user=' + (sessionStorage.getItem('userEmail')||'');
+                document.getElementById('dbg-auth').textContent = (localStorage.getItem('idToken') ? 'idToken=yes' : 'idToken=no') + ', user=' + (localStorage.getItem('userEmail') || '');
                 document.getElementById('dbg-aws').textContent = (window.AWSUtils && AWSUtils.isInitialized) ? 'initialized' : 'not-initialized';
                 document.getElementById('dbg-table').textContent = 'WhizzDrivers_dev';
                 // count filled by drivers.js when available

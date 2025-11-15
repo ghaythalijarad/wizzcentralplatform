@@ -402,13 +402,13 @@ class AmazonConnectFileService {
             // Try to get access token first, then ID token as fallback
             return window.Auth.getToken('accessToken') ||
                 window.Auth.getToken('idToken') ||
-                sessionStorage.getItem('accessToken') ||
-                sessionStorage.getItem('idToken');
+                localStorage.getItem('accessToken') ||
+                localStorage.getItem('idToken');
         }
 
         // Fallback to direct session storage access
-        return sessionStorage.getItem('accessToken') ||
-            sessionStorage.getItem('idToken') ||
+        return localStorage.getItem('accessToken') ||
+            localStorage.getItem('idToken') ||
             localStorage.getItem('authToken');
     }
 

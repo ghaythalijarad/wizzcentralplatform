@@ -554,10 +554,10 @@
             if (errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token')) {
                 console.warn('⚠️ Token expired, redirecting to login...');
                 // Clear expired tokens
-                sessionStorage.removeItem('idToken');
-                sessionStorage.removeItem('accessToken');
-                sessionStorage.removeItem('refreshToken');
-                sessionStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('idToken');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('isAuthenticated');
                 // Redirect to login
                 window.location.href = '/pages/login.html';
                 return;

@@ -1,8 +1,8 @@
 // WizzCentral Login Page Script (externalized for CSP compliance)
 (function initLoginPage(){
   try {
-    const isAuthed = sessionStorage.getItem('isAuthenticated') === 'true';
-    const idToken = sessionStorage.getItem('idToken');
+    const isAuthed = localStorage.getItem('isAuthenticated') === 'true';
+    const idToken = localStorage.getItem('idToken');
     if (isAuthed && idToken) {
       window.location.replace('/pages/dashboard.html');
       return; // Skip initialization if already logged in
@@ -70,16 +70,16 @@
             const accessToken = result.getAccessToken().getJwtToken();
             const idToken = result.getIdToken().getJwtToken();
             const refreshToken = result.getRefreshToken().getToken();
-            sessionStorage.setItem('accessToken', accessToken);
-            sessionStorage.setItem('idToken', idToken);
-            sessionStorage.setItem('refreshToken', refreshToken);
-            sessionStorage.setItem('userEmail', email);
-            sessionStorage.setItem('isAuthenticated', 'true');
-            sessionStorage.setItem('lastLoginTime', Date.now().toString());
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('idToken', idToken);
+            localStorage.setItem('refreshToken', refreshToken);
+            localStorage.setItem('userEmail', email);
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('lastLoginTime', Date.now().toString());
             showStatus('✅ Login successful! Redirecting...', 'success');
             setTimeout(() => {
-              const returnUrl = sessionStorage.getItem('returnUrl');
-              if (returnUrl) { sessionStorage.removeItem('returnUrl'); window.location.href = returnUrl; }
+              const returnUrl = localStorage.getItem('returnUrl');
+              if (returnUrl) { localStorage.removeItem('returnUrl'); window.location.href = returnUrl; }
               else { window.location.href = '/pages/dashboard.html'; }
             }, 1500);
           },
@@ -138,12 +138,12 @@
         cognitoUser.completeNewPasswordChallenge(newPassword, userAttributes, {
           onSuccess: function(result) {
             log('✅ Password changed successfully!', 'success');
-            sessionStorage.setItem('accessToken', result.getAccessToken().getJwtToken());
-            sessionStorage.setItem('idToken', result.getIdToken().getJwtToken());
-            sessionStorage.setItem('refreshToken', result.getRefreshToken().getToken());
-            sessionStorage.setItem('userEmail', userEmail);
-            sessionStorage.setItem('isAuthenticated', 'true');
-            sessionStorage.setItem('lastLoginTime', Date.now().toString());
+            localStorage.setItem('accessToken', result.getAccessToken().getJwtToken());
+            localStorage.setItem('idToken', result.getIdToken().getJwtToken());
+            localStorage.setItem('refreshToken', result.getRefreshToken().getToken());
+            localStorage.setItem('userEmail', userEmail);
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('lastLoginTime', Date.now().toString());
             showStatus('✅ Password changed! Redirecting to dashboard...', 'success');
             delete window.pendingPasswordChange;
             setTimeout(() => { window.location.href = '/pages/dashboard.html'; }, 1500);

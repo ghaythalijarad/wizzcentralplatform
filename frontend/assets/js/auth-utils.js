@@ -5,16 +5,16 @@ window.Auth = {
     // Check if user is authenticated
     requireAuthentication() {
         console.log('🔐 Checking authentication...');
-        sessionStorage.setItem('lastAuthCheckTime', new Date().toISOString());
+        localStorage.setItem('lastAuthCheckTime', new Date().toISOString());
         console.log('🔍 Current URL:', window.location.href);
         console.log('🔍 Current Path:', window.location.pathname);
 
         // Get authentication data
-        const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-        const userEmail = sessionStorage.getItem('userEmail');
-        const userId = sessionStorage.getItem('userId');
-        const idToken = sessionStorage.getItem('idToken');
-        const accessToken = sessionStorage.getItem('accessToken');
+        const isAuthenticated = localStorage.getItem('isAuthenticated');
+        const userEmail = localStorage.getItem('userEmail');
+        const userId = localStorage.getItem('userId');
+        const idToken = localStorage.getItem('idToken');
+        const accessToken = localStorage.getItem('accessToken');
 
         console.log('📊 Auth status:', {
             isAuthenticated: isAuthenticated,
@@ -34,7 +34,7 @@ window.Auth = {
         // Also check if we have userEmail (might be set without isAuthenticated flag)
         if (userEmail && idToken) {
             console.log('✅ Authentication check passed (userEmail + idToken present)');
-            sessionStorage.setItem('isAuthenticated', 'true'); // Set the flag for next time
+            localStorage.setItem('isAuthenticated', 'true'); // Set the flag for next time
             return true;
         }
 
@@ -48,9 +48,9 @@ window.Auth = {
                 // Check if token is expired
                 if (tokenPayload.exp && tokenPayload.exp < currentTime) {
                     console.warn('⚠️ Token expired, clearing token values only');
-                    sessionStorage.removeItem('idToken');
-                    sessionStorage.removeItem('accessToken');
-                    sessionStorage.removeItem('refreshToken');
+                    localStorage.removeItem('idToken');
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
                     this.redirectToLogin('Token expired');
                     return false;
                 }
@@ -75,12 +75,12 @@ window.Auth = {
                 // Token is valid, ensure basic auth flags are set
                 if (isAuthenticated !== 'true') {
                     console.log('🔧 Setting basic auth flags from valid token');
-                    sessionStorage.setItem('isAuthenticated', 'true');
+                    localStorage.setItem('isAuthenticated', 'true');
                     if (!userEmail && tokenPayload.email) {
-                        sessionStorage.setItem('userEmail', tokenPayload.email);
+                        localStorage.setItem('userEmail', tokenPayload.email);
                     }
                     if (!userId && tokenPayload.sub) {
-                        sessionStorage.setItem('userId', tokenPayload.sub);
+                        localStorage.setItem('userId', tokenPayload.sub);
                     }
                 }
 
@@ -108,31 +108,31 @@ window.Auth = {
         // Loop protection
         try {
             const now = Date.now();
-            const lastTime = parseInt(sessionStorage.getItem('redirectLoop:lastTime') || '0', 10);
-            let count = parseInt(sessionStorage.getItem('redirectLoop:count') || '0', 10);
+            const lastTime = parseInt(localStorage.getItem('redirectLoop:lastTime') || '0', 10);
+            let count = parseInt(localStorage.getItem('redirectLoop:count') || '0', 10);
             if (now - lastTime < 8000) { // within 8s window
                 count += 1;
             } else {
                 count = 1; // reset window
             }
-            sessionStorage.setItem('redirectLoop:lastTime', String(now));
-            sessionStorage.setItem('redirectLoop:count', String(count));
+            localStorage.setItem('redirectLoop:lastTime', String(now));
+            localStorage.setItem('redirectLoop:count', String(count));
 
             if (count > 5) {
                 console.warn('🛑 Redirect loop detected (count=' + count + '). Breaking loop.');
                 // Preserve debug info then stop auto redirects
-                sessionStorage.setItem('redirectLoop:broken', 'true');
+                localStorage.setItem('redirectLoop:broken', 'true');
                 // Do not redirect again automatically; show minimal banner
                 if (!document.getElementById('auth-loop-banner')) {
                     const b = document.createElement('div');
                     b.id = 'auth-loop-banner';
                     b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;padding:6px 10px;font:12px sans-serif;text-align:center';
-                    b.innerHTML = 'Authentication redirect loop stopped. Please open console, copy auth debug overlay, then click <button style="margin-left:6px;padding:2px 6px;background:#111;color:#fff;border:1px solid #444;border-radius:3px;cursor:pointer" onclick="(function(){sessionStorage.removeItem(\'redirectLoop:count\');sessionStorage.removeItem(\'redirectLoop:lastTime\');sessionStorage.removeItem(\'redirectLoop:broken\');location.reload();})()">Retry</button>';
+                    b.innerHTML = 'Authentication redirect loop stopped. Please open console, copy auth debug overlay, then click <button style="margin-left:6px;padding:2px 6px;background:#111;color:#fff;border:1px solid #444;border-radius:3px;cursor:pointer" onclick="(function(){localStorage.removeItem(\'redirectLoop:count\');localStorage.removeItem(\'redirectLoop:lastTime\');localStorage.removeItem(\'redirectLoop:broken\');location.reload();})()">Retry</button>';
                     document.body.appendChild(b);
                 }
                 return; // Abort further redirect
             }
-            if (sessionStorage.getItem('redirectLoop:broken') === 'true') {
+            if (localStorage.getItem('redirectLoop:broken') === 'true') {
                 console.warn('Redirect loop previously broken; skipping redirect.');
                 return;
             }
@@ -145,7 +145,7 @@ window.Auth = {
         }
         
         // Check if we just came from login (within last 10 seconds) to avoid redirect loops
-        const lastLoginTime = sessionStorage.getItem('lastLoginTime');
+        const lastLoginTime = localStorage.getItem('lastLoginTime');
         if (lastLoginTime) {
             const timeSinceLogin = Date.now() - parseInt(lastLoginTime, 10);
             if (timeSinceLogin < 10000) {
@@ -157,16 +157,16 @@ window.Auth = {
 
         // Telemetry for debugging redirect loops
         try {
-            const history = JSON.parse(sessionStorage.getItem('redirectHistory') || '[]');
+            const history = JSON.parse(localStorage.getItem('redirectHistory') || '[]');
             history.push({ time: new Date().toISOString(), from: window.location.pathname + window.location.search, reason });
             while (history.length > 25) history.shift();
-            sessionStorage.setItem('redirectHistory', JSON.stringify(history));
+            localStorage.setItem('redirectHistory', JSON.stringify(history));
         } catch (e) { }
 
         try {
-            sessionStorage.setItem('lastRedirectFrom', window.location.pathname + window.location.search);
-            sessionStorage.setItem('lastRedirectReason', reason || 'unspecified');
-            sessionStorage.setItem('lastRedirectTime', new Date().toISOString());
+            localStorage.setItem('lastRedirectFrom', window.location.pathname + window.location.search);
+            localStorage.setItem('lastRedirectReason', reason || 'unspecified');
+            localStorage.setItem('lastRedirectTime', new Date().toISOString());
         } catch (e) {
             console.warn('Failed to record redirect telemetry');
         }
@@ -177,7 +177,7 @@ window.Auth = {
 
         if (!currentPath.includes('/index.html') && !currentPath.endsWith('/login.html')) {
             const returnUrl = currentPath + window.location.search;
-            sessionStorage.setItem('returnUrl', returnUrl);
+            localStorage.setItem('returnUrl', returnUrl);
             console.log('💾 Stored return URL:', returnUrl);
         }
 
@@ -189,31 +189,31 @@ window.Auth = {
 
     // Store authentication tokens
     setToken(key, value) {
-        sessionStorage.setItem(key, value);
+        localStorage.setItem(key, value);
     },
 
     // Get authentication token (defaults to idToken when no key specified)
     getToken(key = 'idToken') {
-        return sessionStorage.getItem(key);
+        return localStorage.getItem(key);
     },
 
     // Convenience helpers
     getIdToken() {
-        return sessionStorage.getItem('idToken');
+        return localStorage.getItem('idToken');
     },
 
     getAccessToken() {
-        return sessionStorage.getItem('accessToken');
+        return localStorage.getItem('accessToken');
     },
 
     // Extract current user info from stored session and token
     getCurrentUser() {
         try {
-            const userId = sessionStorage.getItem('userId');
-            const userEmail = sessionStorage.getItem('userEmail');
-            const idToken = sessionStorage.getItem('idToken');
+            const userId = localStorage.getItem('userId');
+            const userEmail = localStorage.getItem('userEmail');
+            const idToken = localStorage.getItem('idToken');
 
-            let role = sessionStorage.getItem('role') || null;
+            let role = localStorage.getItem('role') || null;
             let username = null;
 
             if (idToken) {
@@ -249,16 +249,16 @@ window.Auth = {
     // Clear all authentication tokens
     clearTokens() {
         // More surgical clearing (keep returnUrl & debug flags)
-        const preservedReturn = sessionStorage.getItem('returnUrl');
-        const preservedDebug = sessionStorage.getItem('authDebug');
-        sessionStorage.removeItem('idToken');
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('userEmail');
-        sessionStorage.removeItem('userId');
-        sessionStorage.removeItem('isAuthenticated');
-        if (preservedReturn) sessionStorage.setItem('returnUrl', preservedReturn);
-        if (preservedDebug) sessionStorage.setItem('authDebug', preservedDebug);
+        const preservedReturn = localStorage.getItem('returnUrl');
+        const preservedDebug = localStorage.getItem('authDebug');
+        localStorage.removeItem('idToken');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('isAuthenticated');
+        if (preservedReturn) localStorage.setItem('returnUrl', preservedReturn);
+        if (preservedDebug) localStorage.setItem('authDebug', preservedDebug);
         localStorage.removeItem('rememberLogin');
         localStorage.removeItem('lastEmail');
     },
@@ -283,9 +283,9 @@ window.Auth = {
 
     // Get and clear return URL after successful login
     getAndClearReturnUrl() {
-        const returnUrl = sessionStorage.getItem('returnUrl');
+        const returnUrl = localStorage.getItem('returnUrl');
         if (returnUrl) {
-            sessionStorage.removeItem('returnUrl');
+            localStorage.removeItem('returnUrl');
             return returnUrl;
         }
         return null;
@@ -408,9 +408,9 @@ window.logout = Auth.logout;
 // Auth Debug Overlay (optional) - enable with ?authdebug=1 or sessionStorage.authDebug = 'true'
 (function authDebugOverlay() {
     try {
-        const enabled = window.location.search.includes('authdebug=1') || sessionStorage.getItem('authDebug') === 'true';
+        const enabled = window.location.search.includes('authdebug=1') || localStorage.getItem('authDebug') === 'true';
         if (!enabled) return;
-        sessionStorage.setItem('authDebug', 'true');
+        localStorage.setItem('authDebug', 'true');
         if (document.getElementById('auth-debug-overlay')) return;
         const box = document.createElement('div');
         box.id = 'auth-debug-overlay';
@@ -419,29 +419,29 @@ window.logout = Auth.logout;
         document.body.appendChild(box);
         const bodyEl = document.getElementById('authDbgBody');
         function short(t) { if (!t) return '∅'; return t.length > 18 ? t.slice(0, 8) + '…' + t.slice(-8) : t; }
-        function expInfo() { try { const t = sessionStorage.getItem('idToken'); if (!t) return 'n/a'; const p = JSON.parse(atob(t.split('.')[1] || '')); if (!p.exp) return 'no exp'; const left = p.exp - Math.floor(Date.now() / 1000); return left + 's'; } catch (e) { return 'err'; } }
+        function expInfo() { try { const t = localStorage.getItem('idToken'); if (!t) return 'n/a'; const p = JSON.parse(atob(t.split('.')[1] || '')); if (!p.exp) return 'no exp'; const left = p.exp - Math.floor(Date.now() / 1000); return left + 's'; } catch (e) { return 'err'; } }
         function render() {
             const data = {
                 path: window.location.pathname,
-                isAuth: sessionStorage.getItem('isAuthenticated'),
-                email: sessionStorage.getItem('userEmail'),
-                idTok: short(sessionStorage.getItem('idToken') || ''),
-                accTok: short(sessionStorage.getItem('accessToken') || ''),
+                isAuth: localStorage.getItem('isAuthenticated'),
+                email: localStorage.getItem('userEmail'),
+                idTok: short(localStorage.getItem('idToken') || ''),
+                accTok: short(localStorage.getItem('accessToken') || ''),
                 expIn: expInfo(),
-                lastRedirectReason: sessionStorage.getItem('lastRedirectReason'),
-                lastRedirectFrom: sessionStorage.getItem('lastRedirectFrom'),
-                lastRedirectTime: sessionStorage.getItem('lastRedirectTime'),
-                returnUrl: sessionStorage.getItem('returnUrl'),
-                lastAuthCheck: sessionStorage.getItem('lastAuthCheckTime'),
-                redirectHistory: (() => { try { return (JSON.parse(sessionStorage.getItem('redirectHistory') || '[]')).slice(-5); } catch (e) { return []; } })()
+                lastRedirectReason: localStorage.getItem('lastRedirectReason'),
+                lastRedirectFrom: localStorage.getItem('lastRedirectFrom'),
+                lastRedirectTime: localStorage.getItem('lastRedirectTime'),
+                returnUrl: localStorage.getItem('returnUrl'),
+                lastAuthCheck: localStorage.getItem('lastAuthCheckTime'),
+                redirectHistory: (() => { try { return (JSON.parse(localStorage.getItem('redirectHistory') || '[]')).slice(-5); } catch (e) { return []; } })()
             };
             bodyEl.textContent = JSON.stringify(data, null, 2);
         }
         render();
         const intId = setInterval(() => { if (!document.body.contains(box)) { clearInterval(intId); return; } render(); }, 1500);
         document.getElementById('authDbgCopy').onclick = () => { try { navigator.clipboard.writeText(bodyEl.textContent); } catch (e) { } };
-        document.getElementById('authDbgClearRet').onclick = () => { sessionStorage.removeItem('returnUrl'); render(); };
-        document.getElementById('authDbgOff').onclick = () => { sessionStorage.removeItem('authDebug'); box.remove(); };
+        document.getElementById('authDbgClearRet').onclick = () => { localStorage.removeItem('returnUrl'); render(); };
+        document.getElementById('authDbgOff').onclick = () => { localStorage.removeItem('authDebug'); box.remove(); };
         document.getElementById('authDbgToggle').onclick = (e) => { const pre = bodyEl; if (pre.style.display === 'none') { pre.style.display = 'block'; e.target.textContent = '−'; } else { pre.style.display = 'none'; e.target.textContent = '+'; } };
     } catch (e) { console.warn('Auth debug overlay failed', e); }
 })();

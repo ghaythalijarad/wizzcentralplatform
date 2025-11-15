@@ -267,7 +267,7 @@ class CustomerPointsService {
      * @private
      */
     _getAuthHeaders() {
-        const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
+        const token = localStorage.getItem('idToken') || localStorage.getItem('accessToken');
         if (token) {
             return { 'Authorization': `Bearer ${token}` };
         }

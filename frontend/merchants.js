@@ -128,7 +128,7 @@ const onDomReady = async function () {
 // New: Fetch merchants via backend API
 async function fetchMerchantsFromApi() {
     console.log('🔍 Fetching merchants from API endpoint');
-    const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
+    const token = localStorage.getItem('idToken') || localStorage.getItem('accessToken');
     if (!token) throw new Error('No authentication token available');
     updateDataSourceIndicator('loading', 'Fetching merchants from API...');
 
@@ -890,7 +890,7 @@ async function loadMerchantProducts(merchantId) {
 
     try {
         // Use API endpoints instead of direct DynamoDB access
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
 
         // Load categories first
         const categoriesResponse = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/categories`, {
@@ -1142,7 +1142,7 @@ async function handleEditProductFormSubmit(event) {
     messageElement.style.display = 'none';
 
     try {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${currentMerchantId}/products/${productId}`, {
             method: 'PUT',
             headers: {
@@ -1293,7 +1293,7 @@ async function handleEditFormSubmission(event) {
     };
 
     try {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         if (!idToken) {
             throw new Error('Authentication token not found.');
         }

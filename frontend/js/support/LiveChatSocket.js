@@ -199,7 +199,7 @@
         }
 
         // Fallback to direct sessionStorage access
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         if (idToken) {
           console.log('✅ Using sessionStorage idToken for WebSocket authentication');
           return idToken;

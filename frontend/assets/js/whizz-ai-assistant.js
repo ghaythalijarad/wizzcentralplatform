@@ -18,6 +18,14 @@ class WhizzMeAssistant {
    * Initialize AI suggestion UI panel
    */
   initializeUI() {
+    // Get translations (with fallback if i18n not loaded)
+    const t = (key, fallback) => {
+      if (window.SupportI18n) {
+        return window.SupportI18n.t(key);
+      }
+      return fallback;
+    };
+    
     // Create AI suggestion panel (inserted above chat input)
     const panel = document.createElement('div');
     panel.id = 'ai-suggestion-panel';
@@ -25,35 +33,35 @@ class WhizzMeAssistant {
     panel.innerHTML = `
       <div class="ai-suggestion-header">
         <div class="ai-icon">🤖</div>
-        <span class="ai-title">WhizzMe Suggestion</span>
+        <span class="ai-title" data-i18n="whizzMeSuggestion">${t('whizzMeSuggestion', 'WhizzMe Suggestion')}</span>
         <button class="ai-close-btn" type="button">×</button>
       </div>
       <div class="ai-suggestion-body">
         <div class="ai-loading hidden">
           <div class="spinner"></div>
-          <span>Generating suggestion...</span>
+          <span data-i18n="generatingSuggestionDots">${t('generatingSuggestionDots', 'Generating suggestion...')}</span>
         </div>
         <div class="ai-content hidden">
           <p class="ai-suggestion-text"></p>
           <div class="ai-actions">
-            <button class="btn-ai-use" type="button">
-              ✓ Use This Response
+            <button class="btn-ai-use" type="button" data-i18n="useThisResponse">
+              ${t('useThisResponse', '✓ Use This Response')}
             </button>
-            <button class="btn-ai-regenerate" type="button">
-              🔄 Regenerate
+            <button class="btn-ai-regenerate" type="button" data-i18n="regenerate">
+              ${t('regenerate', '🔄 Regenerate')}
             </button>
-            <button class="btn-ai-dismiss" type="button">
-              Dismiss
+            <button class="btn-ai-dismiss" type="button" data-i18n="dismiss">
+              ${t('dismiss', 'Dismiss')}
             </button>
           </div>
         </div>
         <div class="ai-error hidden">
           <p class="ai-error-text"></p>
-          <button class="btn-ai-retry" type="button">Try Again</button>
+          <button class="btn-ai-retry" type="button" data-i18n="tryAgain">${t('tryAgain', 'Try Again')}</button>
         </div>
       </div>
       <div class="ai-footer">
-        <small>AI-generated suggestion • Review before sending</small>
+        <small data-i18n="reviewBeforeSending">${t('reviewBeforeSending', 'AI-generated suggestion • Review before sending')}</small>
       </div>
     `;
     
@@ -88,11 +96,19 @@ class WhizzMeAssistant {
    * Add AI trigger button next to send button
    */
   addTriggerButton() {
+    const t = (key, fallback) => {
+      if (window.SupportI18n) {
+        return window.SupportI18n.t(key);
+      }
+      return fallback;
+    };
+    
     const sendBtn = document.querySelector('.send-button');
     if (sendBtn) {
       const aiBtn = document.createElement('button');
       aiBtn.className = 'ai-trigger-btn';
-      aiBtn.innerHTML = '🤖 WhizzMe Suggest';
+      aiBtn.setAttribute('data-i18n', 'whizzMeSuggest');
+      aiBtn.innerHTML = t('whizzMeSuggest', '🤖 WhizzMe Suggest');
       aiBtn.type = 'button';
       aiBtn.addEventListener('click', () => this.requestSuggestion());
       sendBtn.parentNode.insertBefore(aiBtn, sendBtn);

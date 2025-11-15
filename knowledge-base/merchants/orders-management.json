@@ -1,0 +1,230 @@
+{
+  "category": "order_management",
+  "version": "1.0",
+  "last_updated": "2025-11-15",
+  "description": "Comprehensive guide for merchant order management",
+  "questions": [
+    {
+      "id": "OM001",
+      "question": "How do I accept a new order?",
+      "answer": "To accept an order:\n1. You'll receive a push notification immediately\n2. Open the WhizzMerchants app\n3. Tap on the order in the Orders tab\n4. Review order details carefully\n5. Tap the green 'Accept Order' button\n6. Preparation timer starts automatically\n\n⏰ Important: You have 2 minutes to accept before the order is auto-rejected.",
+      "keywords": ["accept order", "new order", "order notification", "confirm order"],
+      "priority": "critical",
+      "related": ["OM002", "OM003", "OM008"],
+      "escalate_if": ["can't see orders", "app not working", "notification not received"]
+    },
+    {
+      "id": "OM002",
+      "question": "Why am I not receiving orders?",
+      "answer": "Check these common issues:\n\n1. ✅ Store Status: Tap profile → Ensure 'Open' status\n2. 🔔 Notifications: Settings → Enable push notifications\n3. 📍 Location: Enable GPS/location services\n4. 🌐 Internet: Check WiFi or mobile data\n5. ⏰ Business Hours: Verify working hours are correct\n6. 📱 App Version: Update to latest version in app store\n7. 👤 Account Status: Ensure account is verified and active\n\nIf all above are correct and still no orders after 30 minutes, contact support immediately.",
+      "keywords": ["no orders", "not receiving orders", "missing orders", "orders not showing"],
+      "priority": "high",
+      "related": ["OM001", "TS003", "AC001"],
+      "escalate_if": ["tried all steps", "still no orders after 1 hour", "urgent"]
+    },
+    {
+      "id": "OM003",
+      "question": "How do I cancel or refund an order?",
+      "answer": "⚠️ Order Cancellation Process:\n\n**Before Preparation Started:**\n- Tap order → 'Cancel Order' button\n- Select cancellation reason\n- Confirm cancellation\n- Customer receives full automatic refund\n\n**After Preparation Started:**\n- First, contact customer via in-app chat\n- Explain the situation\n- Get customer agreement if possible\n- Tap 'Request Support' in order details\n- Support team will process refund\n\n💰 Note: Frequent cancellations (>10% of orders) may affect your merchant rating and could lead to account suspension.",
+      "keywords": ["cancel order", "refund", "cancel", "order cancellation"],
+      "priority": "high",
+      "related": ["OM001", "PM004", "OM009"],
+      "escalate_if": ["customer dispute", "multiple cancellations", "wrong order prepared"]
+    },
+    {
+      "id": "OM004",
+      "question": "What happens if I miss an order notification?",
+      "answer": "If you don't accept an order within 2 minutes:\n\n❌ **Immediate Effects:**\n- Order is automatically rejected\n- Customer is notified and can choose another merchant\n- You receive a 'missed order' mark\n\n📊 **Impact on Your Business:**\n- 3+ missed orders in 24 hours: Warning notification\n- 5+ missed orders in a week: Account review\n- Consistent pattern: Temporary suspension possible\n\n✅ **Prevention Tips:**\n- Keep app open during business hours\n- Enable loud notifications\n- Set realistic operating hours\n- Close store if unable to fulfill orders",
+      "keywords": ["missed order", "auto-reject", "rejected order", "timeout"],
+      "priority": "medium",
+      "related": ["OM001", "OM002", "AC005"],
+      "escalate_if": ["technical glitch", "didn't receive notification", "account suspension"]
+    },
+    {
+      "id": "OM005",
+      "question": "How do I mark an order as ready for pickup?",
+      "answer": "When order is prepared:\n\n1. Open the active order\n2. Tap 'Order Ready' button\n3. Driver is notified immediately\n4. Order moves to 'Ready for Pickup' status\n\n⏱️ **Timing Guidelines:**\n- Mark ready only when fully prepared\n- Include all items and packaging\n- Verify order completeness\n- Driver typically arrives within 5-10 minutes\n\n📦 **Checklist:**\n✅ All items prepared\n✅ Correct quantities\n✅ Special instructions followed\n✅ Properly packaged\n✅ Utensils/napkins included",
+      "keywords": ["ready for pickup", "order ready", "mark ready", "prepared order"],
+      "priority": "medium",
+      "related": ["OM001", "OM006"],
+      "escalate_if": []
+    },
+    {
+      "id": "OM006",
+      "question": "What should I do if the driver hasn't arrived?",
+      "answer": "If driver is delayed:\n\n**First 10 minutes:**\n- Wait patiently, drivers may be finishing previous delivery\n- Keep order ready and accessible\n\n**After 10 minutes:**\n- Tap order → View driver location\n- Check if driver is approaching\n\n**After 20 minutes:**\n- Tap 'Contact Driver' in order details\n- Call or message driver\n\n**After 30 minutes:**\n- Tap 'Request Support' in order\n- Support will reassign driver or resolve issue\n\n⚠️ Important: Don't give order to anyone without verifying their driver ID and order code.",
+      "keywords": ["driver delay", "driver not arrived", "waiting for driver", "driver late"],
+      "priority": "medium",
+      "related": ["OM005", "OM007"],
+      "escalate_if": ["driver no-show", "customer complaining", "order getting cold"]
+    },
+    {
+      "id": "OM007",
+      "question": "How do I handle special instructions or dietary requirements?",
+      "answer": "Handling special requests:\n\n✅ **Always Check:**\n- Review 'Special Instructions' section in order\n- Look for allergy warnings (marked with ⚠️)\n- Check for dietary preferences (vegan, halal, etc.)\n\n🚫 **Cannot Accommodate:**\n- Contact customer immediately via in-app chat\n- Explain what you can/cannot do\n- Offer alternatives if possible\n- Allow customer to cancel if needed\n\n✅ **Successfully Handled:**\n- Follow instructions precisely\n- Use separate preparation areas for allergies\n- Mark items clearly\n- Add confirmation note in chat\n\n⚠️ **Food Allergies:** Take these VERY seriously. If unsure, recommend customer cancels for safety.",
+      "keywords": ["special instructions", "dietary requirements", "allergies", "custom order"],
+      "priority": "high",
+      "related": ["OM003", "OM001"],
+      "escalate_if": ["serious allergy concern", "cannot meet requirement", "customer upset"]
+    },
+    {
+      "id": "OM008",
+      "question": "What is the preparation time and can I change it?",
+      "answer": "**Preparation Time Overview:**\n\n⏱️ **Standard Times:**\n- Your default prep time is set in Business Settings\n- Typical range: 15-45 minutes depending on cuisine\n- Shown to customers before they order\n\n🔄 **Changing Prep Time:**\n- Go to Settings → Business Info → Preparation Time\n- Adjust based on your actual speed\n- Changes apply to new orders immediately\n\n⚡ **Best Practices:**\n- Set realistic times (avoid rushing)\n- Add 5-10 min buffer for busy periods\n- Account for complex menu items\n- Update during peak hours if needed\n\n📊 **Impact:**\n- Longer prep time: Fewer orders but more manageable\n- Shorter prep time: More orders but must keep pace\n- Consistently late: Negative ratings",
+      "keywords": ["preparation time", "prep time", "cooking time", "ready time"],
+      "priority": "medium",
+      "related": ["OM005", "BS002"],
+      "escalate_if": []
+    },
+    {
+      "id": "OM009",
+      "question": "How do I handle order complaints or issues after delivery?",
+      "answer": "**Post-Delivery Issues:**\n\n📱 **If Customer Contacts You Directly:**\n1. Listen to their concern\n2. Apologize for the inconvenience\n3. Offer a solution (refund/remake)\n4. Document the issue\n\n🔄 **Resolution Options:**\n- Full refund: Serious quality issues\n- Partial refund: Minor missing items\n- Offer voucher: Future order discount\n- Remake order: If customer nearby\n\n📊 **Reporting:**\n- Go to Order History\n- Find the order\n- Tap 'Report Issue'\n- Select issue type\n- Add description\n- Submit for review\n\n⚠️ **Important:** Be proactive - address quality issues before customer complains. Maintain high standards to avoid refunds and negative ratings.",
+      "keywords": ["complaint", "order issue", "customer unhappy", "food quality", "missing items"],
+      "priority": "high",
+      "related": ["OM003", "PM004"],
+      "escalate_if": ["customer threatening review", "demanding full refund", "food safety concern"]
+    },
+    {
+      "id": "OM010",
+      "question": "Can I pause or temporarily stop receiving orders?",
+      "answer": "**Pausing Orders:**\n\n✅ **Quick Pause:**\n- Tap your profile icon\n- Toggle 'Store Open/Closed' switch\n- Orders stop immediately\n- Customers see 'Currently Closed'\n\n⏰ **Scheduled Breaks:**\n- Go to Settings → Business Hours\n- Set break times (e.g., 3-4 PM)\n- Applies automatically daily\n\n🔔 **Auto-Resume:**\n- App can auto-open at scheduled times\n- Enable in Settings → Operating Hours\n\n💡 **Use Cases:**\n- Lunch break\n- Restocking ingredients\n- Handling rush\n- Staff shortage\n- Kitchen maintenance\n\n⚠️ **Note:** Frequent on/off toggling may affect your visibility in customer search results. Use scheduled hours for predictable breaks.",
+      "keywords": ["pause orders", "stop orders", "close store", "temporary close", "break time"],
+      "priority": "medium",
+      "related": ["BS001", "OM002"],
+      "escalate_if": []
+    }
+  ],
+  "workflows": [
+    {
+      "id": "WF_ORDER_FLOW",
+      "name": "Standard Order Processing Flow",
+      "steps": [
+        "1. Receive order notification",
+        "2. Review order details (2 min window)",
+        "3. Accept order",
+        "4. Prepare food according to specifications",
+        "5. Mark as 'Order Ready'",
+        "6. Hand off to driver with order code verification",
+        "7. Order marked as 'Picked Up' automatically"
+      ],
+      "avg_time": "30-45 minutes",
+      "critical_points": ["2-minute acceptance window", "Verify driver ID", "Quality check before handoff"]
+    },
+    {
+      "id": "WF_ORDER_TROUBLESHOOT",
+      "name": "Troubleshooting Missing Orders",
+      "steps": [
+        "1. Verify store status is 'Open'",
+        "2. Check notification permissions in device settings",
+        "3. Confirm internet connection is stable",
+        "4. Review business hours settings",
+        "5. Restart the app",
+        "6. Check for app updates",
+        "7. Log out and log back in",
+        "8. If still no orders after 30 min, contact support"
+      ],
+      "avg_time": "10-15 minutes",
+      "success_rate": "95%"
+    },
+    {
+      "id": "WF_CANCELLATION",
+      "name": "Order Cancellation Process",
+      "decision_tree": {
+        "started_preparation": {
+          "yes": [
+            "Contact customer first",
+            "Explain situation",
+            "Request support team assistance",
+            "Wait for approval",
+            "Process refund through support"
+          ],
+          "no": [
+            "Select order",
+            "Tap 'Cancel Order'",
+            "Choose reason",
+            "Confirm cancellation",
+            "Automatic refund processed"
+          ]
+        }
+      },
+      "avg_time": "2-5 minutes"
+    }
+  ],
+  "policies": [
+    {
+      "id": "POL_ACCEPTANCE_TIME",
+      "name": "Order Acceptance Time Limit",
+      "description": "Merchants have 2 minutes to accept incoming orders",
+      "consequence": "Orders are automatically rejected after 2 minutes of no response",
+      "impact_on_merchant": "Missed orders count toward performance metrics. 5+ missed orders per week triggers account review."
+    },
+    {
+      "id": "POL_CANCELLATION",
+      "name": "Order Cancellation Policy",
+      "description": "Merchants should minimize order cancellations after acceptance",
+      "thresholds": {
+        "warning": "3 cancellations within 24 hours",
+        "review": "10% cancellation rate over 30 days",
+        "suspension": "15% cancellation rate or customer complaints"
+      },
+      "exceptions": "Technical issues, ingredient shortage, force majeure events"
+    },
+    {
+      "id": "POL_PREP_TIME",
+      "name": "Preparation Time Accuracy",
+      "description": "Merchants should set realistic preparation times and meet them consistently",
+      "expectation": "Orders ready within stated prep time in 90% of cases",
+      "consequence": "Consistently late orders result in lower search ranking and customer ratings"
+    },
+    {
+      "id": "POL_QUALITY_STANDARDS",
+      "name": "Food Quality and Safety Standards",
+      "description": "All orders must meet food safety and quality standards",
+      "requirements": [
+        "Proper food handling and temperature control",
+        "Correct order fulfillment (all items included)",
+        "Special instructions followed",
+        "Allergy warnings taken seriously",
+        "Professional packaging"
+      ],
+      "violations": "Quality complaints trigger investigation. Serious or repeated violations may result in suspension."
+    }
+  ],
+  "quick_actions": [
+    {
+      "trigger": "not receiving orders",
+      "immediate_checks": [
+        "Store status: Open",
+        "Notifications: Enabled",
+        "Internet: Connected",
+        "App: Latest version"
+      ]
+    },
+    {
+      "trigger": "need to cancel order",
+      "immediate_action": "Check if preparation started → If yes, contact customer first → If no, cancel directly in app"
+    },
+    {
+      "trigger": "driver delayed",
+      "wait_time": "10 minutes normal → 20 minutes check location → 30 minutes contact support"
+    }
+  ],
+  "common_mistakes": [
+    {
+      "mistake": "Accepting orders when too busy",
+      "consequence": "Late orders, negative ratings, stressed staff",
+      "solution": "Set store to 'Closed' during peak times if overwhelmed. Better to miss orders than deliver late."
+    },
+    {
+      "mistake": "Ignoring special instructions",
+      "consequence": "Customer complaints, refunds, bad reviews",
+      "solution": "Always read full order details. If can't accommodate, contact customer immediately."
+    },
+    {
+      "mistake": "Not verifying driver identity",
+      "consequence": "Order given to wrong person, loss of revenue, customer complaint",
+      "solution": "Always check driver ID and order pickup code before handing over food."
+    }
+  ]
+}
