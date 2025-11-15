@@ -1024,7 +1024,27 @@
             // Clean old handlers/socket if present
             try { if (merchantChatWS) { merchantChatWS.onopen = merchantChatWS.onclose = merchantChatWS.onerror = merchantChatWS.onmessage = null; } } catch (_) { }
 
+            console.log('🔗 Attempting to connect to:', MERCHANT_WS_URL);
+            console.log('⚠️ NOTE: If connection fails, check AWS WebSocket API Gateway configuration');
+            
             merchantChatWS = new WebSocket(MERCHANT_WS_URL);
+            
+            // Add connection timeout (10 seconds)
+            let connectionTimeout = setTimeout(() => {
+                if (merchantChatWS && merchantChatWS.readyState === WebSocket.CONNECTING) {
+                    console.error('⏱️ WebSocket connection timeout - still connecting after 10s');
+                    console.error('🔍 Possible causes:');
+                    console.error('   1. AWS WebSocket API Gateway returns 403 Forbidden');
+                    console.error('   2. Missing Lambda authorizer or incorrect configuration');
+                    console.error('   3. Network/firewall blocking the connection');
+                    console.error('   4. WebSocket endpoint URL is incorrect');
+                    console.error('📝 Recommended: Check AWS API Gateway console for the WebSocket API');
+                    updateConnectionStatus('disconnected', 'Connection timeout - AWS configuration issue');
+                    try { merchantChatWS.close(); } catch (_) { }
+                    scheduleMerchantReconnect('timeout');
+                }
+            }, 10000);
+            
             // Expose for diagnostics
             try { window.merchantChatWS = merchantChatWS; } catch (_) { }
 
@@ -1033,21 +1053,22 @@
                 console.log('📍 Active endpoint: wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth');
                 console.log('✅ CONNECTION STATE: merchantChatWS is OPEN (readyState: 1)');
 
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
                 // Reset reconnect backoff
                 try { if (merchantReconnectTimer) clearTimeout(merchantReconnectTimer); } catch (_) { }
                 merchantReconnectAttempts = 0;
 
-                // Store connection info on window for debugging
-                window.ACTIVE_WS_CONNECTION = {
-                    type: 'merchantChatWS',
-                    endpoint: 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth',
-                    status: 'connected',
-                    timestamp: new Date().toISOString()
+                // Send agent connect message
+                const msg = {
+                    action: 'chat_agent_connect',
+                    type: 'chat_agent_connect',
+                    agentId: AGENT_ID,
+                    agentName: AGENT_NAME
                 };
-
-                // Update the UI status badge since this is the working connection
-                updateConnectionStatus('connected');
-                sendMerchantAgentConnect();
+                merchantChatWS.send(JSON.stringify(msg));
+                console.log('📤 Sent merchant agent_connect');
 
                 // Expose agent identity for subsequent join_channel actions
                 try { window.MERCHANT_AGENT_ID = AGENT_ID; window.MERCHANT_AGENT_NAME = AGENT_NAME; } catch (_) { }
@@ -1065,29 +1086,43 @@
 
             merchantChatWS.onerror = (error) => {
                 console.error('❌ Merchant chat WebSocket error:', error);
+                console.error('❌ WebSocket endpoint:', MERCHANT_WS_URL);
+                console.error('❌ Error details:', {
+                    type: error.type,
+                    target: error.target,
+                    timestamp: new Date().toISOString(),
+                    readyState: merchantChatWS?.readyState
+                });
+                console.error('💡 TIP: Test endpoint with: curl -I https://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth');
+                
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
                 // Briefly reflect error, then keep trying
-                updateConnectionStatus('connecting');
+                updateConnectionStatus('disconnected', 'Connection error - check AWS configuration');
                 scheduleMerchantReconnect('error');
             };
 
             merchantChatWS.onclose = (evt) => {
                 console.log('🔌 Merchant chat WebSocket disconnected – code:', evt?.code, 'reason:', evt?.reason);
+                
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
+                // Log specific close codes for debugging
+                if (evt?.code === 1006) {
+                    console.error('❌ Close code 1006: Abnormal closure - likely authentication/authorization failure');
+                    console.error('💡 This usually means AWS API Gateway returned 403 Forbidden');
+                } else if (evt?.code === 1002) {
+                    console.error('❌ Close code 1002: Protocol error');
+                } else if (evt?.code === 1003) {
+                    console.error('❌ Close code 1003: Unsupported data');
+                }
+                
                 // Update UI and schedule reconnect with backoff
-                updateConnectionStatus('disconnected');
+                updateConnectionStatus('disconnected', 'Disconnected - retrying...');
                 scheduleMerchantReconnect('close');
             };
-
-            // Send agent connect message
-            function sendMerchantAgentConnect() {
-                const msg = {
-                    action: 'chat_agent_connect',
-                    type: 'chat_agent_connect',
-                    agentId: AGENT_ID,
-                    agentName: AGENT_NAME
-                };
-                merchantChatWS.send(JSON.stringify(msg));
-                console.log('📤 Sent merchant agent_connect');
-            }
         }
 
             console.log('✅ Production Support page loaded - ready for driver and merchant sessions');
