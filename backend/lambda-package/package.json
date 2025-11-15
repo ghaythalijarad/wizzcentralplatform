@@ -1,0 +1,13 @@
+{
+  "name": "whizzme-lambda",
+  "version": "1.0.0",
+  "description": "WhizzMe AI Agent Lambda Function",
+  "main": "src/handlers/agent-suggestion-handler.js",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.650.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.650.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -181,19 +181,10 @@ window.Auth = {
             console.log('💾 Stored return URL:', returnUrl);
         }
 
-        // Build login URL based on hosting base (repo root vs /frontend as web root)
-        try {
-            const basePrefix = this._getBasePrefix();
-            const loginPath = basePrefix === '/frontend' ? '/frontend/index.html' : '/index.html';
-            const loginUrl = window.location.origin + loginPath;
-            console.log('🔄 Redirecting to login URL:', loginUrl);
-            window.location.href = loginUrl;
-        } catch (e) {
-            // Safe fallback
-            const loginUrl = window.location.origin + '/index.html';
-            console.log('🔄 Redirecting to fallback login URL:', loginUrl);
-            window.location.href = loginUrl;
-        }
+        // Build login URL - always use /frontend/index.html for local development
+        const loginUrl = window.location.origin + '/frontend/index.html';
+        console.log('🔄 Redirecting to login URL:', loginUrl);
+        window.location.href = loginUrl;
     },
 
     // Store authentication tokens

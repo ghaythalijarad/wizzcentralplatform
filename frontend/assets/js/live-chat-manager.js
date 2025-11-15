@@ -4,13 +4,25 @@
  */
 
 class LiveChatManager {
-    constructor({ userType, userId, userDisplayName = null } = {}) {
+    constructor({ userType, userId, userDisplayName = null, enableVirtualAgent = false, virtualAgentOptions = {} } = {}) {
         this.userType = userType; // 'customer' | 'driver' | 'merchant' | 'agent'
         this.userId = userId;
         this.userDisplayName = userDisplayName || `${userType}_${userId}`;
         this.sessionId = null;
         this.agentName = null;
         this.isActive = false;
+        if (typeof enableVirtualAgent === 'boolean') {
+            this.virtualAgentEnabled = enableVirtualAgent;
+        } else {
+            this.virtualAgentEnabled = userType === 'agent';
+        }
+        this.virtualAgentConfig = {
+            maxAutoResponses: virtualAgentOptions.maxAutoResponses || 2,
+            initialGreeting: virtualAgentOptions.initialGreeting || "👋 Hi! I'm WhizzAI, our virtual assistant. I'll do my best to solve this quickly for you.",
+            escalateKeywords: virtualAgentOptions.escalateKeywords || ['agent', 'human', 'representative', 'person', 'support', 'real person'],
+            resolutionKeywords: virtualAgentOptions.resolutionKeywords || ['thanks', 'resolved', 'fixed', 'great', 'perfect', 'all good', 'works now'],
+            frustrationKeywords: virtualAgentOptions.frustrationKeywords || ['still', 'not working', 'angry', 'upset', 'frustrated', 'worse', 'problem', 'issue', 'cannot', 'cant']
+        };
         
         // Get WebSocket connection from the global manager
         this.wsManager = window.wsManager || window.WebSocketManager;
@@ -37,6 +49,68 @@ class LiveChatManager {
         this.chatSessions = new Map();
         this.activeSessionId = null;
         this.listeners = {};
+        this.collapsedFaqPanels = new Set();
+        this.virtualAgentSessions = new Map();
+        this.watchedSessions = new Set();
+        this.faqQuickReplies = [
+            {
+                category: 'Account & Access',
+                label: 'Reset merchant PIN',
+                description: 'Guide merchants through resetting their dashboard PIN.',
+                message: 'To reset your PIN open the WhizzMerchant app, tap Profile > Security > Reset PIN, then follow the SMS verification prompt. Let me know once you see the confirmation screen.',
+                keywords: ['pin', 'reset', 'password', 'forgot']
+            },
+            {
+                category: 'Account & Access',
+                label: 'Add new staff user',
+                description: 'Steps for inviting a cashier/manager.',
+                message: 'You can add a new team member from Settings > Staff Access > Invite New. Enter their email, pick their role, and they will get an invite link that expires in 24 hours.',
+                keywords: ['staff', 'user', 'add employee', 'teammate', 'invite']
+            },
+            {
+                category: 'Orders & Menu',
+                label: 'Update menu item availability',
+                description: 'Mark an item as sold out for the day.',
+                message: 'Go to Menu > Items, tap the product, then toggle "Today Only - Sold Out". The change syncs to customers in under a minute.',
+                keywords: ['sold out', 'availability', 'menu', 'item unavailable', 'out of stock']
+            },
+            {
+                category: 'Orders & Menu',
+                label: 'Missing order notification',
+                description: 'Checklist when merchants do not see an incoming order.',
+                message: 'Please confirm the device volume is up, the app is on version 3.12+, and the "Pause Orders" switch is off in Operations. If all looks good, force close and reopen the app to refresh the socket connection.',
+                keywords: ['missing order', 'notification', 'alert', 'sound', 'not receiving']
+            },
+            {
+                category: 'Payments & Payouts',
+                label: 'Where is my payout?',
+                description: 'Bank settlement timeline explanation.',
+                message: 'Daily payouts land next business day by 6 PM local time. If today is a bank holiday it will shift to the following day. You can track the transfer under Finance > Payouts with the reference code shown there.',
+                keywords: ['payout', 'payment', 'deposit', 'bank', 'money', 'transfer']
+            },
+            {
+                category: 'Payments & Payouts',
+                label: 'Update bank account',
+                description: 'Remind merchants about verification documents.',
+                message: 'To update your bank account open Finance > Banking > Replace Account, enter the new routing/account numbers, and upload a voided check. Our team approves changes within 2 business hours.',
+                keywords: ['bank', 'routing', 'account', 'change bank', 'update payment']
+            },
+            {
+                category: 'Device & App Health',
+                label: 'General troubleshooting',
+                description: 'Standard restart + network checklist.',
+                message: 'Please confirm Wi-Fi or LTE has at least 3 bars, then restart the tablet/phone and reopen WhizzMerchant. This clears cached sessions and usually restores chat + orders instantly.',
+                keywords: ['network', 'wifi', 'lte', 'app slow', 'restart', 'connection']
+            },
+            {
+                category: 'Device & App Health',
+                label: 'Printer not working',
+                description: 'Pair Bluetooth printer quickly.',
+                message: 'Check that the printer is powered, hold the pair button until it flashes, then in WhizzMerchant go to Settings > Hardware > Printers and tap "Reconnect". A successful sync shows a green dot next to the printer name.',
+                keywords: ['printer', 'print', 'receipt', 'bluetooth', 'paper']
+            }
+        ];
+        this.knowledgeBaseEntries = this.buildKnowledgeBaseEntries();
 
         console.log(`💬 LiveChatManager initialized for ${userType}: ${userId}`);
     }
@@ -543,7 +617,7 @@ class LiveChatManager {
             
             message.sessions.forEach(session => {
                 // Apply enhanced filtering
-                if (!this.isTestSession(session) && this.isAllowedDriverSession(session)) {
+                if (!this.isTestSession(session) && this.isAllowedUserSession(session)) {
                     this.chatSessions.set(session.sessionId, session);
                     addedCount++;
                 } else {
@@ -551,7 +625,7 @@ class LiveChatManager {
                 }
             });
             
-            console.log(`📊 Loaded ${addedCount} genuine WizzDriver sessions (filtered ${message.sessions.length - addedCount} test/mock sessions)`);
+            console.log(`📊 Loaded ${addedCount} genuine user sessions (filtered ${message.sessions.length - addedCount} test/mock sessions)`);
         }
         
         // Update UI with filtered sessions
@@ -652,6 +726,10 @@ class LiveChatManager {
         }
 
         // Update UI
+        if (this.virtualAgentEnabled) {
+            this.maybeHandleWithVirtualAgent(session, newMessage);
+        }
+
         this.updateChatSessionsList();
         
         // If this session is currently active, update the conversation
@@ -719,7 +797,7 @@ class LiveChatManager {
                     return;
                 }
                 
-                if (!this.isAllowedDriverSession(sessionData)) {
+                if (!this.isAllowedUserSession(sessionData)) {
                     console.log('🚫 Filtered out non-WizzDriver connection:', driverName, sessionId);
                     return;
                 }
@@ -797,47 +875,64 @@ class LiveChatManager {
     /**
      * Check if session is from genuine WizzDriver app AND actively contacting support
      */
-    isAllowedDriverSession(sessionData = {}) {
+    isAllowedUserSession(sessionData = {}) {
         try {
             const meta = sessionData.metadata || {};
-            const platform = sessionData.platform || meta.platform || sessionData.driverInfo?.platform;
-            const sourceRaw = meta.source || sessionData.source || sessionData.driverInfo?.source;
+            const platform = sessionData.platform || meta.platform;
+            const sourceRaw = meta.source || sessionData.source;
             const source = typeof sourceRaw === 'string' ? sourceRaw.toLowerCase() : null;
             const userAgent = (meta.userAgent || '').toString();
-            const driverName = (sessionData.driverName || '').toLowerCase();
             
-            // First check: Must be from WizzDriver Flutter app
-            const allowByPlatform = typeof platform === 'string' && platform.toLowerCase() === 'flutter';
-            const allowBySource = source === 'wizzdriver' || source === 'flutter_http_bridge';
-            const allowByUA = /dart|flutter/i.test(userAgent);
+            // Get user information from session - check all possible user types
+            const driverName = (sessionData.driverName || sessionData.driver_name || '').toLowerCase();
+            const customerName = (sessionData.customerName || sessionData.customer_name || '').toLowerCase();
+            const merchantName = (sessionData.merchantName || sessionData.merchant_name || sessionData.businessName || '').toLowerCase();
+            const userName = (sessionData.userName || sessionData.user_name || '').toLowerCase();
             
-            // Additional validation for genuine driver names
-            const hasRealDriverName = driverName && 
-                !driverName.includes('test') && 
-                !driverName.includes('mock') && 
-                !driverName.includes('demo') &&
-                driverName !== 'driver 123' &&
-                driverName !== 'driver';
+            // First check: Must be from legitimate Wizz apps (Flutter or web)
+            const allowByPlatform = typeof platform === 'string' && 
+                (platform.toLowerCase() === 'flutter' || platform.toLowerCase() === 'web' || platform.toLowerCase() === 'mobile');
+            const allowBySource = source && (
+                source.includes('wizzdriver') || 
+                source.includes('wizzmerchant') || 
+                source.includes('wizzcustomer') ||
+                source.includes('flutter') ||
+                source.includes('web')
+            );
+            const allowByUA = /dart|flutter|wizz/i.test(userAgent);
             
-            // Must have at least one positive indicator for WizzDriver app
+            // Additional validation for genuine user names (any user type)
+            const hasRealUserName = (driverName || customerName || merchantName || userName) && 
+                ![driverName, customerName, merchantName, userName].some(name => 
+                    name && (
+                        name.includes('test') || 
+                        name.includes('mock') || 
+                        name.includes('demo') ||
+                        name === 'driver 123' ||
+                        name === 'customer 123' ||
+                        name === 'merchant 123' ||
+                        name === 'driver' ||
+                        name === 'customer' ||
+                        name === 'merchant'
+                    )
+                );
+            
+            // Must have at least one positive indicator for legitimate Wizz app
             const hasPositiveIndicator = allowByPlatform || allowBySource || allowByUA;
             
             // Explicitly disallow test/mock sources
-            const explicitNonFlutter = typeof platform === 'string' && platform && platform.toLowerCase() !== 'flutter';
-            const explicitMock = typeof source === 'string' && /test|mock|demo|web|browser/i.test(source);
-            if (explicitNonFlutter || explicitMock) return false;
+            const explicitMock = typeof source === 'string' && /test|mock|demo/i.test(source);
+            if (explicitMock) return false;
             
-            // Second check: Must be an active live chat session initiated by driver
+            // Second check: Must be an active live chat session
             const isActiveChatSession = this.isActiveLiveChatSession(sessionData);
             
-            // CORE REQUIREMENT: Only show drivers who actively contacted live chat support
-            // Must have: WizzDriver app + Real driver name + Active chat session
-            const isValidWizzDriverSession = hasPositiveIndicator && hasRealDriverName;
+            // CORE REQUIREMENT: Only show users who actively contacted live chat support
+            // Must have: Legitimate Wizz app + Real user name + Active chat session
+            const isValidUserSession = hasPositiveIndicator && (hasRealUserName || isActiveChatSession);
             
-            // Return true only if BOTH conditions are met:
-            // 1. Valid WizzDriver app session with real driver name
-            // 2. Driver actively initiated a live chat conversation
-            return isValidWizzDriverSession && isActiveChatSession;
+            // Return true if this is a valid user session with active chat
+            return isValidUserSession && isActiveChatSession;
             
         } catch (e) {
             return false; // Default to reject on error for security
@@ -898,7 +993,7 @@ class LiveChatManager {
         const sessionsToRemove = [];
         
         this.chatSessions.forEach((session, sessionId) => {
-            if (this.isTestSession(session) || !this.isAllowedDriverSession(session)) {
+            if (this.isTestSession(session) || !this.isAllowedUserSession(session)) {
                 sessionsToRemove.push(sessionId);
                 removedCount++;
             }
@@ -927,7 +1022,7 @@ class LiveChatManager {
         
         this.chatSessions.forEach((session, sessionId) => {
             const isTest = this.isTestSession(session);
-            const isAllowed = this.isAllowedDriverSession(session);
+            const isAllowed = this.isAllowedUserSession(session);
             const status = isTest ? '❌ TEST' : isAllowed ? '✅ ALLOWED' : '🚫 FILTERED';
             
             console.log(`${status} ${sessionId}: ${session.driverName}`, {
@@ -953,7 +1048,7 @@ class LiveChatManager {
             }
             
             // Only allow genuine WizzDriver sessions
-            if (this.isAllowedDriverSession(session)) {
+            if (this.isAllowedUserSession(session)) {
                 filteredSessions.set(sessionId, session);
             } else {
                 console.log('🚫 Filtering out non-WizzDriver session:', sessionId, session.driverName);
@@ -1274,7 +1369,8 @@ class LiveChatManager {
         // Mark messages as read
         if (session.messages) {
             session.messages.forEach(msg => {
-                if (msg.senderType === 'driver') {
+                // Mark all non-agent messages as read when session is selected
+                if (msg.senderType !== 'agent' && msg.senderType !== 'support') {
                     msg.read = true;
                 }
             });
@@ -1297,25 +1393,82 @@ class LiveChatManager {
 
         const messages = session.messages || [];
         
+        // Determine user type and display name
+        const getUserTypeAndName = (session) => {
+            // Check for customer information first
+            if (session.customerName || session.customer_name) {
+                return {
+                    type: 'Customer',
+                    name: session.customerName || session.customer_name,
+                    phone: session.customerPhone || session.customer_phone || 'No phone'
+                };
+            }
+            // Check for merchant information
+            if (session.merchantName || session.merchant_name || session.businessName) {
+                return {
+                    type: 'Merchant',
+                    name: session.merchantName || session.merchant_name || session.businessName,
+                    phone: session.merchantPhone || session.merchant_phone || session.phone || 'No phone'
+                };
+            }
+            // Check for driver information
+            if (session.driverName || session.driver_name) {
+                return {
+                    type: 'Driver',
+                    name: session.driverName || session.driver_name,
+                    phone: session.driverPhone || session.driver_phone || 'No phone'
+                };
+            }
+            // Default fallback - check userType field
+            if (session.userType || session.user_type) {
+                const userType = session.userType || session.user_type;
+                const capitalizedType = userType.charAt(0).toUpperCase() + userType.slice(1);
+                return {
+                    type: capitalizedType,
+                    name: session.userName || session.user_name || `Unknown ${capitalizedType}`,
+                    phone: session.userPhone || session.user_phone || 'No phone'
+                };
+            }
+            // Final fallback
+            return {
+                type: 'User',
+                name: 'Unknown User',
+                phone: 'No phone'
+            };
+        };
+
+        const userInfo = getUserTypeAndName(session);
+        const faqQuickRepliesSection = this.renderFaqQuickRepliesSection(session);
+        const virtualAgentBanner = this.renderVirtualAgentBanner(session.sessionId);
+        const sessionInsights = this.renderSessionMeta(session);
+        const messageToolbar = this.renderMessageToolbar(session);
+        
         conversationArea.innerHTML = `
             <div class="conversation-header">
-                <h3>Chat with ${session.driverName || 'Driver'}</h3>
+                <h3>Chat with ${userInfo.name} (${userInfo.type})</h3>
                 <div class="conversation-subtitle">
-                    ${session.driverPhone || 'No phone'} • Session: ${session.sessionId}
+                    ${userInfo.phone} • Session: ${session.sessionId}
                 </div>
             </div>
+
+            ${virtualAgentBanner}
+            ${sessionInsights}
             
             <div class="messages-container" id="messages-${session.sessionId}">
                 ${messages.length === 0 ? `
                     <div class="empty-conversation">
                         <div class="empty-icon">💬</div>
                         <h4>Start the conversation</h4>
-                        <p>Send a message to help ${session.driverName || 'the driver'}</p>
+                        <p>Send a message to help ${userInfo.name.toLowerCase()}</p>
                     </div>
                 ` : messages.map(msg => this.renderMessage(msg)).join('')}
             </div>
 
             <div class="message-input-container">
+                ${faqQuickRepliesSection}
+
+                ${messageToolbar}
+
                 <div class="agent-tools">
                     <button class="tool-btn" onclick="window.liveChatManager.insertQuickReply('👋 Hello! How can I help you today?')" title="Greeting">
                         <i class="fas fa-hand-wave"></i>
@@ -1344,7 +1497,7 @@ class LiveChatManager {
                 </div>
                 
                 <div class="message-info">
-                    <small>Press Enter to send • Be professional and helpful</small>
+                    <small>Press Enter to send • Shift+Enter for newline • Max 500 characters</small>
                 </div>
             </div>
         `;
@@ -1359,14 +1512,180 @@ class LiveChatManager {
     }
 
     /**
+     * Render the FAQ quick replies drawer
+     */
+    renderFaqQuickRepliesSection(session) {
+        if (!Array.isArray(this.faqQuickReplies) || this.faqQuickReplies.length === 0) {
+            return '';
+        }
+
+        const groupedReplies = this.faqQuickReplies.reduce((map, reply) => {
+            if (!map.has(reply.category)) {
+                map.set(reply.category, []);
+            }
+            map.get(reply.category).push(reply);
+            return map;
+        }, new Map());
+
+        const isCollapsed = this.collapsedFaqPanels.has(session.sessionId);
+        const categoriesHtml = Array.from(groupedReplies.entries()).map(([category, replies]) => `
+            <div class="faq-category">
+                <div class="faq-category-title">${this.escapeHtml(category)}</div>
+                <div class="faq-replies">
+                    ${replies.map(reply => `
+                        <button class="faq-reply-btn" data-message="${this.escapeAttribute(reply.message)}" onclick="window.liveChatManager.insertFaqQuickReply(this)">
+                            <div class="faq-reply-label">${this.escapeHtml(reply.label)}</div>
+                            <div class="faq-reply-description">${this.escapeHtml(reply.description)}</div>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        return `
+            <div class="faq-quick-replies" id="faq-replies-${session.sessionId}">
+                <div class="faq-header">
+                    <div>
+                        <div class="faq-title">FAQ Quick Replies</div>
+                        <div class="faq-subtitle">QA-approved responses for the most common merchant issues</div>
+                    </div>
+                    <button class="faq-toggle-btn" onclick="window.liveChatManager.toggleFaqQuickReplies('${session.sessionId}')">
+                        ${isCollapsed ? '<i class="fas fa-chevron-down"></i> Expand' : '<i class="fas fa-chevron-up"></i> Collapse'}
+                    </button>
+                </div>
+                <div class="faq-body ${isCollapsed ? 'collapsed' : ''}" id="faq-body-${session.sessionId}">
+                    ${categoriesHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render the status banner for the virtual AI agent
+     */
+    renderVirtualAgentBanner(sessionId) {
+        if (!this.virtualAgentEnabled) return '';
+        const state = this.virtualAgentSessions.get(sessionId);
+        if (!state) return '';
+
+        let statusText = 'WhizzAI is assisting with this request.';
+        let statusClass = 'handling';
+
+        if (state.status === 'resolved') {
+            statusText = '✅ Resolved by WhizzAI. Monitoring for further questions.';
+            statusClass = 'resolved';
+        } else if (state.status === 'escalated') {
+            statusText = '⏳ Escalated to a live agent. Please take over.';
+            statusClass = 'escalated';
+        } else if (state.status === 'handed_off') {
+            statusText = '👤 Human agent is now leading this conversation.';
+            statusClass = 'handed-off';
+        }
+
+        const attemptsText = typeof state.attempts === 'number'
+            ? `AI Attempts: ${state.attempts}/${this.virtualAgentConfig.maxAutoResponses}`
+            : '';
+
+        return `
+            <div class="virtual-agent-banner ${statusClass}">
+                <div class="va-left">
+                    <div class="va-icon">🤖</div>
+                    <div>
+                        <div class="va-title">WhizzAI Virtual Agent</div>
+                        <div class="va-status">${statusText}</div>
+                        ${attemptsText ? `<div class="va-attempts">${attemptsText}</div>` : ''}
+                    </div>
+                </div>
+                ${state.status === 'handling' ? `
+                    <button class="va-escalate-btn" onclick="window.liveChatManager.escalateToHumanAgent('${sessionId}', 'manual_handoff')">
+                        <i class="fas fa-headset"></i> Connect to agent
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * Render session metadata chips and stats
+     */
+    renderSessionMeta(session) {
+        if (!session) return '';
+
+        const chips = [];
+        if (session.priority) {
+            chips.push(`<span class="meta-chip priority-${session.priority}">Priority: ${session.priority}</span>`);
+        }
+        if (session.context?.orderId || session.orderId) {
+            chips.push(`<span class="meta-chip"><i class="fas fa-receipt"></i> Order ${session.context?.orderId || session.orderId}</span>`);
+        }
+        if (session.platform || session.source) {
+            chips.push(`<span class="meta-chip"><i class="fas fa-mobile-screen"></i> ${session.platform || session.source}</span>`);
+        }
+
+        const lastMessageTime = session.messages && session.messages.length > 0
+            ? this.getTimeAgo(new Date(session.messages[session.messages.length - 1].timestamp || Date.now()))
+            : 'No messages yet';
+        const startedAt = session.startedAt ? this.getTimeAgo(new Date(session.startedAt)) : 'Just now';
+        const unreadCount = session.messages
+            ? session.messages.filter(msg => msg.senderType !== 'agent' && !msg.read).length
+            : 0;
+
+        return `
+            <div class="conversation-insights">
+                <div class="insight-chips">
+                    ${chips.join('')}
+                    <span class="meta-chip neutral">Session ${session.sessionId}</span>
+                </div>
+                <div class="insight-stats">
+                    <span><strong>${session.messages?.length || 0}</strong> messages</span>
+                    <span><strong>${unreadCount}</strong> unread</span>
+                    <span>Last message ${lastMessageTime}</span>
+                    <span>Started ${startedAt}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Render toolbar for composer actions
+     */
+    renderMessageToolbar(session) {
+        if (!session) return '';
+        const watchLabel = this.watchedSessions.has(session.sessionId) ? 'Watching' : 'Watch';
+
+        return `
+            <div class="message-toolbar">
+                <div class="toolbar-left">
+                    <button class="toolbar-button" onclick="window.liveChatManager.handleSessionQuickAction('history','${session.sessionId}')">
+                        <i class="fas fa-clock-rotate-left"></i> History
+                    </button>
+                    <button class="toolbar-button" onclick="window.liveChatManager.handleSessionQuickAction('copy','${session.sessionId}')">
+                        <i class="fas fa-copy"></i> Copy ID
+                    </button>
+                    <button class="toolbar-button ${this.watchedSessions.has(session.sessionId) ? 'active' : ''}" onclick="window.liveChatManager.handleSessionQuickAction('watch','${session.sessionId}')">
+                        <i class="fas fa-eye${this.watchedSessions.has(session.sessionId) ? '' : '-slash'}"></i> ${watchLabel}
+                    </button>
+                </div>
+                <div class="toolbar-right">
+                    <span class="composer-counter">${(session.messages?.length || 0)} msgs • Limit 500 chars</span>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
      * Render individual message
      */
     renderMessage(message) {
         const isAgent = message.senderType === 'agent' || message.senderType === 'support';
+        const isAI = message.senderType === 'ai_agent';
         const timestamp = new Date(message.timestamp).toLocaleTimeString();
         
+        // Use 'user' class instead of 'driver' for better styling consistency
+        const messageClass = isAI ? 'ai' : (isAgent ? 'agent' : 'user');
+        
         return `
-            <div class="message ${isAgent ? 'agent' : 'driver'}">
+            <div class="message ${messageClass}">
                 <div class="message-bubble">
                     <div class="message-content">${this.escapeHtml(message.messageText)}</div>
                     <div class="message-time">${timestamp}</div>
@@ -1385,6 +1704,7 @@ class LiveChatManager {
         const messageText = inputElement.value.trim();
         if (!messageText) return;
 
+        this.markVirtualAgentHandedOff(sessionId);
         console.log('📤 Sending agent message:', messageText);
 
         // Show typing indicator
@@ -1437,6 +1757,343 @@ class LiveChatManager {
             // Hide typing indicator
             this.hideTypingIndicator(sessionId);
         }
+    }
+
+    /**
+     * Insert FAQ quick reply text from button data
+     */
+    insertFaqQuickReply(element) {
+        if (!element || !element.dataset) return;
+        const message = element.dataset.message;
+        if (message) {
+            this.insertQuickReply(message);
+            element.classList.add('selected');
+            setTimeout(() => element.classList.remove('selected'), 1200);
+        }
+    }
+
+    /**
+     * Toggle FAQ quick replies visibility for a session
+     */
+    toggleFaqQuickReplies(sessionId) {
+        const body = document.getElementById(`faq-body-${sessionId}`);
+        if (!body) return;
+
+        const isCollapsed = body.classList.toggle('collapsed');
+        if (isCollapsed) {
+            this.collapsedFaqPanels.add(sessionId);
+        } else {
+            this.collapsedFaqPanels.delete(sessionId);
+        }
+
+        const toggleBtn = document.querySelector(`#faq-replies-${sessionId} .faq-toggle-btn`);
+        if (toggleBtn) {
+            toggleBtn.innerHTML = isCollapsed
+                ? '<i class="fas fa-chevron-down"></i> Expand'
+                : '<i class="fas fa-chevron-up"></i> Collapse';
+        }
+    }
+
+    /**
+     * Handle toolbar actions (history, copy, watch)
+     */
+    handleSessionQuickAction(action, sessionId) {
+        switch (action) {
+            case 'history':
+                this.openSessionHistory(sessionId);
+                break;
+            case 'copy':
+                this.copySessionId(sessionId);
+                break;
+            case 'watch':
+                this.toggleSessionWatch(sessionId);
+                break;
+            default:
+                console.log('Unknown quick action:', action);
+        }
+    }
+
+    copySessionId(sessionId) {
+        if (!sessionId) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(sessionId).then(() => {
+                this.showMessageStatus('Session ID copied', 'success');
+            }).catch(() => {
+                this.showMessageStatus('Copy failed', 'error');
+            });
+        } else {
+            this.showMessageStatus('Clipboard unavailable', 'error');
+        }
+    }
+
+    openSessionHistory(sessionId) {
+        const session = this.chatSessions.get(sessionId);
+        console.log('Opening session history for', sessionId, session);
+        window.dispatchEvent(new CustomEvent('open-session-history', { detail: { sessionId, session } }));
+        this.showMessageStatus('History panel opened', 'success');
+    }
+
+    toggleSessionWatch(sessionId) {
+        if (this.watchedSessions.has(sessionId)) {
+            this.watchedSessions.delete(sessionId);
+            this.showMessageStatus('Watch removed', 'success');
+        } else {
+            this.watchedSessions.add(sessionId);
+            this.showMessageStatus('Session pinned to watchlist', 'success');
+        }
+        const session = this.chatSessions.get(sessionId);
+        if (session && this.activeSessionId === sessionId) {
+            this.renderConversation(session);
+        }
+    }
+
+    /**
+     * Build normalized knowledge base entries from FAQ quick replies
+     */
+    buildKnowledgeBaseEntries() {
+        return this.faqQuickReplies.map(entry => {
+            const keywords = Array.isArray(entry.keywords) && entry.keywords.length > 0
+                ? entry.keywords.map(keyword => keyword.toLowerCase())
+                : (entry.label || '')
+                    .toLowerCase()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 3);
+            return {
+                ...entry,
+                keywords
+            };
+        });
+    }
+
+    /**
+     * Ensure a virtual agent state exists for a session
+     */
+    ensureVirtualAgentSession(sessionId) {
+        if (!sessionId || !this.virtualAgentEnabled) return null;
+
+        if (!this.virtualAgentSessions.has(sessionId)) {
+            this.virtualAgentSessions.set(sessionId, {
+                status: 'handling',
+                attempts: 0,
+                createdAt: Date.now(),
+                lastMessageAt: null
+            });
+            this.sendVirtualAgentMessage(sessionId, this.virtualAgentConfig.initialGreeting, { stage: 'greeting' });
+        }
+
+        return this.virtualAgentSessions.get(sessionId);
+    }
+
+    /**
+     * Let WhizzAI try to resolve the merchant request
+     */
+    maybeHandleWithVirtualAgent(session, message) {
+        if (!this.virtualAgentEnabled || !session || !message) return;
+        const sessionId = session.sessionId;
+        if (!sessionId) return;
+
+        const senderType = (message.senderType || '').toLowerCase();
+        if (['agent', 'support', 'ai_agent', 'system'].includes(senderType)) {
+            return;
+        }
+
+        const text = (message.messageText || message.content || '').trim();
+        if (!text) return;
+
+        const state = this.ensureVirtualAgentSession(sessionId);
+        if (!state || ['escalated', 'handed_off', 'resolved'].includes(state.status)) {
+            return;
+        }
+
+        if (this.detectHumanAgentRequest(text)) {
+            this.escalateToHumanAgent(sessionId, 'user_requested_agent');
+            return;
+        }
+
+        if (this.detectFrustration(text)) {
+            this.escalateToHumanAgent(sessionId, 'user_frustrated');
+            return;
+        }
+
+        if (this.detectResolutionKeywords(text)) {
+            this.markVirtualAgentResolved(sessionId);
+            return;
+        }
+
+        if (state.attempts >= this.virtualAgentConfig.maxAutoResponses) {
+            this.escalateToHumanAgent(sessionId, 'max_attempts');
+            return;
+        }
+
+        const kbMatch = this.findKnowledgeBaseResponse(text);
+        if (kbMatch) {
+            this.sendVirtualAgentMessage(sessionId, kbMatch.message, {
+                topic: kbMatch.category,
+                source: 'knowledge_base',
+                label: kbMatch.label
+            });
+            state.attempts += 1;
+            state.lastMessageAt = Date.now();
+        } else {
+            this.escalateToHumanAgent(sessionId, 'no_kb_match');
+        }
+    }
+
+    /**
+     * Attempt to find a knowledge base response for a message
+     */
+    findKnowledgeBaseResponse(messageText) {
+        if (!messageText) return null;
+        const normalized = messageText.toLowerCase();
+        let bestMatch = null;
+        let bestScore = 0;
+
+        this.knowledgeBaseEntries.forEach(entry => {
+            let score = 0;
+            entry.keywords.forEach(keyword => {
+                if (normalized.includes(keyword)) {
+                    score += 1;
+                }
+            });
+
+            if (score > bestScore) {
+                bestMatch = entry;
+                bestScore = score;
+            }
+        });
+
+        return bestScore > 0 ? bestMatch : null;
+    }
+
+    /**
+     * Send a message from the AI agent into the conversation
+     */
+    sendVirtualAgentMessage(sessionId, text, metadata = {}) {
+        if (!this.virtualAgentEnabled || !sessionId || !text) return;
+
+        const aiMessage = {
+            type: 'agent_message',
+            payload: {
+                session_id: sessionId,
+                message_text: text,
+                sender_type: 'ai_agent',
+                sender_name: 'WhizzAI Assistant',
+                sender_id: 'whizz_ai_' + Date.now(),
+                metadata,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        let sent = false;
+        try {
+            sent = this.send(aiMessage);
+        } catch (error) {
+            console.warn('⚠️ Failed to send virtual agent message:', error);
+        }
+
+        if (!sent) {
+            return;
+        }
+
+        const session = this.chatSessions.get(sessionId);
+        if (session) {
+            if (!session.messages) session.messages = [];
+            session.messages.push({
+                messageId: aiMessage.payload.sender_id,
+                messageText: text,
+                senderType: 'ai_agent',
+                senderName: 'WhizzAI Assistant',
+                timestamp: aiMessage.payload.timestamp,
+                metadata
+            });
+
+            this.renderConversation(session);
+            this.updateChatSessionsList();
+        }
+    }
+
+    /**
+     * Escalate the conversation to a live agent
+     */
+    escalateToHumanAgent(sessionId, reason = 'manual') {
+        if (!sessionId) return;
+        const session = this.chatSessions.get(sessionId);
+        if (!session) return;
+
+        const state = this.virtualAgentSessions.get(sessionId) || {};
+        if (state.status === 'escalated') return;
+
+        state.status = 'escalated';
+        state.escalatedAt = Date.now();
+        state.reason = reason;
+        this.virtualAgentSessions.set(sessionId, state);
+
+        session.priority = 'high';
+        session.requiresHuman = true;
+
+        this.sendVirtualAgentMessage(sessionId, "I'm going to connect you with a live support specialist who can take it from here. Please hold for a moment.", {
+            stage: 'escalate',
+            reason
+        });
+
+        this.updateChatSessionsList();
+
+        try {
+            window.dispatchEvent(new CustomEvent('virtual-agent-escalated', {
+                detail: { sessionId, reason }
+            }));
+        } catch (_) { /* no-op */ }
+    }
+
+    /**
+     * Mark a session as resolved by the virtual agent
+     */
+    markVirtualAgentResolved(sessionId) {
+        const state = this.virtualAgentSessions.get(sessionId);
+        if (!state) return;
+
+        if (state.status !== 'resolved') {
+            state.status = 'resolved';
+            state.resolvedAt = Date.now();
+            this.virtualAgentSessions.set(sessionId, state);
+            this.sendVirtualAgentMessage(sessionId, "Glad I could help! I'll stay here in case you need anything else. Just type your question.", {
+                stage: 'resolved'
+            });
+        }
+    }
+
+    /**
+     * Mark a session as handed off to a human
+     */
+    markVirtualAgentHandedOff(sessionId) {
+        const state = this.virtualAgentSessions.get(sessionId);
+        if (!state) return;
+
+        if (state.status !== 'handed_off') {
+            state.status = 'handed_off';
+            state.handedOffAt = Date.now();
+            this.virtualAgentSessions.set(sessionId, state);
+            this.updateChatSessionsList();
+        }
+    }
+
+    /**
+     * Keyword helpers for escalation/resolution
+     */
+    detectHumanAgentRequest(text) {
+        const normalized = text.toLowerCase();
+        return this.virtualAgentConfig.escalateKeywords.some(keyword => normalized.includes(keyword));
+    }
+
+    detectResolutionKeywords(text) {
+        const normalized = text.toLowerCase();
+        return this.virtualAgentConfig.resolutionKeywords.some(keyword => normalized.includes(keyword));
+    }
+
+    detectFrustration(text) {
+        const normalized = text.toLowerCase();
+        return this.virtualAgentConfig.frustrationKeywords.some(keyword => normalized.includes(keyword));
     }
 
     /**
@@ -1561,9 +2218,19 @@ class LiveChatManager {
      * Utility function to escape HTML
      */
     escapeHtml(text) {
+        if (typeof text !== 'string') {
+            return '';
+        }
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Escape text for safe usage inside data attributes
+     */
+    escapeAttribute(text) {
+        return this.escapeHtml(text).replace(/"/g, '&quot;');
     }
 
     /**
@@ -1630,7 +2297,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.liveChatManager = new LiveChatManager({
                 userType: 'agent',
                 userId: 'platform_agent_' + Date.now(),
-                userDisplayName: 'Platform Agent'
+                userDisplayName: 'Platform Agent',
+                enableVirtualAgent: true
             });
             
             // Connect to live chat WebSocket

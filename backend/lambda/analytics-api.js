@@ -4,10 +4,14 @@
  * Author: WizzCentral Dev Team
  */
 
-const AWS = require('aws-sdk');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
 
-// Initialize AWS services
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
+// Initialize AWS SDK v3 services
+const ddbClient = new DynamoDBClient({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
+const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
 // Table names
 const CAMPAIGNS_TABLE = 'WizzCentral_Campaigns';
@@ -429,10 +433,10 @@ async function getTopPerformingCampaigns(period, limit) {
 
 async function getCampaignInfo(campaignId) {
     try {
-        const result = await dynamoDB.get({
+        const result = await dynamoDB.send(new GetCommand({
             TableName: CAMPAIGNS_TABLE,
             Key: { campaignId }
-        }).promise();
+        }));
         
         return result.Item;
 
@@ -451,7 +455,7 @@ async function getActiveCampaigns() {
             ExpressionAttributeValues: { ':status': 'active' }
         };
         
-        const result = await dynamoDB.scan(params).promise();
+        const result = await dynamoDB.send(new ScanCommand(params));
         return result.Items || [];
 
     } catch (error) {

@@ -1143,6 +1143,163 @@ app.get('/api/merchants/search', merchantsSearchAccessGuard, async (req, res) =>
     }
 });
 
+// ============================================
+// WhizzMe AI Chat API - Production Ready
+// ============================================
+
+// WhizzMe Chat endpoint
+app.post('/api/whizzme/chat', async (req, res) => {
+    try {
+        console.log('🤖 WhizzMe Chat Request:', {
+            userType: req.body.userType,
+            sessionId: req.body.sessionId,
+            messageLength: req.body.message?.length,
+            category: req.body.metadata?.category
+        });
+
+        // Validate request
+        if (!req.body.message || !req.body.userType) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required fields: message, userType'
+            });
+        }
+
+        // Import Bedrock service
+        const { getAISuggestion } = require('./backend/src/services/bedrock-agent-service');
+
+        // Prepare context for AI
+        const context = {
+            sessionId: req.body.sessionId || `session_${Date.now()}`,
+            userType: req.body.userType, // 'merchant' or 'customer'
+            message: req.body.message,
+            conversationHistory: req.body.conversationHistory || [],
+            metadata: req.body.metadata || {}
+        };
+
+        // Try to get AI suggestion from AWS Bedrock
+        let aiResponse = null;
+        try {
+            aiResponse = await getAISuggestion(context);
+        } catch (error) {
+            console.warn('⚠️ Bedrock AI unavailable, using fallback:', error.message);
+        }
+
+        if (aiResponse && aiResponse.success) {
+            return res.json({
+                success: true,
+                suggestion: aiResponse.suggestion,
+                confidence: aiResponse.confidence || 0.8,
+                category: req.body.metadata?.category || 'general',
+                sessionId: context.sessionId,
+                source: 'aws-bedrock'
+            });
+        } else {
+            // Fallback response if AI service fails
+            const fallbackResponse = getFallbackWhizzMeResponse(req.body.message, req.body.metadata?.category);
+            return res.json({
+                success: true,
+                suggestion: fallbackResponse,
+                confidence: 0.7,
+                category: req.body.metadata?.category || 'general',
+                sessionId: context.sessionId,
+                source: 'fallback',
+                note: 'Using knowledge base due to AI service unavailability'
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ WhizzMe Chat Error:', error);
+        
+        // Return fallback response even on error
+        const fallbackResponse = getFallbackWhizzMeResponse(req.body.message, req.body.metadata?.category);
+        return res.json({
+            success: true,
+            suggestion: fallbackResponse,
+            confidence: 0.6,
+            category: 'general',
+            source: 'error-fallback',
+            note: 'Fallback response due to unexpected error'
+        });
+    }
+});
+
+// WhizzMe Health Check
+app.get('/api/whizzme/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        service: 'WhizzMe Chat API',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        endpoints: {
+            chat: '/api/whizzme/chat',
+            health: '/api/whizzme/health'
+        }
+    });
+});
+
+/**
+ * Get fallback WhizzMe response when AI is unavailable
+ */
+function getFallbackWhizzMeResponse(message, category) {
+    const lowerMessage = message.toLowerCase();
+
+    // Category-specific responses
+    if (category === 'technical_support' || lowerMessage.includes('crash') || lowerMessage.includes('bug') || lowerMessage.includes('not working')) {
+        return "For technical issues, I recommend:\n\n" +
+               "1️⃣ Restart the app\n" +
+               "2️⃣ Check your internet connection\n" +
+               "3️⃣ Update to the latest version\n" +
+               "4️⃣ Clear app cache if the problem persists\n\n" +
+               "Would you like me to connect you with our technical support team?";
+    }
+
+    if (category === 'order_management' || lowerMessage.includes('order')) {
+        return "For order-related questions:\n\n" +
+               "📋 Check the Orders tab for current status\n" +
+               "🔔 Enable push notifications for new orders\n" +
+               "💬 Contact customers directly through the app\n" +
+               "⏱️ Accept orders within the time limit\n\n" +
+               "What specific order issue can I help you with?";
+    }
+
+    if (category === 'payment_issues' || lowerMessage.includes('payment') || lowerMessage.includes('payout')) {
+        return "For payment inquiries:\n\n" +
+               "💰 Payouts are processed weekly\n" +
+               "📊 Check your Earnings section for details\n" +
+               "🏦 Ensure your bank details are up to date\n" +
+               "💳 Payment methods can be updated in Settings\n\n" +
+               "What specific payment question do you have?";
+    }
+
+    if (category === 'account_issues' || lowerMessage.includes('login') || lowerMessage.includes('password')) {
+        return "For account issues:\n\n" +
+               "🔐 Use 'Forgot Password' to reset your password\n" +
+               "📧 Check your email for verification links\n" +
+               "✅ Ensure your account is verified\n" +
+               "👤 Update your profile in Settings\n\n" +
+               "What account issue are you experiencing?";
+    }
+
+    if (category === 'business_setup' || lowerMessage.includes('menu') || lowerMessage.includes('hours')) {
+        return "For business setup:\n\n" +
+               "📝 Update menu items in Menu Management\n" +
+               "🕒 Set store hours in Business Settings\n" +
+               "📍 Verify your location for accurate delivery\n" +
+               "🏪 Keep your business info current\n\n" +
+               "Which setup area needs help?";
+    }
+
+    // Generic fallback
+    return "I understand you need assistance. Let me help you with that!\n\n" +
+           "Could you provide more details about your issue? " +
+           "Or would you like me to connect you with a human support agent for personalized assistance?";
+}
+
+// ============================================
+// End WhizzMe AI API
+// ============================================
+
 // Test condition evaluation with real DynamoDB data
 app.post('/dev/test-conditions', async (req, res) => {
     try {

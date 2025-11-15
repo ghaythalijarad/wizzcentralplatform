@@ -4,7 +4,7 @@
   class LiveChatSocket {
     constructor({ businessId, endpoint, userId, token, agentId, agentName }) {
       this.businessId = businessId;
-      this.endpoint = endpoint;
+      this.endpoint = endpoint || 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth';
       this.userId = userId || 'support_dashboard';
       this.token = token || '';
       this.agentId = agentId || this.userId;
@@ -923,11 +923,11 @@
           <div class="live-chat-stat">Errors: ${this.stats.errors}</div>
         `;
       }
-    }
 
-    // Public API
-    sendChatMessage(sessionId, messageText) {
-      return this.send({
+      // Bridge to support page badge when available
+      try {
+        if (typeof window.updateConnectionStatus === 'function') {
+          const map = {
         type: 'chat_message',
         sessionId,
         senderType: 'agent',
