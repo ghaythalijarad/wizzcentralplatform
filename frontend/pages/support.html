@@ -17,6 +17,18 @@
     <link rel="stylesheet" href="../styles/dashboard.css">
     <!-- Security utilities -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script>
+        // LOCAL TESTING BYPASS - Set mock auth if not authenticated
+        if (!localStorage.getItem('isAuthenticated')) {
+            console.log('🧪 LOCAL TESTING MODE - Setting mock authentication');
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('userEmail', 'test@whizz.local');
+            localStorage.setItem('userId', 'test-user-123');
+            localStorage.setItem('userName', 'Test User');
+            localStorage.setItem('userGroups', 'Admin');
+            localStorage.setItem('idToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ0ZXN0QHdoaXp6LmxvY2FsIiwiZXhwIjo5OTk5OTk5OTk5fQ.test');
+        }
+    </script>
     <script src="../assets/js/security-utils.js"></script>
     <script src="../assets/js/auth-utils.js"></script>
     <script src="../assets/js/rbac.js"></script>
