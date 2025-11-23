@@ -20,7 +20,7 @@ window.WIZZCENTRAL_CONFIG = {
 
     // AWS Cognito Configuration (WizzCentral User Pool)
     COGNITO_REGION: 'us-east-1',
-    COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi',
+    COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi', // wizzcentral user pool (correct)
     COGNITO_CLIENT_ID: '5hun8p61grnakisu5gammcjelv', // NEW: Browser-specific client with no secret
     COGNITO_IDENTITY_POOL_ID: 'us-east-1:10dd68af-9c1e-448e-ae67-89eaeb3c8160', // NEW: WizzCentralPlatform Identity Pool
 

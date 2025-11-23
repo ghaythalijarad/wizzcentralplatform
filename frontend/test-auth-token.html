@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Token Test</title>
+    <script src="../assets/js/auth-utils.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #fff;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h1 { color: #4CAF50; }
+        h2 { color: #2196F3; margin-top: 30px; }
+        .info { background: #333; padding: 15px; margin: 10px 0; border-radius: 4px; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        pre { 
+            background: #1e1e1e; 
+            padding: 15px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #1976D2; }
+        .test-result {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            border: 2px solid #333;
+        }
+        .test-result.success { border-color: #4CAF50; background: rgba(76, 175, 80, 0.1); }
+        .test-result.error { border-color: #f44336; background: rgba(244, 67, 54, 0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Authentication Token Diagnostic Tool</h1>
+        <p>This page helps diagnose authentication issues with push notifications.</p>
+
+        <h2>📋 Step 1: Check localStorage</h2>
+        <div class="info" id="localStorageCheck">Checking...</div>
+
+        <h2>🔑 Step 2: Decode Token</h2>
+        <div class="info" id="tokenDecoded">Checking...</div>
+
+        <h2>🧪 Step 3: Test API Call</h2>
+        <button onclick="testApiCall()">Test Push Notification API</button>
+        <div id="apiTestResult"></div>
+
+        <h2>🛠️ Actions</h2>
+        <button onclick="refreshToken()">Refresh Authentication</button>
+        <button onclick="clearAndReauth()">Clear & Re-authenticate</button>
+        <button onclick="copyToken()">Copy ID Token</button>
+    </div>
+
+    <script>
+        const API_URL = 'https://fdkevgp6g8.execute-api.us-east-1.amazonaws.com/Prod';
+
+        // Step 1: Check localStorage
+        function checkLocalStorage() {
+            const keys = ['idToken', 'accessToken', 'refreshToken', 'isAuthenticated', 'userEmail', 'userId'];
+            const results = {};
+            
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                results[key] = value ? '✅ Present' : '❌ Missing';
+                if (key.includes('Token') && value) {
+                    results[key] += ` (${value.length} chars)`;
+                } else if (value) {
+                    results[key] += ` (${value})`;
+                }
+            });
+
+            document.getElementById('localStorageCheck').innerHTML = `
+                <pre>${JSON.stringify(results, null, 2)}</pre>
+            `;
+        }
+
+        // Step 2: Decode token
+        function decodeToken() {
+            const idToken = localStorage.getItem('idToken');
+            const el = document.getElementById('tokenDecoded');
+            
+            if (!idToken) {
+                el.innerHTML = '<p class="error">❌ No ID token found in localStorage</p>';
+                return;
+            }
+
+            try {
+                const parts = idToken.split('.');
+                if (parts.length !== 3) {
+                    throw new Error('Invalid token format');
+                }
+
+                const header = JSON.parse(atob(parts[0]));
+                const payload = JSON.parse(atob(parts[1]));
+                
+                // Check expiration
+                const now = Math.floor(Date.now() / 1000);
+                const expired = payload.exp < now;
+                const expiresIn = expired ? 'EXPIRED' : `${Math.floor((payload.exp - now) / 60)} minutes`;
+
+                el.innerHTML = `
+                    <h3>Token Header:</h3>
+                    <pre>${JSON.stringify(header, null, 2)}</pre>
+                    
+                    <h3>Token Payload:</h3>
+                    <pre>${JSON.stringify(payload, null, 2)}</pre>
+                    
+                    <h3>Token Status:</h3>
+                    <div class="${expired ? 'error' : 'success'}">
+                        <p><strong>Issued at:</strong> ${new Date(payload.iat * 1000).toLocaleString()}</p>
+                        <p><strong>Expires at:</strong> ${new Date(payload.exp * 1000).toLocaleString()}</p>
+                        <p><strong>Status:</strong> ${expired ? '❌ EXPIRED' : '✅ Valid'}</p>
+                        <p><strong>Time remaining:</strong> ${expiresIn}</p>
+                        <p><strong>User:</strong> ${payload.email || payload['cognito:username'] || 'Unknown'}</p>
+                        <p><strong>Groups:</strong> ${JSON.stringify(payload['cognito:groups'] || [])}</p>
+                        <p><strong>Issuer:</strong> ${payload.iss}</p>
+                        <p><strong>Expected Issuer:</strong> https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Cp9YnOQWi</p>
+                        <p><strong>Match:</strong> ${payload.iss === 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Cp9YnOQWi' ? '✅ Yes' : '❌ No'}</p>
+                    </div>
+                `;
+            } catch (error) {
+                el.innerHTML = `<p class="error">❌ Error decoding token: ${error.message}</p>`;
+            }
+        }
+
+        // Step 3: Test API call
+        async function testApiCall() {
+            const resultDiv = document.getElementById('apiTestResult');
+            resultDiv.innerHTML = '<div class="test-result"><p>⏳ Testing API call...</p></div>';
+
+            const idToken = window.Auth?.getIdToken();
+            
+            if (!idToken) {
+                resultDiv.innerHTML = '<div class="test-result error"><p>❌ No ID token available</p></div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/merchants/send-info-notification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({
+                        notificationTitle: 'Test Notification',
+                        notificationBody: 'This is a test from the diagnostic tool',
+                        notificationType: 'info',
+                        targetAudience: 'all',
+                        priority: 'normal'
+                    })
+                });
+
+                const responseText = await response.text();
+                let responseData;
+                try {
+                    responseData = JSON.parse(responseText);
+                } catch (e) {
+                    responseData = { rawResponse: responseText };
+                }
+
+                const isSuccess = response.ok;
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result ${isSuccess ? 'success' : 'error'}">
+                        <h3>${isSuccess ? '✅ Success!' : '❌ Failed'}</h3>
+                        <p><strong>Status:</strong> ${response.status} ${response.statusText}</p>
+                        <p><strong>Headers:</strong></p>
+                        <pre>${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}</pre>
+                        <p><strong>Response:</strong></p>
+                        <pre>${JSON.stringify(responseData, null, 2)}</pre>
+                    </div>
+                `;
+
+                if (isSuccess) {
+                    alert('✅ Success! Notification sent successfully!');
+                } else {
+                    alert(`❌ Failed with status ${response.status}: ${responseData.message || responseText}`);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result error">
+                        <h3>❌ Network Error</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        // Helper functions
+        function refreshToken() {
+            alert('Refresh token functionality not implemented yet. Please log out and log in again.');
+        }
+
+        function clearAndReauth() {
+            if (confirm('This will clear all authentication data and redirect to login. Continue?')) {
+                localStorage.clear();
+                window.location.href = '/';
+            }
+        }
+
+        function copyToken() {
+            const token = localStorage.getItem('idToken');
+            if (!token) {
+                alert('No token to copy!');
+                return;
+            }
+            navigator.clipboard.writeText(token).then(() => {
+                alert('✅ Token copied to clipboard!');
+            });
+        }
+
+        // Run diagnostics on load
+        window.addEventListener('DOMContentLoaded', () => {
+            checkLocalStorage();
+            decodeToken();
+        });
+    </script>
+</body>
+</html>

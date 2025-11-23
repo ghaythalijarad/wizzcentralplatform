@@ -131,7 +131,7 @@ Resources:
         DefaultAuthorizer: CognitoAuthorizer
         Authorizers:
           CognitoAuthorizer:
-            UserPoolArn: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/us-east-1_3IEp5f8YP
+            UserPoolArn: !Sub arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/us-east-1_Cp9YnOQWi
         AddDefaultAuthorizerToCorsPreflight: false
       GatewayResponses:
         DEFAULT_4XX:
