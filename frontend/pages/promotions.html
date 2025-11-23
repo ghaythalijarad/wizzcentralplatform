@@ -3159,19 +3159,26 @@
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
             try {
-                        // Get authentication token
+                        // Get authentication token from localStorage via Auth utility
                         const idToken = window.Auth?.getIdToken();
-                        const headers = {
-                            'Content-Type': 'application/json'
-                        };
                         
-                        if (idToken) {
-                            headers['Authorization'] = `Bearer ${idToken}`;
+                        console.log('🔐 Auth check:', window.Auth ? 'Auth object found' : 'Auth object missing');
+                        console.log('🎫 ID Token:', idToken ? 'Present (' + idToken.substring(0, 20) + '...)' : 'Missing');
+                        
+                        if (!idToken) {
+                            console.error('❌ No ID token available - user may not be authenticated');
+                            alert('🔐 Authentication Required\n\nYou need to be logged in to send notifications.\n\nPlease log in and try again.');
+                            return false;
                         }
+                        
+                        const headers = {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${idToken}`
+                        };
                         
                         console.log('🌐 Sending request to:', `${API_BASE_URL}/api/merchants/send-info-notification`);
                         console.log('📦 Request data:', data);
-                        console.log('🔑 Headers:', headers);
+                        console.log('🔑 Auth header set:', headers.Authorization ? 'Yes (Bearer ***)' : 'No');
                         
                         const response = await fetch(`${API_BASE_URL}/api/merchants/send-info-notification`, {
                             method: 'POST',
