@@ -2469,11 +2469,18 @@
                     
                     // Detect environment and set API base URL
                     const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                    const API_BASE_URL = IS_LOCAL
-                        ? 'http://localhost:3000'  // Local development
-                        : 'https://fdkevgp6g8.execute-api.us-east-1.amazonaws.com/Prod'; // Production AWS API Gateway
                     
-                    console.log('🌐 API Base URL:', API_BASE_URL);
+                    // Use Lambda Function URL from config for main API (discounts, campaigns)
+                    const MAIN_API_URL = window.WIZZCENTRAL_CONFIG?.API_BASE_URL || 'https://wkmj5ihhypx7oviwo3yk6bi6lu0vjrum.lambda-url.us-east-1.on.aws';
+                    
+                    // Use API Gateway for push notifications
+                    const PUSH_API_URL = 'https://fdkevgp6g8.execute-api.us-east-1.amazonaws.com/Prod';
+                    
+                    // For backwards compatibility (some code uses API_BASE_URL)
+                    const API_BASE_URL = MAIN_API_URL;
+                    
+                    console.log('🌐 Main API URL (Discounts/Campaigns):', MAIN_API_URL);
+                    console.log('🔔 Push Notification API URL:', PUSH_API_URL);
                     console.log('🏠 Is Local:', IS_LOCAL);
                     
                     // Check if backend is available
@@ -2922,7 +2929,7 @@
                     headers['Authorization'] = `Bearer ${idToken}`;
                 }
                 
-                const response = await fetch(`${API_BASE_URL}/api/discounts/${discountId}/send-notification`, {
+                const response = await fetch(`${PUSH_API_URL}/api/discounts/${discountId}/send-notification`, {
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify(data)
@@ -3176,11 +3183,11 @@
                             'Authorization': `Bearer ${idToken}`
                         };
                         
-                        console.log('🌐 Sending request to:', `${API_BASE_URL}/api/merchants/send-info-notification`);
+                        console.log('🌐 Sending request to:', `${PUSH_API_URL}/api/merchants/send-info-notification`);
                         console.log('📦 Request data:', data);
                         console.log('🔑 Auth header set:', headers.Authorization ? 'Yes (Bearer ***)' : 'No');
                         
-                        const response = await fetch(`${API_BASE_URL}/api/merchants/send-info-notification`, {
+                        const response = await fetch(`${PUSH_API_URL}/api/merchants/send-info-notification`, {
                             method: 'POST',
                             headers: headers,
                             body: JSON.stringify(data)

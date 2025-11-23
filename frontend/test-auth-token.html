@@ -219,7 +219,14 @@
         function clearAndReauth() {
             if (confirm('This will clear all authentication data and redirect to login. Continue?')) {
                 localStorage.clear();
-                window.location.href = '/';
+                // Redirect to login page based on environment
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    window.location.href = 'http://localhost:8080/frontend/index.html';
+                } else if (window.location.protocol === 'file:') {
+                    window.location.href = '../index.html';
+                } else {
+                    window.location.href = '/frontend/index.html';
+                }
             }
         }
 
