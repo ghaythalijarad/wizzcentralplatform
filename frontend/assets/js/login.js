@@ -4,7 +4,7 @@
     const isAuthed = localStorage.getItem('isAuthenticated') === 'true';
     const idToken = localStorage.getItem('idToken');
     if (isAuthed && idToken) {
-      window.location.replace('/pages/dashboard.html');
+      window.location.replace('/frontend/pages/dashboard.html');
       return; // Skip initialization if already logged in
     }
   } catch(_){}
@@ -80,7 +80,7 @@
             setTimeout(() => {
               const returnUrl = localStorage.getItem('returnUrl');
               if (returnUrl) { localStorage.removeItem('returnUrl'); window.location.href = returnUrl; }
-              else { window.location.href = '/pages/dashboard.html'; }
+              else { window.location.href = '/frontend/pages/dashboard.html'; }
             }, 1500);
           },
           onFailure: function(err) {
@@ -146,7 +146,7 @@
             localStorage.setItem('lastLoginTime', Date.now().toString());
             showStatus('✅ Password changed! Redirecting to dashboard...', 'success');
             delete window.pendingPasswordChange;
-            setTimeout(() => { window.location.href = '/pages/dashboard.html'; }, 1500);
+            setTimeout(() => { window.location.href = '/frontend/pages/dashboard.html'; }, 1500);
           },
           onFailure: function(err) {
             log(`❌ Password change failed: ${err.code || err.name}`, 'error');

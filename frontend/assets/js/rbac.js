@@ -282,7 +282,85 @@ window.RBAC = {
     // Legacy API compatibility
     async ensure() { return Promise.resolve(); },
     pageAllowed(page) { return this.hasPageAccess(page); },
-    applyReadOnly() { this.applyReadOnlyMode(); }
+    applyReadOnly() { this.applyReadOnlyMode(); },
+    
+    // Fetch current user information
+    async fetchMe() {
+        try {
+            const idToken = localStorage.getItem('idToken');
+            if (!idToken) {
+                return { email: 'Guest', roles: [] };
+            }
+            
+            const payload = JSON.parse(atob(idToken.split('.')[1]));
+            const email = payload.email || payload['cognito:username'] || 'User';
+            const groups = payload['cognito:groups'] || [];
+            
+            // Convert groups to display names
+            const roles = groups.map(groupName => {
+                const groupConfig = RBAC_CONFIG.groups[groupName];
+                return groupConfig?.name || groupName;
+            });
+            
+            return {
+                email,
+                roles,
+                groups,
+                primaryRole: this.getRoleDisplayName()
+            };
+        } catch (error) {
+            console.error('RBAC: Error fetching user info:', error);
+            return { email: 'User', roles: [] };
+        }
+    },
+    
+    // Check if user can perform action on domain
+    can(domain, action = 'read') {
+        const userGroups = this.getUserGroups();
+        
+        // Admins can do everything
+        if (userGroups.includes('admins')) {
+            return true;
+        }
+        
+        // Domain to permission mapping
+        const domainPermissions = {
+            financial: ['view_financial_reports', 'manage_commissions', 'manage_fees'],
+            campaigns: ['manage_campaigns', 'manage_promotions'],
+            regions: ['manage_regions'],
+            orders: ['view_orders', 'manage_orders'],
+            merchants: ['view_merchants', 'manage_merchants', 'approve_merchants'],
+            drivers: ['manage_drivers'],
+            customers: ['manage_customers'],
+            support: ['view_support_tickets', 'manage_support']
+        };
+        
+        const permissions = domainPermissions[domain] || [];
+        
+        // Check if user has any permission for this domain
+        for (const groupName of userGroups) {
+            const groupConfig = RBAC_CONFIG.groups[groupName];
+            if (!groupConfig) continue;
+            
+            // Wildcard permissions
+            if (groupConfig.permissions.includes('*')) {
+                return true;
+            }
+            
+            // Check specific permissions
+            for (const permission of permissions) {
+                if (groupConfig.permissions.includes(permission)) {
+                    // If action is 'write', check if group is read-only
+                    if (action === 'write' && groupConfig.readOnly) {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
 };
 
 // Auto-filter navigation on script load

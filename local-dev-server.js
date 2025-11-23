@@ -4,6 +4,9 @@
  * Integrates frontend, backend APIs, and condition engine
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -54,7 +57,6 @@ const { handler: conditionEngineHandler } = require('./backend/lambda/condition-
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_PORT = process.env.API_PORT || 3001;
 
 // Set AWS environment variables for local development
 process.env.AWS_REGION = process.env.AWS_REGION || 'us-east-1';
@@ -112,7 +114,7 @@ app.use(helmet({
             mediaSrc: ["'self'"],
             frameSrc: ["'none'"],
             baseUri: ["'self'"],
-            formAction: ["'self'"],
+            formAction: ["'self'", "'unsafe-inline'"], // Allow inline form actions for local dev
             upgradeInsecureRequests: [] // Empty array to disable for local HTTP
         }
     },
@@ -184,7 +186,7 @@ console.log('');
 // Restrict CORS to specific origins
 const allowedOrigins = process.env.NODE_ENV === 'production'
     ? [process.env.PRODUCTION_URL || 'https://yourdomain.com']
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'];
+    : ['http://localhost:3000', 'http://localhost:8080', 'http://localhost:5173'];
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -477,6 +479,10 @@ const CAMPAIGNS_TABLE = 'WizzCentral_Campaigns';
 const ORDERS_TABLE = 'WizzOrders_dev';
 // Add regions table for regions management (DynamoDB exclusive source)
 const REGIONS_TABLE = 'WizzCentral_Regions';
+// NEW: Promotions table
+const PROMOTIONS_TABLE = 'WizzCentral_Promotions';
+// Merchant Discounts table (REAL DATA)
+const MERCHANT_DISCOUNTS_TABLE = 'WhizzMerchants_Discounts';
 
 // Financial Management Tables
 const COMMISSIONS_TABLE = 'WizzCentral_Commission_Rules';
@@ -619,28 +625,51 @@ const getOrderFromDynamoDB = async (orderId) => {
     }
 };
 
+// NEW: Helper to get all promotions and campaigns
+const getPromotionsFromDynamoDB = async () => {
+    try {
+        const command = new ScanCommand({
+            TableName: PROMOTIONS_TABLE,
+            Limit: 100 // Fetch up to 100 items
+        });
+        const result = await dynamoDB.send(command);
+        return result.Items || [];
+    } catch (error) {
+        console.error('❌ Error fetching promotions from DynamoDB:', error);
+        if (error.name === 'ResourceNotFoundException') {
+            console.warn(`⚠️ Promotions table (${PROMOTIONS_TABLE}) not found. Returning empty array.`);
+            return []; // Return empty array if table doesn't exist
+        }
+        throw error; // Re-throw other errors
+    }
+};
+
+// NEW: Helper to get merchant discounts from REAL DynamoDB table
+const getMerchantDiscountsFromDynamoDB = async () => {
+    try {
+        console.log(`📊 Fetching merchant discounts from ${MERCHANT_DISCOUNTS_TABLE}...`);
+        const command = new ScanCommand({
+            TableName: MERCHANT_DISCOUNTS_TABLE,
+            Limit: 100
+        });
+        const result = await dynamoDB.send(command);
+        console.log(`✅ Found ${result.Items?.length || 0} merchant discounts in DynamoDB`);
+        return result.Items || [];
+    } catch (error) {
+        console.error('❌ Error fetching merchant discounts from DynamoDB:', error);
+        if (error.name === 'ResourceNotFoundException') {
+            console.warn(`⚠️ Merchant discounts table (${MERCHANT_DISCOUNTS_TABLE}) not found.`);
+            return [];
+        }
+        throw error;
+    }
+};
+
 // ============================================
-// CONDITION ENGINE API ROUTES
+// Condition Engine Routes
 // ============================================
 
-app.post('/conditions/evaluate', campaignsAccessGuard, async (req, res) => {
-    req.lambdaEvent.resource = '/conditions/evaluate';
-    await handleLambdaResponse(conditionEngineHandler, req, res);
-});
-
-app.post('/conditions/validate', campaignsAccessGuard, async (req, res) => {
-    req.lambdaEvent.resource = '/conditions/validate';
-    await handleLambdaResponse(conditionEngineHandler, req, res);
-});
-
-app.get('/conditions/:campaignId', campaignsAccessGuard, async (req, res) => {
-    req.lambdaEvent.resource = '/conditions/{campaignId}';
-    req.lambdaEvent.pathParameters = { campaignId: req.params.campaignId };
-    await handleLambdaResponse(conditionEngineHandler, req, res);
-});
-
-app.post('/conditions/:campaignId', campaignsAccessGuard, async (req, res) => {
-    req.lambdaEvent.resource = '/conditions/{campaignId}';
+app.put('/campaigns/:campaignId/conditions', campaignsAccessGuard, async (req, res) => {
     req.lambdaEvent.pathParameters = { campaignId: req.params.campaignId };
     await handleLambdaResponse(conditionEngineHandler, req, res);
 });
@@ -755,34 +784,153 @@ app.get('/campaigns', campaignsAccessGuard, async (req, res) => {
 
 app.post('/campaigns', campaignsAccessGuard, async (req, res) => {
     try {
-        const campaign = {
-            campaignId: `camp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            ...req.body,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            status: req.body.status || 'draft',
-            createdBy: req.headers['x-user-id'] || 'dev-user'
-        };
+        const campaignData = req.body;
+        // Basic validation
+        if (!campaignData.campaignId || !campaignData.campaignName) {
+            return res.status(400).json({ success: false, error: 'bad_request', message: 'campaignId and campaignName are required' });
+        }
         
-        // Save to DynamoDB
-        const putCommand = new PutCommand({
+        const command = new PutCommand({
             TableName: CAMPAIGNS_TABLE,
-            Item: campaign
+            Item: {
+                ...campaignData,
+                updatedAt: new Date().toISOString()
+            }
         });
-        await dynamoDB.send(putCommand);
         
-        res.json({
-            success: true,
-            message: 'Campaign created successfully',
-            campaign,
-            source: 'real-dynamodb'
+        await dynamoDB.send(command);
+        
+        res.status(201).json({ success: true, data: campaignData });
+    } catch (error) {
+        console.error('❌ Error creating/updating campaign:', error);
+        if (isAwsCredentialsError(error)) {
+            return sendAwsAuthError(res, { route: '/campaigns', method: 'POST' }, error);
+        }
+        res.status(500).json({ success: false, error: 'server_error', message: error.message });
+    }
+});
+
+// NEW: Promotions endpoints to fetch real data
+app.get('/api/promotions', async (req, res) => {
+    try {
+        console.log('📊 Fetching promotions and merchant discounts...');
+        
+        const [promotions, campaigns, merchantDiscounts] = await Promise.all([
+            getPromotionsFromDynamoDB(),
+            getCampaignsFromDynamoDB(),
+            getMerchantDiscountsFromDynamoDB()
+        ]);
+        
+        console.log(`📊 Results: ${promotions.length} promotions, ${campaigns.length} campaigns, ${merchantDiscounts.length} merchant discounts`);
+        
+        // Transform merchant discounts to match frontend format
+        const transformedDiscounts = merchantDiscounts.map(discount => ({
+            promotionId: discount.discountId || discount.id,
+            discountCode: discount.title || 'N/A',
+            merchantId: discount.businessId || 'N/A',
+            merchantName: discount.businessName || 'Unknown Merchant',
+            type: discount.type === 'percentage' ? 'Percentage' : 
+                  discount.type === 'freeDelivery' ? 'Free Delivery' :
+                  discount.type === 'buyXGetY' ? 'Buy X Get Y' : 'Fixed Amount',
+            value: discount.value || 0,
+            discountCode: discount.title || 'N/A',
+            description: discount.description || '',
+            minValue: discount.minimum_order_amount || 0,
+            status: (discount.status || 'inactive').toUpperCase(),
+            usageCount: discount.usage_count || 0,
+            usageLimit: discount.usage_limit || null,
+            validUntil: discount.valid_to || null,
+            applicability: discount.applicability || 'allItems',
+            conditionalRule: discount.conditional_rule || null,
+            conditionalParameters: discount.conditional_parameters || {}
+        }));
+        
+        res.json({ 
+            promotions: transformedDiscounts,
+            campaigns: campaigns || [],
+            source: 'dynamodb-real',
+            timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('❌ Error creating campaign in DynamoDB:', error);
-        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/campaigns', error);
+        console.error('❌ Error fetching promotions data:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/promotions', error);
+        res.status(500).json({ 
+            error: 'Failed to fetch promotions data', 
+            details: error.message 
+        });
+    }
+});
+
+// NEW: Push notification endpoint for discount offers
+const { handler: discountPushHandler } = require('./backend/lambda/discount-push-notification.js');
+
+app.post('/api/discounts/:discountId/send-notification', campaignsAccessGuard, async (req, res) => {
+    try {
+        const { discountId } = req.params;
+        console.log(`📱 Sending push notification for discount: ${discountId}`);
+        
+        // Get discount details from DynamoDB
+        const discount = await dynamoDB.send(new GetCommand({
+            TableName: MERCHANT_DISCOUNTS_TABLE,
+            Key: { discountId }
+        }));
+        
+        if (!discount.Item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Discount not found'
+            });
+        }
+        
+        // Prepare Lambda event with discount data and targeting options from request body
+        const targetOptions = req.body || {};
+        req.lambdaEvent.body = JSON.stringify({
+            discountId: discount.Item.discountId || discount.Item.id,
+            discountCode: discount.Item.title,
+            merchantId: discount.Item.businessId,
+            discountType: discount.Item.type,
+            discountValue: discount.Item.value,
+            description: discount.Item.description,
+            validUntil: discount.Item.valid_to,
+            minimumOrderValue: discount.Item.minimum_order_amount,
+            ...targetOptions // Allow override from request
+        });
+        
+        await handleLambdaResponse(discountPushHandler, req, res);
+    } catch (error) {
+        console.error('❌ Error sending discount notification:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/discounts/:discountId/send-notification', error);
         res.status(500).json({
-            error: 'Failed to create campaign',
-            message: error.message
+            success: false,
+            message: 'Failed to send notification',
+            error: error.message
+        });
+    }
+});
+
+// Generic push notification endpoint (for custom notifications)
+app.post('/api/push-notifications/send', campaignsAccessGuard, async (req, res) => {
+    req.lambdaEvent.httpMethod = 'POST';
+    req.lambdaEvent.path = '/push-notifications/send';
+    await handleLambdaResponse(discountPushHandler, req, res);
+});
+
+// NEW: Merchant information notification endpoint
+const { handler: merchantInfoNotificationHandler } = require('./backend/lambda/merchant-info-notification.js');
+
+app.post('/api/merchants/send-info-notification', campaignsAccessGuard, async (req, res) => {
+    try {
+        console.log('📢 Sending information notification to merchants');
+        req.lambdaEvent.httpMethod = 'POST';
+        req.lambdaEvent.path = '/merchants/send-info-notification';
+        await handleLambdaResponse(merchantInfoNotificationHandler, req, res);
+    } catch (error) {
+        console.error('❌ Error sending merchant info notification:', error);
+        if (isAwsCredentialsError(error)) return sendAwsAuthError(res, '/api/merchants/send-info-notification', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send notification',
+            error: error.message
         });
     }
 });
@@ -1260,7 +1408,7 @@ function getFallbackWhizzMeResponse(message, category) {
                "🔔 Enable push notifications for new orders\n" +
                "💬 Contact customers directly through the app\n" +
                "⏱️ Accept orders within the time limit\n\n" +
-               "What specific order issue can I help you with?";
+               "What specific order question do you have?";
     }
 
     if (category === 'payment_issues' || lowerMessage.includes('payment') || lowerMessage.includes('payout')) {
