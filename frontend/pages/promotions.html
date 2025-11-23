@@ -2471,13 +2471,13 @@
                     const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
                     const API_BASE_URL = IS_LOCAL
                         ? 'http://localhost:3000'  // Local development
-                        : null; // Will be set after Lambda deployment
+                        : 'https://fdkevgp6g8.execute-api.us-east-1.amazonaws.com/Prod'; // Production AWS API Gateway
                     
                     console.log('🌐 API Base URL:', API_BASE_URL);
                     console.log('🏠 Is Local:', IS_LOCAL);
                     
                     // Check if backend is available
-                    const BACKEND_AVAILABLE = IS_LOCAL; // Only works on localhost for now
+                    const BACKEND_AVAILABLE = true; // Backend is now deployed! 🚀
 
                     /**
                      * Shows loading state for both tables

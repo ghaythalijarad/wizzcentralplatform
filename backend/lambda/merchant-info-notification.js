@@ -13,37 +13,59 @@
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, ScanCommand, QueryCommand, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
+const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const admin = require('firebase-admin');
-const path = require('path');
 
-// Initialize DynamoDB client
+// Initialize clients
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
+const secretsManager = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
 // Table names
 const BUSINESSES_TABLE = process.env.BUSINESSES_TABLE || 'WhizzMerchants_Businesses';
 const MERCHANT_DEVICE_TOKENS_TABLE = process.env.MERCHANT_DEVICE_TOKENS_TABLE || 'WhizzMerchants_DeviceTokens';
 const NOTIFICATION_LOG_TABLE = process.env.NOTIFICATION_LOG_TABLE || 'WizzCentral_Merchant_Notification_Logs';
+const FIREBASE_SECRET_NAME = process.env.FIREBASE_SECRET_NAME || 'firebase-service-account';
 
-// Initialize Firebase Admin SDK
+// Firebase initialization flag
 let firebaseApp = null;
-try {
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || 
-        path.join(__dirname, '../../config/wizz-business-app-firebase-adminsdk.json');
-    
-    if (!admin.apps.length) {
-        const serviceAccount = require(serviceAccountPath);
-        firebaseApp = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        console.log('🔥 Firebase Admin SDK initialized successfully ✅');
-    } else {
-        firebaseApp = admin.app();
-        console.log('🔥 Firebase Admin SDK already initialized ✅');
+let firebaseInitialized = false;
+
+/**
+ * Initialize Firebase Admin SDK from AWS Secrets Manager
+ */
+async function initializeFirebase() {
+    if (firebaseInitialized) {
+        return firebaseApp;
     }
-} catch (error) {
-    console.error('❌ Failed to initialize Firebase Admin SDK:', error.message);
-    console.log('⚠️  Will fall back to simulation mode');
+
+    try {
+        console.log('🔥 Initializing Firebase Admin SDK from Secrets Manager...');
+        
+        // Get Firebase credentials from Secrets Manager
+        const command = new GetSecretValueCommand({
+            SecretId: FIREBASE_SECRET_NAME
+        });
+        
+        const secretResponse = await secretsManager.send(command);
+        const serviceAccount = JSON.parse(secretResponse.SecretString);
+        
+        if (!admin.apps.length) {
+            firebaseApp = admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log('✅ Firebase Admin SDK initialized successfully');
+        } else {
+            firebaseApp = admin.app();
+            console.log('✅ Firebase Admin SDK already initialized');
+        }
+        
+        firebaseInitialized = true;
+        return firebaseApp;
+    } catch (error) {
+        console.error('❌ Failed to initialize Firebase Admin SDK:', error);
+        throw new Error(`Firebase initialization failed: ${error.message}`);
+    }
 }
 
 /**
@@ -54,6 +76,9 @@ exports.handler = async (event) => {
     console.log('Event:', JSON.stringify(event, null, 2));
 
     try {
+        // Initialize Firebase
+        await initializeFirebase();
+        
         // Parse request body
         const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
         
