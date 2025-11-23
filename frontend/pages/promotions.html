@@ -2468,11 +2468,16 @@
                     // =========================================================================
                     
                     // Detect environment and set API base URL
-                    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                    const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    const API_BASE_URL = IS_LOCAL
                         ? 'http://localhost:3000'  // Local development
-                        : 'https://your-api-gateway-url.amazonaws.com/prod'; // AWS API Gateway (UPDATE THIS!)
+                        : null; // Will be set after Lambda deployment
                     
                     console.log('🌐 API Base URL:', API_BASE_URL);
+                    console.log('🏠 Is Local:', IS_LOCAL);
+                    
+                    // Check if backend is available
+                    const BACKEND_AVAILABLE = IS_LOCAL; // Only works on localhost for now
 
                     /**
                      * Shows loading state for both tables
@@ -2501,6 +2506,36 @@
                         console.log('Fetching promotions data...');
                         showLoadingState();
 
+                        // Check if backend is available
+                        if (!BACKEND_AVAILABLE) {
+                            console.log('⚠️ Backend not available on production yet');
+                            const backendPendingHtml = `
+                                <tr>
+                                    <td colspan="8" style="text-align: center; padding: 3rem;">
+                                        <div style="max-width: 600px; margin: 0 auto; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                                            <i class="fas fa-server" style="font-size: 3rem; color: #ff9800; margin-bottom: 1rem;"></i>
+                                            <h3 style="color: #856404; margin: 1rem 0;">Backend API Not Yet Deployed</h3>
+                                            <p style="color: #856404; margin-bottom: 1rem;">
+                                                The promotions data and push notification features will be available once the backend Lambda functions are deployed to AWS.
+                                            </p>
+                                            <p style="color: #856404; font-size: 0.9rem;">
+                                                <strong>To enable this feature:</strong><br>
+                                                1. Deploy Lambda functions: <code style="background: #fff; padding: 0.25rem 0.5rem; border-radius: 4px;">./deploy-push-notifications.sh dev</code><br>
+                                                2. Update API Gateway URL in code<br>
+                                                3. Push changes to Git
+                                            </p>
+                                            <p style="color: #856404; font-size: 0.85rem; margin-top: 1rem;">
+                                                📝 See <code>QUICK_FIX_GUIDE.txt</code> for detailed instructions
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                            document.getElementById('merchant-discounts-tbody').innerHTML = backendPendingHtml;
+                            document.getElementById('special-campaigns-tbody').innerHTML = backendPendingHtml;
+                            return;
+                        }
+
             try {
                 // Get authentication token
                 const idToken = window.Auth?.getIdToken();
@@ -2512,6 +2547,8 @@
                     headers['Authorization'] = `Bearer ${idToken}`;
                 }
                 
+                console.log('🌐 Fetching from:', `${API_BASE_URL}/api/promotions`);
+                
                 const response = await fetch(`${API_BASE_URL}/api/promotions`, {
                     method: 'GET',
                     headers: headers
@@ -2519,6 +2556,32 @@
         
             // Check for non-2xx responses
             if (!response.ok) {
+                // Check if this is due to missing backend (common on Amplify before Lambda deployment)
+                if (response.status === 404 || response.status === 0) {
+                    const backendPendingHtml = `
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 3rem;">
+                                <div style="max-width: 600px; margin: 0 auto; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                                    <i class="fas fa-server" style="font-size: 3rem; color: #ff9800; margin-bottom: 1rem;"></i>
+                                    <h3 style="color: #856404; margin: 1rem 0;">Backend API Not Yet Deployed</h3>
+                                    <p style="color: #856404; margin-bottom: 1rem;">
+                                        The promotions data will be available once the backend Lambda functions are deployed to AWS.
+                                    </p>
+                                    <p style="color: #856404; font-size: 0.9rem;">
+                                        <strong>Next Step:</strong> Deploy Lambda functions using the deployment script:<br>
+                                        <code style="background: #fff; padding: 0.5rem; border-radius: 4px; display: inline-block; margin-top: 0.5rem;">
+                                            ./deploy-push-notifications.sh dev
+                                        </code>
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    document.getElementById('merchant-discounts-tbody').innerHTML = backendPendingHtml;
+                    document.getElementById('special-campaigns-tbody').innerHTML = backendPendingHtml;
+                    return;
+                }
+                
                 const errorHtml = `<tr><td colspan="8" class="error-message">Failed to load data: ${response.status} ${response.statusText}</td></tr>`;
                 document.getElementById('merchant-discounts-tbody').innerHTML = errorHtml;
                 document.getElementById('special-campaigns-tbody').innerHTML = errorHtml;
@@ -2536,9 +2599,38 @@
             }
         } catch (error) {
                                     console.error('Error fetching promotions data:', error);
-                                    const errorHtml = `<tr><td colspan="5" class="error-message">Failed to load data: ${error.message}</td></tr>`;
-                                    document.getElementById('merchant-discounts-tbody').innerHTML = errorHtml;
-                                    document.getElementById('special-campaigns-tbody').innerHTML = errorHtml;
+                                    
+                                    // Show friendly message for network errors (backend not available)
+                                    if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+                                        const backendPendingHtml = `
+                                            <tr>
+                                                <td colspan="8" style="text-align: center; padding: 3rem;">
+                                                    <div style="max-width: 600px; margin: 0 auto; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                                                        <i class="fas fa-server" style="font-size: 3rem; color: #ff9800; margin-bottom: 1rem;"></i>
+                                                        <h3 style="color: #856404; margin: 1rem 0;">Backend API Not Available</h3>
+                                                        <p style="color: #856404; margin-bottom: 1rem;">
+                                                            Unable to connect to the backend API. This is expected if the Lambda functions haven't been deployed yet.
+                                                        </p>
+                                                        <p style="color: #856404; font-size: 0.9rem;">
+                                                            <strong>To fix this:</strong> Deploy the backend Lambda functions to AWS:<br>
+                                                            <code style="background: #fff; padding: 0.5rem; border-radius: 4px; display: inline-block; margin-top: 0.5rem;">
+                                                                ./deploy-push-notifications.sh dev
+                                                            </code>
+                                                        </p>
+                                                        <p style="color: #666; font-size: 0.85rem; margin-top: 1rem;">
+                                                            See <strong>AMPLIFY_DEPLOYMENT_PUSH_FIX.md</strong> for detailed instructions.
+                                                        </p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `;
+                                        document.getElementById('merchant-discounts-tbody').innerHTML = backendPendingHtml;
+                                        document.getElementById('special-campaigns-tbody').innerHTML = backendPendingHtml;
+                                    } else {
+                                        const errorHtml = `<tr><td colspan="5" class="error-message">Failed to load data: ${error.message}</td></tr>`;
+                                        document.getElementById('merchant-discounts-tbody').innerHTML = errorHtml;
+                                        document.getElementById('special-campaigns-tbody').innerHTML = errorHtml;
+                                    }
                                 } finally {
                                     hideLoadingState();
                                 }
@@ -2790,6 +2882,15 @@
         async function sendPushNotification(event) {
             event.preventDefault();
 
+            // Check if backend is available
+            if (!BACKEND_AVAILABLE) {
+                alert('🚧 Push Notifications Not Yet Deployed\n\n' +
+                      'The backend Lambda functions haven\'t been deployed yet.\n\n' +
+                      'This feature works on localhost but requires AWS Lambda deployment for production.\n\n' +
+                      'See QUICK_FIX_GUIDE.txt for deployment instructions.');
+                return false;
+            }
+
             const form = event.target;
             const formData = new FormData(form);
 
@@ -3015,6 +3116,18 @@
             console.log('🔥 sendMerchantInfoNotification called!', event);
             event.preventDefault();
 
+            // Check if backend is available
+            if (!BACKEND_AVAILABLE) {
+                alert('🚧 Push Notifications Not Yet Deployed\n\n' +
+                      'The backend Lambda functions haven\'t been deployed yet.\n\n' +
+                      'To enable this feature:\n' +
+                      '1. Deploy Lambda functions with: ./deploy-push-notifications.sh\n' +
+                      '2. Update API Gateway URL in the code\n' +
+                      '3. Push changes to Git\n\n' +
+                      'See QUICK_FIX_GUIDE.txt for details.');
+                return false;
+            }
+
             const form = event.target;
             const formData = new FormData(form);
 
@@ -3082,7 +3195,19 @@
                     } catch (error) {
                         console.error('❌ Error sending merchant notification:', error);
                         console.error('❌ Error stack:', error.stack);
-                        alert(`❌ Error: ${error.message}`);
+                        
+                        // Show friendly message for network errors (backend not available)
+                        if (error.message.includes('Failed to fetch') || error.name === 'TypeError' || error.message.includes('NetworkError')) {
+                            alert(`🚨 Backend API Not Available\n\n` +
+                                  `The push notification service is not yet deployed to AWS.\n\n` +
+                                  `To fix this:\n` +
+                                  `1. Deploy Lambda functions: ./deploy-push-notifications.sh dev\n` +
+                                  `2. Update API Gateway URL in promotions.html\n` +
+                                  `3. Push changes to Git\n\n` +
+                                  `See AMPLIFY_DEPLOYMENT_PUSH_FIX.md for details.`);
+                        } else {
+                            alert(`❌ Error: ${error.message}`);
+                        }
                     } finally {
                         console.log('🔄 Resetting button...');
                         submitBtn.disabled = false;
