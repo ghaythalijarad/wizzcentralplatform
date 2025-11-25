@@ -1,0 +1,152 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'WhizzMe Agent Backend - Single Source of Truth
+
+  Uses AWS Bedrock Runtime (Amazon Nova) for AI-powered support suggestions
+
+  No authentication required (MVP mode)
+
+  '
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Deployment stage (dev/staging/prod)
+    AllowedValues:
+    - dev
+    - staging
+    - prod
+  S3Bucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment package
+  S3Key:
+    Type: String
+    Description: S3 key for Lambda deployment package
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        STAGE:
+          Ref: Stage
+        MODEL_ID: anthropic.claude-3-sonnet-20240229-v1:0
+Resources:
+  AgentSuggestionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName:
+        Fn::Sub: whizzme-agent-${Stage}
+      Description:
+        Fn::Sub: WhizzMe Agent for ${Stage} environment - Amazon Nova
+      CodeUri:
+        Bucket:
+          Ref: S3Bucket
+        Key:
+          Ref: S3Key
+      Handler: src/handlers/agent-suggestion-handler.handler
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+      - Statement:
+        - Sid: BedrockRuntimeAccess
+          Effect: Allow
+          Action:
+          - bedrock:InvokeModel
+          - bedrock:InvokeModelWithResponseStream
+          - bedrock:InvokeAgent
+          - bedrock-agent-runtime:InvokeAgent
+          Resource:
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}::foundation-model/*
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
+          - Fn::Sub: arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*
+        - Sid: MarketplaceAccess
+          Effect: Allow
+          Action:
+          - aws-marketplace:ViewSubscriptions
+          - aws-marketplace:Subscribe
+          Resource: '*'
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /agent-suggestion
+            Method: POST
+            RestApiId:
+              Ref: AgentApi
+        HealthCheck:
+          Type: Api
+          Properties:
+            Path: /health
+            Method: GET
+            RestApiId:
+              Ref: AgentApi
+      Tags:
+        Project: whizzAI
+        Environment:
+          Ref: Stage
+        ManagedBy: CloudFormation
+    Metadata:
+      SamResourceId: AgentSuggestionFunction
+  AgentApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name:
+        Fn::Sub: whizz-ai-api-${Stage}
+      StageName:
+        Ref: Stage
+      Description:
+        Fn::Sub: whizzAI Agent API - ${Stage}
+      Cors:
+        AllowMethods: '''GET,POST,OPTIONS'''
+        AllowHeaders: '''Content-Type,Authorization,X-Requested-With,X-Api-Key'''
+        AllowOrigin: '''*'''
+        AllowCredentials: false
+        MaxAge: 600
+      Tags:
+        Project: whizzAI
+        Environment:
+          Ref: Stage
+    Metadata:
+      SamResourceId: AgentApi
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL for whizzAI Agent
+    Value:
+      Fn::Sub: https://${AgentApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ApiUrl
+  FunctionName:
+    Description: Lambda function name
+    Value:
+      Ref: AgentSuggestionFunction
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-FunctionName
+  FunctionArn:
+    Description: Lambda function ARN
+    Value:
+      Fn::GetAtt:
+      - AgentSuggestionFunction
+      - Arn
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-FunctionArn
+  ApiId:
+    Description: API Gateway ID
+    Value:
+      Ref: AgentApi
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-ApiId
+  Stage:
+    Description: Deployment stage
+    Value:
+      Ref: Stage
+  Region:
+    Description: AWS Region
+    Value:
+      Ref: AWS::Region

@@ -1,0 +1,132 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║     PUSH NOTIFICATION AMPLIFY DEPLOYMENT - QUICK REFERENCE                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📋 ISSUE SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Problem: Push notifications work on localhost but fail on Amplify with 
+         "Failed to load" error
+         
+Root Cause: Frontend hardcoded to http://localhost:3000 which doesn't exist 
+            on AWS Amplify (static hosting only)
+            
+Solution: Deploy Lambda functions + API Gateway, update frontend to use 
+          production API URL
+
+✅ CHANGES MADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. ✅ Made API_BASE_URL environment-aware in promotions.html
+2. ✅ Created SAM template (push-notification-template.yaml)
+3. ✅ Created deployment script (deploy-push-notifications.sh)
+4. ✅ Comprehensive deployment guide (PUSH_NOTIFICATION_LAMBDA_DEPLOYMENT.md)
+5. ✅ Pushed to GitHub and Amplify repositories
+
+🚀 DEPLOYMENT STEPS (DO THESE NOW!)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: Deploy Lambda Functions
+────────────────────────────────────────────────────────────────────────────
+cd /Users/ghaythallaheebi/WhizzEcoSystem/whizzEcosystem/whizzCentralPlatform
+
+# Login to AWS (if needed)
+aws sso login --profile wizz-drivers-ghayth-dev
+
+# Deploy Lambda functions
+./deploy-push-notifications.sh dev
+
+# This will output an API Gateway URL like:
+# https://abc123xyz.execute-api.us-east-1.amazonaws.com/Prod
+────────────────────────────────────────────────────────────────────────────
+
+STEP 2: Update Frontend with API Gateway URL
+────────────────────────────────────────────────────────────────────────────
+# Edit: frontend/pages/promotions.html (line ~2471)
+
+# Replace:
+const API_BASE_URL = window.location.hostname === 'localhost' || ...
+    ? 'http://localhost:3000'
+    : 'https://your-api-gateway-url.amazonaws.com/prod'; // UPDATE THIS!
+
+# With your actual API Gateway URL from Step 1:
+const API_BASE_URL = window.location.hostname === 'localhost' || ...
+    ? 'http://localhost:3000'
+    : 'https://YOUR-ACTUAL-API-URL.execute-api.us-east-1.amazonaws.com/Prod';
+────────────────────────────────────────────────────────────────────────────
+
+STEP 3: Commit and Deploy
+────────────────────────────────────────────────────────────────────────────
+git add frontend/pages/promotions.html
+git commit -m "Update API Gateway URL for production push notifications"
+git push origin main
+git push amplify main
+────────────────────────────────────────────────────────────────────────────
+
+STEP 4: Wait and Test
+────────────────────────────────────────────────────────────────────────────
+# Wait 2-3 minutes for Amplify build
+
+# Open production URL:
+open https://main.d2f5oacwil9cbi.amplifyapp.com/pages/promotions.html
+
+# Test push notification:
+1. Click "Send to Merchants" button
+2. Fill in notification details
+3. Click "Send Notification"
+4. Should work! ✅
+────────────────────────────────────────────────────────────────────────────
+
+📁 FILES CREATED/MODIFIED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Modified:
+  • frontend/pages/promotions.html (environment-aware API URL)
+
+New Files:
+  • push-notification-template.yaml (SAM template)
+  • deploy-push-notifications.sh (automated deployment)
+  • PUSH_NOTIFICATION_LAMBDA_DEPLOYMENT.md (complete guide)
+  • AMPLIFY_DEPLOYMENT_PUSH_FIX.md (this summary)
+
+🏗️ ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Amplify (Static)  →  API Gateway  →  Lambda  →  Firebase FCM  →  iPhone
+                                        ↓
+                                    DynamoDB + Secrets Manager
+
+💰 ESTIMATED COST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Lambda: ~$0.20/month (Free Tier)
+• API Gateway: ~$3.50/month (1M requests)
+• Secrets Manager: $0.40/month
+• Total: ~$4.10/month
+
+🐛 TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If deployment fails:
+  → Check AWS credentials: aws sts get-caller-identity --profile wizz-drivers-ghayth-dev
+  → Ensure SAM CLI installed: sam --version
+  → Check CloudFormation in AWS Console
+
+If notifications still fail:
+  → Verify API Gateway URL is correct in frontend
+  → Check Lambda CloudWatch logs
+  → Verify CORS on API Gateway
+  → Check Firebase credentials in Secrets Manager
+
+📝 CURRENT STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Frontend code fixed and pushed to Git
+✅ Deployment resources created
+⏳ Waiting for Lambda deployment (Step 1)
+⏳ Waiting for API Gateway URL update (Step 2)
+⏳ Waiting for production testing (Step 4)
+
+🎯 NEXT ACTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RUN THIS COMMAND:
+./deploy-push-notifications.sh dev
+
+Then follow the output instructions!
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  For detailed instructions, see: AMPLIFY_DEPLOYMENT_PUSH_FIX.md             ║
+╚══════════════════════════════════════════════════════════════════════════════╝

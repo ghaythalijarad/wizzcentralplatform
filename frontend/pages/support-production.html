@@ -484,6 +484,7 @@
     </div>
 
     <!-- Load required dependencies -->
+    <script src="../assets/js/security-utils.js"></script>
     <script src="../js/websocket-manager.js"></script>
     <script src="../js/support/ChatSessionService.js"></script>
     <script src="../js/support/LiveChatSocket.js"></script>
@@ -859,6 +860,7 @@
             }
 
             if (sessionCount === 0) {
+                // SECURITY: Safe static content
                 sessionsList.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
@@ -869,6 +871,7 @@
                 return;
             }
 
+            // SECURITY: Clear with empty string (safe)
             sessionsList.innerHTML = '';
 
             // Sort sessions by last message time (most recent first)
@@ -884,25 +887,31 @@
                 sessionElement.dataset.sessionId = session.id;
                 sessionElement.onclick = () => selectChatSession(session);
 
-                const messagePreview = session.lastMessage.length > 50 ?
-                    session.lastMessage.substring(0, 50) + '...' :
-                    session.lastMessage;
+                // SECURITY: Sanitize user-generated content
+                const safeLastMessage = SecurityUtils.escapeHTML(session.lastMessage || '');
+                const messagePreview = safeLastMessage.length > 50 ?
+                    safeLastMessage.substring(0, 50) + '...' :
+                    safeLastMessage;
 
-                const customerInitials = session.customer.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                const safeCustomer = SecurityUtils.escapeHTML(session.customer || 'Unknown');
+                const customerInitials = SecurityUtils.escapeHTML(
+                    safeCustomer.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
+                );
+                const safeTime = SecurityUtils.escapeHTML(session.time || '');
                 
-                sessionElement.innerHTML = `
+                sessionElement.innerHTML = SecurityUtils.sanitizeHTML(`
                     <div class="session-info">
                         <div class="customer-avatar">${customerInitials}</div>
                         <div class="session-details">
-                            <div class="customer-name">${session.customer}</div>
+                            <div class="customer-name">${safeCustomer}</div>
                             <div class="last-message">${messagePreview}</div>
                         </div>
                         <div class="session-meta">
-                            <div class="message-time">${session.time}</div>
+                            <div class="message-time">${safeTime}</div>
                             ${session.unread ? '<div class="unread-badge">•</div>' : ''}
                         </div>
                     </div>
-                `;
+                `);
 
                 sessionsList.appendChild(sessionElement);
             });
@@ -1121,6 +1130,7 @@
             // Disable send button temporarily
             if (sendButton) {
                 sendButton.disabled = true;
+                // SECURITY: Safe static content
                 sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             }
             
@@ -1170,6 +1180,7 @@
             setTimeout(() => {
                 if (sendButton) {
                     sendButton.disabled = false;
+                    // SECURITY: Safe static content
                     sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
                 }
                 messageInput.focus();
@@ -1213,6 +1224,7 @@
                     const endSessionBtn = document.getElementById('endSessionBtn');
                     
                     if (chatMessages) {
+                        // SECURITY: Safe static content
                         chatMessages.innerHTML = `
                             <div class="empty-state">
                                 <i class="fas fa-comment-dots"></i>
@@ -1366,6 +1378,7 @@
                 if (isTyping) {
                     const typingElement = document.createElement('div');
                     typingElement.className = 'message customer typing-indicator';
+                    // SECURITY: Safe static content
                     typingElement.innerHTML = `
                         <div class="message-content">
                             <div class="message-bubble">
@@ -1424,6 +1437,7 @@
                     const endSessionBtn = document.getElementById('endSessionBtn');
                     
                     if (chatMessages) {
+                        // SECURITY: Safe static content
                         chatMessages.innerHTML = `
                             <div class="empty-state">
                                 <i class="fas fa-comment-dots"></i>

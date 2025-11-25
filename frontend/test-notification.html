@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notification Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Merchant Notification</h1>
+    <p>This is a simplified test page to verify the notification API works.</p>
+    
+    <form id="testForm">
+        <div class="form-group">
+            <label>Title:</label>
+            <input type="text" id="title" name="title" value="Test from Simple Page" required>
+        </div>
+        
+        <div class="form-group">
+            <label>Message:</label>
+            <textarea id="body" name="body" rows="3" required>This is a test notification sent from the simple test page.</textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Type:</label>
+            <select id="notificationType" name="notificationType">
+                <option value="info">Information</option>
+                <option value="warning">Warning</option>
+                <option value="urgent">Urgent</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Target:</label>
+            <select id="targetAudience" name="targetAudience">
+                <option value="all">All Merchants</option>
+                <option value="active">Active Only</option>
+            </select>
+        </div>
+        
+        <button type="submit" id="submitBtn">Send Notification</button>
+    </form>
+    
+    <div id="result" style="margin-top: 20px;"></div>
+    
+    <script>
+        console.log('✅ Test page loaded');
+        
+        async function sendTestNotification(event) {
+            event.preventDefault();
+            console.log('🔥 sendTestNotification called!');
+            
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            const data = {
+                notificationType: formData.get('notificationType'),
+                notificationTitle: formData.get('title'),
+                notificationBody: formData.get('body'),
+                targetAudience: formData.get('targetAudience'),
+                priority: 'normal'
+            };
+            
+            console.log('📤 Sending data:', data);
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const resultDiv = document.getElementById('result');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            resultDiv.innerHTML = '';
+            
+            try {
+                // Get token from localStorage (if you're logged in to WizzCentral)
+                const idToken = localStorage.getItem('idToken');
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (idToken) {
+                    headers['Authorization'] = `Bearer ${idToken}`;
+                    console.log('🔑 Using auth token');
+                } else {
+                    console.warn('⚠️ No auth token found in localStorage');
+                }
+                
+                console.log('🌐 Sending POST to http://localhost:3000/api/merchants/send-info-notification');
+                
+                const response = await fetch('http://localhost:3000/api/merchants/send-info-notification', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(data)
+                });
+                
+                console.log('📡 Response status:', response.status);
+                
+                const result = await response.json();
+                console.log('📥 Response data:', result);
+                
+                if (response.ok && result.success) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            ✅ Success!<br>
+                            Targeted: ${result.targeted} merchants<br>
+                            Sent: ${result.sent}<br>
+                            Failed: ${result.failed}
+                        </div>
+                    `;
+                    alert(`✅ Notification sent successfully!\n\nTargeted: ${result.targeted}\nSent: ${result.sent}\nFailed: ${result.failed}`);
+                } else {
+                    throw new Error(result.message || 'Failed to send');
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                alert(`❌ Error: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Notification';
+            }
+            
+            return false;
+        }
+        
+        // Expose to window
+        window.sendTestNotification = sendTestNotification;
+        console.log('✅ sendTestNotification exposed to window');
+        console.log('✅ Function type:', typeof window.sendTestNotification);
+        
+        // Attach event listener to form
+        document.getElementById('testForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            sendTestNotification(event);
+        });
+        console.log('✅ Form event listener attached');
+    </script>
+</body>
+</html>

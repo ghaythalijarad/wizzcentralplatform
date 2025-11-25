@@ -30,7 +30,8 @@ class AgentChatInterface {
         this.liveChatManager = new LiveChatManager({
             userType: 'agent',
             userId: this.agentId,
-            userDisplayName: this.agentName
+            userDisplayName: this.agentName,
+            enableVirtualAgent: true
         });
         
         // Bind event handlers

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Page - Direct Access (No Auth)</title>
+</head>
+<body>
+<h1>Redirecting to Support Page...</h1>
+<script>
+    // Set mock authentication for local testing
+    localStorage.setItem('isAuthenticated', 'true');
+    localStorage.setItem('userEmail', 'test@whizz.local');
+    localStorage.setItem('userId', 'test-user-123');
+    localStorage.setItem('userName', 'Test User');
+    localStorage.setItem('idToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ0ZXN0QHdoaXp6LmxvY2FsIiwiZXhwIjo5OTk5OTk5OTk5fQ.test');
+    
+    // Redirect to support page
+    console.log('🔐 Mock authentication set for local testing');
+    window.location.href = '/frontend/pages/support.html';
+</script>
+</body>
+</html>

@@ -5,13 +5,14 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   stage: ${opt:stage, 'dev'}
+  websocketsApiName: WizzCentral-Chat-WebSocket-${self:provider.stage}
+  websocketsApiRouteSelectionExpression: $request.body.action
   memorySize: 512
   timeout: 30
   environment:
     WEBSOCKET_CONNECTIONS_TABLE: websocket-connections-${self:provider.stage}
     CHAT_SESSIONS_TABLE: chat-sessions-${self:provider.stage}
     CHAT_MESSAGES_TABLE: chat-messages-${self:provider.stage}
-    WEBSOCKET_API_ENDPOINT: wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev
     STAGE: ${self:provider.stage}
     AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
   iam:
@@ -78,6 +79,8 @@ functions:
           route: chat_driver_connect
       - websocket:
           route: chat_agent_connect
+      - websocket:
+          route: chat_merchant_connect
   liveChatMessage:
     handler: src/handlers/websocket-connections.handler
     timeout: 12

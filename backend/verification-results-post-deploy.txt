@@ -1,0 +1,61 @@
+🔍 MERCHANT CHAT DEPLOYMENT VERIFICATION
+==========================================
+
+📦 1. CloudFormation Stack Status:
+   Checking: wizzcentral-websocket-dev
+   ❌ Stack not found or error: 
+
+📡 2. WebSocket API Gateway:
+   Checking API: 7ysrz3rspi
+   ✅ Name: WizzCentral-Chat-WebSocket-dev
+   ✅ Endpoint: wss://7ysrz3rspi.execute-api.us-east-1.amazonaws.com
+   ✅ Route Selection: $request.body.action
+
+🛣️  3. WebSocket Routes:
+   ✅ chat_merchant_connect route exists
+      Target: integrations/8fblls0
+   📊 Total routes: 9
+      - chat_session_close
+      - $default
+      - $disconnect
+      - $connect
+      - chat_driver_connect
+      - chat_typing
+      - chat_message
+      - chat_agent_connect
+      - chat_merchant_connect
+
+λ  4. Lambda Functions:
+   ❌ wizzcentral-websocket-dev-websocketConnect: NOT FOUND
+   ❌ wizzcentral-websocket-dev-liveChatConnect: NOT FOUND
+   ❌ wizzcentral-websocket-dev-liveChatMessage: NOT FOUND
+   ❌ wizzcentral-websocket-dev-websocketDisconnect: NOT FOUND
+
+🗄️  5. DynamoDB Tables:
+   ❌ websocket-connections-dev: NOT FOUND
+   ❌ chat-sessions-dev: NOT FOUND
+   ✅ chat-messages-dev
+      Status: ACTIVE
+      Items: 0
+
+📊 6. Recent CloudWatch Logs:
+   Checking: /aws/lambda/wizzcentral-websocket-dev-liveChatConnect
+   ⚠️  Logs found but no recent merchant chat deployment:
+      
+      An error occurred (ResourceNotFoundException) when calling the FilterLogEvents operation: The specified log group does not exist.
+      
+
+==========================================
+📋 VERIFICATION SUMMARY
+
+❌ CloudFormation Stack
+✅ WebSocket API
+✅ Merchant Connect Route
+❌ Lambda Functions
+❌ DynamoDB Tables
+
+⚠️  SOME CHECKS FAILED. Deployment may be needed.
+
+Recommended action:
+Run: npx serverless deploy -c serverless.websocket.yml --stage dev --region us-east-1 --aws-profile wizz-drivers-ghayth-dev
+

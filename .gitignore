@@ -5,6 +5,12 @@ yarn-debug.log*
 yarn-error.log*
 .dart_tool/
 
+# Firebase Service Account Credentials (SENSITIVE)
+firebase-service-account.json
+**/firebase-service-account.json
+config/wizz-business-app-firebase-adminsdk.json
+config/*-firebase-adminsdk*.json
+
 # Mapbox Configuration (contains access token)
 .env.mapbox
 *.mapbox.env

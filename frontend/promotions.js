@@ -178,7 +178,7 @@ async function loadPromotionsData() {
         tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="padding: 2rem;">Loading promotions...</td></tr>`;
     }
     try {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         console.log('DEBUG: Debug loadPromotionsData:', window.WIZZCENTRAL_CONFIG.API_BASE_URL + '/promotions', 'Authorization:', `Bearer ${idToken}`);
         const urlLoad = `${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/promotions`;
         const headersLoad = { 'Authorization': `Bearer ${idToken}` };

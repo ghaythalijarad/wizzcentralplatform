@@ -1,14 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WizzCentral Platform - Live Support</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="version" content="1763060500">
+    <title>منصة ويز المركزية - الدعم المباشر | v1763060500</title>
+    <!-- Support Internationalization -->
+    <script src="../assets/js/support-i18n.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../styles/dashboard.css">
+    <!-- Security utilities -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script>
+        // LOCAL TESTING BYPASS - Set mock auth if not authenticated
+        if (!localStorage.getItem('isAuthenticated')) {
+            console.log('🧪 LOCAL TESTING MODE - Setting mock authentication');
+            localStorage.setItem('isAuthenticated', 'true');
+            localStorage.setItem('userEmail', 'test@whizz.local');
+            localStorage.setItem('userId', 'test-user-123');
+            localStorage.setItem('userName', 'Test User');
+            localStorage.setItem('userGroups', 'Admin');
+            localStorage.setItem('idToken', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZW1haWwiOiJ0ZXN0QHdoaXp6LmxvY2FsIiwiZXhwIjo5OTk5OTk5OTk5fQ.test');
+        }
+    </script>
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/auth-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
+    <script src="../assets/js/rbac-early-check.js"></script>
     <style>
         .support-header {
             display: flex;
@@ -78,12 +102,22 @@
             background: #10b981;
         }
         
+        .status-indicator.connected {
+            background: #10b981;
+        }
+        
         .status-indicator.disconnected {
             background: #ef4444;
         }
         
         .status-indicator.connecting {
             background: #f59e0b;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         
         .section-title {
@@ -125,6 +159,25 @@
             background: #eff6ff;
             border-color: #3b82f6;
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+        
+        /* Closed session styles */
+        .session-card.closed-session {
+            opacity: 0.8;
+            background: #f9fafb;
+            border-color: #e5e7eb;
+        }
+        
+        .session-card.closed-session:hover {
+            opacity: 1;
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        
+        .session-card.closed-session.active {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            opacity: 1;
         }
         
         .session-info {
@@ -424,6 +477,148 @@
             outline-offset: 2px;
         }
         
+        .ai-trigger-btn {
+            background: linear-gradient(135deg, #7c3aed, #4c1d95);
+            color: #fff;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.65rem 0.9rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .ai-trigger-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(124, 58, 237, 0.35);
+        }
+        
+        .ai-suggestion-panel {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.85rem;
+            padding: 1rem 1.1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 12px 30px rgba(99, 102, 241, 0.12);
+        }
+        
+        .ai-suggestion-panel.hidden {
+            display: none;
+        }
+        
+        .ai-suggestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        
+        .ai-suggestion-header .ai-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #ede9fe;
+            color: #5b21b6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        
+        .ai-suggestion-header .ai-title {
+            font-weight: 600;
+            margin-left: 0.5rem;
+            color: #111827;
+        }
+        
+        .ai-close-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        
+        .ai-suggestion-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+        
+        .ai-loading,
+        .ai-error,
+        .ai-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .ai-loading.hidden,
+        .ai-error.hidden,
+        .ai-content.hidden {
+            display: none;
+        }
+        
+        .ai-loading .spinner {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 3px solid #e0e7ff;
+            border-top-color: #6366f1;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .ai-suggestion-text {
+            font-size: 0.95rem;
+            color: #111827;
+            line-height: 1.45;
+        }
+        
+        .ai-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .ai-actions button {
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        
+        .btn-ai-use {
+            background: #10b981;
+            color: #fff;
+        }
+        
+        .btn-ai-regenerate {
+            background: #f59e0b;
+            color: #1f2937;
+        }
+        
+        .btn-ai-dismiss,
+        .btn-ai-retry {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        
+        .ai-footer {
+            text-align: right;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
         @media (max-width: 1024px) {
             .support-container {
                 flex-direction: column;
@@ -446,6 +641,24 @@
             .support-controls {
                 justify-content: center;
             }
+        }
+        
+        /* RTL-specific adjustments */
+        [dir="rtl"] .sessions-panel {
+            border-right: none;
+            border-left: 1px solid #e5e7eb;
+        }
+        
+        [dir="rtl"] .message {
+            direction: rtl;
+        }
+        
+        [dir="rtl"] .message.agent {
+            flex-direction: row;
+        }
+        
+        [dir="rtl"] .message:not(.agent) {
+            flex-direction: row-reverse;
         }
         
         @media (max-width: 768px) {
@@ -480,18 +693,24 @@
     <div class="main-content" id="mainContent">
         <div class="support-header">
             <div class="support-title">
-                <h1><i class="fas fa-headset"></i> Live Support</h1>
-                <p>Real-time customer assistance</p>
+                <h1><i class="fas fa-headset"></i> <span data-i18n="liveSupport">الدعم المباشر</span></h1>
+                <p data-i18n="realTimeAssistance">المساعدة الفورية للعملاء</p>
             </div>
             
             <div class="support-controls">
                 <div class="connection-status">
                     <div class="status-indicator" id="connectionIndicator"></div>
-                    <span id="connectionStatus">Connecting...</span>
+                    <span id="connectionStatus" data-i18n="connecting">جاري الاتصال...</span>
                 </div>
                 
-                <button class="quick-action-button" onclick="reconnectWebSocket()">
-                    <i class="fas fa-sync-alt"></i> Reconnect
+                <!-- Language switcher -->
+                <button class="quick-action-button" id="languageSwitcher" title="Switch Language / تبديل اللغة">
+                    <i class="fas fa-language"></i>
+                    <span id="currentLang">AR</span>
+                </button>
+                <!-- Reconnect button wired via JS to satisfy CSP -->
+                <button class="quick-action-button" id="reconnectBtn">
+                    <i class="fas fa-sync-alt"></i> <span data-i18n="reconnect">إعادة الاتصال</span>
                 </button>
             </div>
         </div>
@@ -501,15 +720,31 @@
             <div class="sessions-panel">
                 <div class="sessions-header">
                     <div class="section-title">
-                        Active Conversations (<span id="activeSessions">0</span>)
+                        <span data-i18n="activeConversations">المحادثات النشطة</span> (<span id="activeSessions">0</span>)
                     </div>
                 </div>
                 
                 <div class="sessions-list" id="sessionsList">
                     <div class="empty-state">
                         <i class="fas fa-comments"></i>
-                        <h3>No active conversations</h3>
-                        <p>New conversations will appear here when customers start chatting</p>
+                        <h3 data-i18n="noActiveConversations">لا توجد محادثات نشطة</h3>
+                        <p data-i18n="noActiveConversationsDesc">ستظهر المحادثات الجديدة هنا عندما يبدأ العملاء بالدردشة</p>
+                    </div>
+                </div>
+                <!-- Closed Sessions Section -->
+                <div class="sessions-header" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
+                    <div class="section-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-archive" style="font-size: 0.875rem;"></i>
+                        <span data-i18n="closedSessions">الجلسات المغلقة (آخر ساعتين)</span>
+                        <span id="closedSessionsCount"
+                            style="background: #6c757d; color: white; padding: 0.125rem 0.5rem; border-radius: 0.75rem; font-size: 0.75rem; font-weight: 600;">0</span>
+                    </div>
+                </div>
+                
+                <div class="sessions-list" id="closedSessionsList" style="max-height: 300px; overflow-y: auto;">
+                    <div class="empty-state-small" style="padding: 2rem; text-align: center; color: #999;">
+                        <i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i>
+                        <p style="margin: 0; font-size: 0.875rem;" data-i18n="noClosedSessions">لا توجد جلسات مغلقة مؤخراً</p>
                     </div>
                 </div>
             </div>
@@ -519,24 +754,25 @@
             <div class="chat-header">
                 <div class="chat-title">
                     <i class="fas fa-user"></i>
-                    <h2 id="chatTitle">Select a conversation</h2>
+                    <h2 id="chatTitle" data-i18n="selectConversation">اختر محادثة</h2>
                 </div>
                 <div class="chat-actions">
-                    <button class="btn btn-secondary" onclick="endChatSession()" id="endSessionBtn" style="display: none;">
-                        <i class="fas fa-times"></i> End Session
+                    <button class="btn btn-secondary" id="endSessionBtn" style="display: none;" data-write-only>
+                        <i class="fas fa-times"></i> <span data-i18n="endSession">إنهاء الجلسة</span>
                     </button>
                 </div>
             </div>
             <div class="chat-messages" id="chatMessages">
                 <div class="empty-state">
                     <i class="fas fa-comments"></i>
-                    <h3>Welcome to Support Dashboard</h3>
-                    <p>Select an active conversation from the sidebar to start helping customers</p>
+                    <h3 data-i18n="welcomeToSupport">مرحباً بك في لوحة الدعم</h3>
+                    <p data-i18n="selectConversationDesc">اختر محادثة نشطة من الشريط الجانبي لبدء مساعدة العملاء</p>
                 </div>
             </div>
-            <div class="chat-input" id="chatInputArea" style="display: none;">
+            <div class="chat-input" id="chatInputArea" style="display: none;" data-write-only>
                 <div class="input-container">
-                    <textarea class="message-input" id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                    <textarea class="message-input" id="messageInput" data-i18n-placeholder="typeYourMessage" placeholder="اكتب رسالتك..."
+                        rows="1"></textarea>
                     <button class="send-button" id="sendButton">
                         <i class="fas fa-paper-plane"></i>
                     </button>
@@ -546,989 +782,787 @@
     </div>
 
     <!-- Load required dependencies -->
-    <script src="/assets/js/websocket-manager.js"></script>
-    <script src="/js/support/ChatSessionService.js"></script>
-    <script src="/js/support/LiveChatSocket.js"></script>
-    <script src="/js/auto-session-filter.js"></script>
+    <script>
+        // Prevent global WebSocketManager from auto-initializing on this page to avoid dual connections
+        window.DISABLE_GLOBAL_WS_MANAGER = true;
+    </script>
+    <script src="../assets/js/websocket-manager.js?v=1763059200"></script>
+    <script src="../js/support/ChatSessionService.js?v=1763059200"></script>
+    <script src="../js/support/LiveChatSocket.js?v=1763059200"></script>
+    <script src="../js/auto-session-filter.js?v=1763059200"></script>
+
+    <script>
+                            // ⏰ SCRIPT VERSION: 1763060500 - MERCHANT_WS_FIX_COMPLETE
+                            console.log('📄 Support.html inline script loaded - VERSION: 1763060500 - MERCHANT_WS_FIX_COMPLETE');
+                            console.log('🔍 Endpoint info: merchantChatWS will connect to bx4snzqxpd/ghayth');
+                            window.SUPPORT_PAGE_VERSION = '1763060500_MERCHANT_WS_FIX_COMPLETE';
+                        
+        (function () {
+            try {
+                // New RBAC system - auto-detects page name
+                window.RBAC.enforcePage();
+
+                // Apply read-only if needed (automatic in new system)
+                if (window.RBAC.isReadOnly()) {
+                    document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+                }
+            } catch (e) { console.warn('RBAC init failed', e); }
+        })();
+    </script>
 
     <script>
         // Global variables
         let activeChatSessions = new Map();
         let currentSessionId = null;
         let wsManager = null;
+            let merchantChatWS = null;
+            let merchantSessions = new Map();
+            let closedSessions = new Map();  // Store recently closed sessions
+            let merchantStatusWatchId = null; // 🔍 Watchdog for reflecting merchant WS state into UI
+            // 🔄 Reconnect state (exponential backoff)
+            let merchantReconnectAttempts = 0;
+            let merchantReconnectTimer = null;
+            const MERCHANT_RECONNECT_BASE_MS = 1000;  // 1s
+            const MERCHANT_RECONNECT_MAX_MS = 15000;  // 15s cap
+            const AI_API_ENDPOINT = 'https://c9zg7yodh3.execute-api.us-east-1.amazonaws.com/dev/agent-suggestion';
+            // ▶️ Track last joined session to avoid redundant join_channel calls
+            let lastJoinedSessionId = null;
+            // ▶️ De-dupe window to avoid echoing agent messages from server after optimistic append
+            const DUPLICATE_WINDOW_MS = 3000;
+
+                // 🌐 Language switcher initialization
+                document.addEventListener('DOMContentLoaded', function () {
+                    const langSwitcher = document.getElementById('languageSwitcher');
+                    const currentLangSpan = document.getElementById('currentLang');
+
+                    // Update language indicator
+                    function updateLanguageIndicator() {
+                        if (currentLangSpan && window.SupportI18n) {
+                            currentLangSpan.textContent = window.SupportI18n.getLanguage().toUpperCase();
+                        }
+                    }
+
+                    // Language switcher click handler
+                    if (langSwitcher && window.SupportI18n) {
+                        langSwitcher.addEventListener('click', function () {
+                            const currentLang = window.SupportI18n.getLanguage();
+                            const newLang = currentLang === 'ar' ? 'en' : 'ar';
+                            window.SupportI18n.setLanguage(newLang);
+                            updateLanguageIndicator();
+
+                            // Update dynamic content
+                            updateConnectionStatus();
+                            updateSessionsList();
+                            updateClosedSessionsList();
+
+                            console.log(`🌐 Language switched to: ${newLang}`);
+                        });
+                    }
+
+                    updateLanguageIndicator();
+                });
+
+            if (typeof window !== 'undefined') {
+                window.activeChatSessions = activeChatSessions;
+                try {
+                    Object.defineProperty(window, 'currentSessionId', {
+                        configurable: true,
+                        get() {
+                            return currentSessionId;
+                        },
+                        set(value) {
+                            currentSessionId = value;
+                    }
+                });
+            } catch (err) {
+                console.warn('Unable to define currentSessionId on window:', err);
+                window.currentSessionId = currentSessionId;
+            }
+        }
+
+            function scheduleMerchantReconnect(reason = 'unknown') {
+                try { if (merchantReconnectTimer) clearTimeout(merchantReconnectTimer); } catch (_) { }
+                const exp = Math.min(
+                    MERCHANT_RECONNECT_BASE_MS * Math.pow(2, merchantReconnectAttempts),
+                    MERCHANT_RECONNECT_MAX_MS
+                );
+                const jitter = exp * (Math.random() * 0.2); // up to +20%
+                const delay = Math.floor(exp + jitter);
+                merchantReconnectAttempts++;
+                console.log(`🔄 Merchant WS reconnect in ${delay}ms (attempt ${merchantReconnectAttempts}) – reason: ${reason}`);
+                updateConnectionStatus('connecting');
+                merchantReconnectTimer = setTimeout(() => {
+                    initializeMerchantChatSystem();
+                }, delay);
+            }
+
+            function triggerAISuggestion(sessionId) {
+                if (!sessionId || !window.whizzAI || typeof window.whizzAI.requestSuggestion !== 'function') {
+                    return;
+                }
+            const activeSessionId = window.currentSessionId || currentSessionId;
+            if (sessionId !== activeSessionId) return;
+
+            setTimeout(() => {
+                try {
+                    window.whizzAI.requestSuggestion();
+                } catch (err) {
+                    console.warn('whizzAI auto-trigger failed:', err);
+                }
+            }, 800);
+        }
 
             // Initialize support page when DOM is ready
+            // CACHE BUSTER: v1736100000_FINAL_FIX
             document.addEventListener('DOMContentLoaded', function () {
-            console.log('🚀 Production Support page initializing...');
+                console.log('🚀 Production Support page initializing...');
+                console.log('🔍 DEBUG: Script version check - FIX APPLIED v3 - TIMESTAMP: 1736100000');
+                // Request notification permission
+                requestNotificationPermission();
 
-            // Request notification permission
-            requestNotificationPermission();
-            
-            // Initialize real live chat system only - no mock fallback
-            initializeRealLiveChatSystem();
+            console.log('🎯 Using merchant chat system as primary connection');
+
+            // Add global diagnostic function
+            window.checkConnectionStatus = function () {
+                console.log('=== CONNECTION STATUS DIAGNOSTIC ===');
+                console.log('Page Version:', window.SUPPORT_PAGE_VERSION || 'OLD VERSION');
+                console.log('Active Connection:', window.ACTIVE_WS_CONNECTION || 'Not yet connected');
+                console.log('merchantChatWS readyState:', window.merchantChatWS?.readyState, '(1=OPEN, 3=CLOSED)');
+                console.log('liveChatSocket:', window.liveChatSocket ? 'EXISTS (should be undefined)' : 'undefined (correct)');
+                console.log('UI Status Element:', document.querySelector('.connection-status')?.textContent);
+                console.log('====================================');
+
+                if (window.SUPPORT_PAGE_VERSION === '1763060500_MERCHANT_WS_FIX_COMPLETE') {
+                    console.log('✅ Correct version loaded with all functions!');
+                } else {
+                    console.log('❌ OLD VERSION - Cache issue! Current:', window.SUPPORT_PAGE_VERSION);
+                }
+            };
+
+            initializeMerchantChatSystem();
+
+            // ✅ CSP-safe event listeners (no inline handlers)
+            const reconnectBtn = document.getElementById('reconnectBtn');
+            if (reconnectBtn) {
+                reconnectBtn.addEventListener('click', () => window.reconnectWebSocket());
+            }
+            const sendBtnEl = document.getElementById('sendButton');
+            if (sendBtnEl) {
+                sendBtnEl.addEventListener('click', () => window.sendMessage());
+            }
+            const endBtnEl = document.getElementById('endSessionBtn');
+            if (endBtnEl) {
+                endBtnEl.addEventListener('click', () => window.endChatSession());
+            }
+
+            // 🔄 Mirror actual merchant WS readyState into the UI periodically
+            if (!merchantStatusWatchId) {
+                merchantStatusWatchId = setInterval(() => {
+                    try {
+                        if (!merchantChatWS) return;
+                        const rs = merchantChatWS.readyState;
+                        if (rs === WebSocket.OPEN) {
+                            updateConnectionStatus('connected');
+                        } else if (rs === WebSocket.CONNECTING) {
+                            updateConnectionStatus('connecting');
+                        } else {
+                            updateConnectionStatus('disconnected');
+                        }
+                    } catch (e) {
+                        console.warn('Status watchdog error', e);
+                    }
+                }, 1500);
+            }
+
+            // Initialize AI assistant panel
+            if (typeof initializeWhizzAI === 'function') {
+                initializeWhizzAI(AI_API_ENDPOINT);
+            } else {
+                console.warn('⚠️ whizzAI assistant script not loaded');
+            }
         });
 
             // Request notification permission
-        function requestNotificationPermission() {
-            if ('Notification' in window && Notification.permission === 'default') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        console.log('✅ Notification permission granted');
-                    }
-                });
-            }
-        }
-
-            // Initialize real WebSocket live chat system (production-ready)
-        async function initializeRealLiveChatSystem() {
-            console.log('🚀 Initializing production live chat system with LiveChatSocket...');
-
-            try {
-                updateConnectionStatus('connecting', 'Connecting to live chat...');
-
-                // Wait for LiveChatSocket to be available (with timeout)
-                let attempts = 0;
-                const maxAttempts = 10;
-
-                while (!window.LiveChatSocket && attempts < maxAttempts) {
-                    console.log(`⏳ Waiting for LiveChatSocket... (attempt ${attempts + 1})`);
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    attempts++;
-                }
-
-                // Initialize LiveChatSocket for support agents                    if (window.LiveChatSocket) {
-                const liveChatSocket = new window.LiveChatSocket({
-                    businessId: '7ccf646c-9594-48d4-8f63-c366d89257e5',
-                    endpoint: 'wss://0fs1zdwyzf.execute-api.us-east-1.amazonaws.com/dev',
-                    userId: 'support_dashboard_' + Date.now(),
-                    agentId: 'support_agent_' + Date.now(),
-                    agentName: 'WizzCentral Support Agent'
-                });
-
-                // Add message listener for debugging
-                liveChatSocket.ws?.addEventListener('message', (event) => {
-                    console.log('🔍 DEBUG: Raw WebSocket message received:', event.data);
-                    try {
-                        const msg = JSON.parse(event.data);
-                        console.log('🔍 DEBUG: Parsed message type:', msg.type);
-                        if (msg.type === 'driver_message' || msg.type === 'chat_message') {
-                            console.log('🚗 DEBUG: Driver message detected!', msg);
+            function requestNotificationPermission() {
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === 'granted') {
+                            console.log('✅ Notification permission granted');
                         }
-                    } catch (e) {
-                        console.log('🔍 DEBUG: Raw message (not JSON):', event.data);
-                    }
-                });
-
-                // Initialize the socket
-                liveChatSocket.init();
-
-                // Connect to the WebSocket
-                const connected = await liveChatSocket.connect();
-                    
-                    if (connected) {
-                        console.log('✅ LiveChatSocket connected successfully as support agent');
-                        updateConnectionStatus('connected', 'Connected to live chat as support agent');
-                        
-                        // Store reference globally
-                        window.liveChatSocket = liveChatSocket;
-                        
-                        // Load active chat sessions
-                        loadActiveChatSessions();
-                    } else {
-                        throw new Error('Failed to connect LiveChatSocket');
-                    }
-
-                } else {
-                    console.error('❌ LiveChatSocket still not available after waiting');
-                    console.error('Available on window:', Object.keys(window).filter(key => key.includes('Chat')));
-                    throw new Error('LiveChatSocket not available after ' + maxAttempts + ' attempts - check if LiveChatSocket.js is loaded correctly');
+                    });
                 }
-                        
-            } catch (error) {
-                console.error('❌ Failed to initialize live chat system:', error);
-                updateConnectionStatus('disconnected', 'Connection failed: ' + error.message);
-
-                // Log production error but don't fall back to mock system
-                console.error('⚠️ Production support page requires LiveChatSocket connection');
-            }
         }
-
-            // LiveChatSocket integrated event handling - managed automatically by LiveChatSocket
-
-                // Handle incoming chat messages
-                function handleIncomingChatMessage(message) {
-                    try {
-                const data = typeof message === 'string' ? JSON.parse(message) : message;
-
-                switch (data.type || data.action) {
-                    case 'channel_joined':
-                        console.log('✅ Successfully joined live chat channel');
-                        updateConnectionStatus('connected', 'Connected to live chat');
-                        break;
-                    case 'connection_confirmed':
-                        console.log('✅ Agent connection confirmed by server');
-                        updateConnectionStatus('connected', 'Connected to live chat');
-                        break;
-                    case 'active_sessions':
-                        console.log('📋 Received active sessions');
-                        handleAgentSessions(data);
-                        break;
-                    case 'chat_message':
-                    case 'message_received':
-                    case 'CHAT_MESSAGE':
-                        console.log('💬 Processing incoming chat message');
-                        handleChatMessage(data);
-                        break;
-                    case 'new_chat_session':
-                    case 'chat_session_created':
-                    case 'CHAT_INIT':
-                        console.log('🆕 New chat session created');
-                        handleNewChatSession(data);
-                        break;
-                    case 'chat_session_closed':
-                    case 'session_closed':
-                    case 'CHAT_END':
-                        console.log('❌ Chat session closed');
-                        handleChatSessionEnd(data);
-                        break;
-                    case 'TYPING_INDICATOR':
-                        handleTypingIndicator(data);
-                        break;
-                    case 'HEARTBEAT':
-                    case 'PONG':
-                        // Handle heartbeat responses silently
-                        break;
-                    case 'error':
-                        console.error('❌ Server error:', data.message);
-                        break;
-                    default:
-                        console.log('📨 Unhandled message type:', data.type || data.action, data);
-                }
-            } catch (error) {
-                console.error('❌ Error handling chat message:', error);
-            }
-        }
-
-            // Handle new chat session (only real sessions from WizzDriver app)
-            function handleNewChatSession(data) {
-                // Apply session filtering - only allow genuine WizzDriver sessions
-                if (isTestSession(data) || !isAllowedDriverSession(data)) {
-                    console.log('🚫 Filtered out test/mock session:', data.sessionId || data.id);
-                    return;
-                }
-
-            const sessionId = data.sessionId || data.id || 'session_' + Date.now();
-            const session = {
-                id: sessionId,
-                customer: data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'WizzDriver User',
-                lastMessage: 'New chat session started',
-                time: 'Just now',
-                unread: true,
-                messages: []
-            };
-
-            activeChatSessions.set(sessionId, session);
-            updateSessionsList();
-
-            console.log('📱 New genuine WizzDriver session:', session);
-        }
-
-            // Handle chat message (only from real sessions)
-            function handleChatMessage(data) {
-                const sessionId = data.sessionId || data.payload?.sessionId;
-                let session = activeChatSessions.get(sessionId);
-
-            // Only process messages from verified sessions
-            if (!session) {
-                // Apply filtering before creating new session
-                if (isTestSession(data) || !isAllowedDriverSession(data)) {
-                    console.log('🚫 Ignored message from filtered session:', sessionId);
-                    return;
-                }
-
-                session = {
-                    id: sessionId,
-                    customer: data.payload?.userDisplayName || data.payload?.userId || data.driverName || 'WizzDriver User',
-                    lastMessage: '',
-                    time: 'Just now',
-                    unread: true,
-                    messages: []
-                };
-                activeChatSessions.set(sessionId, session);
-                console.log('📱 Created new verified session for incoming message:', sessionId);
-            }
-
-            const message = {
-                id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                text: data.payload?.text || data.text || 'Empty message',
-                sender: data.payload?.userType || data.payload?.senderType || 'customer',
-                timestamp: new Date(),
-                senderName: data.payload?.userDisplayName || data.payload?.senderName || session.customer
-            };
-
-            session.messages.push(message);
-            session.lastMessage = message.text;
-            session.time = formatTimestamp(new Date());
-            session.unread = (message.sender !== 'agent');
-
-            // Update UI immediately
-            updateSessionsList();
-
-            // If this session is currently active, add message directly
-            if (currentSessionId === sessionId) {
-                appendMessageToChat(message);
-                // Mark as read since it's the active session
-                session.unread = false;
-                updateSessionsList();
-            }
-
-            // Show notification for new messages
-            if (message.sender !== 'agent') {
-                showNewMessageNotification(session, message);
-            }
-                
-            console.log('💬 New message in verified session:', sessionId, message);
-        }
-
-            // Session filtering functions (production-ready)
-            function isTestSession(sessionData = {}) {
-                try {
-                    const meta = sessionData.metadata || {};
-                    const id = (sessionData.sessionId || sessionData.id || '').toString().toLowerCase();
-                    const name = (
-                        sessionData.driverName ||
-                        sessionData.driverInfo?.driverName ||
-                        sessionData.payload?.userDisplayName ||
-                        meta.driverName ||
-                        ''
-                    ).toString().toLowerCase();
-
-                    // Enhanced test detection patterns
-                    const testFlags = [
-                        sessionData.isTest,
-                        meta.isTest,
-                        meta.source === 'test',
-                        meta.source === 'mock',
-                        meta.source === 'demo'
-                    ];
-
-                    // Comprehensive test patterns
-                    const testPatterns = [
-                        id.startsWith('test_'),
-                        id.startsWith('mock_'),
-                        id.startsWith('demo_'),
-                        id.includes('test'),
-                        id.includes('mock'),
-                        id.includes('demo'),
-                        name.includes('test'),
-                        name.includes('mock'),
-                        name.includes('demo'),
-                        name === 'driver 123',
-                        name === 'test driver',
-                        name === 'mock driver',
-                        id.startsWith('support_session_') && name.toLowerCase().includes('test')
-                    ];
-
-                    return Boolean(testFlags.some(Boolean) || testPatterns.some(Boolean));
-                } catch (e) {
-                    return false;
-                }
-            }
-
-            function isAllowedDriverSession(sessionData = {}) {
-                try {
-                    const meta = sessionData.metadata || {};
-                    const source = meta.source || sessionData.source || 'unknown';
-                    const userType = sessionData.userType || sessionData.payload?.userType || 'unknown';
-
-                    // Only allow WizzDriver Flutter app sessions
-                    const allowedSources = ['wizzdriver_app', 'flutter_app', 'mobile_app'];
-                    const allowedUserTypes = ['driver', 'customer', 'user'];
-
-                    const hasValidSource = allowedSources.includes(source);
-                    const hasValidUserType = allowedUserTypes.includes(userType);
-
-                    // Must have at least one valid identifier
-                    return hasValidSource || hasValidUserType;
-                } catch (e) {
-                    // If we can't determine, allow it (err on side of inclusion)
-                    return true;
-                }
-            }
-
-            // Handle agent sessions (with filtering)
-            function handleAgentSessions(data) {
-                if (data.payload && data.payload.sessions) {
-                    let addedCount = 0;
-
-                    data.payload.sessions.forEach(sessionData => {
-                        // Apply filtering to only show genuine WizzDriver sessions
-                        if (isTestSession(sessionData) || !isAllowedDriverSession(sessionData)) {
-                            console.log('🚫 Filtered out session:', sessionData.sessionId, sessionData.driverName || 'Unknown');
-                            return;
-                        }
-        
-                    const session = {
-                        id: sessionData.sessionId,
-                        customer: sessionData.customerName || sessionData.driverName || sessionData.userId,
-                        lastMessage: sessionData.lastMessage || 'Active session',
-                        time: sessionData.lastMessageTime || 'Active',
-                        unread: sessionData.unread || false,
-                        messages: sessionData.messages || []
-                    };
-            
-                    activeChatSessions.set(session.id, session);
-                    addedCount++;
-                });
-
-                            console.log(`📋 Loaded ${addedCount} verified WizzDriver sessions (filtered ${data.payload.sessions.length - addedCount} test/mock sessions)`);
-                        }
-
-                        updateSessionsList();
-                    }
-
-                    // Load active chat sessions
-                    function loadActiveChatSessions() {
-                        if (wsManager) {
-                const requestMessage = {
-                    action: 'get_active_sessions',
-                    type: 'GET_SESSIONS',
-                    payload: {
-                        agentId: 'support_agent_' + Date.now()
-                    }
-                };
-
-                wsManager.send(requestMessage);
-                console.log('📤 Requested active sessions');
-            }
-        }
-
-            // Update sessions list UI
-            function updateSessionsList() {
-            const sessionsList = document.getElementById('sessionsList');
-            const activeSessionsCount = document.getElementById('activeSessions');
-
-            if (!sessionsList) return;
-
-            const sessionCount = activeChatSessions.size;
-            
-            // Update active sessions counter
-            if (activeSessionsCount) {
-                activeSessionsCount.textContent = sessionCount.toString();
-            }
-
-            if (sessionCount === 0) {
-                sessionsList.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-comments"></i>
-                        <h3>No active conversations</h3>
-                        <p>New conversations will appear here when genuine WizzDriver users start chatting</p>
-                    </div>
-                `;
-                return;
-            }
-
-            sessionsList.innerHTML = '';
-
-            // Sort sessions by last message time (most recent first)
-            const sortedSessions = Array.from(activeChatSessions.values()).sort((a, b) => {
-                const aTime = a.messages.length > 0 ? new Date(a.messages[a.messages.length - 1].timestamp) : new Date(0);
-                const bTime = b.messages.length > 0 ? new Date(b.messages[b.messages.length - 1].timestamp) : new Date(0);
-                return bTime - aTime;
-            });
-
-            sortedSessions.forEach((session, index) => {
-                const sessionElement = document.createElement('div');
-                sessionElement.className = `session-card ${session.id === currentSessionId ? 'active' : ''} ${session.unread ? 'unread' : ''}`;
-                sessionElement.dataset.sessionId = session.id;
-                sessionElement.onclick = () => selectChatSession(session);
-
-                const messagePreview = session.lastMessage.length > 50 ?
-                    session.lastMessage.substring(0, 50) + '...' :
-                    session.lastMessage;
-
-                const customerInitials = session.customer.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-
-                sessionElement.innerHTML = `
-                    <div class="session-info">
-                        <div class="customer-avatar">${customerInitials}</div>
-                        <div class="session-details">
-                            <div class="customer-name">${session.customer}</div>
-                            <div class="last-message">${messagePreview}</div>
-                        </div>
-                        <div class="session-meta">
-                            <div class="message-time">${session.time}</div>
-                            ${session.unread ? '<div class="unread-badge">•</div>' : ''}
-                        </div>
-                    </div>
-                `;
-
-                sessionsList.appendChild(sessionElement);
-            });
-                
-            // Auto-select first session if none selected and we have sessions
-            if (activeChatSessions.size > 0 && !currentSessionId) {
-                const firstSession = sortedSessions[0];
-                selectChatSession(firstSession);
-            }
-        }
-
-            // Select a chat session
-            function selectChatSession(session) {
-            console.log('📱 Selecting chat session:', session.customer);
-
-            // Update current session
-            const previousSessionId = currentSessionId;
-            currentSessionId = session.id;
-
-            // Update active session UI
-            document.querySelectorAll('.session-card').forEach(item => {
-                item.classList.remove('active');
-            });
-
-            const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
-            if (sessionElement) {
-                sessionElement.classList.add('active');
-            }
-
-            // Mark as read
-            session.unread = false;
-
-            // Update chat view
-            updateChatView(session);
-
-            // Update sessions list to reflect changes
-            updateSessionsList();
-
-            // Send notification via WebSocket
-            if (wsManager && previousSessionId !== session.id) {
-                const switchMessage = {
-                    action: 'agent_session_switch',
-                    type: 'AGENT_SESSION_SWITCH',
-                    payload: {
-                        agentId: 'support_agent_' + Date.now(),
-                        fromSessionId: previousSessionId,
-                        toSessionId: session.id
-                    }
-                };
-
-                wsManager.send(switchMessage);
-                console.log('📤 Sent session switch message:', switchMessage);
-            }
-        }
-
-            // Update chat view
-            function updateChatView(session) {
-                const chatTitle = document.getElementById('chatTitle');
-                const chatMessages = document.getElementById('chatMessages');
-                const chatInputArea = document.getElementById('chatInputArea');
-                const endSessionBtn = document.getElementById('endSessionBtn');
-
-            if (chatTitle) {
-                chatTitle.textContent = session.customer;
-            }
-
-            if (chatMessages) {
-                chatMessages.innerHTML = renderMessages(session.messages);
-                scrollToBottom();
-            }
-
-            if (chatInputArea) {
-                chatInputArea.style.display = 'block';
-                setupMessageInput();
-            }
-
-            if (endSessionBtn) {
-                endSessionBtn.style.display = 'block';
-            }
-        }
-
-            // Render messages HTML
-            function renderMessages(messages) {
-                if (!messages || messages.length === 0) {
-                    return `
-                    <div class="empty-state">
-                        <i class="fas fa-comment-dots"></i>
-                        <h3>Start the conversation</h3>
-                        <p>Send a message to help this customer</p>
-                    </div>
-                `;
-            }
-
-            return messages.map(msg => {
-                if (msg.sender === 'system') {
-                    return `
-                        <div class="message system" data-message-id="${msg.id}">
-                            <div class="message-bubble">
-                                ${escapeHtml(msg.text)}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                const initials = msg.senderName ?
-                    msg.senderName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) :
-                    (msg.sender === 'agent' ? 'SA' : 'CU');
-
-                return `
-                    <div class="message ${msg.sender}" data-message-id="${msg.id}">
-                        <div class="message-avatar">${initials}</div>
-                        <div class="message-content">
-                            <div class="message-bubble">
-                                <div class="message-text">${escapeHtml(msg.text)}</div>
-                            </div>
-                            <div class="message-timestamp">${formatTimestamp(msg.timestamp)}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-            // Append single message to chat (for real-time updates)
-            function appendMessageToChat(message) {
-            const chatMessages = document.getElementById('chatMessages');
-            if (!chatMessages) return;
-
-            // Remove empty state if it exists
-            const emptyState = chatMessages.querySelector('.empty-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
-
-            const messageElement = document.createElement('div');
-            messageElement.className = `message ${message.sender}`;
-            messageElement.dataset.messageId = message.id;
-
-            if (message.sender === 'system') {
-                messageElement.innerHTML = `
-                    <div class="message-bubble">
-                        ${escapeHtml(message.text)}
-                    </div>
-                `;
-            } else {
-                const initials = message.senderName ?
-                    message.senderName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) :
-                    (message.sender === 'agent' ? 'SA' : 'CU');
-
-                messageElement.innerHTML = `
-                    <div class="message-avatar">${initials}</div>
-                    <div class="message-content">
-                        <div class="message-bubble">
-                            <div class="message-text">${escapeHtml(message.text)}</div>
-                        </div>
-                        <div class="message-timestamp">${formatTimestamp(message.timestamp)}</div>
-                    </div>
-                `;
-            }
-
-            chatMessages.appendChild(messageElement);
-            scrollToBottom();
-
-            // Add smooth animation
-            messageElement.style.opacity = '0';
-            messageElement.style.transform = 'translateY(10px)';
-            setTimeout(() => {
-                messageElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-                messageElement.style.opacity = '1';
-                messageElement.style.transform = 'translateY(0)';
-            }, 10);
-        }
-
-            // Setup message input handlers
-            function setupMessageInput() {
-            const messageInput = document.getElementById('messageInput');
-            const sendButton = document.getElementById('sendButton');
-            if (!messageInput) return;
-
-            messageInput.addEventListener('keypress', function (e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
-            });
-
-            messageInput.addEventListener('input', function () {
-                this.style.height = 'auto';
-                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-
-                // Send typing indicator
-                sendTypingIndicator();
-
-                // Enable/disable send button
-                if (sendButton) {
-                    sendButton.disabled = !this.value.trim();
-                }
-            });
-
-            // Focus input
-            messageInput.focus();
-        }
-
-            // Send message function
-            window.sendMessage = function () {
-            const messageInput = document.getElementById('messageInput');
-            const sendButton = document.getElementById('sendButton');
-
-            if (!messageInput || !currentSessionId) return;
-
-            const message = messageInput.value.trim();
-            if (!message) return;
-            
-            const session = activeChatSessions.get(currentSessionId);
-            if (!session) return;
-            
-            // Disable send button temporarily
-            if (sendButton) {
-                sendButton.disabled = true;
-                sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            }
-
-            // Create message object
-            const messageObj = {
-                id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                text: message,
-                sender: 'agent',
-                timestamp: new Date(),
-                senderName: 'Support Agent'
-            };
-
-            // Add message to local session immediately for instant feedback
-            session.messages.push(messageObj);
-            session.lastMessage = message;
-            session.time = formatTimestamp(new Date());
-
-            // Append message to chat view immediately
-            appendMessageToChat(messageObj);
-            
-            // Clear input immediately
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-
-            // Send via WebSocket
-            if (wsManager) {
-                const chatMessage = {
-                    action: 'chat_message',
-                    type: 'chat_message',
-                    sessionId: currentSessionId,
-                    messageText: message,
-                    text: message,
-                    senderType: 'agent',
-                    senderName: 'Support Agent',
-                    agentId: 'support_agent_' + Date.now(),
-                    timestamp: new Date().toISOString()
-                };
-
-                wsManager.send(chatMessage);
-                console.log('📤 Sent chat message:', chatMessage);
-            }
-
-            // Update sessions list
-            updateSessionsList();
-
-            // Re-enable send button
-            setTimeout(() => {
-                if (sendButton) {
-                    sendButton.disabled = false;
-                    sendButton.innerHTML = '<i class="fas fa-paper-plane"></i>';
-                }
-                messageInput.focus();
-            }, 500);
-        };
-
-            // End chat session function
-            window.endChatSession = function (sessionId) {
-            if (!sessionId) sessionId = currentSessionId;
-            if (!sessionId) return;
-
-            const session = activeChatSessions.get(sessionId);
-            if (!session) return;
-
-            if (confirm(`Are you sure you want to end the chat session with ${session.customer}?`)) {
-                // Send session end message via WebSocket
-                if (wsManager) {
-                    const endMessage = {
-                        action: 'chat_session_close',
-                        type: 'chat_session_close',
-                        sessionId: sessionId,
-                        senderType: 'agent',
-                        agentId: 'support_agent',
-                        reason: 'ended_by_agent',
-                        timestamp: new Date().toISOString()
-                    };
-
-                    wsManager.send(endMessage);
-                    console.log('📤 Sent session end message:', endMessage);
-                }
-
-                // Remove from local sessions
-                activeChatSessions.delete(sessionId);
-                    
-                // Clear chat view if this was the active session
-                if (currentSessionId === sessionId) {
-                    currentSessionId = null;
-                    const chatMessages = document.getElementById('chatMessages');
-                    const chatInputArea = document.getElementById('chatInputArea');
-                    const chatTitle = document.getElementById('chatTitle');
-                    const endSessionBtn = document.getElementById('endSessionBtn');
-
-                    if (chatMessages) {
-                        chatMessages.innerHTML = `
-                            <div class="empty-state">
-                                <i class="fas fa-comment-dots"></i>
-                                <h3>Select a conversation</h3>
-                                <p>Choose a conversation from the left to start helping customers</p>
-                            </div>
-                        `;
-                    }
-
-                    if (chatInputArea) {
-                        chatInputArea.style.display = 'none';
-                    }
-
-                    if (chatTitle) {
-                        chatTitle.textContent = 'Select a conversation';
-                    }
-
-                    if (endSessionBtn) {
-                        endSessionBtn.style.display = 'none';
-                    }
-                }
-
-                // Update sessions list
-                updateSessionsList();
-
-                console.log('✅ Session ended:', sessionId);
-            }
-        };
 
             // Reconnect WebSocket function
             window.reconnectWebSocket = function () {
-                console.log('🔄 Reconnecting WebSocket...');
-                if (wsManager) {
-                    wsManager.disconnect();
-                    setTimeout(() => {
-                        initializeRealLiveChatSystem();
-                    }, 1000);
-                } else {
-                    window.location.reload();
+                console.log('🔄 Reconnecting WebSocket (merchantChatWS)...');
+                try {
+                    // Reset backoff and any pending timers
+                    try { if (merchantReconnectTimer) clearTimeout(merchantReconnectTimer); } catch (_) { }
+                    merchantReconnectAttempts = 0;
+                    updateConnectionStatus('connecting');
+
+                // Close current socket if present
+                if (merchantChatWS && merchantChatWS.readyState !== WebSocket.CLOSED) {
+                    try { merchantChatWS.onopen = merchantChatWS.onclose = merchantChatWS.onerror = merchantChatWS.onmessage = null; } catch (_) { }
+                    try { merchantChatWS.close(); } catch (_) { }
+                }
+
+                // Attempt immediate reconnect
+                setTimeout(() => {
+                    initializeMerchantChatSystem();
+                }, 200);
+            } catch (e) {
+                console.error('Reconnect error', e);
+                setTimeout(() => initializeMerchantChatSystem(), 500);
+            }
+        };
+
+            function initializeMerchantChatSystem() {
+                console.log('🏪 Initializing merchant chat system...');
+
+            // Prevent parallel sockets
+            if (merchantChatWS && (merchantChatWS.readyState === WebSocket.OPEN || merchantChatWS.readyState === WebSocket.CONNECTING)) {
+                console.log('🔁 Merchant WS already active (state:', merchantChatWS.readyState, ')');
+                return;
+            }
+
+            // Update UI to show connecting state
+            updateConnectionStatus('connecting', 'Connecting to live chat...');
+
+            const MERCHANT_WS_URL = 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth';
+            const AGENT_ID = 'agent_' + Date.now();
+            const AGENT_NAME = 'Support Agent';
+
+            // Clean old handlers/socket if present
+            try { if (merchantChatWS) { merchantChatWS.onopen = merchantChatWS.onclose = merchantChatWS.onerror = merchantChatWS.onmessage = null; } } catch (_) { }
+
+            console.log('🔗 Attempting to connect to:', MERCHANT_WS_URL);
+            console.log('⚠️ NOTE: If connection fails, check AWS WebSocket API Gateway configuration');
+            
+            merchantChatWS = new WebSocket(MERCHANT_WS_URL);
+            
+            // Add connection timeout (10 seconds)
+            let connectionTimeout = setTimeout(() => {
+                if (merchantChatWS && merchantChatWS.readyState === WebSocket.CONNECTING) {
+                    console.error('⏱️ WebSocket connection timeout - still connecting after 10s');
+                    console.error('🔍 Possible causes:');
+                    console.error('   1. AWS WebSocket API Gateway returns 403 Forbidden');
+                    console.error('   2. Missing Lambda authorizer or incorrect configuration');
+                    console.error('   3. Network/firewall blocking the connection');
+                    console.error('   4. WebSocket endpoint URL is incorrect');
+                    console.error('📝 Recommended: Check AWS API Gateway console for the WebSocket API');
+                    updateConnectionStatus('disconnected', 'Connection timeout - AWS configuration issue');
+                    try { merchantChatWS.close(); } catch (_) { }
+                    scheduleMerchantReconnect('timeout');
+                }
+            }, 10000);
+            
+            // Expose for diagnostics
+            try { window.merchantChatWS = merchantChatWS; } catch (_) { }
+
+            merchantChatWS.onopen = () => {
+                console.log('✅ Merchant chat WebSocket connected');
+                console.log('📍 Active endpoint: wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth');
+                console.log('✅ CONNECTION STATE: merchantChatWS is OPEN (readyState: 1)');
+
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
+                // Reset reconnect backoff
+                try { if (merchantReconnectTimer) clearTimeout(merchantReconnectTimer); } catch (_) { }
+                merchantReconnectAttempts = 0;
+
+                // Send agent connect message
+                const msg = {
+                    action: 'chat_agent_connect',
+                    type: 'chat_agent_connect',
+                    agentId: AGENT_ID,
+                    agentName: AGENT_NAME
+                };
+                merchantChatWS.send(JSON.stringify(msg));
+                console.log('📤 Sent merchant agent_connect');
+
+                // Expose agent identity for subsequent join_channel actions
+                try { window.MERCHANT_AGENT_ID = AGENT_ID; window.MERCHANT_AGENT_NAME = AGENT_NAME; } catch (_) { }
+            };
+
+            merchantChatWS.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('📥 Merchant chat message:', data.type);
+                    handleMerchantChatMessage(data);
+                } catch (e) {
+                    console.error('❌ Error parsing merchant message:', e);
                 }
             };
 
-            // Update connection status
-            function updateConnectionStatus(status, message) {
-            const connectionDot = document.getElementById('connectionIndicator');
-            const connectionText = document.getElementById('connectionStatus');
+            merchantChatWS.onerror = (error) => {
+                console.error('❌ Merchant chat WebSocket error:', error);
+                console.error('❌ WebSocket endpoint:', MERCHANT_WS_URL);
+                console.error('❌ Error details:', {
+                    type: error.type,
+                    target: error.target,
+                    timestamp: new Date().toISOString(),
+                    readyState: merchantChatWS?.readyState
+                });
+                console.error('💡 TIP: Test endpoint with: curl -I https://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth');
+                
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
+                // Briefly reflect error, then keep trying
+                updateConnectionStatus('disconnected', 'Connection error - check AWS configuration');
+                scheduleMerchantReconnect('error');
+            };
 
-            if (connectionDot) {
-                connectionDot.className = `status-indicator ${status}`;
-            }
-
-            if (connectionText) {
-                connectionText.textContent = message;
-            }
+            merchantChatWS.onclose = (evt) => {
+                console.log('🔌 Merchant chat WebSocket disconnected – code:', evt?.code, 'reason:', evt?.reason);
+                
+                // Clear connection timeout
+                try { clearTimeout(connectionTimeout); } catch (_) { }
+                
+                // Log specific close codes for debugging
+                if (evt?.code === 1006) {
+                    console.error('❌ Close code 1006: Abnormal closure - likely authentication/authorization failure');
+                    console.error('💡 This usually means AWS API Gateway returned 403 Forbidden');
+                } else if (evt?.code === 1002) {
+                    console.error('❌ Close code 1002: Protocol error');
+                } else if (evt?.code === 1003) {
+                    console.error('❌ Close code 1003: Unsupported data');
+                }
+                
+                // Update UI and schedule reconnect with backoff
+                updateConnectionStatus('disconnected', 'Disconnected - retrying...');
+                scheduleMerchantReconnect('close');
+            };
         }
 
-            // Utility functions
-            function scrollToBottom() {
-                const chatMessages = document.getElementById('chatMessages');
-                if (chatMessages) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
+            console.log('✅ Production Support page loaded - ready for driver and merchant sessions');
+
+            // Utility: update connection badge UI
+            function updateConnectionStatus(status, message) {
+                const dot = document.getElementById('connectionIndicator');
+                const text = document.getElementById('connectionStatus');
+                if (dot) {
+                    dot.className = `status-indicator ${status}`;
+                }
+                if (text) {
+                    // Use i18n translation if message is a known key, otherwise use the provided message
+                    if (window.SupportI18n && !message) {
+                        // Map status to translation keys
+                        const statusKeyMap = {
+                            'connected': 'connected',
+                            'connecting': 'connecting',
+                            'disconnected': 'disconnected'
+                        };
+                        text.textContent = window.SupportI18n.t(statusKeyMap[status] || 'connecting');
+                    } else if (typeof message === 'string') {
+                        text.textContent = message;
+                    }
                 }
             }
 
-    function formatTimestamp(timestamp) {
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMinutes = Math.floor((now - date) / (1000 * 60));
-
-            if (diffMinutes < 1) return 'Just now';
-            if (diffMinutes < 60) return `${diffMinutes}m ago`;
-
-            const diffHours = Math.floor(diffMinutes / 60);
-            if (diffHours < 24) return `${diffHours}h ago`;
-            return date.toLocaleDateString();
-        }
-
-            function escapeHtml(text) {
+            // Utility: safe HTML injection
+            function safeText(text) {
                 const div = document.createElement('div');
-                div.textContent = text;
+                div.textContent = String(text ?? '');
                 return div.innerHTML;
             }
 
-            function showNewMessageNotification(session, message) {
-                if (currentSessionId === session.id) return; // Don't notify for active session
-
-            // Visual notification in the session list
-            const sessionElement = document.querySelector(`[data-session-id="${session.id}"]`);
-            if (sessionElement) {
-                sessionElement.style.backgroundColor = '#dbeafe';
-                setTimeout(() => {
-                    sessionElement.style.backgroundColor = '';
-                }, 2000);
-            }
-            
-            // Browser notification (if permitted)
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(`New message from ${session.customer}`, {
-                    body: message.text.substring(0, 100) + (message.text.length > 100 ? '...' : ''),
-                    icon: '/favicon.ico'
-                });
-            }
+            // Append a chat message into the transcript
+            function appendMessageToChat(message) {
+                const chatMessages = document.getElementById('chatMessages');
+                if (!chatMessages) return;
+                const el = document.createElement('div');
+                const sender = message.senderType === 'agent' ? 'agent' : 'driver';
+                el.className = `message ${sender === 'agent' ? 'agent' : ''}`;
+                const initials = (message.senderName || (sender === 'agent' ? 'SA' : 'CU'))
+                    .split(' ').map(s => s[0]).join('').toUpperCase().slice(0, 2);
+                el.innerHTML = `
+                <div class="message-avatar">${safeText(initials)}</div>
+                <div class="message-content">
+                    <div class="message-bubble">
+                        <div class="message-text">${safeText(message.messageText || message.text || '')}</div>
+                    </div>
+                    <div class="message-timestamp">${new Date(message.timestamp || Date.now()).toLocaleTimeString()}</div>
+                </div>`;
+            chatMessages.appendChild(el);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-            // Send typing indicator
-            let typingTimer = null;
-            function sendTypingIndicator() {
-                if (!currentSessionId || !wsManager) return;
-        
-            clearTimeout(typingTimer);
-            
-            const typingMessage = {
-                action: 'chat_typing',
-                type: 'TYPING_INDICATOR',
-                sessionId: currentSessionId,
-                payload: {
-                    userType: 'agent',
-                    typing: true
-                }
-            };
-            
-            wsManager.send(typingMessage);
-
-            // Stop typing after 3 seconds
-            typingTimer = setTimeout(() => {
-                const stopTypingMessage = {
-                    ...typingMessage,
-                    payload: { ...typingMessage.payload, typing: false }
-                };
-                wsManager.send(stopTypingMessage);
-            }, 3000);
-                    }
-
-                    // Handle typing indicator
-                    function handleTypingIndicator(data) {
-                        const sessionId = data.sessionId || data.payload?.sessionId;
-                        const isTyping = data.payload?.typing || false;
-                        const userType = data.payload?.userType || 'customer';
-
-                        if (currentSessionId === sessionId && userType !== 'agent') {
-                            const chatMessages = document.getElementById('chatMessages');
-                            if (!chatMessages) return;
-
-                            // Remove existing typing indicator
-                            const existingIndicator = chatMessages.querySelector('.typing-indicator');
-                            if (existingIndicator) {
-                                existingIndicator.remove();
-                            }
-
-                // Add typing indicator if user is typing
-                if (isTyping) {
-                    const typingElement = document.createElement('div');
-                    typingElement.className = 'message customer typing-indicator';
-                    typingElement.innerHTML = `
-                        <div class="message-content">
-                            <div class="message-bubble">
-                                <div class="typing-dots">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </div>
+            // Minimal sessions list renderer for incoming sessions
+            function updateSessionsList() {
+                const list = document.getElementById('sessionsList');
+                const activeCount = document.getElementById('activeSessions');
+                if (!list) return;
+                list.innerHTML = '';
+                const items = Array.from(merchantSessions.values());
+                if (items.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    const noActiveText = window.SupportI18n ? window.SupportI18n.t('noActiveConversations') : 'No active conversations';
+                    const noActiveDesc = window.SupportI18n ? window.SupportI18n.t('noActiveConversationsDesc') : 'New conversations will appear here when customers start chatting';
+                    empty.innerHTML = `<i class="fas fa-comments"></i><h3>${safeText(noActiveText)}</h3><p>${safeText(noActiveDesc)}</p>`;
+                    list.appendChild(empty);
+                } else {
+                    items.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
+                    items.forEach(sess => {
+                        const card = document.createElement('div');
+                        card.className = `session-card${currentSessionId === sess.id ? ' active' : ''}`;
+                        card.setAttribute('data-session-id', sess.id);
+                        card.addEventListener('click', () => selectSession(sess.id));
+                        const initials = (sess.driverName || 'Driver').split(' ').map(s => s[0]).join('').toUpperCase().slice(0, 2);
+                        card.innerHTML = `
+                        <div class="session-info">
+                            <div class="customer-avatar">${safeText(initials)}</div>
+                            <div class="session-details">
+                                <div class="customer-name">${safeText(sess.driverName || 'Driver')}</div>
+                                <div class="last-message">${safeText(sess.lastMessage || '')}</div>
                             </div>
-                        </div>
-                    `;
-                    chatMessages.appendChild(typingElement);
-                    scrollToBottom();
+                            <div class="session-meta">
+                                <div class="message-time">${safeText(sess.time || '')}</div>
+                            </div>
+                        </div>`;
+                        list.appendChild(card);
+                    });
                 }
+                if (activeCount) activeCount.textContent = String(merchantSessions.size);
             }
         }
 
-            // Handle chat session end
-            function handleChatSessionEnd(data) {
-                const sessionId = data.sessionId || data.payload?.sessionId;
+            function selectSession(sessionId) {
+                currentSessionId = sessionId;
+                const chatTitle = document.getElementById('chatTitle');
+                const chatInputArea = document.getElementById('chatInputArea');
+                const endSessionBtn = document.getElementById('endSessionBtn');
+                const sess = merchantSessions.get(sessionId);
+
+                // Use i18n for chat title
+                const defaultTitle = window.SupportI18n ? window.SupportI18n.t('selectConversation') : 'Select a conversation';
+                if (chatTitle) chatTitle.textContent = sess ? (sess.customer || sess.driverName || 'Conversation') : defaultTitle;
+                
+                if (chatInputArea) chatInputArea.style.display = sess ? '' : 'none';
+                if (endSessionBtn) endSessionBtn.style.display = sess ? '' : 'none';
+                // Render existing messages if any
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) chatMessages.innerHTML = '';
+                if (sess && Array.isArray(sess.messages)) {
+                    sess.messages.forEach(m => appendMessageToChat(m));
+                } else if (chatMessages) {
+                    // Use i18n for empty state
+                    const emptyTitle = window.SupportI18n ? window.SupportI18n.t('selectConversation') : 'Select a conversation';
+                    const emptyDesc = window.SupportI18n ? window.SupportI18n.t('selectConversationDesc') : 'Choose a conversation from the left to start helping customers';
+                    chatMessages.innerHTML = `<div class="empty-state"><i class="fas fa-comments"></i><h3>${emptyTitle}</h3><p>${emptyDesc}</p></div>`;
+                }
+
+            // Join the session/channel on backend to receive history and mark assignment
+            try {
+                if (merchantChatWS && merchantChatWS.readyState === WebSocket.OPEN && lastJoinedSessionId !== sessionId) {
+                    const joinMsg = {
+                        action: 'join_channel',
+                        type: 'join_channel',
+                        sessionId: sessionId,
+                        agentId: window.MERCHANT_AGENT_ID || 'support_dashboard',
+                        agentName: window.MERCHANT_AGENT_NAME || 'Support Agent'
+                    };
+                    merchantChatWS.send(JSON.stringify(joinMsg));
+                    lastJoinedSessionId = sessionId;
+                    console.log('📡 Sent join_channel for session', sessionId);
+                }
+            } catch (e) { console.warn('join_channel failed', e); }
+        }
+
+            // Handle incoming merchant messages
+            function handleMerchantChatMessage(data) {
+                const type = data.type || data.action;
+                if (!type) return;
+
+            // Ack, auth, and connection confirmations
+            if (type === 'message_ack') {
+                console.log('✅ Message ACK:', data.messageId, 'session:', data.sessionId);
+                return;
+            }
+            if (type === 'agent_authenticated' || type === 'connection_confirmed') {
+                // Reflect connected status
+                updateConnectionStatus('connected');
+                return;
+            }
+
+            // Echo guard: ignore agent echoes or empty payloads
+            if (data.senderType === 'agent' && !data.messageText && !data.message?.messageText && !data.message && !data.text) {
+                return;
+            }
+
+            // Normalize message payload
+            if (type === 'chat_message' || type === 'driver_message' || type === 'CHAT_MESSAGE' || type === 'new_message') {
+                const payload = typeof data.message === 'object' ? data.message : data;
+                const sessionId = payload.sessionId || payload.session_id || data.sessionId || data.session_id;
                 if (!sessionId) return;
 
-                const session = activeChatSessions.get(sessionId);
-                if (!session) return;
-
-                console.log('❌ Chat session ended:', sessionId);
-
-                // Add system message about session end
-                const endMessage = {
-                    id: `end_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    text: 'Chat session ended',
-                    sender: 'system',
-                    timestamp: new Date(),
-                    senderName: 'System'
+                const msg = {
+                    id: payload.messageId || `msg_${Date.now()}`,
+                    sessionId,
+                    senderType: (payload.senderType === 'driver' || payload.senderType === 'user') ? 'driver' : (payload.senderType || 'agent'),
+                    senderName: payload.senderName || ((payload.senderType === 'driver' || payload.senderType === 'user') ? 'Driver' : 'Support Agent'),
+                    messageText: (payload.messageText || payload.text || data.message || data.messageText || ''),
+                    timestamp: payload.createdAt || payload.timestamp || data.timestamp || new Date().toISOString()
                 };
 
-            session.messages.push(endMessage);
-            session.lastMessage = 'Chat session ended';
-            session.time = formatTimestamp(new Date());
+                // Ensure session exists
+                if (!merchantSessions.has(sessionId)) {
+                    merchantSessions.set(sessionId, {
+                        id: sessionId,
+                        driverName: msg.senderType === 'driver' ? (msg.senderName || 'Driver') : (payload.driverName || data.driverName || 'Driver'),
+                        lastMessage: msg.messageText,
+                        time: new Date(msg.timestamp).toLocaleTimeString(),
+                        messages: []
+                    });
+                }
+                const sess = merchantSessions.get(sessionId);
 
-            // If this session is currently active, show the end message
-            if (currentSessionId === sessionId) {
-                appendMessageToChat(endMessage);
+                // De-duplication: skip if same sender and text appeared very recently
+                const nowTs = Date.parse(msg.timestamp) || Date.now();
+                const recent = (sess.messages || []).slice(-5).some(m => (
+                    (m.senderType === msg.senderType) &&
+                    (String(m.messageText || '') === String(msg.messageText || '')) &&
+                    Math.abs((Date.parse(m.timestamp) || nowTs) - nowTs) < DUPLICATE_WINDOW_MS
+                ));
+                if (recent) {
+                    console.log('🧹 Skipping duplicate message echo');
+                } else {
+                    sess.messages = sess.messages || [];
+                    sess.messages.push(msg);
+                }
+
+                sess.lastMessage = msg.messageText;
+                sess.time = new Date(msg.timestamp).toLocaleTimeString();
+                sess.lastActivity = Date.parse(msg.timestamp);
+
+                // Auto-select the session if none selected to reveal input box
+                if (!currentSessionId) {
+                    currentSessionId = sessionId;
+                    selectSession(currentSessionId);
+                } else {
+                    if (currentSessionId === sessionId && !recent) appendMessageToChat(msg);
+                    updateSessionsList();
+                }
+                if (typeof triggerAISuggestion === 'function' && msg.senderType !== 'agent') {
+                    try { triggerAISuggestion(sessionId); } catch (_) { }
+                }
+                return;
             }
 
-            // Remove session after a delay
-            setTimeout(() => {
-                activeChatSessions.delete(sessionId);
+            if (type === 'session_messages') {
+                const sessionId = data.sessionId;
+                if (!sessionId || !Array.isArray(data.messages)) return;
+                // Ensure session
+                if (!merchantSessions.has(sessionId)) {
+                    merchantSessions.set(sessionId, { id: sessionId, driverName: data.driverName || 'Driver', messages: [] });
+                }
+                const sess = merchantSessions.get(sessionId);
+                const chron = [...data.messages].reverse();
+                chron.forEach(m => {
+                    const norm = {
+                        id: m.messageId,
+                        sessionId,
+                        senderType: m.senderType === 'driver' ? 'driver' : 'agent',
+                        senderName: m.senderType === 'driver' ? (data.driverName || 'Driver') : 'Support Agent',
+                        messageText: m.text || '',
+                        timestamp: m.createdAt || new Date().toISOString()
+                    };
+                    // Deduplicate by id
+                    const exists = (sess.messages || []).some(x => x.id && norm.id && x.id === norm.id);
+                    if (!exists) {
+                        sess.messages = sess.messages || [];
+                        sess.messages.push(norm);
+                    }
+                });
+                // Re-render if active
+                if (currentSessionId === sessionId) {
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (chatMessages) chatMessages.innerHTML = '';
+                    (sess.messages || []).forEach(m => appendMessageToChat(m));
+                }
+                updateSessionsList();
+                return;
+            }
 
-                // Clear chat view if this was the active session
+            if (type === 'active_sessions' || type === 'new_chat_session') {
+                const sessions = Array.isArray(data.sessions) ? data.sessions : [data];
+                sessions.forEach(s => {
+                    const sessionId = s.sessionId || s.id;
+                    if (!sessionId) return;
+                    if (!merchantSessions.has(sessionId)) {
+                        merchantSessions.set(sessionId, {
+                            id: sessionId,
+                            driverName: s.driverName || s.customer || 'Driver',
+                            lastMessage: s.lastMessage || '',
+                            time: s.lastActivity ? new Date(s.lastActivity).toLocaleTimeString() : '',
+                            messages: []
+                        });
+                    }
+                });
+                updateSessionsList();
+                // Auto-select first session when list arrives and none selected
+                if (!currentSessionId && sessions.length > 0) {
+                    currentSessionId = sessions[0].sessionId || sessions[0].id;
+                    selectSession(currentSessionId);
+                }
+                return;
+            }
+
+            if (type === 'session_closed' || type === 'chat_session_closed') {
+                const sessionId = data.sessionId;
+                if (!sessionId) return;
+                // Move to closed
+                const sess = merchantSessions.get(sessionId) || { id: sessionId, messages: [] };
+                merchantSessions.delete(sessionId);
+                closedSessions.set(sessionId, { ...sess, closedAt: new Date().toISOString() });
+                updateSessionsList();
+                updateClosedSessionsList();
                 if (currentSessionId === sessionId) {
                     currentSessionId = null;
                     const chatMessages = document.getElementById('chatMessages');
-                    const chatInputArea = document.getElementById('chatInputArea');
-                    const chatTitle = document.getElementById('chatTitle');
-                    const endSessionBtn = document.getElementById('endSessionBtn');
-            
                     if (chatMessages) {
-                        chatMessages.innerHTML = `
-                            <div class="empty-state">
-                                <i class="fas fa-comment-dots"></i>
-                                <h3>Select a conversation</h3>
-                                <p>Choose a conversation from the left to start helping customers</p>
-                            </div>
-                        `;
+                        chatMessages.innerHTML = '<div class="empty-state"><i class="fas fa-comment-dots"></i><h3>Select a conversation</h3><p>Choose a conversation from the left to start helping customers</p></div>';
                     }
-
-                    if (chatInputArea) {
-                        chatInputArea.style.display = 'none';
-                    }
-
-                    if (chatTitle) {
-                        chatTitle.textContent = 'Select a conversation';
-                    }
-                    
-                    if (endSessionBtn) {
-                        endSessionBtn.style.display = 'none';
-                    }
+                    const chatTitle = document.getElementById('chatTitle');
+                    if (chatTitle) chatTitle.textContent = 'Select a conversation';
+                    const endBtn = document.getElementById('endSessionBtn');
+                    if (endBtn) endBtn.style.display = 'none';
                 }
+                return;
+            }
+        }
 
+            // Expose Send/End for CSP-safe bindings
+            window.sendMessage = function () {
+            const input = document.getElementById('messageInput');
+            if (!input || !currentSessionId) return;
+            const text = input.value.trim();
+            if (!text) return;
+            const outbound = {
+                action: 'chat_message',
+                type: 'chat_message',
+                sessionId: currentSessionId,
+                messageText: text,
+                senderType: 'agent',
+                senderName: 'Support Agent',
+                agentId: 'support_dashboard',
+                timestamp: new Date().toISOString()
+            };
+            try { merchantChatWS?.send(JSON.stringify(outbound)); } catch (e) { console.error('Send failed', e); }
+            // Optimistic UI
+            const optim = { sessionId: currentSessionId, senderType: 'agent', senderName: 'Support Agent', messageText: text, text, timestamp: outbound.timestamp };
+            appendMessageToChat(optim);
+            // Track locally
+            const sess = merchantSessions.get(currentSessionId);
+            if (sess) {
+                sess.messages = sess.messages || [];
+                sess.messages.push(optim);
+                sess.lastMessage = optim.messageText;
+                sess.time = new Date(optim.timestamp).toLocaleTimeString();
+                sess.lastActivity = Date.parse(optim.timestamp);
                 updateSessionsList();
-            }, 3000);
-                    }
+            }
+            input.value = '';
+            input.style.height = 'auto';
+        };
 
-                    // Handle message function
-                    function handleMessage(message) {
-                        handleIncomingChatMessage(message);
-                    }
+            window.endChatSession = function () {
+                if (!currentSessionId) return;
+                const outbound = {
+                    action: 'chat_session_close',
+                    type: 'chat_session_close',
+                sessionId: currentSessionId,
+                senderType: 'agent',
+                reason: 'ended_by_agent',
+                timestamp: new Date().toISOString()
+            };
+            try { merchantChatWS?.send(JSON.stringify(outbound)); } catch (e) { console.error('End session send failed', e); }
+            // Archive locally
+            merchantSessions.delete(currentSessionId);
+            currentSessionId = null;
+            updateSessionsList();
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = '<div class="empty-state"><i class="fas fa-comment-dots"></i><h3>Select a conversation</h3><p>Choose a conversation from the left to start helping customers</p></div>';
+            }
+            const chatTitle = document.getElementById('chatTitle');
+            if (chatTitle) chatTitle.textContent = 'Select a conversation';
+            const endBtn = document.getElementById('endSessionBtn');
+            if (endBtn) endBtn.style.display = 'none';
+            // Reflect in closed sessions panel
+            updateClosedSessionsList();
+        };
 
-            console.log('✅ Production Support page loaded - ready for genuine WizzDriver sessions only');
-        </script>
-        </div> <!-- End support-container -->
-        </div> <!-- End main-content -->
-        
-        <!-- Navigation Manager -->
-        <script src="../aggressive-sidebar-fix.js"></script>
-        <script src="../immediate-sidebar-fix.js"></script>
-        <script src="../assets/js/navigation.js"></script>
-        <script>
-            // Initialize navigation when page loads
-            document.addEventListener('DOMContentLoaded', async function () {
-                const nav = new NavigationManager();
-                await nav.init();
-            });
-        </script>
+            // Extra UX: Enter to send, Shift+Enter for newline. Disable send if socket not open.
+            document.addEventListener('DOMContentLoaded', function () {
+                const input = document.getElementById('messageInput');
+                const sendBtn = document.getElementById('sendButton');
+                if (input) {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            window.sendMessage();
+                        }
+                });
+            }
+            // Disable send if disconnected
+            setInterval(() => {
+                try {
+                    const disabled = !(merchantChatWS && merchantChatWS.readyState === WebSocket.OPEN && currentSessionId);
+                    if (sendBtn) sendBtn.disabled = disabled;
+                } catch (_) { }
+            }, 800);
+        });
+
+            // Closed sessions renderer
+            function updateClosedSessionsList() {
+                const list = document.getElementById('closedSessionsList');
+                const countEl = document.getElementById('closedSessionsCount');
+                if (!list) return;
+                list.innerHTML = '';
+                const items = Array.from(closedSessions.values())
+                    .sort((a, b) => (Date.parse(b.closedAt || 0)) - (Date.parse(a.closedAt || 0)));
+                if (items.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state-small';
+                    empty.style.cssText = 'padding:2rem; text-align:center; color:#999;';
+                    const noClosedText = window.SupportI18n ? window.SupportI18n.t('noClosedSessions') : 'No recently closed sessions';
+                    empty.innerHTML = `<i class="fas fa-archive" style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5;"></i><p style="margin: 0; font-size: 0.875rem;">${safeText(noClosedText)}</p>`;
+                    list.appendChild(empty);
+                } else {
+                    items.slice(0, 20).forEach(sess => {
+                        const card = document.createElement('div');
+                        card.className = 'session-card closed-session';
+                        card.innerHTML = `
+                        <div class="session-info">
+                            <div class="customer-avatar">${safeText((sess.driverName || 'D').split(' ').map(s => s[0]).join('').toUpperCase().slice(0, 2))}</div>
+                            <div class="session-details">
+                                <div class="customer-name">${safeText(sess.driverName || 'Driver')}</div>
+                                <div class="last-message">${safeText(sess.lastMessage || '')}</div>
+                            </div>
+                            <div class="session-meta">
+                                <div class="message-time">${safeText(new Date(sess.closedAt || Date.now()).toLocaleTimeString())}</div>
+                            </div>
+                        </div>`;
+                        list.appendChild(card);
+                    });
+                }
+                if (countEl) countEl.textContent = String(items.length);
+            }
+</script>
+    <script src="../aggressive-sidebar-fix.js"></script>
+    <script src="../immediate-sidebar-fix.js"></script>
+    <script src="../assets/js/navigation.js"></script>
+    <script>
+        // Initialize navigation when page loads
+        document.addEventListener('DOMContentLoaded', async function () {
+            const nav = new NavigationManager();
+            await nav.init();
+        });
+    </script>
 </body>
 </html>

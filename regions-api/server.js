@@ -413,6 +413,80 @@ async function startServer() {
     });
 }
 
+// ============================================
+// TEMPORARY: Support Chat Image Upload Endpoint
+// ============================================
+
+// Temporary image upload endpoint for support chat testing
+app.get('/support/upload-image', async (req, res) => {
+    try {
+        const { sessionId, merchantId, fileName } = req.query;
+
+        if (!sessionId || !merchantId || !fileName) {
+            return res.status(400).json({
+                error: 'Missing required parameters: sessionId, merchantId, fileName'
+            });
+        }
+
+        // For testing, return a mock presigned URL and image URL
+        // In production, this would generate real S3 presigned URLs
+        const mockPresignedUrl = `http://localhost:3000/support/upload/${sessionId}/${merchantId}/${fileName}`;
+        const mockImageUrl = `http://localhost:3000/support/images/${sessionId}/${merchantId}/${fileName}`;
+
+        console.log(`📤 Mock presigned URL generated for: ${fileName}`);
+
+        res.json({
+            success: true,
+            presignedUrl: mockPresignedUrl,
+            imageUrl: mockImageUrl,
+            expiresIn: 300
+        });
+
+    } catch (error) {
+        console.error('❌ Error generating mock presigned URL:', error);
+        res.status(500).json({
+            error: 'Failed to generate presigned URL',
+            message: error.message
+        });
+    }
+});
+
+// Mock image upload endpoint
+app.put('/support/upload/:sessionId/:merchantId/:fileName', async (req, res) => {
+    try {
+        const { sessionId, merchantId, fileName } = req.params;
+        
+        console.log(`📤 Mock image upload received: ${fileName} for session ${sessionId}`);
+        console.log(`📊 Content-Type: ${req.headers['content-type']}`);
+        console.log(`📏 Content-Length: ${req.headers['content-length']} bytes`);
+
+        // Simulate successful upload
+        res.status(200).send('');
+
+    } catch (error) {
+        console.error('❌ Mock upload error:', error);
+        res.status(500).json({
+            error: 'Upload failed',
+            message: error.message
+        });
+    }
+});
+
+// Mock image serving endpoint
+app.get('/support/images/:sessionId/:merchantId/:fileName', (req, res) => {
+    const { sessionId, merchantId, fileName } = req.params;
+    console.log(`🖼️ Mock image request: ${fileName} for session ${sessionId}`);
+    
+    // Return a placeholder image or success message
+    res.json({
+        message: 'Mock image uploaded successfully',
+        sessionId,
+        merchantId,
+        fileName,
+        uploadedAt: new Date().toISOString()
+    });
+});
+
 startServer().catch(console.error);
 
 module.exports = app;

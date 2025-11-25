@@ -18,7 +18,7 @@
             awsSdk: !!window.AWS,
             idToken: !!sessionStorage.getItem('idToken'),
             debugMode: sessionStorage.getItem('debugMode') === 'true',
-            isAuthenticated: sessionStorage.getItem('isAuthenticated') === 'true'
+            isAuthenticated: localStorage.getItem('isAuthenticated') === 'true'
         };
         
         console.log('📊 Current state:', diagnostics);

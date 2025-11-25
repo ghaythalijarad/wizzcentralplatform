@@ -1,0 +1,100 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    🎯 UI NOTIFICATION TEST READY                         ║
+║                         Quick Reference Card                             ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+┌─ SYSTEM STATUS ─────────────────────────────────────────────────────────┐
+│ ✅ Server Running:        http://localhost:3000                         │
+│ ✅ Test Page:            /pages/promotions.html                         │
+│ ✅ Backend API:          Tested & Working                                │
+│ ✅ Auth Fixed:           window.Auth (was AuthUtils)                    │
+│ ✅ iPhone Ready:         1 FCM token in DynamoDB                        │
+│ ✅ Merchants:            4 in database                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ TEST STEPS ────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  1. Open: http://localhost:3000/pages/promotions.html                   │
+│                                                                          │
+│  2. Click: Purple "📣 Send to Merchants" button (page header)           │
+│                                                                          │
+│  3. Fill Form:                                                           │
+│     • Type:    ℹ️ Information                                           │
+│     • Title:   UI Test - Live from Browser                              │
+│     • Body:    Complete notification flow working!                      │
+│     • Target:  All Merchants                                            │
+│     • Priority: Normal                                                   │
+│     • Send:    Immediately                                              │
+│                                                                          │
+│  4. Click: "Send Notification" button                                   │
+│                                                                          │
+│  5. Verify: Success alert with stats                                    │
+│     ✅ Targeted: 4 merchants                                            │
+│     ✅ Sent: 1                                                          │
+│     ✅ Failed: 0                                                        │
+│                                                                          │
+│  6. Check: iPhone for notification (within 3 seconds)                   │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ QUICK DEBUG ───────────────────────────────────────────────────────────┐
+│                                                                          │
+│  Modal won't open?                                                       │
+│  → F12 console, check for errors                                        │
+│  → Verify: document.getElementById('sendToMerchantsBtn')                │
+│                                                                          │
+│  API fails?                                                              │
+│  → Check: localStorage.getItem('idToken')                               │
+│  → Network tab: Look for Authorization header                           │
+│  → Refresh AWS: aws sso login --profile wizz-drivers-ghayth-dev         │
+│                                                                          │
+│  Notification doesn't arrive?                                            │
+│  → WhizzMerchants app running?                                          │
+│  → iPhone has internet?                                                  │
+│  → Check server response: should show "sent: 1"                         │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT YOU'RE TESTING ───────────────────────────────────────────────────┐
+│                                                                          │
+│  Complete end-to-end notification flow:                                 │
+│                                                                          │
+│  UI Button → Modal Form → API Call → Lambda Function →                  │
+│  DynamoDB Query → Firebase FCM → iPhone Notification                    │
+│                                                                          │
+│  This proves the ENTIRE system works from UI to device!                 │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES MODIFIED ────────────────────────────────────────────────────────┐
+│                                                                          │
+│  ✅ frontend/pages/promotions.html                                      │
+│     • Fixed: window.AuthUtils → window.Auth (3 locations)              │
+│     • Line ~2498, ~2807, ~3041                                          │
+│                                                                          │
+│  ✅ backend/lambda/merchant-info-notification.js                        │
+│     • Complete Lambda function (450+ lines)                             │
+│                                                                          │
+│  ✅ local-dev-server.js                                                 │
+│     • Added: POST /api/merchants/send-info-notification                 │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─ SUCCESS MEANS ─────────────────────────────────────────────────────────┐
+│                                                                          │
+│  You'll have a complete, production-ready notification system:          │
+│                                                                          │
+│  • Send targeted notifications to merchants                             │
+│  • Multiple notification types (info, warning, urgent, etc.)            │
+│  • Audience filtering (all, active, by city, by category)               │
+│  • Priority levels                                                       │
+│  • Real-time delivery via Firebase Cloud Messaging                      │
+│  • Full authentication & authorization                                   │
+│  • Beautiful UI with form validation                                     │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         🎉 GO TEST IT NOW! 🎉                           ║
+║                  http://localhost:3000/pages/promotions.html             ║
+╚══════════════════════════════════════════════════════════════════════════╝

@@ -4,11 +4,18 @@
  * Author: WizzCentral Dev Team
  */
 
-const AWS = require('aws-sdk');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
+const { CognitoIdentityProviderClient, ListUsersCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
-// Initialize AWS services
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const cognito = new AWS.CognitoIdentityProvider();
+// Initialize AWS SDK v3 services
+const ddbClient = new DynamoDBClient({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
+const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
+const cognito = new CognitoIdentityProviderClient({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
 
 // Table names
 const CAMPAIGNS_TABLE = 'WizzCentral_Campaigns';
@@ -122,7 +129,7 @@ async function getCampaigns(queryParams, userContext) {
             params.ExpressionAttributeValues[':type'] = type;
         }
 
-        const result = await dynamoDB.scan(params).promise();
+        const result = await dynamoDB.send(new ScanCommand(params));
         
         // Enrich campaigns with condition details
         const enrichedCampaigns = await Promise.all(
@@ -195,10 +202,10 @@ async function createCampaign(campaignData, userContext) {
         }
 
         // Save campaign
-        await dynamoDB.put({
+        await dynamoDB.send(new PutCommand({
             TableName: CAMPAIGNS_TABLE,
             Item: campaignItem
-        }).promise();
+        }));
 
         // Save advanced conditions if provided
         if (campaignItem.usesAdvancedConditions && campaignItem.conditions.length > 0) {
@@ -223,10 +230,10 @@ async function createCampaign(campaignData, userContext) {
 
 async function getCampaign(campaignId, userContext) {
     try {
-        const result = await dynamoDB.get({
+        const result = await dynamoDB.send(new GetCommand({
             TableName: CAMPAIGNS_TABLE,
             Key: { campaignId }
-        }).promise();
+        }));
 
         if (!result.Item) {
             return createResponse(404, { error: 'Campaign not found' });
@@ -256,10 +263,10 @@ async function getCampaign(campaignId, userContext) {
 async function updateCampaign(campaignId, updateData, userContext) {
     try {
         // Get existing campaign
-        const existing = await dynamoDB.get({
+        const existing = await dynamoDB.send(new GetCommand({
             TableName: CAMPAIGNS_TABLE,
             Key: { campaignId }
-        }).promise();
+        }));
 
         if (!existing.Item) {
             return createResponse(404, { error: 'Campaign not found' });
@@ -282,13 +289,13 @@ async function updateCampaign(campaignId, updateData, userContext) {
         updateExpression.push(`updatedAt = :updatedAt`);
         expressionAttributeValues[':updatedAt'] = new Date().toISOString();
 
-        await dynamoDB.update({
+        await dynamoDB.send(new UpdateCommand({
             TableName: CAMPAIGNS_TABLE,
             Key: { campaignId },
             UpdateExpression: `SET ${updateExpression.join(', ')}`,
             ExpressionAttributeNames: expressionAttributeNames,
             ExpressionAttributeValues: expressionAttributeValues
-        }).promise();
+        }));
 
         // Update conditions if provided
         if (updateData.conditions && updateData.usesAdvancedConditions) {

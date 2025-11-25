@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WizzCentral Platform - Orders Management</title>
+    <!-- Security: DOMPurify for XSS Protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -12,6 +14,9 @@
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <!-- Security Utilities -->
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
     <style>
         /* Material 3 Orders Management Styles */
         .orders-stats {
@@ -80,6 +85,7 @@
             font-weight: var(--md-sys-typescale-label-small-font-weight);
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-right: 4px;
         }
     
         .status-confirmed {
@@ -120,6 +126,7 @@
         .orders-grid table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
     
         .orders-grid th,
@@ -139,12 +146,22 @@
         .orders-grid td {
             font-size: 14px;
             color: var(--md-sys-color-on-surface);
+            vertical-align: middle;
         }
     
         .orders-grid tr:hover {
             background: var(--md-sys-color-surface-container-low);
         }
-    
+
+        .orders-grid th:nth-child(1) { width: 140px; }
+        .orders-grid th:nth-child(2) { width: 220px; }
+        .orders-grid th:nth-child(3) { width: 120px; }
+        .orders-grid th:nth-child(4) { width: 110px; }
+        .orders-grid th:nth-child(5) { width: 140px; }
+        .orders-grid th:nth-child(6) { width: 120px; }
+        .orders-grid tbody tr:nth-child(even) { background: var(--md-sys-color-surface-container); }
+        .orders-grid tbody tr:hover { background: var(--md-sys-color-surface-container-highest); }
+
         .view-details-btn {
             background: var(--md-sys-color-primary);
             color: var(--md-sys-color-on-primary);
@@ -322,6 +339,15 @@
             border-top: 2px solid var(--md-sys-color-primary);
             font-size: 16px;
         }
+
+        .customer-cell { display: flex; flex-direction: column; gap: 4px; }
+        .customer-name { font-weight: 600; word-break: break-word; }
+        .customer-meta { font-size: 11px; color: var(--md-sys-color-on-surface-variant); line-height: 1.2; }
+        .status-badge { display: inline-flex; align-items: center; gap: 4px; letter-spacing: .75px; margin-right: 4px; }
+        .amount-cell { font-weight: 500; font-family: system-ui, Roboto, sans-serif; }
+        .order-id { font-family: "Courier New", monospace; font-size: 12px; background: var(--md-sys-color-surface-container); padding: 4px 6px; border-radius: 6px; display: inline-block; }
+        @media (max-width: 900px) { .orders-grid th:nth-child(4), .orders-grid td:nth-child(4) { display:none; } }
+        @media (max-width: 720px) { .orders-grid th:nth-child(5), .orders-grid td:nth-child(5) { display:none; } }
     
         @media (max-width: 768px) {
             .controls-row {
@@ -399,18 +425,19 @@
                         <div class="orders-controls">
                             <div class="controls-row">
                                 <div class="search-box">
-                                    <input type="text" id="search-input" placeholder="Search orders by ID, customer name..."
-                                        onkeyup="filterOrders()">
+                                    <!-- Removed inline onkeyup for CSP compliance -->
+                                    <input type="text" id="search-input" placeholder="Search orders by ID, customer name...">
                                 </div>
                                 <div class="filter-group">
-                                    <select id="status-filter" onchange="filterOrders()">
+                                    <!-- Removed inline onchange for CSP compliance -->
+                                    <select id="status-filter">
                                         <option value="">All Statuses</option>
                                         <option value="confirmed">Confirmed</option>
                                         <option value="pending">Pending</option>
                                         <option value="cancelled">Cancelled</option>
                                     </select>
-                                    <input type="date" id="date-from" onchange="filterOrders()" title="From Date">
-                                    <input type="date" id="date-to" onchange="filterOrders()" title="To Date">
+                                    <input type="date" id="date-from" title="From Date">
+                                    <input type="date" id="date-to" title="To Date">
                     </div>
                 </div>
             </div>
@@ -450,7 +477,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Order Details</h2>
-                <button class="modal-close" onclick="closeOrderModal()">&times;</button>
+                <button class="modal-close" data-action="close-order-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="order-details-content">
@@ -481,6 +508,7 @@
         const tableStatus = document.getElementById('table-status');
         const tbody = document.getElementById('orders-tbody');
 
+        // SECURITY: Safe static content
         tableStatus.innerHTML = '<span class="loading-spinner"></span> Loading orders...';
 
         try {
@@ -516,6 +544,7 @@
             updateStatistics();
             renderOrdersTable();
 
+            // SECURITY: Safe static content
             tableStatus.innerHTML = `${allOrders.length} orders loaded from WizzOrders table`;
         } catch (error) {
             console.error('Error loading orders:', error);
@@ -525,26 +554,30 @@
             if (errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token')) {
                 console.warn('⚠️ Token expired, redirecting to login...');
                 // Clear expired tokens
-                sessionStorage.removeItem('idToken');
-                sessionStorage.removeItem('accessToken');
-                sessionStorage.removeItem('refreshToken');
-                sessionStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('idToken');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                localStorage.removeItem('isAuthenticated');
                 // Redirect to login
                 window.location.href = '/pages/login.html';
                 return;
             }
             
+            // SECURITY: Safe static content
             tableStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error loading orders';
-            tbody.innerHTML = `
+
+            // SECURITY: Sanitize error message
+            const safeErrorMessage = SecurityUtils.escapeHTML(error.message || 'Unknown error');
+            tbody.innerHTML = SecurityUtils.sanitizeHTML(`
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                            <div>Failed to load orders: ${error.message}</div>
+                            <div>Failed to load orders: ${safeErrorMessage}</div>
                             ${errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token') ? 
                                 '<div style="margin-top: 1rem;"><a href="/pages/login.html" style="color: var(--md-sys-color-primary);">Please log in again</a></div>' : ''}
                         </td>
                     </tr>
-                `;
+                `);
         }
     }
 
@@ -557,6 +590,11 @@
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'Invalid Date';
             
+            // Use date-fns if available
+            if (window.dateFns && typeof window.dateFns.format === 'function') {
+                return window.dateFns.format(date, 'MMM d, yyyy');
+            }
+
             // Format as: Nov 4, 2025
             return date.toLocaleDateString('en-US', {
                 year: 'numeric',
@@ -591,6 +629,26 @@
         return 0;
     }
 
+        // Helper: format currency consistently
+        function formatCurrency(amount, currency) {
+            const cur = (currency || 'IQD').toUpperCase();
+            const num = Number(amount || 0);
+            try {
+                if (typeof Intl !== 'undefined' && Intl.NumberFormat) {
+                    // IQD is 0-decimal; fallback to standard for others
+                    const minimumFractionDigits = cur === 'IQD' ? 0 : 2;
+                    const maximumFractionDigits = cur === 'IQD' ? 0 : 2;
+                    // Not all runtimes support currency IQD, so use style: 'decimal' and append code for safety
+                    const supportsCurrency = false;
+                    if (supportsCurrency) {
+                        return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(num);
+                    }
+                    return `${new Intl.NumberFormat('en-US', { minimumFractionDigits, maximumFractionDigits }).format(num)} ${cur}`;
+                }
+            } catch (e) { /* ignore */ }
+            return `${(cur === 'IQD' ? Math.round(num) : num.toFixed(2))} ${cur}`;
+        }
+
     // Update statistics
     function updateStatistics() {
         const stats = allOrders.reduce((acc, order) => {
@@ -612,6 +670,7 @@
         const tbody = document.getElementById('orders-tbody');
 
         if (filteredOrders.length === 0) {
+            // SECURITY: Safe static content
             tbody.innerHTML = `
                     <tr>
                         <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
@@ -623,27 +682,46 @@
             return;
         }
 
-        tbody.innerHTML = filteredOrders.map(order => `
+        // SECURITY: Sanitize all user-generated content before rendering
+        tbody.innerHTML = SecurityUtils.sanitizeHTML(
+            filteredOrders.map(order => {
+                const safeOrderId = SecurityUtils.escapeHTML(order.orderId);
+                const safeCustomerName = SecurityUtils.escapeHTML(order.customerName || 'N/A');
+                const safeCustomerEmail = SecurityUtils.escapeHTML(order.customerEmail || '');
+                const statusRaw = (order.status || '').toString();
+                const safeStatus = SecurityUtils.escapeHTML(statusRaw);
+                const safeStatusClass = SecurityUtils.escapeHTML(statusRaw.toLowerCase());
+                const safeFormattedDate = SecurityUtils.escapeHTML(order.formattedDate);
+                const safeCleanOrderId = SecurityUtils.escapeHTML(order.cleanOrderId);
+                const currency = order.currency || 'IQD';
+                const amountStr = formatCurrency(order.totalAmount || 0, currency);
+                const safeAmount = SecurityUtils.escapeHTML(amountStr);
+
+                return `
                 <tr>
-                    <td><strong>${order.orderId}</strong></td>
+                    <td><span class="order-id" title="Order ID">${safeOrderId}</span></td>
                     <td>
-                        <div>${order.customerName || 'N/A'}</div>
-                        <div style="font-size: 12px; color: var(--md-sys-color-on-surface-variant);">${order.customerEmail || ''}</div>
+                        <div class="customer-cell">
+                            <div class="customer-name">${safeCustomerName}</div>
+                            <div class="customer-meta">${safeCustomerEmail}</div>
+                        </div>
                     </td>
                     <td>
-                        <span class="status-badge status-${order.status}">
-                            ${order.status}
+                        <span class="status-badge status-${safeStatusClass}">
+                            ${safeStatus}
                         </span>
                     </td>
-                    <td>$${(order.totalAmount || 0).toFixed(2)}</td>
-                    <td>${order.formattedDate}</td>
+                    <td class="amount-cell">${safeAmount}</td>
+                    <td>${safeFormattedDate}</td>
                     <td>
-                        <button class="view-details-btn" onclick="showOrderDetails('${order.cleanOrderId}')">>
+                        <button class="view-details-btn" data-order-id="${safeCleanOrderId}">
                             View Details
                         </button>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('')
+        );
     }
 
     // Filter orders
@@ -672,6 +750,7 @@
         });
 
         renderOrdersTable();
+        // SECURITY: Safe static content
         document.getElementById('table-status').innerHTML = `${filteredOrders.length} orders shown`;
     }
 
@@ -680,6 +759,7 @@
         const modal = document.getElementById('orderModal');
         const content = document.getElementById('order-details-content');
 
+        // SECURITY: Safe static content
         content.innerHTML = '<div style="text-align: center;"><span class="loading-spinner"></span> Loading order details...</div>';
         modal.style.display = 'block';
 
@@ -694,92 +774,125 @@
             // Use the fullData if available, otherwise use the order itself
             const orderData = order.fullData || order;
 
-            content.innerHTML = `
+            // SECURITY: Sanitize all user-generated content before rendering
+            const safeOrderId = SecurityUtils.escapeHTML(order.orderId || 'N/A');
+            const safeStatus = SecurityUtils.escapeHTML(order.status || 'N/A');
+            const safeTotal = SecurityUtils.escapeHTML(order.total || 'N/A');
+            const safeFormattedDate = SecurityUtils.escapeHTML(order.formattedDate || 'N/A');
+            const safeCustomerName = SecurityUtils.escapeHTML(order.customerName || 'N/A');
+            const safeCustomerPhone = SecurityUtils.escapeHTML(order.customerPhone || 'N/A');
+            const safeStoreName = SecurityUtils.escapeHTML(order.storeName || 'N/A');
+            const safePaymentMethod = SecurityUtils.escapeHTML(order.paymentMethod || 'N/A');
+            const safeDeliveryAddress = SecurityUtils.escapeHTML(order.deliveryAddress || 'N/A');
+            const safeCurrency = SecurityUtils.escapeHTML(order.currency || 'IQD');
+            const safeDriverId = SecurityUtils.escapeHTML(order.driverId || '');
+            const safeConfirmedAt = order.confirmedAt ? SecurityUtils.escapeHTML(new Date(order.confirmedAt).toLocaleString()) : '';
+
+            // Build items HTML safely
+            let itemsHtml = '';
+            if (order.items && order.items.length > 0) {
+                const safeItemsHtml = order.items.map(item => {
+                    const safeItemName = SecurityUtils.escapeHTML(item.name || item.title || 'Item');
+                    const safeQuantity = SecurityUtils.escapeHTML(String(item.quantity || 1));
+                    const safePrice = item.price ? SecurityUtils.escapeHTML(String(item.price)) : '';
+
+                    return `
+                        <div class="item-row">
+                            <div class="item-name">${safeItemName}</div>
+                            <div class="item-details">
+                                <span>Qty: ${safeQuantity}</span>
+                                ${safePrice ? `<span>Price: ${safeCurrency} ${safePrice}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                itemsHtml = `
+                    <h4>Order Items</h4>
+                    <div class="items-list">
+                        ${safeItemsHtml}
+                    </div>
+                `;
+            }
+
+            // Safely stringify JSON
+            const safeJsonData = SecurityUtils.escapeHTML(JSON.stringify(orderData, null, 2));
+
+            content.innerHTML = SecurityUtils.sanitizeHTML(`
                 <div class="order-detail-grid">
                     <div class="detail-item">
                         <div class="detail-label">Order ID</div>
-                        <div class="detail-value">${order.orderId}</div>
+                        <div class="detail-value">${safeOrderId}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Status</div>
                         <div class="detail-value">
-                            <span class="status-badge status-${order.status}">${order.status}</span>
+                            <span class="status-badge status-${safeStatus}">${safeStatus}</span>
                         </div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Total Amount</div>
-                        <div class="detail-value">${order.total}</div>
+                        <div class="detail-value">${safeTotal}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Created Date</div>
-                        <div class="detail-value">${order.formattedDate}</div>
+                        <div class="detail-value">${safeFormattedDate}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Customer Name</div>
-                        <div class="detail-value">${order.customerName || 'N/A'}</div>
+                        <div class="detail-value">${safeCustomerName}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Customer Phone</div>
-                        <div class="detail-value">${order.customerPhone || 'N/A'}</div>
+                        <div class="detail-value">${safeCustomerPhone}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Store Name</div>
-                        <div class="detail-value">${order.storeName || 'N/A'}</div>
+                        <div class="detail-value">${safeStoreName}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Payment Method</div>
-                        <div class="detail-value">${order.paymentMethod || 'N/A'}</div>
+                        <div class="detail-value">${safePaymentMethod}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Delivery Address</div>
-                        <div class="detail-value">${order.deliveryAddress || 'N/A'}</div>
+                        <div class="detail-value">${safeDeliveryAddress}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-label">Currency</div>
-                        <div class="detail-value">${order.currency || 'IQD'}</div>
+                        <div class="detail-value">${safeCurrency}</div>
                     </div>
-                    ${order.driverId ? `
+                    ${safeDriverId ? `
                     <div class="detail-item">
                         <div class="detail-label">Driver ID</div>
-                        <div class="detail-value">${order.driverId}</div>
+                        <div class="detail-value">${safeDriverId}</div>
                     </div>
                     ` : ''}
-                    ${order.confirmedAt ? `
+                    ${safeConfirmedAt ? `
                     <div class="detail-item">
                         <div class="detail-label">Confirmed At</div>
-                        <div class="detail-value">${new Date(order.confirmedAt).toLocaleString()}</div>
+                        <div class="detail-value">${safeConfirmedAt}</div>
                     </div>
                     ` : ''}
                 </div>
                 
-                ${order.items && order.items.length > 0 ? `
-                <h4>Order Items</h4>
-                <div class="items-list">
-                    ${order.items.map(item => `
-                        <div class="item-row">
-                            <div class="item-name">${item.name || item.title || 'Item'}</div>
-                            <div class="item-details">
-                                <span>Qty: ${item.quantity || 1}</span>
-                                ${item.price ? `<span>Price: ${order.currency || 'IQD'} ${item.price}</span>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-                ` : ''}
+                ${itemsHtml}
                 
                 <details style="margin-top: 20px;">
                     <summary style="cursor: pointer; font-weight: bold;">Raw Order Data</summary>
-                    <div class="raw-data" style="max-height: 300px; overflow-y: auto;">${JSON.stringify(orderData, null, 2)}</div>
+                    <div class="raw-data" style="max-height: 300px; overflow-y: auto;">${safeJsonData}</div>
                 </details>
-            `;
+            `);
         } catch (error) {
             console.error('Error loading order details:', error);
-            content.innerHTML = `
+            // SECURITY: Sanitize error message
+            const safeErrorMessage = SecurityUtils.escapeHTML(error.message || 'Unknown error');
+            content.innerHTML = SecurityUtils.sanitizeHTML(`
                     <div style="text-align: center; color: var(--md-sys-color-error);">
                         <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <div>Failed to load order details: ${error.message}</div>
+                        <div>Failed to load order details: ${safeErrorMessage}</div>
                     </div>
-                `;
+                `);
         }
     }
 
@@ -805,6 +918,31 @@
             AuthUtils: !!window.AuthUtils
         });
 
+        // Attach filter listeners (CSP-safe)
+        const searchInput = document.getElementById('search-input');
+        const statusFilter = document.getElementById('status-filter');
+        const dateFrom = document.getElementById('date-from');
+        const dateTo = document.getElementById('date-to');
+        [searchInput, statusFilter, dateFrom, dateTo].forEach(el => {
+            if (!el) return;
+            const evt = el.tagName === 'INPUT' && el.type === 'text' ? 'input' : 'change';
+            el.addEventListener(evt, filterOrders);
+        });
+
+        // Delegated click for view details buttons
+        document.getElementById('orders-tbody').addEventListener('click', (e) => {
+            const btn = e.target.closest('.view-details-btn');
+            if (btn && btn.dataset.orderId) {
+                showOrderDetails(btn.dataset.orderId);
+            }
+        });
+
+        // Close modal button (CSP-safe)
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target.closest('button[data-action="close-order-modal"]');
+            if (closeBtn) { closeOrderModal(); }
+        });
+
         setTimeout(() => {
             console.log('🔄 Starting loadOrders() after brief delay...');
             loadOrders();
@@ -822,6 +960,7 @@
 
             const placeholder = document.getElementById('sidebar-placeholder');
             if (placeholder) {
+                // SECURITY: Sidebar HTML is from trusted source (internal file)
                 placeholder.innerHTML = html;
                 console.log('✅ Sidebar loaded successfully');
 
@@ -846,6 +985,21 @@
         loadSidebar();
     }
 </script>
+<script>
+    (async function () {
+        try {
+            await RBAC.ensure();
+            // Enforce RBAC - New system auto-detects page name
+            window.RBAC.enforcePage();
+            // Orders domain: read/write are same roles in backend, but keep generic
+            if (!RBAC.can('orders', 'write')) {
+                // apply read-only
+                RBAC.applyReadOnly('body', 'orders');
+                // Optionally hide creation/edit controls if identifiable
+                document.querySelectorAll('[data-write-only], .view-details-btn[data-action="write"]').forEach(el => el.style.display = 'none');
+            }
+        } catch (e) { console.warn('RBAC init failed', e); }
+    })();
+</script>
 </body>
-
 </html>

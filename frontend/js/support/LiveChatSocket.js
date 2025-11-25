@@ -4,7 +4,7 @@
   class LiveChatSocket {
     constructor({ businessId, endpoint, userId, token, agentId, agentName }) {
       this.businessId = businessId;
-      this.endpoint = endpoint;
+      this.endpoint = endpoint || 'wss://bx4snzqxpd.execute-api.us-east-1.amazonaws.com/ghayth';
       this.userId = userId || 'support_dashboard';
       this.token = token || '';
       this.agentId = agentId || this.userId;
@@ -199,7 +199,7 @@
         }
 
         // Fallback to direct sessionStorage access
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         if (idToken) {
           console.log('✅ Using sessionStorage idToken for WebSocket authentication');
           return idToken;
@@ -288,9 +288,10 @@
 
       console.log('✅ LiveChatSocket connected successfully');
 
-      // Send agent connect message (using 'chat_init' action as that's what the AWS handler supports)
+      // Send agent connect message (using 'chat_agent_connect' action to align with AWS handler)
       this.send({
-        action: 'chat_init',
+        action: 'chat_agent_connect',
+        type: 'chat_agent_connect',
         userType: 'agent',
         agentId: this.agentId,
         agentName: this.agentName,
@@ -922,11 +923,11 @@
           <div class="live-chat-stat">Errors: ${this.stats.errors}</div>
         `;
       }
-    }
 
-    // Public API
-    sendChatMessage(sessionId, messageText) {
-      return this.send({
+      // Bridge to support page badge when available
+      try {
+        if (typeof window.updateConnectionStatus === 'function') {
+          const map = {
         type: 'chat_message',
         sessionId,
         senderType: 'agent',

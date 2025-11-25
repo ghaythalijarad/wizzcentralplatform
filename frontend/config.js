@@ -4,6 +4,9 @@ window.WIZZCENTRAL_CONFIG = {
     // API Gateway URL (can be overridden via Amplify Console env var 'API_BASE_URL')
     // Using RegionDashboardAPI Lambda Function URL for Central Platform regions management
     API_BASE_URL: (typeof window !== 'undefined' && typeof window.__API_BASE_URL__ !== 'undefined' && window.__API_BASE_URL__) || 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws',
+    
+    // Push Notification API Gateway Endpoint
+    PUSH_NOTIFICATION_API_URL: 'https://570ve00sak.execute-api.us-east-1.amazonaws.com/prod',
 
     // Frontend Configuration
     APP_NAME: 'WizzCentral Platform',
@@ -17,7 +20,7 @@ window.WIZZCENTRAL_CONFIG = {
 
     // AWS Cognito Configuration (WizzCentral User Pool)
     COGNITO_REGION: 'us-east-1',
-    COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi',
+    COGNITO_USER_POOL_ID: 'us-east-1_Cp9YnOQWi', // wizzcentral user pool (correct)
     COGNITO_CLIENT_ID: '5hun8p61grnakisu5gammcjelv', // NEW: Browser-specific client with no secret
     COGNITO_IDENTITY_POOL_ID: 'us-east-1:10dd68af-9c1e-448e-ae67-89eaeb3c8160', // NEW: WizzCentralPlatform Identity Pool
 

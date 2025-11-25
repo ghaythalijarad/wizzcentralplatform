@@ -37,6 +37,9 @@ class NavigationManager {
             // Initialize navigation features
             this.initializeNavigation();
 
+            // Apply RBAC gating after sidebar & navigation are ready
+            await this.applyRBACGating();
+
             // Set active page
             this.setActivePage();        // Setup event listeners
         this.setupEventListeners();
@@ -502,8 +505,8 @@ class NavigationManager {
                 
                 try {
                     // First try: Get from sessionStorage directly
-                    userEmail = sessionStorage.getItem('userEmail') || '';
-                    const isAuthenticated = sessionStorage.getItem('isAuthenticated') === 'true';
+                    userEmail = localStorage.getItem('userEmail') || '';
+                    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
                     
                     if (userEmail) {
                         userName = userEmail.split('@')[0]; // Use part before @
@@ -511,7 +514,7 @@ class NavigationManager {
                     }
                     
                     // Second try: Decode JWT token if available
-                    const token = sessionStorage.getItem('idToken');
+                    const token = localStorage.getItem('idToken');
                     if (token) {
                         try {
                             const payload = JSON.parse(atob(token.split('.')[1]));
@@ -637,7 +640,7 @@ class NavigationManager {
                             <span class="user-role">Administrator</span>
                         </div>
                     </div>
-                    <button class="logout-btn" onclick="logout()">
+                    <button class="logout-btn">
                         <i class="fas fa-sign-out-alt"></i>
                         <span>Logout</span>
                     </button>
@@ -716,6 +719,78 @@ class NavigationManager {
     isReady() {
         return this.isInitialized;
     }
+
+    // Ensure RBAC utility is present; load dynamically if missing
+    async ensureRBACLoaded() {
+        if (window.RBAC) return;
+        await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = this._prefix('/assets/js/rbac.js');
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = (e) => reject(new Error('Failed to load RBAC util'));
+            document.head.appendChild(s);
+        });
+    }
+
+    _prefix(path) {
+        const base = this._getBasePrefix() || '';
+        return base + path;
+    }
+
+    // Centralized RBAC enforcement for sidebar and current page
+    async applyRBACGating() {
+        try {
+            await this.ensureRBACLoaded();
+            await window.RBAC.ensure();
+
+            // Update sidebar user info
+            const me = await window.RBAC.fetchMe();
+            const nameEl = document.querySelector('.sidebar-footer .user-name');
+            const roleEl = document.querySelector('.sidebar-footer .user-role');
+            if (nameEl) nameEl.textContent = me?.email || 'User';
+            if (roleEl) roleEl.textContent = (me?.roles || []).join(', ') || 'Viewer';
+
+            // Hide nav items without page permission
+            const items = (this.sidebar || document).querySelectorAll?.('.nav-item[data-page]') || [];
+            items.forEach(li => {
+                const p = li.getAttribute('data-page');
+                if (!window.RBAC.pageAllowed(p)) {
+                    li.style.display = 'none';
+                }
+            });
+
+            // Enforce current page access (skip on unauthorized page itself)
+            const current = this.currentPage;
+            const isUnauthorized = /\/pages\/unauthorized\.html$/.test(window.location.pathname || '');
+            if (current && !isUnauthorized && !window.RBAC.pageAllowed(current)) {
+                const target = this._prefix('/pages/unauthorized.html');
+                console.warn('RBAC: redirecting to unauthorized page for', current);
+                window.location.replace(target);
+                return;
+            }
+
+            // Apply read-only mode for domains where user lacks write
+            const pageToDomain = {
+                financial: 'financial',
+                promotions: 'campaigns',
+                regions: 'regions',
+                orders: 'orders',
+                merchants: 'merchants',
+                drivers: 'drivers',
+                customers: 'customers',
+                support: 'support'
+            };
+            const domain = pageToDomain[current];
+            if (domain && !window.RBAC.can(domain, 'write')) {
+                window.RBAC.applyReadOnly('body', domain);
+                // Hide explicit write-only UI hooks if present
+                document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+            }
+        } catch (e) {
+            console.warn('RBAC gating failed or not available', e);
+        }
+    }
 }
 
 // Initialize the navigation manager
@@ -763,6 +838,33 @@ if (!window.logout) {
         }
     };
 }
+
+// Ensure logout works under CSP (no inline handlers)
+(function attachLogoutHandlerOnce() {
+    if (window.__logoutHandlerAttached) return;
+    window.__logoutHandlerAttached = true;
+    document.addEventListener('click', function (e) {
+        const btn = e.target && e.target.closest && e.target.closest('.logout-btn');
+        if (btn) {
+            e.preventDefault();
+            try {
+                if (typeof window.logout === 'function') {
+                    window.logout();
+                } else if (window.Auth && typeof window.Auth.logout === 'function') {
+                    window.Auth.logout();
+                } else {
+                    // Fallback: clear storage and go to login
+                    sessionStorage.clear();
+                    localStorage.clear();
+                    window.location.href = window.location.origin + '/index.html';
+                }
+            } catch (err) {
+                console.error('Logout handler error:', err);
+                window.location.href = window.location.origin + '/index.html';
+            }
+        }
+    }, true);
+})();
 
 // Global function to refresh user profile (useful for testing and manual updates)
 window.refreshUserProfile = function() {

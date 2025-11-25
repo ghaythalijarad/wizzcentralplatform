@@ -1,0 +1,113 @@
+╔══════════════════════════════════════════════════════════════════╗
+║                  SUPPORT ADMIN ACCESS - QUICK REF                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+👤 USER: clasicman10@yahoo.com
+🏷️  GROUP: support_admin
+✅ STATUS: MERCHANTS & DRIVERS ACCESS ENABLED
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📊 ACCESS SUMMARY                                                │
+└──────────────────────────────────────────────────────────────────┘
+
+✅ CAN ACCESS (9 pages):
+   🏠 Dashboard
+   💬 Support
+   💬 Support - Merchants
+   💬 Support - Production
+   👥 Customers
+   👥 Customers Simple
+   📦 Orders
+   🏪 Merchants          ← NEWLY ENABLED
+   🚗 Drivers            ← NEWLY ENABLED
+
+❌ CANNOT ACCESS:
+   💰 Financial Management
+   🎁 Promotions
+   🗺️  Regions
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🧪 QUICK TEST                                                    │
+└──────────────────────────────────────────────────────────────────┘
+
+1. Login: clasicman10@yahoo.com
+2. Navigate to: /frontend/pages/merchants.html
+3. Expected: ✅ Page loads (not redirected)
+4. Navigate to: /frontend/pages/drivers.html
+5. Expected: ✅ Page loads (not redirected)
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🔧 CONFIGURATION DETAILS                                         │
+└──────────────────────────────────────────────────────────────────┘
+
+File: /frontend/assets/js/rbac.js
+Lines: 19-24
+
+support_admin: {
+    name: 'Support Admin',
+    precedence: 20,
+    allowedPages: [
+        'dashboard.html',
+        'support.html',
+        'support-merchants.html',
+        'support-production.html',
+        'customers.html',
+        'customers-simple.html',
+        'orders.html',
+        'merchants.html',      ✅ ADDED
+        'drivers.html'         ✅ ADDED
+    ],
+    permissions: [
+        'view_support_tickets',
+        'manage_support',
+        'view_merchants',      ✅ ADDED
+        'view_drivers'         ✅ ADDED
+    ]
+}
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🐛 TROUBLESHOOTING                                               │
+└──────────────────────────────────────────────────────────────────┘
+
+If redirected to unauthorized page:
+1. Clear browser cache (Ctrl+Shift+Delete)
+2. Clear session storage (F12 > Application > Session Storage > Clear)
+3. Re-login to get fresh token
+4. Check console (F12) for RBAC logs
+5. Verify user is in support_admin group in AWS Cognito
+
+Console Check:
+> window.RBAC.getUserGroups()
+  Expected: ['support_admin']
+> window.RBAC.hasPageAccess('merchants.html')
+  Expected: true
+> window.RBAC.hasPageAccess('drivers.html')
+  Expected: true
+
+┌──────────────────────────────────────────────────────────────────┐
+│ ✅ VERIFICATION CHECKLIST                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+✅ rbac.js updated with merchants.html & drivers.html
+✅ rbac-config.js synchronized (backup file)
+✅ Both pages have RBAC enforcement
+✅ Navigation menu will auto-filter
+✅ User token contains support_admin group
+✅ No conflicting configurations
+✅ System ready for production use
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📅 CHANGE LOG                                                    │
+└──────────────────────────────────────────────────────────────────┘
+
+Date: November 10, 2025
+Change: Added merchants.html and drivers.html to support_admin
+Reason: Support team needs access to merchant/driver info for tickets
+Files Modified:
+  - frontend/assets/js/rbac.js (primary)
+  - frontend/assets/js/rbac-config.js (backup)
+Test Status: ✅ Configuration verified
+
+╔══════════════════════════════════════════════════════════════════╗
+║  🎯 READY TO USE - NO FURTHER ACTION REQUIRED                    ║
+╚══════════════════════════════════════════════════════════════════╝

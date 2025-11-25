@@ -9,6 +9,8 @@
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- XSS Protection -->
+    <script src="../assets/js/security-utils.js"></script>
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
@@ -402,35 +404,50 @@
                 return;
             }
             
-            tbody.innerHTML = filteredOrders.map(order => `
-                <tr>
-                    <td>
-                        <div class="order-id">${order.cleanOrderId}</div>
-                    </td>
-                    <td>
-                        <div class="customer-info">
-                            <div class="customer-name">${order.customer.name}</div>
-                            <div class="customer-email">${order.customer.email}</div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="status-badge status-${order.status}">
-                            ${order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                        </span>
-                    </td>
-                    <td>${order.createdAtFormatted}</td>
-                    <td>${order.confirmedAtFormatted}</td>
-                    <td>${order.channel || 'N/A'}</td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="btn-sm btn-view" onclick="viewOrderDetails('${order.orderId}')">
-                                <i class="fas fa-eye"></i>
-                                View
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
+            // XSS Protection: Sanitize all order fields
+            const rows = filteredOrders.map(order => {
+                const safeOrderId = SecurityUtils.escapeHTML(order.cleanOrderId || 'N/A');
+                const safeCustomerName = SecurityUtils.escapeHTML(order.customer?.name || 'N/A');
+                const safeCustomerEmail = SecurityUtils.escapeHTML(order.customer?.email || 'N/A');
+                const safeStatus = SecurityUtils.escapeHTML(order.status || 'unknown');
+                const safeStatusLabel = SecurityUtils.escapeHTML(order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown');
+                const safeCreatedAt = SecurityUtils.escapeHTML(order.createdAtFormatted || 'N/A');
+                const safeConfirmedAt = SecurityUtils.escapeHTML(order.confirmedAtFormatted || 'N/A');
+                const safeChannel = SecurityUtils.escapeHTML(order.channel || 'N/A');
+                const safeOrderIdAttr = SecurityUtils.escapeHTML(order.orderId || '');
+
+                return `
+                    <tr>
+                        <td>
+                            <div class="order-id">${safeOrderId}</div>
+                        </td>
+                        <td>
+                            <div class="customer-info">
+                                <div class="customer-name">${safeCustomerName}</div>
+                                <div class="customer-email">${safeCustomerEmail}</div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="status-badge status-${safeStatus}">
+                                ${safeStatusLabel}
+                            </span>
+                        </td>
+                        <td>${safeCreatedAt}</td>
+                        <td>${safeConfirmedAt}</td>
+                        <td>${safeChannel}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn-sm btn-view" onclick="viewOrderDetails('${safeOrderIdAttr}')">
+                                    <i class="fas fa-eye"></i>
+                                    View
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.innerHTML = SecurityUtils.sanitizeHTML(rows);
         }
 
         // Update orders statistics
@@ -514,34 +531,74 @@
             const modal = document.getElementById('orderDetailsModal');
             const content = document.getElementById('orderDetailsContent');
             
-            content.innerHTML = `
+            // XSS Protection: Sanitize all order fields
+            const safeOrderId = SecurityUtils.escapeHTML(order.cleanOrderId || 'N/A');
+            const safeStatus = SecurityUtils.escapeHTML(order.status || 'unknown');
+            const safeStatusLabel = SecurityUtils.escapeHTML(order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown');
+            const safeChannel = SecurityUtils.escapeHTML(order.channel || 'N/A');
+            const safeCreatedAt = SecurityUtils.escapeHTML(order.createdAt || 'N/A');
+            const safeConfirmedAt = SecurityUtils.escapeHTML(order.confirmedAt || 'N/A');
+            const safeCustomerName = SecurityUtils.escapeHTML(order.customerName || 'N/A');
+            const safeCustomerEmail = SecurityUtils.escapeHTML(order.customerEmail || 'N/A');
+            const safeCurrency = SecurityUtils.escapeHTML(order.currency || 'N/A');
+
+            let cancellationSection = '';
+            if (order.canceledAt) {
+                const safeCanceledAt = SecurityUtils.escapeHTML(order.canceledAt || 'N/A');
+                const safeCanceledBy = SecurityUtils.escapeHTML(order.canceledBy || 'N/A');
+                const safeCancelReason = SecurityUtils.escapeHTML(order.cancelReason || 'N/A');
+
+                cancellationSection = `
+                <div style="margin-top: 20px;">
+                    <h3>Cancellation Information</h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancelled At:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCanceledAt}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancelled By:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCanceledBy}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancel Reason:</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCancelReason}</td>
+                        </tr>
+                    </table>
+                </div>
+                `;
+            }
+
+            const safeOrderJson = SecurityUtils.escapeHTML(JSON.stringify(order, null, 2));
+
+            content.innerHTML = SecurityUtils.sanitizeHTML(`
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
                         <h3>Order Information</h3>
                         <table style="width: 100%; border-collapse: collapse;">
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Order ID:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.cleanOrderId}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeOrderId}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Status:</td>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee;">
-                                    <span class="status-badge status-${order.status}">
-                                        ${order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                                    <span class="status-badge status-${safeStatus}">
+                                        ${safeStatusLabel}
                                     </span>
                                 </td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Channel:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.channel || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeChannel}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Created At:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.createdAt || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCreatedAt}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Confirmed At:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.confirmedAt || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeConfirmedAt}</td>
                             </tr>
                         </table>
                     </div>
@@ -550,45 +607,27 @@
                         <table style="width: 100%; border-collapse: collapse;">
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Name:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.customerName || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCustomerName}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Email:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.customerEmail || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCustomerEmail}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Currency:</td>
-                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.currency || 'N/A'}</td>
+                                <td style="padding: 8px; border-bottom: 1px solid #eee;">${safeCurrency}</td>
                             </tr>
                         </table>
                     </div>
                 </div>
                 
-                ${order.canceledAt ? `
-                <div style="margin-top: 20px;">
-                    <h3>Cancellation Information</h3>
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancelled At:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.canceledAt}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancelled By:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.canceledBy || 'N/A'}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 500;">Cancel Reason:</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${order.cancelReason || 'N/A'}</td>
-                        </tr>
-                    </table>
-                </div>
-                ` : ''}
+                ${cancellationSection}
                 
                 <div style="margin-top: 20px;">
                     <h3>Raw Data</h3>
-                    <pre style="background: #f8f9fa; padding: 16px; border-radius: 4px; overflow: auto; max-height: 300px; font-size: 12px;">${JSON.stringify(order, null, 2)}</pre>
+                    <pre style="background: #f8f9fa; padding: 16px; border-radius: 4px; overflow: auto; max-height: 300px; font-size: 12px;">${safeOrderJson}</pre>
                 </div>
-            `;
+            `);
             
             modal.style.display = 'flex';
         }
@@ -601,11 +640,13 @@
         // Show error message
         function showError(message) {
             const tbody = document.getElementById('ordersTableBody');
-            tbody.innerHTML = `
+            // XSS Protection: Sanitize error message
+            const safeMessage = SecurityUtils.escapeHTML(message);
+            tbody.innerHTML = SecurityUtils.sanitizeHTML(`
                 <tr>
                     <td colspan="7" class="error-state">
                         <i class="fas fa-exclamation-triangle"></i><br>
-                        ${message}
+                        ${safeMessage}
                         <br><br>
                         <button class="btn-primary" onclick="loadOrders()">
                             <i class="fas fa-retry"></i>
@@ -613,7 +654,7 @@
                         </button>
                     </td>
                 </tr>
-            `;
+            `);
         }
 
         // Modal click outside to close

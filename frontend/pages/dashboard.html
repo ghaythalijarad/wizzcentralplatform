@@ -5,13 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WizzCentral Platform - Dashboard</title>
+    <!-- Security: DOMPurify for XSS Protection -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/umd/date-fns.min.js"></script>
+    <!-- Security Utilities -->
+    <script src="../assets/js/security-utils.js"></script>
     <style>
         /* Material 3 Dashboard Enhancements */
         .stats-grid {
@@ -58,7 +62,7 @@
         .stat-icon {
             width: 56px;
             height: 56px;
-            border-radius: var(--md-sys-shape-corner-medium);
+            border-radius: var (--md-sys-shape-corner-medium);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -148,7 +152,7 @@
             align-items: center;
             padding: 16px 24px;
             border-bottom: 1px solid var(--md-sys-color-outline-variant);
-            transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+            transition: background-color var(--md-sys-motion-duration-short2) var (--md-sys-motion-easing-standard);
         }
         
         .activity-item:hover {
@@ -284,7 +288,7 @@
         
         .metric-label {
             font-size: var(--md-sys-typescale-body-small-font-size);
-            color: var(--md-sys-color-on-surface-variant);
+            color: var (--md-sys-color-on-surface-variant);
             text-transform: none;
             letter-spacing: 0.25px;
         }
@@ -426,10 +430,14 @@
             font-size: var(--md-sys-typescale-body-small-font-size);
             opacity: 0.8;
         }
+
+        .clickable { cursor: pointer; }
+        .hidden { display: none !important; }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
+    <script src="../assets/js/rbac.js"></script>
 </head>
 
 <body data-page="dashboard">
@@ -445,7 +453,7 @@
         <!-- Dashboard Content -->
         <div class="container mx-auto px-6">
             <!-- Data Source Indicator -->
-            <div id="dataSourceIndicator" class="data-source-indicator" style="display: none;">
+            <div id="dataSourceIndicator" class="data-source-indicator hidden">
                 <div class="indicator-content">
                     <i id="dataSourceIcon" class="indicator-icon fas fa-circle-info"></i>
                     <div>
@@ -525,7 +533,7 @@
                         <span>-5% from last week</span>
                     </div>
                 </div>
-                <div class="stat-card promotions" onclick="window.location.href='promotions.html'" style="cursor: pointer;">
+                <div class="stat-card promotions clickable" data-href="promotions.html">
                     <div class="stat-icon promotions">
                         <i class="fas fa-tags"></i>
                     </div>
@@ -535,241 +543,8 @@
                         <i class="fas fa-arrow-up"></i>
                         <span>Marketing campaigns</span>
                     </div>
-                    </div>
-            </div>
-<!-- Content Grid -->
-<div class="content-grid">
-    <!-- Revenue Analytics -->
-    <div class="dashboard-card">
-        <div class="card-header-modern">
-            <div class="flex items-center justify-between">
-                <h3 class="card-title">Revenue Overview</h3>
-                <button class="btn btn-primary btn-sm" onclick="generateReport()">
-                    <i class="fas fa-download"></i>
-                    Export Report
-                </button>
-            </div>
-        </div>
-                    <div class="p-6">
-                        <div class="chart-container chart-small">
-                            <canvas id="revenueChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-<!-- Analytics Charts -->
-<div class="dashboard-card">
-    <div class="card-header-modern">
-        <div class="flex items-center justify-between">
-            <h3 class="card-title">Order Analytics</h3>
-            <div class="flex items-center gap-2">
-                <select id="analyticsTimeframe" class="text-sm border border-gray-300 rounded px-2 py-1">
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                    <option value="30d">Last 30 Days</option>
-                </select>
-                <button class="btn btn-ghost btn-sm" onclick="refreshAnalytics()">
-                    <i class="fas fa-refresh"></i>
-                </button>
-                            </div>
-                            </div>
-                    </div>
-                    <div class="p-6">
-                        <div class="chart-container">
-                            <canvas id="ordersChart"></canvas>
-                        </div>
-                        <!-- Performance Metrics -->
-                        <div class="performance-grid">
-                            <div class="performance-metric">
-                                <div class="metric-value" id="avgOrderValue">$0</div>
-                                <div class="metric-label">Avg Order Value</div>
-                                <div class="metric-trend trend-up" id="avgOrderTrend">+5.2%</div>
-                            </div>
-                            <div class="performance-metric">
-                                <div class="metric-value" id="orderCompletionRate">0%</div>
-                                <div class="metric-label">Completion Rate</div>
-                                <div class="metric-trend trend-up" id="completionTrend">+2.1%</div>
-                            </div>
-                            <div class="performance-metric">
-                                <div class="metric-value" id="avgDeliveryTime">0min</div>
-                                <div class="metric-label">Avg Delivery Time</div>
-                                <div class="metric-trend trend-down" id="deliveryTrend">-3.5%</div>
-                            </div>
-                            <div class="performance-metric">
-                                <div class="metric-value" id="activeDriversNow">0</div>
-                                <div class="metric-label">Active Drivers</div>
-                                <div class="metric-trend trend-neutral" id="driversTrend">0%</div>
-                            </div>
-                            </div>
-                            </div>
-                            </div>
-
-                <!-- Recent Activity -->
-                <div class="dashboard-card">
-                    <div class="card-header-modern">
-                        <div class="flex items-center justify-between">
-                            <h3 class="card-title">Recent Activity</h3>
-                            <button class="btn btn-primary btn-sm">
-                                <i class="fas fa-external-link-alt"></i>
-                                View All
-                            </button>
-                            </div>
-                            </div>
-                            <div class="recent-activity" id="recentActivityList">
-                                <div class="activity-item">
-                                    <div class="activity-icon order">
-                                        <i class="fas fa-shopping-bag"></i>
-                                    </div>
-                                    <div class="flex-1">
-                                        <h4 class="font-semibold text-gray-900">New order #1234</h4>
-                                        <p class="text-sm text-gray-600">Customer: John Doe • $25.50</p>
-                                        <p class="text-xs text-gray-500">2 minutes ago</p>
-                                    </div>
-                                </div>
-                            
-                                <div class="activity-item">
-                                    <div class="activity-icon customer">
-                                        <i class="fas fa-user-plus"></i>
-                                    </div>
-                                    <div class="flex-1">
-                                        <h4 class="font-semibold text-gray-900">New customer registered</h4>
-                                        <p class="text-sm text-gray-600">Sarah Wilson joined the platform</p>
-                                        <p class="text-xs text-gray-500">5 minutes ago</p>
-                                    </div>
-                                </div>
-                            
-                                <div class="activity-item">
-                                    <div class="activity-icon merchant">
-                                        <i class="fas fa-store"></i>
-                                    </div>
-                                    <div class="flex-1">
-                                        <h4 class="font-semibold text-gray-900">Merchant verification</h4>
-                                        <p class="text-sm text-gray-600">Pizza Palace verified successfully</p>
-                                        <p class="text-xs text-gray-500">15 minutes ago</p>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-icon support">
-                                <i class="fas fa-ticket-alt"></i>
-                            </div>
-                            <div class="flex-1">
-                                <h4 class="font-semibold text-gray-900">Support ticket resolved</h4>
-                                <p class="text-sm text-gray-600">Payment issue resolved for order #1230</p>
-                                <p class="text-xs text-gray-500">1 hour ago</p>
-                            </div>
-                            </div>
-                            </div>
-                            </div>
-                            
-                            <!-- Quick Actions -->
-                <div class="dashboard-card">
-                    <div class="card-header-modern">
-                        <h3 class="card-title">Quick Actions</h3>
-                    </div>
-                    <div class="p-6">
-                        <a href="customers.html" class="quick-action-btn">
-                            <div class="quick-action-icon">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold">Manage Customers</h4>
-                                <p class="text-sm text-gray-600">View and manage customer accounts</p>
-                            </div>
-                            </a>
-                        <a href="merchants.html" class="quick-action-btn">
-                            <div class="quick-action-icon">
-                                <i class="fas fa-store"></i>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold">Add Merchant</h4>
-                                <p class="text-sm text-gray-600">Onboard new restaurant partners</p>
-                            </div>
-                            </a>
-                        <a href="orders.html" class="quick-action-btn">
-                            <div class="quick-action-icon">
-                                <i class="fas fa-shopping-bag"></i>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold">View Orders</h4>
-                                <p class="text-sm text-gray-600">Monitor order status and delivery</p>
-                            </div>
-                            </a>
-                        <a href="support-fixed.html" class="quick-action-btn">
-                            <div class="quick-action-icon">
-                                <i class="fas fa-headset"></i>
-                            </div>
-                            <div>
-                                <h4 class="font-semibold">Support Center</h4>
-                                <p class="text-sm text-gray-600">Manage customer support tickets</p>
-                            </div>
-                            </a>
-                            
-                            <a href="promotions.html" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <i class="fas fa-tags"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold">Promotions Management</h4>
-                                    <p class="text-sm text-gray-600">Create and manage promotions & discounts</p>
-                                </div>
-                            </a>
-                            
-                            <a href="analytics.html" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <i class="fas fa-chart-line"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold">Analytics</h4>
-                                    <p class="text-sm text-gray-600">View detailed platform analytics</p>
-                                </div>
-                            </a>
-                            
-                            <a href="settings.html" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <i class="fas fa-cog"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-semibold">Settings</h4>
-                                    <p class="text-sm text-gray-600">Configure platform settings</p>
-                                </div>
-                            </a>
-                            </div>
-                </div>
-                </div>
-                
-                <!-- System Status -->
-                <div class="dashboard-card">
-                    <div class="card-header-modern">
-                        <h3 class="card-title">System Status</h3>
-                    </div>
-                    <div class="p-6">
-                        <div class="system-status">
-                            <div class="status-item">
-                                <div class="status-indicator online"></div>
-                                <h4 class="font-semibold text-sm">API Services</h4>
-                                <p class="text-xs text-gray-600">All systems operational</p>
-                            </div>
-                
-                            <div class="status-item">
-                                <div class="status-indicator online"></div>
-                                <h4 class="font-semibold text-sm">Payment Gateway</h4>
-                                <p class="text-xs text-gray-600">Processing normally</p>
-                            </div>
-                
-                            <div class="status-item">
-                                <div class="status-indicator warning"></div>
-                                <h4 class="font-semibold text-sm">SMS Service</h4>
-                                <p class="text-xs text-gray-600">Slight delay in delivery</p>
-                            </div>
-                
-                            <div class="status-item">
-                                <div class="status-indicator online"></div>
-                                <h4 class="font-semibold text-sm">Live Chat</h4>
-                                <p class="text-xs text-gray-600">Connected and active</p>
-                        </div>
-                    </div>
                 </div>
             </div>
-        </div>
     </div>
 
     <!-- AWS SDK -->
@@ -789,42 +564,12 @@
     <script src="../assets/js/navigation.js?v=20250906"></script>
     <script src="../test-toggle-functionality.js"></script>
     
-    <!-- Authentication check -->
-    <script>
-        // Check authentication silently in background
-        if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
-            try {
-                window.Auth.requireAuthentication();
-            } catch (e) {
-                console.warn('Auth check error:', e);
-            }
-        }
-    </script>
-    
-    <script>
-        // Initialize navigation manager
-        document.addEventListener('DOMContentLoaded', async function () {
-            console.log('🔧 Dashboard: Initializing navigation...');
-
-            try {
-                const navigationManager = new NavigationManager();
-                await navigationManager.init();
-                console.log('✅ Dashboard: Navigation initialized successfully');
-            } catch (error) {
-                console.error('❌ Dashboard: Navigation initialization failed:', error);
-            }
-        });
-    </script>
+    <!-- Authentication check (moved to external) -->
+    <!-- Initialize navigation manager (moved to external) -->
     <script src="../dashboard.js?v=20250906"></script>
-
-    <!-- Inline build stamp -->
-    <script>
-        (function(){
-            const build = 'dashboard.html#2025-09-23T' + new Date().toISOString().slice(11, 19);
-            document.documentElement.setAttribute('data-build', build);
-            console.log('Dashboard page build:', build);
-        })();
-    </script>
+    <script src="../assets/js/dashboard-init.js" defer></script>
+    <script src="../assets/js/dashboard-actions.js" defer></script>
+    <script src="../assets/js/dashboard-rbac-init.js" defer></script>
 </body>
 
 </html>

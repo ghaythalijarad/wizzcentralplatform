@@ -128,7 +128,7 @@ const onDomReady = async function () {
 // New: Fetch merchants via backend API
 async function fetchMerchantsFromApi() {
     console.log('🔍 Fetching merchants from API endpoint');
-    const token = sessionStorage.getItem('idToken') || sessionStorage.getItem('accessToken');
+    const token = localStorage.getItem('idToken') || localStorage.getItem('accessToken');
     if (!token) throw new Error('No authentication token available');
     updateDataSourceIndicator('loading', 'Fetching merchants from API...');
 
@@ -557,6 +557,19 @@ function renderMerchantsTable() {
         // Use the address that was already built from individual fields
         let displayAddress = merchant.address || 'N/A';
 
+        // SECURITY: Sanitize all user-generated content to prevent XSS
+        const safeName = SecurityUtils.escapeHTML(merchant.name || 'N/A');
+        const safeOwner = SecurityUtils.escapeHTML(merchant.owner || 'N/A');
+        const safeCategory = SecurityUtils.escapeHTML(merchant.category || 'Business');
+        const safeCity = SecurityUtils.escapeHTML(merchant.city || 'Unknown City');
+        const safeEmail = SecurityUtils.escapeHTML(merchant.email || 'N/A');
+        const safePhone = SecurityUtils.escapeHTML(merchant.phone || 'N/A');
+        const safeAddress = SecurityUtils.escapeHTML(displayAddress);
+        const safeAvatar = SecurityUtils.sanitizeURL(merchant.avatar);
+        const safeId = SecurityUtils.escapeHTML(merchant.id || '');
+        const safeStatus = SecurityUtils.escapeHTML(merchant.status || 'unknown');
+        const safeStatusLabel = SecurityUtils.escapeHTML(statusInfo.label);
+
         // Format accepting orders status
         const acceptingOrdersStatus = merchant.acceptingOrders ?
             '<span class="status-badge approved" style="background-color: #10b98120; color: #10b981;">Accepting</span>' :
@@ -566,44 +579,43 @@ function renderMerchantsTable() {
         const lastUpdate = merchant.lastStatusUpdate ?
             new Date(merchant.lastStatusUpdate).toLocaleDateString() :
             (merchant.joinDate !== 'N/A' ? merchant.joinDate : 'N/A');
+        const safeLastUpdate = SecurityUtils.escapeHTML(lastUpdate);
 
         return `
-            <tr>
+            <tr data-merchant-row="${safeId}">
                 <td>
                     <div class="business-info">
-                        <img src="${merchant.avatar}" alt="${merchant.name}" class="business-avatar">
+                        <img src="${safeAvatar}" alt="${safeName}" class="business-avatar" loading="lazy">
                         <div class="business-details">
-                            <h4>${merchant.name}</h4>
-                            <p>${merchant.category || 'Business'} • ${merchant.city || 'Unknown City'}</p>
+                            <h4>${safeName}</h4>
+                            <p>${safeCategory} • ${safeCity}</p>
                         </div>
                     </div>
                 </td>
-                <td>${merchant.owner}</td>
+                <td>${safeOwner}</td>
                 <td>
                     <span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
-                        ${statusInfo.label}
+                        ${safeStatusLabel}
                     </span>
                 </td>
                 <td>${acceptingOrdersStatus}</td>
-                <td>${merchant.email}</td>
-                <td>${merchant.phone}</td>
-                <td>
-                    <div class="address-info">${displayAddress}</div>
-                </td>
-                <td>${lastUpdate}</td>
+                <td>${safeEmail}</td>
+                <td>${safePhone}</td>
+                <td><div class="address-info">${safeAddress}</div></td>
+                <td>${safeLastUpdate}</td>
                 <td>
                     <div class="action-buttons">
-                        <button class="btn-action" onclick="viewMerchantDetails('${merchant.id}')" title="View Details">
+                        <button class="btn-action" data-action="view-details" data-id="${safeId}" title="View Details">
                             <i class="fas fa-eye"></i>
                         </button>
-                        <button class="btn-view-products" onclick="viewMerchantProducts('${merchant.id}')" title="View Products">
+                        <button class="btn-view-products" data-action="view-products" data-id="${safeId}" title="View Products">
                             <i class="fas fa-box"></i>
                         </button>
-                        <button class="btn-action" onclick="editMerchant('${merchant.id}')" title="Edit">
+                        <button class="btn-action" data-action="edit" data-id="${safeId}" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn-toggle-status ${merchant.status === 'approved' ? 'approved' : 'pending'}" 
-                                onclick="toggleMerchantStatus('${merchant.id}', '${merchant.status}')" 
+                                data-action="toggle-status" data-id="${safeId}" data-status="${safeStatus}" 
                                 title="${merchant.status === 'approved' ? 'Suspend Merchant' : 'Approve Merchant'}">
                             <i class="fas ${merchant.status === 'approved' ? 'fa-pause' : 'fa-check'}"></i>
                         </button>
@@ -613,7 +625,36 @@ function renderMerchantsTable() {
         `;
     }).join('');
 
-    tableBody.innerHTML = rows;
+    tableBody.innerHTML = SecurityUtils.sanitizeHTML(rows);
+    attachMerchantsDelegatedEvents();
+}
+
+// Delegated events for merchants table to remove inline handlers (CSP friendly)
+function attachMerchantsDelegatedEvents() {
+    const tableBody = document.getElementById('merchantsTableBody');
+    if (!tableBody || tableBody.dataset.eventsAttached === 'true') return;
+    tableBody.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const id = btn.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        if (!id || !action) return;
+        switch (action) {
+            case 'view-details':
+                viewMerchantDetails(id);
+                break;
+            case 'view-products':
+                viewMerchantProducts(id);
+                break;
+            case 'edit':
+                editMerchant(id);
+                break;
+            case 'toggle-status':
+                toggleMerchantStatus(id); // current status determined inside
+                break;
+        }
+    });
+    tableBody.dataset.eventsAttached = 'true';
 }
 
 // Update dashboard stats based on loaded merchants
@@ -637,32 +678,29 @@ function updateMerchantStats() {
 }
 
 // Toggle merchant status between approved and pending
-async function toggleMerchantStatus(merchantId, currentStatus) {
+async function toggleMerchantStatus(merchantId, legacyStatusParam) {
+    // Determine current status from data arrays if not explicitly passed
+    let merchant = merchantsData.find(m => m.id === merchantId) || filteredMerchants.find(m => m.id === merchantId);
+    if (!merchant) {
+        console.warn('toggleMerchantStatus: merchant not found', merchantId);
+        return;
+    }
+    const currentStatus = legacyStatusParam || merchant.status || 'pending';
     console.log(`🔄 Toggling status for merchant ${merchantId} from ${currentStatus}`);
-
     try {
-        // Show loading state
-        const button = document.querySelector(`button[onclick="toggleMerchantStatus('${merchantId}', '${currentStatus}')"]`);
+        // Find button via data attributes
+        const button = document.querySelector(`button[data-action="toggle-status"][data-id="${merchantId}"]`);
         if (button) {
             button.disabled = true;
             button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         }
-
-        // Determine new status
         const newStatus = currentStatus === 'approved' ? 'pending' : 'approved';
         const newIsActive = newStatus === 'approved';
-
         console.log(`📝 Updating merchant ${merchantId} to status: ${newStatus}, isActive: ${newIsActive}`);
-
-        // Get DynamoDB client
         const dynamoDB = await AWSUtils.getDynamoDBClient();
-
-        // Update the item in DynamoDB
         const updateParams = {
             TableName: 'WhizzMerchants_Businesses',
-            Key: {
-                businessId: merchantId
-            },
+            Key: { businessId: merchantId },
             UpdateExpression: 'SET #status = :status, #isActive = :isActive, #lastStatusUpdate = :timestamp, #statusUpdatedBy = :updatedBy, #statusSource = :source',
             ExpressionAttributeNames: {
                 '#status': 'status',
@@ -680,54 +718,26 @@ async function toggleMerchantStatus(merchantId, currentStatus) {
             },
             ReturnValues: 'ALL_NEW'
         };
-
         const result = await dynamoDB.update(updateParams).promise();
         console.log('✅ Status update successful:', result);
-
-        // Update local data
-        const merchantIndex = merchantsData.findIndex(m => m.id === merchantId);
-        if (merchantIndex !== -1) {
-            merchantsData[merchantIndex].status = newStatus;
-            merchantsData[merchantIndex].isActive = newIsActive;
-        }
-
-        const filteredIndex = filteredMerchants.findIndex(m => m.id === merchantId);
-        if (filteredIndex !== -1) {
-            filteredMerchants[filteredIndex].status = newStatus;
-            filteredMerchants[filteredIndex].isActive = newIsActive;
-        }
-
-        // Refresh the table and stats
+        // Update local objects
+        merchant.status = newStatus;
+        merchant.isActive = newIsActive;
+        const globalIdx = merchantsData.findIndex(m => m.id === merchantId); if (globalIdx !== -1) { merchantsData[globalIdx].status = newStatus; merchantsData[globalIdx].isActive = newIsActive; }
+        const filteredIdx = filteredMerchants.findIndex(m => m.id === merchantId); if (filteredIdx !== -1) { filteredMerchants[filteredIdx].status = newStatus; filteredMerchants[filteredIdx].isActive = newIsActive; }
         renderMerchantsTable();
         updateMerchantStats();
-
-        // Show success message
         showMessage(`Merchant status updated to ${newStatus} successfully!`, 'success');
         setTimeout(() => hideMessage(), 3000);
-
-        console.log(`✅ Merchant ${merchantId} status changed from ${currentStatus} to ${newStatus}`);
-
     } catch (error) {
         console.error('❌ Error updating merchant status:', error);
-
-        // Reset button state
-        const button = document.querySelector(`button[onclick*="toggleMerchantStatus('${merchantId}'"]`);
+        const button = document.querySelector(`button[data-action="toggle-status"][data-id="${merchantId}"]`);
         if (button) {
             button.disabled = false;
-            const icon = currentStatus === 'approved' ? 'fa-pause' : 'fa-check';
+            const icon = (merchant.status === 'approved') ? 'fa-pause' : 'fa-check';
             button.innerHTML = `<i class="fas ${icon}"></i>`;
         }
-
-        let errorMessage = 'Failed to update merchant status';
-        if (error.code === 'ResourceNotFoundException') {
-            errorMessage = 'Merchant not found in database';
-        } else if (error.code === 'ValidationException') {
-            errorMessage = 'Invalid data provided';
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
-
-        showMessage(`Error: ${errorMessage}`, 'error');
+        showMessage(`Error: ${error.message || 'Failed to update merchant status'}`, 'error');
         setTimeout(() => hideMessage(), 5000);
     }
 }
@@ -743,28 +753,38 @@ function viewMerchantDetails(merchantId) {
     // Use the address that was already built from individual fields
     let displayAddress = merchant.address || 'Not provided';
 
+    // SECURITY: Sanitize all user-generated content for modal display
+    const safeName = SecurityUtils.escapeHTML(merchant.name || 'N/A');
+    const safeCategory = SecurityUtils.escapeHTML(merchant.category || 'Business');
+    const safeOwner = SecurityUtils.escapeHTML(merchant.owner || 'N/A');
+    const safeEmail = SecurityUtils.escapeHTML(merchant.email || 'N/A');
+    const safePhone = SecurityUtils.escapeHTML(merchant.phone || 'N/A');
+    const safeAddress = SecurityUtils.escapeHTML(displayAddress);
+    const safeAvatar = SecurityUtils.sanitizeURL(merchant.avatar);
+    const safeStatusLabel = SecurityUtils.escapeHTML(MERCHANT_STATUSES[merchant.status]?.label || 'Unknown');
+
     const modalBody = document.getElementById('merchantDetailsBody');
     if (modalBody) {
-        modalBody.innerHTML = `
+        modalBody.innerHTML = SecurityUtils.sanitizeHTML(`
             <div style="display: grid; gap: 1rem;">
                 <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-                    <img src="${merchant.avatar}" alt="${merchant.name}" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover;">
+                    <img src="${safeAvatar}" alt="${safeName}" style="width: 60px; height: 60px; border-radius: 8px; object-fit: cover;">
                     <div>
-                        <h4 style="margin: 0; color: #1e293b;">${merchant.name}</h4>
-                        <p style="margin: 0; color: #64748b; font-size: 0.9rem;">${merchant.category || 'Business'}</p>
+                        <h4 style="margin: 0; color: #1e293b;">${safeName}</h4>
+                        <p style="margin: 0; color: #64748b; font-size: 0.9rem;">${safeCategory}</p>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div><strong>Owner:</strong> ${merchant.owner}</div>
-                    <div><strong>Status:</strong> <span class="status-badge ${MERCHANT_STATUSES[merchant.status]?.class || 'unknown'}">${MERCHANT_STATUSES[merchant.status]?.label || 'Unknown'}</span></div>
-                    <div><strong>Email:</strong> ${merchant.email}</div>
-                    <div><strong>Phone:</strong> ${merchant.phone}</div>
-                    <div style="grid-column: 1 / -1;"><strong>Address:</strong> ${displayAddress}</div>
+                    <div><strong>Owner:</strong> ${safeOwner}</div>
+                    <div><strong>Status:</strong> <span class="status-badge ${MERCHANT_STATUSES[merchant.status]?.class || 'unknown'}">${safeStatusLabel}</span></div>
+                    <div><strong>Email:</strong> ${safeEmail}</div>
+                    <div><strong>Phone:</strong> ${safePhone}</div>
+                    <div style="grid-column: 1 / -1;"><strong>Address:</strong> ${safeAddress}</div>
                     <div><strong>Join Date:</strong> ${merchant.joinDate ? new Date(merchant.joinDate).toLocaleDateString() : 'N/A'}</div>
                     <div><strong>Commission:</strong> ${merchant.commission || 0}%</div>
                 </div>
             </div>
-        `;
+        `);
 
         document.getElementById('viewMerchantModal').style.display = 'flex';
     }
@@ -870,7 +890,7 @@ async function loadMerchantProducts(merchantId) {
 
     try {
         // Use API endpoints instead of direct DynamoDB access
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
 
         // Load categories first
         const categoriesResponse = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/categories`, {
@@ -1002,34 +1022,44 @@ function renderMerchantProducts() {
     let html = '';
     for (const categoryId of sortedCategories) {
         const categoryName = categoryMap[categoryId] || categoryId;
+        const safeCategoryName = SecurityUtils.escapeHTML(categoryName);
         const products = groupedProducts[categoryId];
+        
         html += `
             <div class="product-category-section">
-                <h3 class="product-category-title">${categoryName} (${products.length} items)</h3>
+                <h3 class="product-category-title">${safeCategoryName} (${products.length} items)</h3>
                 <div class="products-grid">
-                    ${products.map(product => `
+                    ${products.map(product => {
+                        // SECURITY: Sanitize product data
+                        const safeName = SecurityUtils.escapeHTML(product.name || 'Unnamed Product');
+                        const safeDescription = SecurityUtils.escapeHTML(product.description || '');
+                        const safeImageUrl = SecurityUtils.sanitizeURL(product.image_url || 'https://via.placeholder.com/150');
+                        const safeProductId = SecurityUtils.escapeHTML(product.productId || '');
+                        
+                        return `
                         <div class="product-card">
-                            <img src="${product.image_url || 'https://via.placeholder.com/150'}" alt="${product.name}" class="product-image">
+                            <img src="${safeImageUrl}" alt="${safeName}" class="product-image">
                             <div class="product-info">
-                                <h4 class="product-name">${product.name}</h4>
-                                <p class="product-description">${product.description || ''}</p>
+                                <h4 class="product-name">${safeName}</h4>
+                                <p class="product-description">${safeDescription}</p>
                                 <div class="product-price-and-actions">
                                     <span class="product-price">$${product.price}</span>
                                     <div class="product-actions">
-                                        <button class="btn-action btn-edit-product" onclick="editProduct('${product.productId}')" title="Edit Product">
+                                        <button class="btn-action btn-edit-product" onclick="editProduct('${safeProductId}')" title="Edit Product">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    `).join('')}
+                    `;
+                    }).join('')}
                 </div>
             </div>
         `;
     }
 
-    container.innerHTML = html;
+    container.innerHTML = SecurityUtils.sanitizeHTML(html);
 }
 
 function refreshMerchantProducts() {
@@ -1112,7 +1142,7 @@ async function handleEditProductFormSubmit(event) {
     messageElement.style.display = 'none';
 
     try {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         const response = await fetch(`${window.WIZZCENTRAL_CONFIG.API_BASE_URL}/merchants/${currentMerchantId}/products/${productId}`, {
             method: 'PUT',
             headers: {
@@ -1263,7 +1293,7 @@ async function handleEditFormSubmission(event) {
     };
 
     try {
-        const idToken = sessionStorage.getItem('idToken');
+        const idToken = localStorage.getItem('idToken');
         if (!idToken) {
             throw new Error('Authentication token not found.');
         }
@@ -1352,3 +1382,52 @@ window.forceLoadRealData = async function () {
         showLoader(false);
     }
 }
+
+// Setup modal delegated events
+function setupModalDelegatedEvents() {
+    document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+        const action = target.getAttribute('data-action');
+        switch (action) {
+            case 'close-edit-product':
+            case 'cancel-edit-product': {
+                const modal = document.getElementById('editProductModal');
+                if (modal) modal.style.display = 'none';
+                break;
+            }
+            case 'close-view-merchant': {
+                const modal = document.getElementById('viewMerchantModal');
+                if (modal) modal.style.display = 'none';
+                break;
+            }
+            case 'close-status-modal':
+            case 'cancel-status-modal': {
+                const modal = document.getElementById('statusModal');
+                if (modal) modal.style.display = 'none';
+                break;
+            }
+            case 'save-status-modal': {
+                if (typeof updateMerchantStatus === 'function') {
+                    updateMerchantStatus();
+                }
+                break;
+            }
+            case 'close-edit-merchant':
+            case 'cancel-edit-merchant': {
+                const modal = document.getElementById('editMerchantModal');
+                if (modal) modal.style.display = 'none';
+                break;
+            }
+        }
+    }, { passive: true });
+}
+
+// Ensure modal events are set up on DOM ready
+(function () {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupModalDelegatedEvents);
+    } else {
+        setupModalDelegatedEvents();
+    }
+})();

@@ -19,6 +19,10 @@
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <!-- Security utilities -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="../assets/js/security-utils.js"></script>
+    <script src="../assets/js/rbac.js"></script>
     <style>
         /* Regions Management Styles */
         /* Search and Filters */
@@ -979,6 +983,43 @@
             display: none;
             font-size: .85rem;
         }
+
+        /* Brand color override for regions page (no gradients) */
+        :root {
+            --regions-bg: #ffffff;
+        }
+        body[data-page="regions"], body { background: var(--regions-bg); }
+        .search-filters { background:#fff; border:1px solid var(--wizz-secondary); }
+        .region-item { background:#fff; border:1px solid var(--wizz-secondary); }
+        .region-item:hover { border-color: var(--wizz-primary); box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+        .region-name { color: var(--wizz-secondary); }
+        .region-name-arabic { color: var(--wizz-secondary); opacity:.65; }
+        .region-code { background: var(--wizz-primary); color:#1C1B1F; }
+        .region-level { background: var(--wizz-secondary); color:#fff; }
+        .detail-item i { color: var(--wizz-primary); }
+        .view-btn.active { background: var(--wizz-primary); color:#1C1B1F; }
+        .view-btn { color: var(--wizz-secondary); }
+        .view-btn:hover { background: var(--wizz-primary-light); color:#1C1B1F; }
+        .regions-table-container { background:#fff; border:1px solid var(--wizz-secondary); }
+        .regions-data-table th { background:#fff; color: var(--wizz-secondary); border-bottom:2px solid var(--wizz-secondary); }
+        .regions-data-table tbody tr:hover { background: rgba(253,197,0,0.08); }
+        .status-badge.active { background: var(--wizz-primary-light); color:#1C1B1F; }
+        .status-badge.inactive { background:#f8d7da; color:#721c24; }
+        .currency-value { color: var(--wizz-primary-dark); }
+        .action-btn.view { background: var(--wizz-primary); color:#1C1B1F; }
+        .action-btn.edit { background: var(--wizz-secondary); color:#fff; }
+        .action-btn.toggle { background: var(--wizz-primary-light); color:#1C1B1F; }
+        .action-btn.delete { background: var(--wizz-accent-red); color:#fff; }
+        .action-btn:hover { filter: brightness(1.05); }
+        .map-container, #map { border:2px solid var(--wizz-secondary); }
+        .leaflet-control-draw a { background: var(--wizz-primary) !important; color:#1C1B1F !important; }
+        .leaflet-bar a:hover { background: var(--wizz-primary-light) !important; }
+        .button-primary, .primary-btn { background: var(--wizz-primary); color:#1C1B1F; border:none; }
+        .button-primary:hover, .primary-btn:hover { background: var(--wizz-primary-light); }
+        .button-secondary { background:#fff; color: var (--wizz-secondary); border:2px solid var(--wizz-secondary); }
+        .button-secondary:hover { background: var(--wizz-secondary); color:#fff; }
+        /* Remove any gradient classes if present */
+        .header-gradient, .gradient-bg { background:#fff !important; }
     </style>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -1060,7 +1101,7 @@
                     <div class="regions-header">
                         <h3>Service Regions</h3>
                         <div class="regions-header-actions">
-                            <button class="btn-add-region" onclick="openAddRegionModal()">
+                            <button class="btn-add-region" onclick="openAddRegionModal()" data-write-only>
                                 <i class="fas fa-plus"></i>
                                 Add Region
                             </button>
@@ -1276,7 +1317,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeRegionModal()">Cancel</button>
-                <button class="btn-primary" onclick="saveRegion()">
+                <button class="btn-primary" onclick="saveRegion()" data-write-only>
                     <span id="saveButtonText">Save Region</span>
                     <span id="saveButtonSpinner" class="loading-spinner" style="display: none; margin-left: 0.5rem;"></span>
                 </button>
@@ -1407,6 +1448,18 @@
             el.textContent = message;
             el.style.display = 'block';
         }
+
+    (async function () {
+        try {
+            await RBAC.ensure();
+            // Enforce RBAC - New system auto-detects page name
+            window.RBAC.enforcePage();
+            if (!RBAC.can('regions', 'write')) {
+                RBAC.applyReadOnly('body', 'regions');
+                document.querySelectorAll('[data-write-only]').forEach(el => el.style.display = 'none');
+            }
+        } catch (e) { console.warn('RBAC init failed', e); }
+    })();
     </script>
 </body>
 </html>

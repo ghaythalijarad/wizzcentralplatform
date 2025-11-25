@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Function Exposure</title>
+</head>
+<body>
+    <h1>Testing window.sendMerchantInfoNotification</h1>
+    <button onclick="testFunction()">Test Function</button>
+    
+    <script>
+        function testFunction() {
+            console.log('Testing...');
+            if (typeof window.sendMerchantInfoNotification === 'function') {
+                alert('✅ Function IS exposed to window!');
+            } else {
+                alert('❌ Function NOT exposed to window!');
+            }
+        }
+        
+        // Simulate the actual function
+        async function sendMerchantInfoNotification(event) {
+            console.log('Function called!');
+            alert('Function works!');
+            return false;
+        }
+        
+        window.sendMerchantInfoNotification = sendMerchantInfoNotification;
+        console.log('Function exposed:', typeof window.sendMerchantInfoNotification);
+    </script>
+</body>
+</html>

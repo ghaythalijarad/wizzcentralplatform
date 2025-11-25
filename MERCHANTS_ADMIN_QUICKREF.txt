@@ -1,0 +1,145 @@
+╔══════════════════════════════════════════════════════════════════╗
+║            MERCHANTS ADMIN ACCESS - QUICK REFERENCE              ║
+╚══════════════════════════════════════════════════════════════════╝
+
+👤 USER: ali@whizz.com
+🏷️  GROUP: merchants_admin
+✅ STATUS: RESTRICTED TO MERCHANTS ONLY
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📊 ACCESS SUMMARY                                                │
+└──────────────────────────────────────────────────────────────────┘
+
+✅ CAN ACCESS (3 pages):
+   🏠 Dashboard
+   🏪 Merchants
+   🏪 Support - Merchants
+
+❌ CANNOT ACCESS (REMOVED):
+   📦 Orders              ← REMOVED
+   🎁 Promotions          ← REMOVED
+   🗺️  Regions             ← REMOVED
+   💰 Financial Management
+   👥 Customers
+   🚗 Drivers
+   💬 Support
+
+┌──────────────────────────────────────────────────────────────────┐
+│ ⚠️  WHAT CHANGED                                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+BEFORE: merchants_admin had access to 7+ pages
+        (merchants, orders, promotions, regions, etc.)
+
+NOW:    merchants_admin has access to 3 pages ONLY
+        (dashboard, merchants, support-merchants)
+
+REASON: Merchants admins should ONLY manage merchants,
+        not orders, promotions, or regions
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🧪 HOW TO TEST                                                   │
+└──────────────────────────────────────────────────────────────────┘
+
+1. REFRESH your browser (Ctrl+R or Cmd+R)
+2. LOGIN as ali@whizz.com
+3. CHECK navigation menu:
+   - ✅ Dashboard should be visible
+   - ✅ Merchants should be visible
+   - ❌ Orders should be HIDDEN
+   - ❌ Promotions should be HIDDEN
+   - ❌ Regions should be HIDDEN
+
+4. TRY accessing restricted pages:
+   - Navigate to /pages/orders.html
+   - EXPECTED: Redirect to unauthorized page
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🔧 CONFIGURATION                                                 │
+└──────────────────────────────────────────────────────────────────┘
+
+File: /frontend/assets/js/rbac.js
+Lines: 26-30
+
+merchants_admin: {
+    name: 'Merchants Admin',
+    precedence: 30,
+    allowedPages: [
+        'dashboard.html',
+        'merchants.html',
+        'support-merchants.html'
+    ],
+    permissions: [
+        'manage_merchants',
+        'approve_merchants',
+        'view_merchants'
+    ]
+}
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 📋 COMPLETE ACCESS MATRIX                                        │
+└──────────────────────────────────────────────────────────────────┘
+
+User Group          | Merchants | Orders | Promotions | Regions
+--------------------|-----------|--------|------------|----------
+admins              | ✅ Full   | ✅ Full| ✅ Full    | ✅ Full
+financial_admin     | ✅ Read   | ✅ Read| ❌         | ❌
+support_admin       | ✅ Full   | ✅ Full| ❌         | ❌
+merchants_admin     | ✅ Full   | ❌     | ❌         | ❌      ← UPDATED
+drivers_admin       | ❌        | ❌     | ❌         | ❌
+customers_admin     | ❌        | ✅ Full| ❌         | ❌
+campaigns_admin     | ✅ Read   | ❌     | ✅ Full    | ❌
+reporting_view      | ✅ Read   | ✅ Read| ❌         | ❌
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🎯 BUSINESS LOGIC                                                │
+└──────────────────────────────────────────────────────────────────┘
+
+Merchants Admin Role:
+  ✅ Approve new merchant applications
+  ✅ Manage merchant accounts
+  ✅ View merchant details and status
+  ✅ Handle merchant-specific support issues
+  ❌ Should NOT manage orders (that's support/customers role)
+  ❌ Should NOT manage promotions (that's campaigns role)
+  ❌ Should NOT manage regions (that's admin role)
+
+This follows "Principle of Least Privilege"
+
+┌──────────────────────────────────────────────────────────────────┐
+│ 🔍 CONSOLE VERIFICATION                                          │
+└──────────────────────────────────────────────────────────────────┘
+
+Open browser console (F12) and run:
+
+> window.RBAC.getUserGroups()
+  Expected: ['merchants_admin']
+
+> window.RBAC.hasPageAccess('merchants.html')
+  Expected: true  ✅
+
+> window.RBAC.hasPageAccess('orders.html')
+  Expected: false ❌
+
+> window.RBAC.hasPageAccess('promotions.html')
+  Expected: false ❌
+
+> window.RBAC.hasPageAccess('regions.html')
+  Expected: false ❌
+
+┌──────────────────────────────────────────────────────────────────┐
+│ ✅ CHECKLIST                                                     │
+└──────────────────────────────────────────────────────────────────┘
+
+✅ Removed orders.html from allowedPages
+✅ Removed promotions.html from allowedPages
+✅ Removed regions.html from allowedPages
+✅ Removed regions-management.html from allowedPages
+✅ Updated permissions to merchants-only
+✅ Synchronized both RBAC files
+✅ No server restart needed (client-side JS)
+✅ Ready for testing with ali@whizz.com
+
+╔══════════════════════════════════════════════════════════════════╗
+║  🎯 MERCHANTS ONLY - REFRESH BROWSER TO APPLY                    ║
+╚══════════════════════════════════════════════════════════════════╝

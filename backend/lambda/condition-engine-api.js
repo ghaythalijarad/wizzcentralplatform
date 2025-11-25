@@ -4,10 +4,14 @@
  * Author: WizzCentral Dev Team
  */
 
-const AWS = require('aws-sdk');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, UpdateCommand, DeleteCommand } = require('@aws-sdk/lib-dynamodb');
 
-// Initialize AWS services
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
+// Initialize AWS SDK v3 services
+const ddbClient = new DynamoDBClient({
+    region: process.env.AWS_REGION || 'us-east-1'
+});
+const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
 // Table names
 const CONDITIONS_TABLE = 'WizzCentral_Campaign_Conditions';

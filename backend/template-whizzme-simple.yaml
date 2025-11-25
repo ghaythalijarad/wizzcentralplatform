@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  WhizzMe AI Agent - Simplified Deployment
+  Uses AWS Bedrock Runtime (Amazon Nova) for AI-powered support
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Deployment stage
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+
+Globals:
+  Function:
+    Runtime: nodejs18.x
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        BEDROCK_AGENT_ID: KDSBVGPAVK
+        BEDROCK_AGENT_ALIAS_ID: TSTALIASID
+        MODEL_ID: amazon.nova-micro-v1:0
+
+Resources:
+  # Lambda Function for WhizzMe Chat
+  WhizzMeChatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'whizzme-chat-${Stage}'
+      Description: !Sub 'WhizzMe Chat Handler - ${Stage}'
+      CodeUri: lambda-package/
+      Handler: src/handlers/agent-suggestion-handler.handler
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - Statement:
+            - Sid: BedrockAccess
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock-runtime:InvokeModel
+                - bedrock-runtime:InvokeModelWithResponseStream
+                - bedrock-agent-runtime:InvokeAgent
+              Resource: '*'
+      Events:
+        ChatApi:
+          Type: Api
+          Properties:
+            Path: /whizzme/chat
+            Method: POST
+            RestApiId: !Ref WhizzMeApi
+        HealthCheck:
+          Type: Api
+          Properties:
+            Path: /whizzme/health
+            Method: GET
+            RestApiId: !Ref WhizzMeApi
+
+  # API Gateway
+  WhizzMeApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub 'whizzme-api-${Stage}'
+      StageName: !Ref Stage
+      Description: !Sub 'WhizzMe Chat API - ${Stage}'
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Api-Key'"
+        AllowOrigin: "'*'"
+        MaxAge: "'600'"
+
+Outputs:
+  ApiEndpoint:
+    Description: WhizzMe API Gateway endpoint URL
+    Value: !Sub 'https://${WhizzMeApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiEndpoint'
+  
+  ChatEndpoint:
+    Description: WhizzMe Chat endpoint
+    Value: !Sub 'https://${WhizzMeApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/whizzme/chat'
+    Export:
+      Name: !Sub '${AWS::StackName}-ChatEndpoint'
+  
+  FunctionArn:
+    Description: WhizzMe Lambda Function ARN
+    Value: !GetAtt WhizzMeChatFunction.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FunctionArn'
