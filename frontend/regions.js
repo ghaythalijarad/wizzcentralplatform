@@ -638,7 +638,11 @@ class RegionsManager {
                 params.set('offset', '0');
             }
 
-            const url = `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
+            // Lambda Function URL responds on root, not /regions path
+            const isLambdaFunctionUrl = this._apiBase.includes('lambda-url');
+            const url = isLambdaFunctionUrl 
+                ? `${this._apiBase}${params.toString() ? `?${params.toString()}` : ''}`
+                : `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
             console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode, token: this.tokenStack[this.serverPageIndex] || null });
             const t0 = performance.now();
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
