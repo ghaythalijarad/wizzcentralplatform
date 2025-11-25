@@ -312,7 +312,11 @@ async function getRegion(regionId) {
 
 // Create region
 async function createRegion(data) {
-    const { regionId, name, name_ar, level, parent_id, boundary, service_config, delivery_config } = data;
+    // ✅ Accept both 'geometry' (new) and 'boundary' (legacy) from frontend
+    const { regionId, name, name_ar, level, parent_id, geometry, boundary, service_config, delivery_config } = data;
+    
+    // Use geometry if provided, otherwise fallback to boundary (for backward compatibility)
+    const geomData = geometry || boundary;
     
     // Validate required fields
     if (!regionId || !name) {
@@ -323,8 +327,8 @@ async function createRegion(data) {
         return response(400, { error: 'MISSING_LEVEL', message: 'level is required' });
     }
     
-    // Validate boundary
-    const validation = validatePolygonBoundary(boundary);
+    // Validate geometry
+    const validation = validatePolygonBoundary(geomData);
     if (!validation.valid) {
         return response(400, { error: validation.error, message: validation.message });
     }
@@ -349,7 +353,7 @@ async function createRegion(data) {
         level,
         level_n: level,
         parent_id: parent_id || null,
-        boundary,
+        geometry: geomData,  // ✅ Save geometry directly from frontend
         is_active: true,
         is_active_s: 'true',
         name_lower: nameLower,
@@ -383,9 +387,12 @@ async function updateRegion(regionId, data) {
         return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
     }
     
-    // If boundary is being updated, validate it
-    if (data.boundary) {
-        const validation = validatePolygonBoundary(data.boundary);
+    // ✅ Accept both 'geometry' (new) and 'boundary' (legacy)
+    const geomData = data.geometry || data.boundary;
+    
+    // If geometry is being updated, validate it
+    if (geomData) {
+        const validation = validatePolygonBoundary(geomData);
         if (!validation.valid) {
             return response(400, { error: validation.error, message: validation.message });
         }
@@ -397,13 +404,21 @@ async function updateRegion(regionId, data) {
     const exprNames = {};
     const exprValues = {};
     
-    const updatableFields = ['name', 'name_ar', 'level', 'parent_id', 'boundary', 'is_active', 'service_config', 'delivery_config'];
+    // ✅ Updated to accept 'geometry' directly, with 'boundary' as fallback
+    const updatableFields = ['name', 'name_ar', 'level', 'parent_id', 'geometry', 'boundary', 'is_active', 'service_config', 'delivery_config'];
     
     for (const field of updatableFields) {
         if (data[field] !== undefined) {
-            updateExpr.push(`#${field} = :${field}`);
-            exprNames[`#${field}`] = field;
-            exprValues[`:${field}`] = data[field];
+            // If both geometry and boundary exist, prefer geometry
+            if (field === 'boundary' && data.geometry) {
+                continue; // Skip boundary if geometry is provided
+            }
+            
+            // Map 'boundary' to 'geometry' for backward compatibility
+            const targetField = field === 'boundary' ? 'geometry' : field;
+            updateExpr.push(`#${targetField} = :${targetField}`);
+            exprNames[`#${targetField}`] = targetField;
+            exprValues[`:${targetField}`] = data[field];
         }
     }
     

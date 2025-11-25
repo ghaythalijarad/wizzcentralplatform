@@ -817,9 +817,10 @@ class RegionsManager {
                 m.addTo(this._shapesLayer);
                 this.markers.push(m);
             } catch {}
-            // Boundary shape
-            if (r.boundary && r.boundary.coordinates) {
-                const layer = this._boundaryToLeafletLayer(r.boundary);
+            // Boundary shape - Read from geometry first (new), fallback to boundary (old)
+            const geom = r.geometry || r.boundary;
+            if (geom && geom.coordinates) {
+                const layer = this._boundaryToLeafletLayer(geom);
                 if (layer) {
                     layer.addTo(this._shapesLayer);
                 }
@@ -1102,7 +1103,8 @@ class RegionsManager {
             
             // Keep selectedRegion and boundary for editing
             this.selectedRegion = regionData;
-            this._drawnBoundary = regionData.boundary || null;
+            // ✅ Read from geometry first (new), fallback to boundary (old)
+            this._drawnBoundary = regionData.geometry || regionData.boundary || null;
 
             // Prefill coords when NO polygon boundary exists
             if (!this._drawnBoundary) {
@@ -1147,6 +1149,17 @@ class RegionsManager {
         const level = parseInt(levelEl.value || '3', 10);
         const neededParentLevel = level - 1;
         
+        // ✅ Hide parent dropdown for Level 0 (Country)
+        const parentContainer = parentEl.closest('.form-group') || parentEl.parentElement;
+        if (level === 0) {
+            if (parentContainer) parentContainer.style.display = 'none';
+            parentEl.value = ''; // Clear selection
+            console.log('🔒 Parent region hidden for Level 0 (Country)');
+            return;
+        } else {
+            if (parentContainer) parentContainer.style.display = '';
+        }
+        
         // Use allRegionsForDropdown (complete list) instead of this.regions (paginated table)
         const sourceList = this.allRegionsForDropdown.length > 0 ? this.allRegionsForDropdown : this.regions;
         
@@ -1157,7 +1170,7 @@ class RegionsManager {
             usingFullList: sourceList === this.allRegionsForDropdown
         });
         
-        let options = '<option value="">None</option>';
+        let options = '<option value="">-- Select Parent Region --</option>';
         if (neededParentLevel >= 0) {
             const parents = sourceList.filter(r => r.level === neededParentLevel);
             console.log('📋 Found parent options:', { 
@@ -1221,7 +1234,9 @@ class RegionsManager {
             // Editing vs creating
             const isEdit = !!(this.selectedRegion && this.selectedRegion.regionId);
 
-            // Validate parent level relationship using full list (not paginated table)
+            // ✅ Validate parent level relationship
+            // Level 0 (Country) doesn't need parent
+            // Level 1+ requires parent from previous level
             if (selectedLevel > 0 && !parentRegionId) {
                 this.showError('Please select a parent region for this level');
                 return;
@@ -1229,8 +1244,12 @@ class RegionsManager {
             if (parentRegionId) {
                 const sourceList = this.allRegionsForDropdown.length > 0 ? this.allRegionsForDropdown : this.regions;
                 const parent = sourceList.find(r => r.regionId === parentRegionId);
-                if (!parent || Number(parent.level) !== selectedLevel - 1) {
-                    this.showError('Invalid parent region for selected level');
+                if (!parent) {
+                    this.showError('Parent region not found');
+                    return;
+                }
+                if (Number(parent.level) !== selectedLevel - 1) {
+                    this.showError(`Invalid parent level. Parent must be level ${selectedLevel - 1}`);
                     return;
                 }
             }
@@ -1279,7 +1298,8 @@ class RegionsManager {
                     this.showError('Polygon must be closed (first point equals last)');
                     return;
                 }
-                payload.boundary = { type: 'Polygon', coordinates: [ring] };
+                // ✅ Send geometry directly (not boundary)
+                payload.geometry = { type: 'Polygon', coordinates: [ring] };
                 // Remove legacy center/radius when polygon is present
                 delete payload.coordinates;
             } else if (!isEdit) {
@@ -1514,8 +1534,10 @@ class RegionsManager {
         const parent = region.parent_id ? (this.regions.find(x => x.regionId === region.parent_id) || null) : null;
         const children = this.regions.filter(x => x.parent_id === region.regionId);
         const coords = region.coordinates?.center || { lat: 33.3152, lng: 44.3661 };
-        const boundaryType = region.boundary?.type || '—';
-        const boundaryPoints = region.boundary?.coordinates ? (region.boundary.type === 'Polygon' ? (region.boundary.coordinates[0]?.length || 0) : region.boundary.coordinates.length) : 0;
+        // ✅ Read from geometry first (new), fallback to boundary (old)
+        const geom = region.geometry || region.boundary;
+        const boundaryType = geom?.type || '—';
+        const boundaryPoints = geom?.coordinates ? (geom.type === 'Polygon' ? (geom.coordinates[0]?.length || 0) : geom.coordinates.length) : 0;
         const lvl = Number(region.level);
         const levelLabel = ({0:'Country',1:'Governorate',2:'District',3:'Neighborhood'})[lvl] || String(lvl);
         const statusCls = region.isActive ? 'active' : 'inactive';
