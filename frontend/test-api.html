@@ -92,6 +92,7 @@
         <div style="margin-bottom: 20px;">
             <button onclick="testApi()">🧪 Test API</button>
             <button onclick="testWithAuth()">🔐 Test with Auth</button>
+            <button onclick="runDiagnostics()">🔎 Deep Diagnostics</button>
             <button onclick="clearLogs()">🗑️ Clear Logs</button>
         </div>
 
@@ -117,22 +118,37 @@
 
     <script src="config.js"></script>
     <script>
-        const LAMBDA_URL = 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws';
+        // URL override via query param (?url=...)
+        function getParam(name) {
+            try { return new URLSearchParams(window.location.search).get(name); } catch { return null; }
+        }
+        const paramUrl = getParam('url');
+        const cfgUrl = (window.WIZZCENTRAL_CONFIG && window.WIZZCENTRAL_CONFIG.API_BASE_URL);
+        // Prefer query param > config > hardcoded
+        const LAMBDA_URL = paramUrl || cfgUrl || 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws';
+
+        // Global error hooks
+        window.addEventListener('error', (e) => {
+            try { log(`🌋 Window error: ${e.message} at ${e.filename}:${e.lineno}:${e.colno}`,'error'); } catch {}
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            try { log(`🤯 Unhandled rejection: ${e.reason && e.reason.message ? e.reason.message : e.reason}`,'error'); } catch {}
+        });
 
         function log(message, level = 'info') {
             const logsDiv = document.getElementById('logs');
             const timestamp = new Date().toLocaleTimeString();
             const entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.innerHTML = '<span class="timestamp">' + timestamp + '</span><span style="color: ' + (level === 'error' ? '#d9534f' : level === 'success' ? '#5cb85c' : '#333') + '">' + message + '</span>';
+            entry.innerHTML = `<span class="timestamp">${timestamp}</span><span style="color: ${level === 'error' ? '#d9534f' : level === 'success' ? '#5cb85c' : '#333'}">${message}</span>`;
             logsDiv.appendChild(entry);
             logsDiv.scrollTop = logsDiv.scrollHeight;
-            console.log('[' + timestamp + '] ' + message);
+            console.log(`[${timestamp}] ${message}`);
         }
 
         function setStatus(message, type) {
             const statusDiv = document.getElementById('status');
-            statusDiv.className = 'status ' + type;
+            statusDiv.className = `status ${type}`;
             statusDiv.textContent = message;
         }
 
@@ -145,11 +161,12 @@
         async function testApi() {
             try {
                 log('🚀 Starting API test...', 'info');
-                log('📍 Lambda URL: ' + LAMBDA_URL, 'info');
-                log('🌍 Current hostname: ' + window.location.hostname, 'info');
+                log(`📍 Lambda URL: ${LAMBDA_URL}`, 'info');
+                log(`🌍 Current hostname: ${window.location.hostname}`, 'info');
                 
+                // Check if config is loaded
                 if (window.WIZZCENTRAL_CONFIG) {
-                    log('✅ Config loaded: API_BASE_URL = ' + window.WIZZCENTRAL_CONFIG.API_BASE_URL, 'success');
+                    log(`✅ Config loaded: API_BASE_URL = ${window.WIZZCENTRAL_CONFIG.API_BASE_URL}`, 'success');
                 } else {
                     log('⚠️ window.WIZZCENTRAL_CONFIG not found', 'error');
                 }
@@ -157,7 +174,7 @@
                 setStatus('🔄 Fetching regions from Lambda...', 'info');
                 
                 const startTime = Date.now();
-                log('⏱️ Sending request at ' + new Date().toISOString(), 'info');
+                log(`⏱️ Sending request at ${new Date().toISOString()}`, 'info');
                 
                 const response = await fetch(LAMBDA_URL, {
                     method: 'GET',
@@ -168,39 +185,40 @@
                 });
 
                 const elapsed = Date.now() - startTime;
-                log('⏱️ Response received in ' + elapsed + 'ms', 'info');
-                log('📊 Status: ' + response.status + ' ' + response.statusText, response.ok ? 'success' : 'error');
-                log('📋 Content-Type: ' + response.headers.get('content-type'), 'info');
+                log(`⏱️ Response received in ${elapsed}ms`, 'info');
+                log(`📊 Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                log(`📋 Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`, 'info');
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    log('❌ Error response body: ' + errorText.slice(0, 500), 'error');
-                    setStatus('❌ API Error: ' + response.status + ' ' + response.statusText, 'error');
-                    document.getElementById('responseData').textContent = 'Error ' + response.status + ':\n' + errorText;
+                    log(`❌ Error response body: ${errorText.slice(0, 500)}`, 'error');
+                    setStatus(`❌ API Error: ${response.status} ${response.statusText}`, 'error');
+                    document.getElementById('responseData').textContent = `Error ${response.status}:\n${errorText}`;
                     return;
                 }
 
                 const data = await response.json();
-                log('✅ Successfully parsed JSON response', 'success');
+                log(`✅ Successfully parsed JSON response`, 'success');
                 
+                // Extract regions array
                 const regions = data?.data || data?.regions || data?.items || (Array.isArray(data) ? data : []);
                 const regionCount = Array.isArray(regions) ? regions.length : 0;
                 
-                log('📦 Regions found: ' + regionCount, 'success');
+                log(`📦 Regions found: ${regionCount}`, 'success');
                 
                 if (regionCount > 0) {
-                    log('�� First region: ' + (regions[0]?.name || regions[0]?.name_en || 'N/A'), 'info');
-                    log('🔑 First region keys: ' + Object.keys(regions[0] || {}).join(', '), 'info');
+                    log(`📝 First region: ${regions[0]?.name || regions[0]?.name_en || 'N/A'}`, 'info');
+                    log(`🔑 First region keys: ${Object.keys(regions[0] || {}).join(', ')}`, 'info');
                 }
 
-                setStatus('✅ Success! Found ' + regionCount + ' regions', 'success');
+                setStatus(`✅ Success! Found ${regionCount} regions`, 'success');
                 document.getElementById('responseData').textContent = JSON.stringify(data, null, 2);
 
             } catch (error) {
-                log('💥 Exception caught: ' + error.message, 'error');
-                log('Stack: ' + error.stack, 'error');
-                setStatus('❌ Error: ' + error.message, 'error');
-                document.getElementById('responseData').textContent = 'Exception:\n' + error.message + '\n\n' + error.stack;
+                log(`💥 Exception caught: ${error.message}`, 'error');
+                log(`Stack: ${error.stack}`, 'error');
+                setStatus(`❌ Error: ${error.message}`, 'error');
+                document.getElementById('responseData').textContent = `Exception:\n${error.message}\n\n${error.stack}`;
             }
         }
 
@@ -214,8 +232,8 @@
                 }
 
                 log('🚀 Starting authenticated API test...', 'info');
-                log('📍 Lambda URL: ' + LAMBDA_URL, 'info');
-                log('🔐 Using Authorization header', 'info');
+                log(`📍 Lambda URL: ${LAMBDA_URL}`, 'info');
+                log(`🔐 Using Authorization header`, 'info');
 
                 setStatus('🔄 Fetching regions with authentication...', 'info');
                 
@@ -225,18 +243,18 @@
                     cache: 'no-store',
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': 'Bearer ' + idToken.slice(0, 20) + '...'
+                        'Authorization': `Bearer ${idToken.slice(0, 20)}...`
                     }
                 });
 
                 const elapsed = Date.now() - startTime;
-                log('⏱️ Response received in ' + elapsed + 'ms', 'info');
-                log('📊 Status: ' + response.status + ' ' + response.statusText, response.ok ? 'success' : 'error');
+                log(`⏱️ Response received in ${elapsed}ms`, 'info');
+                log(`📊 Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
 
                 if (!response.ok) {
                     const errorText = await response.text();
-                    log('❌ Error response: ' + errorText.slice(0, 500), 'error');
-                    setStatus('❌ API Error: ' + response.status + ' ' + response.statusText, 'error');
+                    log(`❌ Error response: ${errorText.slice(0, 500)}`, 'error');
+                    setStatus(`❌ API Error: ${response.status} ${response.statusText}`, 'error');
                     document.getElementById('responseData').textContent = errorText;
                     return;
                 }
@@ -245,19 +263,148 @@
                 const regions = data?.data || data?.regions || data?.items || (Array.isArray(data) ? data : []);
                 const regionCount = Array.isArray(regions) ? regions.length : 0;
                 
-                log('✅ Successfully authenticated request', 'success');
-                log('📦 Regions found: ' + regionCount, 'success');
+                log(`✅ Successfully authenticated request`, 'success');
+                log(`📦 Regions found: ${regionCount}`, 'success');
                 
-                setStatus('✅ Success! Found ' + regionCount + ' regions (authenticated)', 'success');
+                setStatus(`✅ Success! Found ${regionCount} regions (authenticated)`, 'success');
                 document.getElementById('responseData').textContent = JSON.stringify(data, null, 2);
 
             } catch (error) {
-                log('💥 Exception: ' + error.message, 'error');
-                setStatus('❌ Error: ' + error.message, 'error');
+                log(`💥 Exception: ${error.message}`, 'error');
+                setStatus(`❌ Error: ${error.message}`, 'error');
                 document.getElementById('responseData').textContent = error.stack;
             }
         }
 
+        // New: deep diagnostics to understand browser/network behavior
+        async function runDiagnostics() {
+            setStatus('🔎 Running deep diagnostics...', 'info');
+            try {
+                const ua = navigator.userAgent;
+                const language = navigator.language;
+                const platform = navigator.platform;
+                const online = navigator.onLine;
+                const isSecure = window.isSecureContext;
+                const lambdaOrigin = (() => { try { return new URL(LAMBDA_URL).origin; } catch { return 'n/a'; } })();
+                log(`🌐 UA: ${ua}`);
+                log(`🖥️ Platform: ${platform}, Lang: ${language}`);
+                log(`🔒 Secure Context: ${isSecure}, Online: ${online}`);
+                log(`📍 Page Origin: ${window.location.origin}`);
+                log(`🎯 Lambda Origin: ${lambdaOrigin}`);
+                if (navigator.connection) {
+                    log(`📶 Network: ${navigator.connection.effectiveType || 'n/a'}, saveData=${navigator.connection.saveData || false}`);
+                }
+                try {
+                    const sw = navigator.serviceWorker;
+                    if (sw) {
+                        const reg = await sw.getRegistration();
+                        log(`🧰 ServiceWorker controller: ${!!sw.controller}, registration: ${!!reg}`);
+                    }
+                } catch {}
+                try {
+                    if (navigator.storage && navigator.storage.estimate) {
+                        const est = await navigator.storage.estimate();
+                        log(`💾 Storage usage: ${(est.usage||0)} of ${(est.quota||0)} bytes`);
+                    }
+                } catch {}
+                const cspMeta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+                if (cspMeta) log(`🛡️ CSP meta present: ${cspMeta.content}`);
+                log(`🔗 Open Lambda directly (new tab): <a href="${LAMBDA_URL}" target="_blank" rel="noopener">${LAMBDA_URL}</a>`);
+
+                const attempts = [];
+                const addAttempt = (name, fn) => attempts.push({ name, fn });
+
+                const headersJSON = (h) => { try { return JSON.stringify(Object.fromEntries(h.entries())); } catch { return '{}'; } };
+
+                addAttempt('GET (default settings)', async () => {
+                    const res = await fetch(LAMBDA_URL, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('GET (trailing slash)', async () => {
+                    const url = LAMBDA_URL.endsWith('/') ? LAMBDA_URL : `${LAMBDA_URL}/`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('GET (cache-buster)', async () => {
+                    const sep = LAMBDA_URL.includes('?') ? '&' : '?';
+                    const res = await fetch(`${LAMBDA_URL}${sep}_ts=${Date.now()}`, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('GET (explicit CORS + no-referrer)', async () => {
+                    const res = await fetch(LAMBDA_URL, { mode: 'cors', referrerPolicy: 'no-referrer', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('GET (force preflight: Content-Type: application/json)', async () => {
+                    const res = await fetch(LAMBDA_URL, { method: 'GET', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' }, cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('HEAD (CORS)', async () => {
+                    const res = await fetch(LAMBDA_URL, { method: 'HEAD', mode: 'cors', cache: 'no-store' });
+                    return res;
+                });
+                addAttempt('GET (no-cors; expect opaque)', async () => {
+                    const res = await fetch(LAMBDA_URL, { mode: 'no-cors', cache: 'no-store' });
+                    return res; // opaque response, status 0
+                });
+                addAttempt('XMLHttpRequest (fallback)', async () => {
+                    return new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.open('GET', LAMBDA_URL, true);
+                        xhr.timeout = 10000;
+                        xhr.responseType = 'text';
+                        xhr.onreadystatechange = function() {
+                            if (xhr.readyState === 4) {
+                                resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, statusText: xhr.statusText, headers: new Headers(), text: () => Promise.resolve(xhr.responseText) });
+                            }
+                        };
+                        xhr.onerror = function() { reject(new TypeError('XHR network error')); };
+                        xhr.ontimeout = function() { reject(new TypeError('XHR timeout')); };
+                        try { xhr.send(); } catch (e) { reject(e); }
+                    });
+                });
+
+                for (const attempt of attempts) {
+                    const label = attempt.name;
+                    const started = Date.now();
+                    try {
+                        log(`➡️ Attempt: ${label}`);
+                        const res = await attempt.fn();
+                        const ms = Date.now() - started;
+                        const status = typeof res.status === 'number' ? res.status : 0;
+                        const ok = !!res.ok;
+                        log(`⬅️ Result: ${label}: status=${status}, ok=${ok}, time=${ms}ms` , ok ? 'success' : (status ? 'info' : 'error'));
+                        if (res.headers && res.headers.entries) {
+                            log(`   ↳ Headers: ${headersJSON(res.headers)}`);
+                            const acao = res.headers.get && res.headers.get('access-control-allow-origin');
+                            if (acao) log(`   ↳ ACAO: ${acao}`);
+                        } else {
+                            log('   ↳ No headers available (possibly opaque or XHR shim)');
+                        }
+                        if (ok && res.json) {
+                            try {
+                                const json = await res.clone().json();
+                                const regions = json?.data || json?.regions || json?.items || (Array.isArray(json) ? json : []);
+                                log(`   ↳ Parsed JSON ok. Items: ${Array.isArray(regions) ? regions.length : 'n/a'}`);
+                            } catch {
+                                // ignore parse errors for HEAD/no-cors
+                            }
+                        } else if (status && res.text) {
+                            const text = await res.text();
+                            log(`   ↳ Body (first 200 chars): ${String(text).slice(0,200)}`);
+                        }
+                    } catch (e) {
+                        log(`❌ ${label} failed: ${e && e.message ? e.message : e}`, 'error');
+                    }
+                }
+
+                setStatus('✅ Diagnostics completed. Review logs above.', 'success');
+            } catch (err) {
+                log(`💥 Diagnostics error: ${err.message}`, 'error');
+                setStatus(`❌ Diagnostics error: ${err.message}`, 'error');
+            }
+        }
+
+        // Auto-run tip logs
         log('🎯 Page loaded, ready for testing', 'info');
         log('💡 Tip: Open browser DevTools (F12) to see network requests', 'info');
     </script>
