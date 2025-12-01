@@ -28,7 +28,7 @@ class RegionsManager {
         this.serverPageIndex = 0; // current index in tokenStack
         this.lastNextToken = null; // nextToken returned by last fetch
         this.lastPageCount = 0; // last page item count
-        this._apiBase = this._detectApiBase();
+        this._apiBase = null; // Lazy evaluation - detect on first use
         // Enforce polygons-only when using the draw feature
         this.polygonsOnly = true;
 
@@ -124,16 +124,37 @@ class RegionsManager {
     showError(message) { this.showNotification(message, 'error'); }
     showSuccess(message) { this.showNotification(message, 'success'); }
 
+    // Lazy getter for API base - detects on first use to ensure config.js is loaded
+    get apiBase() {
+        if (!this._apiBaseValue) {
+            this._apiBaseValue = this._detectApiBase();
+            console.log('🔧 API Base detected:', this._apiBaseValue);
+            console.log('🔧 Config object:', window.WIZZCENTRAL_CONFIG);
+        }
+        return this._apiBaseValue;
+    }
+
     _detectApiBase() {
         try {
             const host = (window.location && window.location.hostname) || '';
+            console.log('🔍 Detecting API base for host:', host);
             // Local dev uses Express routes under /api
-            if (host === 'localhost' || host === '127.0.0.1') return '/api';
+            if (host === 'localhost' || host === '127.0.0.1') {
+                console.log('✅ Local development detected, using /api');
+                return '/api';
+            }
             // Production: use API Gateway base from config.js (already includes stage)
             const cfg = window.WIZZCENTRAL_CONFIG || {};
             const base = (cfg.API_BASE_URL || '').replace(/\/$/, '');
-            return base || '/api';
-        } catch { return '/api'; }
+            console.log('🔍 Config API_BASE_URL:', cfg.API_BASE_URL);
+            console.log('🔍 Processed base:', base);
+            const result = base || '/api';
+            console.log('✅ Final API base:', result);
+            return result;
+        } catch (err) { 
+            console.error('❌ Error detecting API base:', err);
+            return '/api'; 
+        }
     }
 
     async init() {
@@ -566,7 +587,7 @@ class RegionsManager {
     async loadAllRegionsForDropdown() {
         try {
             console.log('📋 Loading all regions for dropdown...');
-            const url = `${this._apiBase}/regions?limit=1000`;
+            const url = `${this.apiBase}/regions?limit=1000`;
             
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
             
@@ -672,10 +693,10 @@ class RegionsManager {
             }
 
             // Lambda Function URL responds on root, not /regions path
-            const isLambdaFunctionUrl = this._apiBase.includes('lambda-url');
+            const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
             const url = isLambdaFunctionUrl 
-                ? `${this._apiBase}${params.toString() ? `?${params.toString()}` : ''}`
-                : `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
+                ? `${this.apiBase}${params.toString() ? `?${params.toString()}` : ''}`
+                : `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
             console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode, token: this.tokenStack[this.serverPageIndex] || null });
             const t0 = performance.now();
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
@@ -1436,7 +1457,7 @@ class RegionsManager {
 
     async saveRegionToBackend(region) {
         try {
-            const url = `${this._apiBase}/regions`;
+            const url = `${this.apiBase}/regions`;
             let response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1470,7 +1491,7 @@ class RegionsManager {
 
     async updateRegionInBackend(regionId, region) {
         try {
-            const url = `${this._apiBase}/regions/${encodeURIComponent(regionId)}`;
+            const url = `${this.apiBase}/regions/${encodeURIComponent(regionId)}`;
             let response = await fetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -1523,7 +1544,7 @@ class RegionsManager {
         this.regions[idx].isActive = !prev; // optimistic
         this.renderRegionsList();
         try {
-            let url = `${this._apiBase}/regions/${regionId}/toggle`;
+            let url = `${this.apiBase}/regions/${regionId}/toggle`;
             console.log('📤 Calling:', url);
             let resp = await fetch(url, { method: 'PATCH' });
             if (!resp.ok) {
@@ -1555,7 +1576,7 @@ class RegionsManager {
         const ok = window.confirm('Delete this region? This cannot be undone.');
         if (!ok) return;
         try {
-            let url = `${this._apiBase}/regions/${regionId}`;
+            let url = `${this.apiBase}/regions/${regionId}`;
             let resp = await fetch(url, { method: 'DELETE' });
             if (!resp.ok) {
                 await this.maybeHandleAwsAuthError(resp, `${url} [DELETE]`);
