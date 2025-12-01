@@ -12,16 +12,34 @@ const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
 const REGIONS_TABLE = process.env.REGIONS_TABLE || 'WizzCentral_Regions';
 
-// CORS headers - minimal for Lambda Function URL (CORS already configured at Function URL level)
-const CORS_HEADERS = {
-    'Content-Type': 'application/json'
-};
+// CORS helper: Return ONLY ONE origin (not multiple) to avoid browser rejection
+function getCorsHeaders(event) {
+    const origin = event?.headers?.origin || event?.headers?.Origin || '';
+    const allowedOrigins = [
+        'https://main.d2f5oacwil9cbi.amplifyapp.com',
+        'http://localhost:8080',
+        'http://127.0.0.1:8080',
+        'http://localhost:5500',
+        'http://127.0.0.1:5500'
+    ];
+    
+    // If origin is in allowed list, return it; otherwise return the first allowed origin
+    const allowOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    
+    return {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
+        'Access-Control-Max-Age': '86400'
+    };
+}
 
 // Response helper
-function response(statusCode, body) {
+function response(statusCode, body, event) {
     return {
         statusCode,
-        headers: CORS_HEADERS,
+        headers: getCorsHeaders(event),
         body: JSON.stringify(body)
     };
 }
@@ -110,27 +128,27 @@ exports.handler = async (event, context) => {
     try {
         // Handle OPTIONS preflight
         if (event.requestContext?.http?.method === 'OPTIONS' || event.httpMethod === 'OPTIONS') {
-            return response(200, { message: 'CORS OK' });
+            return response(200, { message: 'CORS OK' }, event);
         }
         
         const { httpMethod, pathSegments, queryParams, body } = parseRequest(event);
         
         // Route handling
         if (httpMethod === 'GET' && pathSegments.length === 0) {
-            return await listRegions(queryParams);
+            return await listRegions(queryParams, event);
         } else if (httpMethod === 'POST' && pathSegments.length === 0) {
-            return await createRegion(body);
+            return await createRegion(body, event);
         } else if (httpMethod === 'GET' && pathSegments.length === 1) {
-            return await getRegion(pathSegments[0]);
+            return await getRegion(pathSegments[0], event);
         } else if (httpMethod === 'PUT' && pathSegments.length === 1) {
-            return await updateRegion(pathSegments[0], body);
+            return await updateRegion(pathSegments[0], body, event);
         } else if (httpMethod === 'DELETE' && pathSegments.length === 1) {
-            return await deleteRegion(pathSegments[0]);
+            return await deleteRegion(pathSegments[0], event);
         } else if (httpMethod === 'PATCH' && pathSegments.length === 2 && pathSegments[1] === 'toggle') {
-            return await toggleRegion(pathSegments[0]);
+            return await toggleRegion(pathSegments[0], event);
         }
         
-        return response(404, { error: 'NOT_FOUND', message: 'Route not found' });
+        return response(404, { error: 'NOT_FOUND', message: 'Route not found' }, event);
         
     } catch (error) {
         console.error('Handler error:', error);
@@ -138,12 +156,12 @@ exports.handler = async (event, context) => {
             error: 'INTERNAL_ERROR', 
             message: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        }, event);
     }
 };
 
 // List regions with pagination and filtering
-async function listRegions(queryParams) {
+async function listRegions(queryParams, event) {
     const { pageMode, limit: limitStr, nextToken, contains, level, parent_id, is_active, search } = queryParams;
     const limit = parseInt(limitStr) || 10;
     
@@ -181,7 +199,7 @@ async function listRegions(queryParams) {
             try {
                 exclusiveStartKey = JSON.parse(Buffer.from(nextToken, 'base64').toString());
             } catch (e) {
-                return response(400, { error: 'INVALID_TOKEN', message: 'Invalid nextToken' });
+                return response(400, { error: 'INVALID_TOKEN', message: 'Invalid nextToken' }, event);
             }
         }
 
@@ -293,25 +311,25 @@ async function listRegions(queryParams) {
         responseData.nextToken = Buffer.from(JSON.stringify(lastKey)).toString('base64');
     }
     
-    return response(200, responseData);
+    return response(200, responseData, event);
 }
 
 // Get single region
-async function getRegion(regionId) {
+async function getRegion(regionId, event) {
     const result = await dynamoDB.send(new GetCommand({
         TableName: REGIONS_TABLE,
         Key: { regionId }
     }));
     
     if (!result.Item) {
-        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' }, event);
     }
     
-    return response(200, result.Item);
+    return response(200, result.Item, event);
 }
 
 // Create region
-async function createRegion(data) {
+async function createRegion(data, event) {
     // ✅ Accept both 'geometry' (new) and 'boundary' (legacy) from frontend
     const { regionId, name, name_ar, level, parent_id, geometry, boundary, service_config, delivery_config } = data;
     
@@ -320,17 +338,17 @@ async function createRegion(data) {
     
     // Validate required fields
     if (!regionId || !name) {
-        return response(400, { error: 'MISSING_FIELDS', message: 'regionId and name are required' });
+        return response(400, { error: 'MISSING_FIELDS', message: 'regionId and name are required' }, event);
     }
     
     if (level === undefined || level === null) {
-        return response(400, { error: 'MISSING_LEVEL', message: 'level is required' });
+        return response(400, { error: 'MISSING_LEVEL', message: 'level is required' }, event);
     }
     
     // Validate geometry
     const validation = validatePolygonBoundary(geomData);
     if (!validation.valid) {
-        return response(400, { error: validation.error, message: validation.message });
+        return response(400, { error: validation.error, message: validation.message }, event);
     }
     
     // Check for duplicate
@@ -340,7 +358,7 @@ async function createRegion(data) {
     }));
     
     if (existing.Item) {
-        return response(409, { error: 'ALREADY_EXISTS', message: 'Region with this ID already exists' });
+        return response(409, { error: 'ALREADY_EXISTS', message: 'Region with this ID already exists' }, event);
     }
     
     // Create item
@@ -372,11 +390,11 @@ async function createRegion(data) {
         Item: item
     }));
     
-    return response(201, item);
+    return response(201, item, event);
 }
 
 // Update region
-async function updateRegion(regionId, data) {
+async function updateRegion(regionId, data, event) {
     // Get existing region
     const existing = await dynamoDB.send(new GetCommand({
         TableName: REGIONS_TABLE,
@@ -384,7 +402,7 @@ async function updateRegion(regionId, data) {
     }));
     
     if (!existing.Item) {
-        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' }, event);
     }
     
     // ✅ Accept both 'geometry' (new) and 'boundary' (legacy)
@@ -394,7 +412,7 @@ async function updateRegion(regionId, data) {
     if (geomData) {
         const validation = validatePolygonBoundary(geomData);
         if (!validation.valid) {
-            return response(400, { error: validation.error, message: validation.message });
+            return response(400, { error: validation.error, message: validation.message }, event);
         }
     }
     
@@ -465,28 +483,28 @@ async function updateRegion(regionId, data) {
         ReturnValues: 'ALL_NEW'
     }));
     
-    return response(200, result.Attributes);
+    return response(200, result.Attributes, event);
 }
 
 // Delete region
-async function deleteRegion(regionId) {
+async function deleteRegion(regionId, event) {
     await dynamoDB.send(new DeleteCommand({
         TableName: REGIONS_TABLE,
         Key: { regionId }
     }));
     
-    return response(200, { message: 'Region deleted successfully' });
+    return response(200, { message: 'Region deleted successfully' }, event);
 }
 
 // Toggle region active status
-async function toggleRegion(regionId) {
+async function toggleRegion(regionId, event) {
     const existing = await dynamoDB.send(new GetCommand({
         TableName: REGIONS_TABLE,
         Key: { regionId }
     }));
     
     if (!existing.Item) {
-        return response(404, { error: 'NOT_FOUND', message: 'Region not found' });
+        return response(404, { error: 'NOT_FOUND', message: 'Region not found' }, event);
     }
     
     const newStatus = !existing.Item.is_active;
@@ -511,5 +529,5 @@ async function toggleRegion(regionId) {
         ReturnValues: 'ALL_NEW'
     }));
     
-    return response(200, result.Attributes);
+    return response(200, result.Attributes, event);
 }
