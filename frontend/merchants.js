@@ -25,6 +25,27 @@ let allMerchants = [];
 let merchantsData = [];
 let filteredMerchants = [];
 
+// Pagination state
+let currentPage = 1;
+let itemsPerPage = 10;
+let totalPages = 1;
+
+// Restore itemsPerPage from localStorage if present
+try {
+    const storedSize = localStorage.getItem('merchants_itemsPerPage');
+    if (storedSize) {
+        const num = parseInt(storedSize, 10);
+        if (!isNaN(num) && [5,10,25,50,100].includes(num)) {
+            itemsPerPage = num;
+            // Reflect in select if exists later
+            document.addEventListener('DOMContentLoaded', () => {
+                const sel = document.getElementById('itemsPerPageSelect');
+                if (sel) sel.value = String(itemsPerPage);
+            });
+        }
+    }
+} catch(e){ console.warn('Failed to restore itemsPerPage', e); }
+
 // Utility to add a timeout to a promise
 function withTimeout(promise, ms, operationName = 'Unnamed operation') {
     let timeoutId;
@@ -83,20 +104,10 @@ const onDomReady = async function () {
             console.warn('initializeDashboard function not found, skipping.');
         }
 
-        console.log('🎯 Loading merchants directly from DynamoDB');
+        console.log('🎯 Loading merchants from backend API');
         showLoader(true, 'Loading merchants...');
 
-        // Check if AWSUtils is available
-        if (!window.AWSUtils) {
-            throw new Error('AWSUtils is not available. Please ensure aws-utils.js is loaded.');
-        }
-
-        console.log('🔐 Initializing AWS...');
-        // Initialize AWS using centralized utility
-        await AWSUtils.initialize();
-        console.log('✅ AWS initialized successfully');
-
-        console.log('📊 Loading merchants from DynamoDB...');
+        console.log('📊 Fetching merchants...');
         await loadMerchantsFromDynamoDB();
 
         if (merchantsData.length > 0) {
@@ -247,26 +258,31 @@ window.onDomReady = onDomReady;
 
 // Load merchants data from DynamoDB using AWS SDK
 async function loadMerchantsFromDynamoDB() {
-    console.log('DEBUG: Executing DynamoDB scan on WhizzMerchants_Businesses...');
-    console.log('DEBUG: MERCHANTS_TABLE constant value:', MERCHANTS_TABLE);
-
-    // Use centralized AWS utilities
-    const dynamoDB = await AWSUtils.getDynamoDBClient();
-    console.log('DEBUG: DynamoDB client obtained:', !!dynamoDB);
-
-    const params = {
-        TableName: 'WhizzMerchants_Businesses',
-    };
-
-    console.log('DEBUG: DynamoDB scan params:', params);
+    console.log('🔄 Loading merchants from backend API...');
 
     try {
-        const data = await withTimeout(
-            dynamoDB.scan(params).promise(),
-            10000,
-            'DynamoDB scan'
-        );
-        console.log('DynamoDB scan result:', data);
+        // Get token if Auth is available, otherwise proceed without it
+        const idToken = (typeof Auth !== 'undefined' && Auth.getIdToken) ? Auth.getIdToken() : '';
+        console.log('🔑 ID Token available:', !!idToken);
+        
+        const response = await fetch('/businesses', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'id-token': idToken || '',
+                'x-debug-mode': 'true' // Enable debug mode for development
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Backend API response:', result);
+
+        const data = { Items: result.businesses || [] };
+        console.log(`📊 Loaded ${data.Items.length} merchants from backend`);
 
         if (data && Array.isArray(data.Items)) {
             merchantsData = data.Items.map(item => ({
@@ -314,12 +330,8 @@ async function loadMerchantsFromDynamoDB() {
             return;
         }
     } catch (error) {
-        console.error('Error loading merchants from DynamoDB:', error);
-        // Provide a more specific error message if it's a credential issue.
-        if (error.code === 'CredentialsError' || error.message.includes('Missing credentials')) {
-            throw new Error('Failed to obtain AWS credentials. Please check the Identity Pool configuration and ensure the auth token is valid.');
-        }
-        throw error;
+        console.error('❌ Error loading merchants from backend API:', error);
+        throw new Error(`Failed to load merchants: ${error.message}`);
     }
 }
 
@@ -548,38 +560,61 @@ function renderMerchantsTable() {
 
     if (filteredMerchants.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="9" class="text-center p-8">No merchants match the current filters.</td></tr>';
+        updatePaginationInfo(0, 0, 0);
+        hidePaginationControls();
         return;
     }
 
-    const rows = filteredMerchants.map(merchant => {
+    // Calculate pagination
+    totalPages = Math.ceil(filteredMerchants.length / itemsPerPage);
+    
+    // Ensure currentPage is within bounds
+    if (currentPage > totalPages) {
+        currentPage = totalPages;
+    }
+    if (currentPage < 1) {
+        currentPage = 1;
+    }
+
+    // Get merchants for current page
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredMerchants.length);
+    const pageMerchants = filteredMerchants.slice(startIndex, endIndex);
+
+    const rows = pageMerchants.map(merchant => {
         const statusInfo = MERCHANT_STATUSES[merchant.status] || MERCHANT_STATUSES['unknown'];
 
-        // Use the address that was already built from individual fields
-        let displayAddress = merchant.address || 'N/A';
+        // Source raw data object for robust fallbacks
+        const raw = merchant.fullData || {};
 
-        // SECURITY: Sanitize all user-generated content to prevent XSS
-        const safeName = SecurityUtils.escapeHTML(merchant.name || 'N/A');
-        const safeOwner = SecurityUtils.escapeHTML(merchant.owner || 'N/A');
-        const safeCategory = SecurityUtils.escapeHTML(merchant.category || 'Business');
-        const safeCity = SecurityUtils.escapeHTML(merchant.city || 'Unknown City');
-        const safeEmail = SecurityUtils.escapeHTML(merchant.email || 'N/A');
-        const safePhone = SecurityUtils.escapeHTML(merchant.phone || 'N/A');
-        const safeAddress = SecurityUtils.escapeHTML(displayAddress);
-        const safeAvatar = SecurityUtils.sanitizeURL(merchant.avatar);
-        const safeId = SecurityUtils.escapeHTML(merchant.id || '');
-        const safeStatus = SecurityUtils.escapeHTML(merchant.status || 'unknown');
-        const safeStatusLabel = SecurityUtils.escapeHTML(statusInfo.label);
+        // Explicitly map fields to headings with fallbacks
+        const businessName = raw.businessName || raw.business_name || merchant.name || merchant.businessName || 'Unknown Business';
+        const ownerName = raw.ownerName || raw.owner_name || raw.owner || merchant.owner || 'N/A';
+        const statusLabel = statusInfo.label || (raw.status || merchant.status || 'Unknown');
+        const accepting = (raw.acceptingOrders !== undefined) ? raw.acceptingOrders : (merchant.acceptingOrders !== undefined ? merchant.acceptingOrders : false);
+        const email = raw.email || raw.businessEmail || merchant.email || 'N/A';
+        const phone = raw.phoneNumber || raw.phone || raw.businessPhone || merchant.phone || 'N/A';
+        const address = buildAddressFromData(raw) || merchant.address || 'Address not available';
 
-        // Format accepting orders status
-        const acceptingOrdersStatus = merchant.acceptingOrders ?
+        // Prefer more accurate last update fields when available
+        const lastUpdateRaw = raw.lastStatusUpdate || raw.updatedAt || raw.inventoryLastUpdated || raw.menuLastUpdated || merchant.lastStatusUpdate || merchant.joinDate || null;
+        const lastUpdate = lastUpdateRaw ? formatLastUpdate(lastUpdateRaw) : 'N/A';
+
+        const safeCategory = SecurityUtils.escapeHTML(merchant.category || raw.businessType || 'Business');
+        const safeCity = SecurityUtils.escapeHTML(merchant.city || raw.city || 'Unknown City');
+        const safeEmail = SecurityUtils.escapeHTML(email);
+        const safePhone = SecurityUtils.escapeHTML(phone);
+        const safeAddress = SecurityUtils.escapeHTML(address);
+        const safeAvatar = SecurityUtils.sanitizeURL(merchant.avatar || raw.businessPhotoUrl || raw.logo);
+        const safeId = SecurityUtils.escapeHTML(merchant.id || raw.businessId || raw.business_id || '');
+        const safeStatusLabel = SecurityUtils.escapeHTML(statusLabel);
+        const safeLastUpdate = SecurityUtils.escapeHTML(lastUpdate);
+        const safeName = SecurityUtils.escapeHTML(businessName);
+        const safeOwner = SecurityUtils.escapeHTML(ownerName);
+
+        const acceptingOrdersStatus = accepting ?
             '<span class="status-badge approved" style="background-color: #10b98120; color: #10b981;">Accepting</span>' :
             '<span class="status-badge pending" style="background-color: #f59e0b20; color: #f59e0b;">Not Accepting</span>';
-
-        // Format last update time
-        const lastUpdate = merchant.lastStatusUpdate ?
-            new Date(merchant.lastStatusUpdate).toLocaleDateString() :
-            (merchant.joinDate !== 'N/A' ? merchant.joinDate : 'N/A');
-        const safeLastUpdate = SecurityUtils.escapeHTML(lastUpdate);
 
         return `
             <tr data-merchant-row="${safeId}">
@@ -587,21 +622,25 @@ function renderMerchantsTable() {
                     <div class="business-info">
                         <img src="${safeAvatar}" alt="${safeName}" class="business-avatar" loading="lazy">
                         <div class="business-details">
-                            <h4>${safeName}</h4>
-                            <p>${safeCategory} • ${safeCity}</p>
+                            <h4 style="margin:0 0 4px 0;">${safeName}</h4>
+                            <p style="margin:0;">${safeCategory} • ${safeCity}</p>
                         </div>
                     </div>
                 </td>
                 <td>${safeOwner}</td>
                 <td>
-                    <span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
-                        ${safeStatusLabel}
-                    </span>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span class="status-badge ${statusInfo.class}" style="background-color: ${statusInfo.color}20; color: ${statusInfo.color};">
+                            ${safeStatusLabel}
+                        </span>
+                    </div>
                 </td>
-                <td>${acceptingOrdersStatus}</td>
+                <td>
+                    <div style="display:flex;align-items:center;gap:8px;">${acceptingOrdersStatus}</div>
+                </td>
                 <td>${safeEmail}</td>
                 <td>${safePhone}</td>
-                <td><div class="address-info">${safeAddress}</div></td>
+                <td><div class="address-info" style="max-width:320px;">${safeAddress}</div></td>
                 <td>${safeLastUpdate}</td>
                 <td>
                     <div class="action-buttons">
@@ -611,11 +650,14 @@ function renderMerchantsTable() {
                         <button class="btn-view-products" data-action="view-products" data-id="${safeId}" title="View Products">
                             <i class="fas fa-box"></i>
                         </button>
+                        <button class="btn-action" data-action="bulk-upload" data-id="${safeId}" title="Bulk Upload Items">
+                            <i class="fas fa-file-upload"></i>
+                        </button>
                         <button class="btn-action" data-action="edit" data-id="${safeId}" title="Edit">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn-toggle-status ${merchant.status === 'approved' ? 'approved' : 'pending'}" 
-                                data-action="toggle-status" data-id="${safeId}" data-status="${safeStatus}" 
+                                data-action="toggle-status" data-id="${safeId}" data-status="${SecurityUtils.escapeHTML(merchant.status || '')}" 
                                 title="${merchant.status === 'approved' ? 'Suspend Merchant' : 'Approve Merchant'}">
                             <i class="fas ${merchant.status === 'approved' ? 'fa-pause' : 'fa-check'}"></i>
                         </button>
@@ -625,8 +667,12 @@ function renderMerchantsTable() {
         `;
     }).join('');
 
-    tableBody.innerHTML = SecurityUtils.sanitizeHTML(rows);
+    tableBody.innerHTML = rows;
     attachMerchantsDelegatedEvents();
+    
+    // Update pagination UI
+    updatePaginationInfo(startIndex + 1, endIndex, filteredMerchants.length);
+    renderPaginationControls();
 }
 
 // Delegated events for merchants table to remove inline handlers (CSP friendly)
@@ -646,6 +692,9 @@ function attachMerchantsDelegatedEvents() {
             case 'view-products':
                 viewMerchantProducts(id);
                 break;
+            case 'bulk-upload':
+                openBulkUploadModal(id);
+                break;
             case 'edit':
                 editMerchant(id);
                 break;
@@ -659,22 +708,27 @@ function attachMerchantsDelegatedEvents() {
 
 // Update dashboard stats based on loaded merchants
 function updateMerchantStats() {
-    const totalMerchants = document.getElementById('total-merchants');
-    const approvedMerchants = document.getElementById('approved-merchants');
-    const pendingMerchants = document.getElementById('pending-merchants');
-    const newThisMonth = document.getElementById('new-this-month');
+    try {
+        const totalMerchants = document.getElementById('total-merchants');
+        const approvedMerchants = document.getElementById('approved-merchants');
+        const pendingMerchants = document.getElementById('pending-merchants');
+        const newThisMonth = document.getElementById('new-this-month');
 
-    if (totalMerchants) totalMerchants.textContent = merchantsData.length;
-    if (approvedMerchants) approvedMerchants.textContent = merchantsData.filter(m => m.status === 'approved').length;
-    if (pendingMerchants) pendingMerchants.textContent = merchantsData.filter(m => m.status === 'pending' || m.status === 'under_review').length;
+        if (totalMerchants) totalMerchants.textContent = merchantsData.length;
+        if (approvedMerchants) approvedMerchants.textContent = merchantsData.filter(m => m.status === 'approved').length;
+        if (pendingMerchants) pendingMerchants.textContent = merchantsData.filter(m => m.status === 'pending' || m.status === 'under_review').length;
 
-    const thisMonthCount = merchantsData.filter(m => {
-        const joinDate = new Date(m.joinDate);
-        const today = new Date();
-        return joinDate.getMonth() === today.getMonth() && joinDate.getFullYear() === today.getFullYear();
-    }).length;
+        const thisMonthCount = merchantsData.filter(m => {
+            const joinDate = new Date(m.joinDate);
+            const today = new Date();
+            return joinDate.getMonth() === today.getMonth() && joinDate.getFullYear() === today.getFullYear();
+        }).length;
 
-    if (newThisMonth) newThisMonth.textContent = thisMonthCount;
+        if (newThisMonth) newThisMonth.textContent = thisMonthCount;
+        console.log('✅ Merchant stats updated successfully');
+    } catch (error) {
+        console.warn('⚠️ Could not update merchant stats (stat elements may not exist on this page):', error.message);
+    }
 }
 
 // Toggle merchant status between approved and pending
@@ -815,6 +869,45 @@ function editMerchant(merchantId) {
     document.getElementById('editMerchantModal').style.display = 'flex';
 }
 
+// Open bulk upload modal for a specific merchant
+function openBulkUploadModal(merchantId) {
+    const merchant = filteredMerchants.find(m => m.id === merchantId);
+    if (!merchant) {
+        console.error('Merchant not found:', merchantId);
+        alert('Merchant not found. Please refresh the page and try again.');
+        return;
+    }
+
+    console.log('Opening bulk upload modal for merchant:', merchant.name || merchant.businessName);
+    
+    // Set the current merchant ID globally for bulk upload
+    window.currentMerchantId = merchantId;
+    currentMerchantId = merchantId;
+    
+    // Open the bulk upload modal
+    const modal = document.getElementById('bulkUploadModal');
+    if (modal) {
+        modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // Reset to first step
+        const showStep = (id) => {
+            ['bulkStepSelectFile', 'bulkStepPreview', 'bulkStepProgress'].forEach(s => {
+                const el = document.getElementById(s);
+                if (el) el.style.display = (s === id ? 'block' : 'none');
+            });
+        };
+        showStep('bulkStepSelectFile');
+        
+        // Clear any previous file selection
+        const fileInput = document.getElementById('bulkFileInput');
+        if (fileInput) fileInput.value = '';
+    } else {
+        console.error('Bulk upload modal not found');
+        alert('Bulk upload feature is not available. Please refresh the page.');
+    }
+}
+
 // Product view functions
 let currentMerchantId = null;
 let merchantProducts = [];
@@ -830,6 +923,7 @@ function viewMerchantProducts(merchantId) {
 
     console.log('Viewing products for merchant:', merchant.name || merchant.businessName);
     currentMerchantId = merchantId;
+    window.currentMerchantId = merchantId; // Make globally accessible for bulk upload
 
     // Hide merchants list view
     document.getElementById('merchantsListView').style.display = 'none';
@@ -1431,3 +1525,272 @@ function setupModalDelegatedEvents() {
         setupModalDelegatedEvents();
     }
 })();
+
+// ============================================
+// PAGINATION FUNCTIONS
+// ============================================
+
+/**
+ * Update pagination information display
+ */
+function updatePaginationInfo(start, end, total) {
+    const startElement = document.getElementById('startItemIndex');
+    const endElement = document.getElementById('endItemIndex');
+    const totalElement = document.getElementById('totalItems');
+    
+    if (startElement) startElement.textContent = start;
+    if (endElement) endElement.textContent = end;
+    if (totalElement) totalElement.textContent = total;
+}
+
+/**
+ * Hide pagination controls when not needed
+ */
+function hidePaginationControls() {
+    const pagination = document.getElementById('merchantsPagination');
+    if (pagination) {
+        pagination.style.display = 'none';
+    }
+}
+
+/**
+ * Show pagination controls
+ */
+function showPaginationControls() {
+    const pagination = document.getElementById('merchantsPagination');
+    if (pagination) {
+        pagination.style.display = 'flex';
+    }
+}
+
+/**
+ * Render pagination controls with page numbers
+ */
+function renderPaginationControls() {
+    if (totalPages <= 1) {
+        hidePaginationControls();
+        return;
+    }
+    
+    showPaginationControls();
+    
+    // Update button states
+    const firstBtn = document.getElementById('firstPageBtn');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const lastBtn = document.getElementById('lastPageBtn');
+    
+    if (firstBtn) firstBtn.disabled = currentPage === 1;
+    if (prevBtn) prevBtn.disabled = currentPage === 1;
+    if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+    if (lastBtn) lastBtn.disabled = currentPage === totalPages;
+    
+    // Render page numbers
+    renderPageNumbers();
+}
+
+/**
+ * Render page number buttons with ellipsis for large page counts
+ */
+function renderPageNumbers() {
+    const container = document.getElementById('pageNumbersContainer');
+    if (!container) return;
+    
+    const maxVisiblePages = 7; // Maximum number of page buttons to show
+    let pages = [];
+    
+    if (totalPages <= maxVisiblePages) {
+        // Show all pages
+        for (let i = 1; i <= totalPages; i++) {
+            pages.push(i);
+        }
+    } else {
+        // Smart pagination with ellipsis
+        if (currentPage <= 4) {
+            // Near the start
+            pages = [1, 2, 3, 4, 5, '...', totalPages];
+        } else if (currentPage >= totalPages - 3) {
+            // Near the end
+            pages = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+        } else {
+            // In the middle
+            pages = [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
+        }
+    }
+    
+    // Generate HTML for page numbers
+    const pageButtons = pages.map(page => {
+        if (page === '...') {
+            return '<span class="page-number ellipsis">...</span>';
+        }
+        
+        const isActive = page === currentPage;
+        return `
+            <button 
+                class="page-number ${isActive ? 'active' : ''}" 
+                data-page="${page}"
+                ${isActive ? 'disabled' : ''}
+            >
+                ${page}
+            </button>
+        `;
+    }).join('');
+    
+    container.innerHTML = pageButtons;
+    
+    // Add click listeners to page buttons
+    container.querySelectorAll('.page-number:not(.ellipsis)').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const page = parseInt(this.getAttribute('data-page'));
+            if (!isNaN(page) && page !== currentPage) {
+                goToPage(page);
+            }
+        });
+    });
+}
+
+/**
+ * Navigate to a specific page
+ */
+function goToPage(page) {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    
+    currentPage = page;
+    
+    // Add slide animation
+    const tableBody = document.getElementById('merchantsTableBody');
+    if (tableBody) {
+        tableBody.classList.add('fade-out');
+        setTimeout(() => {
+            renderMerchantsTable();
+            tableBody.classList.remove('fade-out');
+            tableBody.classList.add('fade-in');
+            setTimeout(() => tableBody.classList.remove('fade-in'), 300);
+        }, 150);
+    } else {
+        renderMerchantsTable();
+    }
+    
+    // Scroll to top of table smoothly
+    const tableContainer = document.querySelector('.table-container');
+    if (tableContainer) {
+        tableContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+/**
+ * Go to first page
+ */
+function goToFirstPage() {
+    goToPage(1);
+}
+
+/**
+ * Go to previous page
+ */
+function goToPreviousPage() {
+    goToPage(currentPage - 1);
+}
+
+/**
+ * Go to next page
+ */
+function goToNextPage() {
+    goToPage(currentPage + 1);
+}
+
+/**
+ * Go to last page
+ */
+function goToLastPage() {
+    goToPage(totalPages);
+}
+
+/**
+ * Change items per page
+ */
+function changeItemsPerPage(newItemsPerPage) {
+    itemsPerPage = parseInt(newItemsPerPage);
+    try { localStorage.setItem('merchants_itemsPerPage', String(itemsPerPage)); } catch(e){ /* ignore */ }
+    currentPage = 1; // Reset to first page
+    renderMerchantsTable();
+}
+
+/**
+ * Initialize pagination event listeners
+ */
+function initializePaginationListeners() {
+    // First/Previous/Next/Last buttons
+    const firstBtn = document.getElementById('firstPageBtn');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    const lastBtn = document.getElementById('lastPageBtn');
+    
+    if (firstBtn) firstBtn.addEventListener('click', goToFirstPage);
+    if (prevBtn) prevBtn.addEventListener('click', goToPreviousPage);
+    if (nextBtn) nextBtn.addEventListener('click', goToNextPage);
+    if (lastBtn) lastBtn.addEventListener('click', goToLastPage);
+    
+    // Items per page select
+    const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener('change', function() {
+            changeItemsPerPage(this.value);
+        });
+    }
+    
+    console.log('✅ Pagination listeners initialized');
+}
+
+// Initialize pagination when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializePaginationListeners);
+} else {
+    initializePaginationListeners();
+}
+
+// Helper: robust date formatting
+function formatLastUpdate(value) {
+    if (!value) return 'N/A';
+    try {
+        // Clean unusual suffixes (e.g., 'NZ') and whitespace
+        const cleaned = String(value).replace(/[^0-9T:\-.Z]/g, '').trim();
+        const d = new Date(cleaned);
+        if (!isNaN(d.getTime())) {
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        // Fallback to original formatted date
+        return formatDate(value);
+    } catch (_) {
+        return formatDate(value) || 'N/A';
+    }
+}
+
+// After rendering rows, apply sticky header + zebra rows (progressive enhancement)
+function applyTableEnhancements() {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    // Sticky header
+    const thead = table.querySelector('thead');
+    if (thead && !thead.classList.contains('sticky-applied')) {
+        thead.classList.add('sticky-applied');
+        thead.style.position = 'sticky';
+        thead.style.top = '0';
+        thead.style.zIndex = '5';
+        thead.style.background = 'var(--md-sys-color-surface-container, #f8fafc)';
+    }
+    // Zebra rows
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach((r,i) => { r.style.backgroundColor = (i % 2 === 0) ? 'var(--md-sys-color-surface, #ffffff)' : 'var(--md-sys-color-surface-container-low, #f9fbfd)'; });
+}
+
+// Inject enhancement call inside renderMerchantsTable after innerHTML assignment
+(function(){
+    const originalRender = renderMerchantsTable;
+    renderMerchantsTable = function(){
+        originalRender();
+        applyTableEnhancements();
+    };
+})();
+
+

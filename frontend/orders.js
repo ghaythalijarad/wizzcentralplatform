@@ -113,17 +113,43 @@ async function loadOrdersFromBackend() {
             return;
         }
 
-        // Transform orders for the UI
-        ordersData = orders.map(order => ({
-            orderId: order.orderId,
-            customerId: order.customerName || order.customerPhone || 'N/A',
-            merchantId: order.storeName || 'N/A',
-            driverId: order.driverId || 'N/A',
-            status: order.status || 'unknown',
-            total: order.total || 'N/A',
-            date: formatDate(order.createdAt),
-            fullData: order
-        }));
+        // Transform orders for the UI using new transformation logic
+        ordersData = orders.map(order => {
+            // Determine status based on timeline
+            let status = 'pending';
+            if (order.deliveredAt) status = 'delivered';
+            else if (order.canceledAt) status = 'cancelled';
+            else if (order.assignedAt && order.collectorId) status = 'out_for_delivery';
+            else if (order.assignedAt) status = 'ready_for_pickup';
+            else if (order.confirmedAt) status = 'preparing';
+            
+            // Extract short order ID from PK (ORDER#uuid)
+            const shortOrderId = order.PK ? order.PK.replace('ORDER#', '').substring(0, 8) : 'N/A';
+            
+            return {
+                orderId: shortOrderId,
+                fullOrderId: order.PK,
+                customerName: order.customerName || 'N/A',
+                customerPhone: order.customerPhone || 'N/A',
+                channel: order.channel || 'unknown',
+                status: status,
+                collectorId: order.collectorId,
+                currency: order.currency || 'IQD',
+                createdAt: order.createdAt,
+                confirmedAt: order.confirmedAt,
+                assignedAt: order.assignedAt,
+                deliveredAt: order.deliveredAt,
+                canceledAt: order.canceledAt,
+                canceledBy: order.canceledBy,
+                cancelReason: order.cancelReason,
+                authorizedAt: order.authorizedAt,
+                capturedAt: order.capturedAt,
+                codCollectedAt: order.codCollectedAt,
+                cashReceived: order.cashReceived,
+                changeGiven: order.changeGiven,
+                fullData: order
+            };
+        });
 
         console.log(`✅ Successfully loaded ${ordersData.length} orders from WizzOrders table`);
         showMessage(`Successfully loaded ${ordersData.length} orders from WizzOrders table`, 'success');
@@ -334,7 +360,43 @@ function renderOrdersTable() {
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:2rem; color:#666;"><i class="fas fa-shopping-bag" style="font-size:3rem; color:#ccc;"></i><div>No orders found</div></td></tr>`;
         return;
     }
+    
     tbody.innerHTML = filteredOrders.map(o => {
+        // Format channel badge
+        const channelIcons = { 'android': '🤖', 'ios': '🍎', 'web': '🌐' };
+        const channelIcon = channelIcons[o.channel?.toLowerCase()] || '📱';
+        const channelClass = `channel-${o.channel?.toLowerCase() || 'unknown'}`;
+        const channelBadge = `<span class="channel-badge ${channelClass}">${channelIcon} ${o.channel || 'N/A'}</span>`;
+        
+        // Format driver badge
+        const driverBadge = o.collectorId 
+            ? `<span class="driver-badge" title="Driver: ${o.collectorId}">${o.collectorId.substring(0, 8)}</span>`
+            : `<span class="driver-unassigned">Unassigned</span>`;
+        
+        // Format payment status
+        let paymentBadge = '';
+        if (o.codCollectedAt) {
+            paymentBadge = `<span class="payment-badge payment-cod">COD ✓</span>`;
+        } else if (o.capturedAt) {
+            paymentBadge = `<span class="payment-badge payment-captured">${o.currency} ✓</span>`;
+        } else if (o.authorizedAt) {
+            paymentBadge = `<span class="payment-badge payment-authorized">${o.currency} ⏳</span>`;
+        } else {
+            paymentBadge = `<span class="payment-badge">${o.currency}</span>`;
+        }
+        
+        // Format created date
+        const createdDate = o.createdAt ? new Date(o.createdAt).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : 'N/A';
+        
+        // Customer info
+        const customerName = SecurityUtils.escapeHTML(o.customerName || 'N/A');
+        const customerPhone = SecurityUtils.escapeHTML(o.customerPhone || 'N/A');
+        
         // Determine available actions based on order status
         const canSendToMerchant = ['pending', 'confirmed'].includes(o.status);
         const sendButton = canSendToMerchant ?
@@ -342,13 +404,18 @@ function renderOrdersTable() {
 
         return `
         <tr id="order-row-${o.orderId}">
-            <td>${o.orderId}</td>
-            <td>${o.customerId}</td>
-            <td>${o.merchantId}</td>
-            <td>${o.driverId}</td>
+            <td><span class="order-id">${o.orderId}</span></td>
+            <td>
+                <div class="customer-cell">
+                    <span class="customer-name">${customerName}</span>
+                    <span class="customer-meta">${customerPhone}</span>
+                </div>
+            </td>
+            <td>${channelBadge}</td>
             <td><span class="status-badge ${ORDER_STATUSES[o.status]?.class || 'unknown'}">${ORDER_STATUSES[o.status]?.label || 'Unknown'}</span></td>
-            <td>${o.total}</td>
-            <td>${o.date}</td>
+            <td>${driverBadge}</td>
+            <td>${createdDate}</td>
+            <td>${paymentBadge}</td>
             <td>
                 <div class="actions">
                     <button class="btn-action" onclick="viewOrder('${o.orderId}')" title="View Details"><i class="fas fa-eye"></i></button>
@@ -356,7 +423,7 @@ function renderOrdersTable() {
                     <button class="btn-action" onclick="trackOrderStatus('${o.orderId}')" title="Track Status"><i class="fas fa-route"></i></button>
                 </div>
             </td>
-        </tr>`
+        </tr>`;
     }).join('');
 }
 
@@ -365,46 +432,65 @@ function viewOrder(id) {
     const o = ordersData.find(x => x.orderId === id);
     if (!o) return;
 
-    // Enhanced order details with full information
-    const orderData = o.fullData || {};
-    const items = orderData.items || [];
-    const deliveryAddress = orderData.deliveryAddress || {};
-    const customerInfo = orderData.customerInfo || {};
+    // Format timestamps
+    const formatTS = (ts) => ts ? new Date(ts).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    }) : 'N/A';
 
-    const itemsList = items.map(item =>
-        `• ${item.name} - $${item.price} x ${item.quantity} = $${(item.price * item.quantity).toFixed(2)}`
-    ).join('\n');
+    // Build timeline
+    const timeline = [];
+    if (o.createdAt) timeline.push(`✅ Created: ${formatTS(o.createdAt)}`);
+    if (o.confirmedAt) timeline.push(`✅ Confirmed: ${formatTS(o.confirmedAt)}`);
+    if (o.assignedAt) timeline.push(`✅ Assigned: ${formatTS(o.assignedAt)}`);
+    if (o.deliveredAt) timeline.push(`✅ Delivered: ${formatTS(o.deliveredAt)}`);
+    if (o.canceledAt) timeline.push(`❌ Cancelled: ${formatTS(o.canceledAt)}`);
 
+    // Payment info
+    const paymentInfo = [];
+    if (o.authorizedAt) paymentInfo.push(`Authorized: ${formatTS(o.authorizedAt)}`);
+    if (o.capturedAt) paymentInfo.push(`Captured: ${formatTS(o.capturedAt)}`);
+    if (o.codCollectedAt) paymentInfo.push(`COD Collected: ${formatTS(o.codCollectedAt)}`);
+    if (o.cashReceived) paymentInfo.push(`Cash Received: ${o.cashReceived} ${o.currency}`);
+    if (o.changeGiven) paymentInfo.push(`Change Given: ${o.changeGiven} ${o.currency}`);
+
+    // Build detail text
     const orderDetails = `
 📦 ORDER DETAILS
-Order ID: ${o.orderId}
-Customer: ${customerInfo.name || o.customerId}
-Phone: ${customerInfo.phone || 'N/A'}
-Email: ${customerInfo.email || 'N/A'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Order ID: ${o.fullOrderId || o.orderId}
+Status: ${ORDER_STATUSES[o.status]?.label || 'Unknown'}
+Channel: ${o.channel?.toUpperCase() || 'N/A'}
 
-🏪 MERCHANT
-Merchant ID: ${o.merchantId}
+👤 CUSTOMER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Name: ${o.customerName || 'N/A'}
+Phone: ${o.customerPhone || 'N/A'}
+Created By: ${o.createdBy || 'N/A'}
 
-🛵 DRIVER
-Driver ID: ${o.driverId}
+🛵 DRIVER/COLLECTOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${o.collectorId ? `Driver ID: ${o.collectorId}\nAssigned: ${formatTS(o.assignedAt)}` : 'Not assigned yet'}
 
-📍 DELIVERY ADDRESS
-${deliveryAddress.street || 'N/A'}
-${deliveryAddress.city || 'N/A'} ${deliveryAddress.zipCode || ''}
+📅 TIMELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${timeline.join('\n') || 'No timeline data'}
 
-🛒 ITEMS
-${itemsList || 'No items available'}
+${o.canceledAt ? `\n❌ CANCELLATION\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nCanceled By: ${o.canceledBy || 'N/A'}\nReason: ${o.cancelReason || 'N/A'}\n` : ''}
 
-💰 TOTAL: ${o.total}
-📅 ORDER DATE: ${o.date}
-📊 STATUS: ${ORDER_STATUSES[o.status]?.label || 'Unknown'}
+💰 PAYMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Currency: ${o.currency || 'IQD'}
+${paymentInfo.join('\n') || 'No payment info recorded'}
 
-Would you like to send this order to the merchant backend?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     `;
 
-    if (confirm(orderDetails)) {
-        sendOrderToMerchant(o.orderId);
-    }
+    alert(orderDetails);
 }
 
 // Send order to merchant backend

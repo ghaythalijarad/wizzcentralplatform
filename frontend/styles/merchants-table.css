@@ -1,5 +1,61 @@
 /* Enhanced Merchants Table Styling */
 
+/* Base table structure - ensure proper display */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+    display: table;
+}
+
+.data-table thead {
+    display: table-header-group;
+}
+
+.data-table tbody {
+    display: table-row-group;
+}
+
+.data-table tr {
+    display: table-row;
+}
+
+.data-table th,
+.data-table td {
+    display: table-cell;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.data-table th {
+    background-color: #f8fafc;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+}
+
+.data-table td {
+    background-color: #fff;
+    color: #1f2937;
+}
+
+/* Sticky header + zebra rows */
+.data-table thead.sticky-applied {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #f8fafc;
+}
+
+.data-table tbody tr:nth-child(odd) {
+    background: #ffffff;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background: #f9fbfd;
+}
 /* Improved table hover effects */
 .data-table tbody tr:hover {
     background-color: #f8f9fa;

@@ -1,0 +1,11 @@
+name,description,price,currency,category,sku,barcode,portion,isAvailable,vatRate,stockQty,imageUrl
+Coca Cola,Classic Coca Cola drink,1500,IQD,Beverages,COKE-CAN-330,5449000000996,can,true,0,100,https://example.com/cocacola-can.jpg
+Pepsi,Refreshing Pepsi cola,1400,IQD,Beverages,PEPSI-CAN-330,012000001765,can,true,0,150,https://example.com/pepsi-can.jpg
+Water Bottle,Pure mineral water,500,IQD,Beverages,WATER-500ML,,bottle,true,0,200,https://example.com/water-bottle.jpg
+Margherita Pizza,Classic cheese and tomato pizza,8000,IQD,Pizza,PIZZA-MARG-L,,large,true,5,50,https://example.com/margherita-pizza.jpg
+Pepperoni Pizza,Spicy pepperoni pizza,9500,IQD,Pizza,PIZZA-PEPP-L,,large,true,5,40,https://example.com/pepperoni-pizza.jpg
+Burger Deluxe,Beef burger with cheese and vegetables,6000,IQD,Burgers,BURGER-DELUXE,,standard,true,5,30,https://example.com/burger.jpg
+French Fries,Crispy golden fries,2000,IQD,Sides,FRIES-REG,,regular,true,5,100,https://example.com/fries.jpg
+Chicken Wings,Spicy chicken wings 6 pieces,4500,IQD,Chicken,WINGS-6PC,,6pc,true,5,60,https://example.com/wings.jpg
+Caesar Salad,Fresh Caesar salad with chicken,3500,IQD,Salads,SALAD-CAESAR,,standard,true,0,40,https://example.com/caesar-salad.jpg
+Ice Cream Sundae,Vanilla ice cream with toppings,2500,IQD,Desserts,ICECREAM-SUND,,standard,true,0,80,https://example.com/sundae.jpg

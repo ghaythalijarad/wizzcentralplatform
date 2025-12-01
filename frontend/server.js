@@ -3,12 +3,50 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 8080;
+const API_PORT = 3000;
 
 const server = http.createServer((req, res) => {
+    // Proxy API requests to regions-api server
+    if (req.url.startsWith('/api/')) {
+        const options = {
+            hostname: 'localhost',
+            port: API_PORT,
+            path: req.url,
+            method: req.method,
+            headers: req.headers
+        };
+
+        const proxy = http.request(options, (apiRes) => {
+            res.writeHead(apiRes.statusCode, apiRes.headers);
+            apiRes.pipe(res);
+        });
+
+        proxy.on('error', (err) => {
+            console.error('API Proxy Error:', err.message);
+            res.writeHead(502, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'API server unavailable' }));
+        });
+
+        req.pipe(proxy);
+        return;
+    }
+
     let filePath = path.join(__dirname, req.url);
     
+    // Check if file exists first
+    if (!fs.existsSync(filePath)) {
+        // Handle root directory
+        if (req.url === '/') {
+            filePath = path.join(__dirname, 'pages', 'customers.html');
+        } else {
+            res.writeHead(404, { 'Content-Type': 'text/html' });
+            res.end('<h1>404 Not Found</h1>', 'utf-8');
+            return;
+        }
+    }
+    
     // If it's a directory, serve index.html
-    if (fs.statSync(filePath).isDirectory()) {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
         filePath = path.join(filePath, 'index.html');
     }
     

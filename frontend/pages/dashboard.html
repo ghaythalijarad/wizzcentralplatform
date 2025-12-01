@@ -8,6 +8,7 @@
     <!-- Security: DOMPurify for XSS Protection -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
+    <link rel="stylesheet" href="../styles/topbar.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -445,6 +446,8 @@
     <script src="../aggressive-sidebar-fix.js"></script>
     <!-- Immediate sidebar state fix -->
     <script src="../immediate-sidebar-fix.js"></script>
+    <!-- Top Bar include placeholder -->
+    <div id="topbar-placeholder"></div>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
     
@@ -564,12 +567,16 @@
     <script src="../assets/js/navigation.js?v=20250906"></script>
     <script src="../test-toggle-functionality.js"></script>
     
+    <!-- Top Bar Loading Script -->
+    <script src="../assets/js/topbar-loader.js"></script>
     <!-- Authentication check (moved to external) -->
     <!-- Initialize navigation manager (moved to external) -->
     <script src="../dashboard.js?v=20250906"></script>
     <script src="../assets/js/dashboard-init.js" defer></script>
     <script src="../assets/js/dashboard-actions.js" defer></script>
     <script src="../assets/js/dashboard-rbac-init.js" defer></script>
+    <!-- Top Bar Management Script -->
+    <script src="../assets/js/topbar.js"></script>
 </body>
 
 </html>

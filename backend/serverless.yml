@@ -208,6 +208,22 @@ functions:
               - Authorization
             allowCredentials: true
 
+  # QZ Tray Integration
+  signQzTrayRequest:
+    handler: src/handlers/qz-tray-handler.signRequest
+    description: "Sign requests for QZ Tray silent printing"
+    timeout: 10
+    events:
+      - http:
+          path: api/qz-tray/sign
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
+
 resources:
   Outputs:
     ChatBridgeApiEndpoint:

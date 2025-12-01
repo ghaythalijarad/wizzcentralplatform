@@ -10,8 +10,11 @@
     <title>WizzCentral Platform - Merchants Management</title>
     <!-- Security: DOMPurify for XSS Protection -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <!-- SheetJS for Excel/CSV parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
     <link rel="stylesheet" href="../styles/merchants-table.css">
+    <link rel="stylesheet" href="../styles/topbar.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -796,6 +799,305 @@
         /* Specific styling for merchant info images (not in table) */
         .merchant-info img {
             width: 48px;
+        }
+
+        /* Enhanced Typography System - Material 3 */
+        .page-title {
+            font-family: var(--md-sys-typescale-display-medium-font);
+            font-size: var(--md-sys-typescale-display-medium-font-size);
+            font-weight: var(--md-sys-typescale-display-medium-font-weight);
+            line-height: var(--md-sys-typescale-display-medium-line-height);
+            letter-spacing: var(--md-sys-typescale-display-medium-tracking);
+            color: var(--md-sys-color-on-surface);
+            margin: 0 0 8px 0;
+        }
+
+        .page-subtitle {
+            font-family: var(--md-sys-typescale-body-large-font);
+            font-size: var(--md-sys-typescale-body-large-font-size);
+            font-weight: var(--md-sys-typescale-body-large-font-weight);
+            line-height: var(--md-sys-typescale-body-large-line-height);
+            letter-spacing: var(--md-sys-typescale-body-large-tracking);
+            color: var(--md-sys-color-on-surface-variant);
+            margin: 0 0 24px 0;
+        }
+
+        .section-heading {
+            font-family: var(--md-sys-typescale-headline-small-font);
+            font-size: var(--md-sys-typescale-headline-small-font-size);
+            font-weight: var(--md-sys-typescale-headline-small-font-weight);
+            line-height: var(--md-sys-typescale-headline-small-line-height);
+            letter-spacing: var(--md-sys-typescale-headline-small-tracking);
+            color: var(--md-sys-color-on-surface);
+            margin: 0 0 16px 0;
+        }
+
+        .label-text {
+            font-family: var(--md-sys-typescale-label-large-font);
+            font-size: var(--md-sys-typescale-label-large-font-size);
+            font-weight: var(--md-sys-typescale-label-large-font-weight);
+            line-height: var(--md-sys-typescale-label-large-line-height);
+            letter-spacing: var(--md-sys-typescale-label-large-tracking);
+            color: var(--md-sys-color-on-surface-variant);
+        }
+
+        /* Page Transitions */
+        .fade-in {
+            animation: fadeIn var(--md-sys-motion-duration-long1) var(--md-sys-motion-easing-emphasized);
+        }
+
+        .fade-out {
+            animation: fadeOut var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+        }
+
+        .slide-in-up {
+            animation: slideInUp var(--md-sys-motion-duration-long2) var(--md-sys-motion-easing-emphasized-decelerate);
+        }
+
+        .slide-out-down {
+            animation: slideOutDown var(--md-sys-motion-duration-medium4) var(--md-sys-motion-easing-emphasized-accelerate);
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0;
+            }
+            to { 
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from { 
+                opacity: 1;
+            }
+            to { 
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideOutDown {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(24px);
+            }
+        }
+
+        /* Enhanced Pagination - Material 3 Design */
+        .table-pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            background: var(--md-sys-color-surface-container-lowest);
+            border-top: 1px solid var(--md-sys-color-outline-variant);
+            border-radius: 0 0 var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large);
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .pagination-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: var(--md-sys-typescale-body-medium-font-size);
+            color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .pagination-info strong {
+            color: var(--md-sys-color-on-surface);
+            font-weight: var(--md-sys-typescale-title-medium-font-weight);
+        }
+
+        .items-per-page {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #itemsPerPageSelect {
+            padding: 8px 12px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-small);
+            background: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-size: var(--md-sys-typescale-body-medium-font-size);
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+        }
+
+        #itemsPerPageSelect:hover {
+            border-color: var(--md-sys-color-primary);
+            background: var(--md-sys-color-surface-container);
+        }
+
+        #itemsPerPageSelect:focus {
+            outline: none;
+            border-color: var(--md-sys-color-primary);
+            box-shadow: 0 0 0 3px var(--md-sys-color-primary-container);
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pagination-btn {
+            padding: 10px 16px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-medium);
+            background: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-size: var(--md-sys-typescale-label-large-font-size);
+            font-weight: var(--md-sys-typescale-label-large-font-weight);
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 44px;
+            justify-content: center;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border-color: var(--md-sys-color-primary);
+            box-shadow: var(--md-sys-elevation-level1);
+            transform: translateY(-1px);
+        }
+
+        .pagination-btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+            background: var(--md-sys-color-surface-variant);
+            color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .page-numbers {
+            display: flex;
+            gap: 4px;
+            margin: 0 8px;
+        }
+
+        .page-number {
+            padding: 10px 16px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: var(--md-sys-shape-corner-small);
+            background: var(--md-sys-color-surface);
+            color: var(--md-sys-color-on-surface);
+            font-size: var(--md-sys-typescale-label-large-font-size);
+            font-weight: var(--md-sys-typescale-label-large-font-weight);
+            cursor: pointer;
+            transition: all var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+            min-width: 44px;
+            text-align: center;
+        }
+
+        .page-number:hover {
+            background: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+            border-color: var(--md-sys-color-primary);
+            transform: translateY(-1px);
+            box-shadow: var(--md-sys-elevation-level1);
+        }
+
+        .page-number.active {
+            background: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border-color: var(--md-sys-color-primary);
+            font-weight: 600;
+            box-shadow: var(--md-sys-elevation-level2);
+        }
+
+        .page-number.ellipsis {
+            pointer-events: none;
+            border: none;
+            background: transparent;
+            color: var(--md-sys-color-on-surface-variant);
+        }
+
+        .page-number.ellipsis:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Enhanced Navigation Breadcrumbs */
+        .page-breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            background: var(--md-sys-color-surface-container-lowest);
+            border-radius: var(--md-sys-shape-corner-medium);
+        }
+
+        .breadcrumb-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: var(--md-sys-typescale-body-medium-font-size);
+            color: var(--md-sys-color-on-surface-variant);
+            text-decoration: none;
+            transition: color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+        }
+
+        .breadcrumb-item:hover {
+            color: var(--md-sys-color-primary);
+        }
+
+        .breadcrumb-item.active {
+            color: var(--md-sys-color-on-surface);
+            font-weight: var(--md-sys-typescale-label-large-font-weight);
+        }
+
+        .breadcrumb-separator {
+            color: var(--md-sys-color-outline);
+            font-size: 12px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .table-pagination {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pagination-controls {
+                justify-content: center;
+            }
+
+            .page-numbers {
+                margin: 0;
+            }
+
+            .pagination-info {
+                justify-content: center;
+                text-align: center;
+            }
+        }
             height: 48px;
             border-radius: var(--md-sys-shape-corner-small);
             object-fit: cover;
@@ -818,6 +1120,8 @@
 </head>
 
 <body data-page="merchants">
+    <!-- Top Bar include placeholder -->
+    <div id="topbar-placeholder"></div>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
 
@@ -834,7 +1138,26 @@
             </div>
 
             <!-- Merchants List View (default) -->
-            <div id="merchantsListView" class="view-container">
+            <div id="merchantsListView" class="view-container fade-in">
+            
+                <!-- Breadcrumb Navigation -->
+                <nav class="page-breadcrumbs">
+                    <a href="../index.html" class="breadcrumb-item">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    <span class="breadcrumb-separator">›</span>
+                    <span class="breadcrumb-item active">
+                        <i class="fas fa-store"></i>
+                        <span>Merchants</span>
+                    </span>
+                </nav>
+            
+                <!-- Page Header -->
+                <div style="margin-bottom: 24px;">
+                    <h1 class="page-title">Merchants Management</h1>
+                    <p class="page-subtitle">Manage and monitor all registered merchants in the platform</p>
+                </div>
                 <!-- Merchants Table -->
                 <div class="table-container">
                     <div id="merchants-table-status"></div>
@@ -855,6 +1178,56 @@
                         </thead>
                         <tbody id="merchantsTableBody"><!-- rows injected by JS using delegated events --></tbody>
                     </table>
+                </div>
+                <!-- Enhanced Pagination Controls -->
+                <div class="table-pagination" id="merchantsPagination">
+                    <div class="pagination-info">
+                        <span>
+                            Showing <strong id="startItemIndex">1</strong> to <strong id="endItemIndex">10</strong>
+                            of <strong id="totalItems">0</strong> merchants
+                        </span>
+                        <div class="items-per-page">
+                            <label class="label-text" for="itemsPerPageSelect">Items per page:</label>
+                            <select id="itemsPerPageSelect">
+                                <option value="5">5</option>
+                                <option value="10" selected>10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+                
+                    <div class="pagination-controls">
+                        <button class="pagination-btn" id="firstPageBtn" disabled>
+                            <i class="fas fa-angle-double-left"></i>
+                            <span>First</span>
+                        </button>
+                        <button class="pagination-btn" id="prevPageBtn" disabled>
+                            <i class="fas fa-angle-left"></i>
+                            <span>Previous</span>
+                        </button>
+                
+                        <div class="page-numbers" id="pageNumbersContainer">
+                            <!-- Page numbers will be dynamically generated -->
+                        </div>
+                
+                        <button class="pagination-btn" id="nextPageBtn" disabled>
+                            <span>Next</span>
+                            <i class="fas fa-angle-right"></i>
+                        </button>
+                        <button class="pagination-btn" id="lastPageBtn" disabled>
+                            <span>Last</span>
+                            <i class="fas fa-angle-double-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="action-buttons" style="display:none;">
+                    <!-- Bulk Upload button removed - now integrated into each merchant's actions -->
+                    <button class="btn-primary btn-sm" id="bulkUploadItemsBtn" title="Bulk Upload Items" style="display:none;">
+                        <i class="fas fa-file-upload"></i> Bulk Upload Items
+                    </button>
                 </div>
             </div>
 
@@ -954,6 +1327,55 @@
                             </div>
                         </form>
                         <div id="editProductFormMessage" class="form-message" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Upload Modal -->
+            <div class="modal" id="bulkUploadModal" style="display:none;">
+                <div class="modal-content" style="max-width:960px;">
+                    <div class="modal-header" style="display:flex;align-items:center;gap:16px;">
+                        <h2 style="margin:0;font-size:1.25rem;">Bulk Upload Items</h2>
+                        <button class="modal-close" id="closeBulkUploadModal" aria-label="Close"
+                            style="margin-left:auto;">&times;</button>
+                    </div>
+                    <div class="modal-body" style="padding:1.25rem;">
+                        <div id="bulkUploadStepContainer">
+                            <div id="bulkStepSelectFile" class="bulk-step">
+                                <h3>Select File (CSV, JSON, XLSX)</h3>
+                                <input type="file" id="bulkFileInput" accept=".csv,.json,.xlsx" />
+                                <p style="font-size:0.75rem;color:var(--md-sys-color-on-surface-variant);margin-top:8px;">Max direct
+                                    upload 1,000 items. For larger files we will guide S3 upload (Phase 2).</p>
+                                <button class="btn-primary btn-sm" id="parseBulkFileBtn" disabled>Parse & Preview</button>
+                            </div>
+                            <div id="bulkStepPreview" class="bulk-step" style="display:none;">
+                                <h3>Preview & Validation</h3>
+                                <div id="bulkValidationSummary" style="margin-bottom:12px;font-size:0.75rem;"></div>
+                                <div style="max-height:300px;overflow:auto;border:1px solid var(--md-sys-color-outline-variant);border-radius:8px;"
+                                    id="bulkPreviewTableWrapper"></div>
+                                <div style="margin-top:12px;display:flex;gap:8px;">
+                                    <button class="btn-outline btn-sm" id="backToFileBtn">Back</button>
+                                    <button class="btn-primary btn-sm" id="startBulkUploadBtn" disabled>Start Upload</button>
+                                    <button class="btn-sm" id="downloadErrorsBtn" style="display:none;">Download Errors CSV</button>
+                                </div>
+                            </div>
+                            <div id="bulkStepProgress" class="bulk-step" style="display:none;">
+                                <h3>Uploading...</h3>
+                                <div id="bulkProgressBar"
+                                    style="height:14px;width:100%;background:#eee;border-radius:7px;overflow:hidden;margin-bottom:12px;">
+                                    <div id="bulkProgressFill"
+                                        style="height:100%;width:0;background:var(--md-sys-color-primary);transition:width .3s;">
+                                    </div>
+                                </div>
+                                <div id="bulkProgressStatus"
+                                    style="font-size:0.75rem;color:var(--md-sys-color-on-surface-variant);"></div>
+                                <div style="margin-top:12px;">
+                                    <button class="btn-outline btn-sm" id="cancelBulkUploadBtn">Cancel</button>
+                                    <button class="btn-primary btn-sm" id="finishBulkUploadBtn"
+                                        style="display:none;">Finish</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1152,25 +1574,19 @@
         <script src="../assets/js/navigation.js?v=2024-merchants"></script>
 
         <!-- Page-specific scripts -->
+        <script>
+            // Removed automatic debug mode enablement for production readiness.
+            // To enable locally, open console and run: sessionStorage.setItem('debugMode','true')
+        </script>
         <script src="../merchants.js?v=2024-merchants"></script>
         <script>
-            console.log('Merchants page script loaded');
-            
+                console.log('Merchants page script loaded');
             // Check authentication silently in background
             if (window.Auth && typeof window.Auth.requireAuthentication === 'function') {
-                try {
-                    window.Auth.requireAuthentication();
-                } catch (e) {
-                    console.warn('Auth check error:', e);
-                }
+                try { window.Auth.requireAuthentication(); } catch (e) { console.warn('Auth check error:', e); }
             }
-            
             // Initialize merchants page when DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', window.onDomReady);
-            } else {
-                window.onDomReady();
-            }
+                if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', window.onDomReady); } else { window.onDomReady(); }
         </script>
 <!-- Sidebar Loading Script -->
 <script>
@@ -1222,6 +1638,134 @@
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
     })();
 </script>
+<!-- Top Bar Loading Script -->
+<script src="../assets/js/topbar-loader.js"></script>
+
+<!-- Top Bar Management Script -->
+<script src="../assets/js/topbar.js"></script>
+
+<script>
+    (function initBulkIad() {
+        try {
+            const btn = document.getElementById('bulkUploadItemsBtn');
+            if (!btn) return;
+            // Show button only for merchants_admin or admin
+            const groups = (window.RBAC && window.RBAC.getUserGroups()) || [];
+            if (groups.includes('admin') || groups.includes('admins') || groups.includes('merchants_admin')) {
+                btn.style.display = 'inline-flex';
+            }
+            const modal = document.getElementById('bulkUploadModal');
+            const closeBtn = document.getElementById('closeBulkUploadModal');
+            const fileInput = document.getElementById('bulkFileInput');
+            const parseBtn = document.getElementById('parseBulkFileBtn');
+            const backBtn = document.getElementById('backToFileBtn');
+            const startBtn = document.getElementById('startBulkUploadBtn');
+            const cancelBtn = document.getElementById('cancelBulkUploadBtn');
+            const finishBtn = document.getElementById('finishBulkUploadBtn');
+            const errorsBtn = document.getElementById('downloadErrorsBtn');
+            const previewWrapper = document.getElementById('bulkPreviewTableWrapper');
+            const validationSummary = document.getElementById('bulkValidationSummary');
+            const progressFill = document.getElementById('bulkProgressFill');
+            const progressStatus = document.getElementById('bulkProgressStatus');
+            let parsedRows = [];
+            let validRows = [];
+            let errorRows = [];
+            let uploading = false;
+
+            function openModal() { modal.style.display = 'block'; document.body.style.overflow = 'hidden'; showStep('bulkStepSelectFile'); }
+            function closeModal() { if (uploading) return; modal.style.display = 'none'; document.body.style.overflow = ''; }
+            function showStep(id) { ['bulkStepSelectFile', 'bulkStepPreview', 'bulkStepProgress'].forEach(s => { const el = document.getElementById(s); if (el) el.style.display = (s === id ? 'block' : 'none'); }); }
+
+            btn.addEventListener('click', openModal);
+            if (closeBtn) closeBtn.addEventListener('click', closeModal);
+            window.addEventListener('keyup', (e) => { if (e.key === 'Escape') closeModal(); });
+
+            fileInput?.addEventListener('change', () => { parseBtn.disabled = !fileInput.files.length; });
+
+            parseBtn?.addEventListener('click', async () => {
+                if (!fileInput.files.length) return; const file = fileInput.files[0];
+                parsedRows = []; validRows = []; errorRows = []; previewWrapper.innerHTML = 'Parsing...';
+                const ext = file.name.toLowerCase().split('.').pop();
+                try {
+                    if (ext === 'csv') { await parseCSV(file); }
+                    else if (ext === 'json') { await parseJSON(file); }
+                    else if (ext === 'xlsx') { await parseXLSX(file); }
+                    else throw new Error('Unsupported file type');
+                    validateRows(); renderPreviewTable(); showStep('bulkStepPreview');
+                } catch (err) { previewWrapper.innerHTML = `<div style="padding:12px;color:var(--md-sys-color-error);">Parse failed: ${err.message}</div>`; }
+            });
+
+            backBtn?.addEventListener('click', () => { showStep('bulkStepSelectFile'); });
+            startBtn?.addEventListener('click', async () => { if (!validRows.length) return; uploading = true; showStep('bulkStepProgress'); startUpload(); });
+            cancelBtn?.addEventListener('click', () => { if (!uploading) { closeModal(); } });
+            finishBtn?.addEventListener('click', () => { if (!uploading) closeModal(); });
+
+            function parseCSV(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => { try { const text = e.target.result; const lines = text.split(/\r?\n/).filter(l => l.trim().length); if (!lines.length) return reject(new Error('Empty CSV')); const header = lines[0].split(',').map(h => h.trim()); const rows = lines.slice(1).map(line => { const cols = line.split(','); const obj = {}; header.forEach((h, i) => { obj[h] = cols[i]?.trim(); }); return obj; }); parsedRows = rows; resolve(); } catch (err) { reject(err); } }; reader.onerror = reject; reader.readAsText(file); }); }
+            function parseJSON(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = e => { try { const data = JSON.parse(e.target.result); if (!Array.isArray(data)) return reject(new Error('JSON must be an array')); parsedRows = data; resolve(); } catch (err) { reject(err); } }; reader.onerror = reject; reader.readAsText(file); }); }
+            function parseXLSX(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async e => { try { if (!window.XLSX) { return reject(new Error('SheetJS not loaded')); } const wb = XLSX.read(e.target.result, { type: 'binary' }); const first = wb.SheetNames[0]; const sheet = wb.Sheets[first]; const json = XLSX.utils.sheet_to_json(sheet); parsedRows = json; resolve(); } catch (err) { reject(err); } }; reader.onerror = reject; reader.readAsBinaryString(file); }); }
+
+            function validateRows() {
+                const required = ['name', 'price', 'currency'];
+                validRows = []; errorRows = [];
+                const seenIds = new Set();
+                parsedRows.forEach((r, idx) => {
+                    const row = { ...r };
+                    let itemId = row.itemId || row.id || `ITEM_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                    if (seenIds.has(itemId)) itemId = `${itemId}_${idx}`;
+                    seenIds.add(itemId);
+                    const errors = [];
+                    required.forEach(f => { if (!row[f]) errors.push(`Missing ${f}`); });
+                    if (row.price && isNaN(parseFloat(row.price))) errors.push('Invalid price');
+                    if (row.currency && row.currency.length > 5) errors.push('Currency too long');
+                    if (errors.length) errorRows.push({ index: idx + 1, errors, row });
+                    else validRows.push({ itemId, name: row.name, description: row.description || '', price: parseFloat(row.price || 0), currency: (row.currency || 'IQD').toUpperCase(), category: row.category || '', isActive: String(row.isActive || row.active || true) === 'true', stockQty: parseInt(row.stockQty || row.stock || 0, 10), vatRate: parseFloat(row.vatRate || 0), imageUrl: row.imageUrl || row.image || '' });
+                });
+                validationSummary.innerHTML = `${validRows.length} valid / ${errorRows.length} errors`;
+                startBtn.disabled = validRows.length === 0;
+                errorsBtn.style.display = errorRows.length ? 'inline-flex' : 'none';
+            }
+
+            function renderPreviewTable() {
+                const cols = ['itemId', 'name', 'price', 'currency', 'category', 'isActive'];
+                const head = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>`;
+                const body = `<tbody>${validRows.slice(0, 200).map(r => `<tr>${cols.map(c => `<td>${SecurityUtils ? SecurityUtils.escapeHTML(String(r[c])) : String(r[c])}</td>`).join('')}</tr>`).join('')}</tbody>`;
+                previewWrapper.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse;">${head}${body}</table>` + (validRows.length > 200 ? `<div style="font-size:0.65rem;padding:4px;">Showing first 200 of ${validRows.length}</div>` : '');
+            }
+
+            errorsBtn?.addEventListener('click', () => {
+                if (!errorRows.length) return; const header = 'row,errors'; const lines = errorRows.map(e => `${e.index},"${e.errors.join('; ')}"`); const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'bulk_upload_errors.csv'; a.click(); URL.revokeObjectURL(a.href);
+            });
+
+            async function startUpload() {
+                showStep('bulkStepProgress'); progressFill.style.width = '0%'; progressStatus.textContent = 'Starting...';
+                const merchantId = window.currentMerchantId || document.querySelector('[data-merchant-id]')?.getAttribute('data-merchant-id');
+                if (!merchantId) { progressStatus.textContent = 'Merchant context missing'; finishBtn.style.display = 'inline-flex'; uploading = false; return; }
+                const chunkSize = 50; // DynamoDB BatchWrite limit simplified
+                let processed = 0; const total = validRows.length;
+                for (let i = 0; i < validRows.length; i += chunkSize) {
+                    if (!uploading) { progressStatus.textContent = 'Cancelled'; break; }
+                    const chunk = validRows.slice(i, i + chunkSize);
+                    progressStatus.textContent = `Uploading items ${i + 1}-${Math.min(i + chunkSize, total)} of ${total}`;
+                    try {
+                        await uploadChunk(merchantId, chunk);
+                    } catch (err) { console.error('Chunk upload failed', err); }
+                    processed += chunk.length; const pct = Math.round((processed / total) * 100); progressFill.style.width = pct + '%';
+                }
+                uploading = false; finishBtn.style.display = 'inline-flex'; cancelBtn.style.display = 'none'; progressStatus.textContent = 'Completed';
+            }
+
+            async function uploadChunk(merchantId, items) {
+                const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
+                const payload = { merchantId, items };
+                const resp = await fetch(`/api/merchants/${merchantId}/items/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {}) }, body: JSON.stringify(payload) });
+                if (!resp.ok) { const txt = await resp.text(); throw new Error(`Bulk upload failed: ${resp.status} ${txt}`); }
+                const data = await resp.json();
+                console.log('Bulk chunk uploaded:', data);
+            }
+        } catch (e) { console.warn('Bulk upload init failed:', e); }
+    })();
+</script>
+
     </body>
 
     </html>

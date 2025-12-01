@@ -1117,7 +1117,8 @@ body {
 .main-content {
     margin-left: 280px;
     flex: 1;
-    padding: 24px;
+    padding: 72px 24px 24px 24px;
+        /* Top padding for top bar (56px + 16px spacing) */
     min-height: 100vh;
     background: var(--md-sys-color-surface);
     transition: margin-left var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-standard);

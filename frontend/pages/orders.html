@@ -4,10 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WizzCentral Platform - Orders Management</title>
+    <title>WizzCentral Platform - Orders</title>
     <!-- Security: DOMPurify for XSS Protection -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
+    <link rel="stylesheet" href="../styles/topbar.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -102,6 +103,84 @@
             background-color: var(--md-sys-color-error-container);
             color: var(--md-sys-color-on-error-container);
         }
+        
+        /* Channel badges */
+        .channel-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface);
+        }
+        
+        .channel-android {
+            background-color: #A4C639;
+            color: white;
+        }
+        
+        .channel-ios {
+            background-color: #007AFF;
+            color: white;
+        }
+        
+        .channel-web {
+            background-color: #4285F4;
+            color: white;
+        }
+        
+        /* Driver badges */
+        .driver-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: var(--md-sys-color-tertiary-container);
+            color: var(--md-sys-color-on-tertiary-container);
+            font-family: monospace;
+        }
+        
+        .driver-unassigned {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: var(--md-sys-color-surface-container-high);
+            color: var(--md-sys-color-on-surface-variant);
+        }
+        
+        /* Payment badges */
+        .payment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface);
+        }
+        
+        .payment-cod {
+            background-color: var(--md-sys-color-success-container);
+            color: var(--md-sys-color-on-success-container);
+        }
+        
+        .payment-captured {
+            background-color: var(--md-sys-color-primary-container);
+            color: var(--md-sys-color-on-primary-container);
+        }
+        
+        .payment-authorized {
+            background-color: var(--md-sys-color-tertiary-container);
+            color: var(--md-sys-color-on-tertiary-container);
+        }
     
         .orders-table {
             background-color: var(--md-sys-color-surface-container-low);
@@ -153,12 +232,15 @@
             background: var(--md-sys-color-surface-container-low);
         }
 
-        .orders-grid th:nth-child(1) { width: 140px; }
-        .orders-grid th:nth-child(2) { width: 220px; }
-        .orders-grid th:nth-child(3) { width: 120px; }
-        .orders-grid th:nth-child(4) { width: 110px; }
-        .orders-grid th:nth-child(5) { width: 140px; }
-        .orders-grid th:nth-child(6) { width: 120px; }
+        /* 8-column layout */
+        .orders-grid th:nth-child(1) { width: 120px; } /* Order ID */
+        .orders-grid th:nth-child(2) { width: 180px; } /* Customer */
+        .orders-grid th:nth-child(3) { width: 100px; } /* Channel */
+        .orders-grid th:nth-child(4) { width: 110px; } /* Status */
+        .orders-grid th:nth-child(5) { width: 120px; } /* Driver */
+        .orders-grid th:nth-child(6) { width: 110px; } /* Created */
+        .orders-grid th:nth-child(7) { width: 100px; } /* Payment */
+        .orders-grid th:nth-child(8) { width: 120px; } /* Actions */
         .orders-grid tbody tr:nth-child(even) { background: var(--md-sys-color-surface-container); }
         .orders-grid tbody tr:hover { background: var(--md-sys-color-surface-container-highest); }
 
@@ -370,6 +452,8 @@
     <script src="../aggressive-sidebar-fix.js"></script>
     <!-- Immediate sidebar state fix -->
     <script src="../immediate-sidebar-fix.js"></script>
+    <!-- Top Bar include placeholder -->
+    <div id="topbar-placeholder"></div>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
 
@@ -378,66 +462,25 @@
         <!-- Page Content -->
         <div class="page-content">
             <!-- Orders Statistics -->
-            <div class="orders-stats">
-                <div class="stat-card">
-                    <div class="stat-icon"
-                        style="background: linear-gradient(45deg, var(--md-sys-color-primary), var(--wizz-primary-dark));">
-                        <i class="fas fa-shopping-bag"></i>
+            <!-- Removed summary stat cards per request -->
+            
+            <!-- Search and Filter Controls -->
+            <div class="orders-controls">
+                <div class="controls-row">
+                    <div class="search-box">
+                        <!-- Removed inline onkeyup for CSP compliance -->
+                        <input type="text" id="search-input" placeholder="Search orders by ID, customer name...">
                     </div>
-                    <div class="stat-info">
-                        <div class="stat-label">Total Orders</div>
-                        <div class="stat-value" id="total-orders">0</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"
-                        style="background: linear-gradient(45deg, var(--md-sys-color-secondary), var(--wizz-secondary-dark));">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-label">Confirmed</div>
-                        <div class="stat-value" id="confirmed-orders">0</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon"
-                        style="background: linear-gradient(45deg, var(--md-sys-color-tertiary), var(--md-sys-color-tertiary));">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-label">Pending</div>
-                        <div class="stat-value" id="pending-orders">0</div>
-                        </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon"
-                                style="background: linear-gradient(45deg, var(--md-sys-color-error), var(--md-sys-color-error));">
-                                <i class="fas fa-times-circle"></i>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-label">Cancelled</div>
-                                <div class="stat-value" id="cancelled-orders">0</div>
-                            </div>
-                        </div>
-                        </div>
-                        
-                        <!-- Search and Filter Controls -->
-                        <div class="orders-controls">
-                            <div class="controls-row">
-                                <div class="search-box">
-                                    <!-- Removed inline onkeyup for CSP compliance -->
-                                    <input type="text" id="search-input" placeholder="Search orders by ID, customer name...">
-                                </div>
-                                <div class="filter-group">
-                                    <!-- Removed inline onchange for CSP compliance -->
-                                    <select id="status-filter">
-                                        <option value="">All Statuses</option>
-                                        <option value="confirmed">Confirmed</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="cancelled">Cancelled</option>
-                                    </select>
-                                    <input type="date" id="date-from" title="From Date">
-                                    <input type="date" id="date-to" title="To Date">
+                    <div class="filter-group">
+                        <!-- Removed inline onchange for CSP compliance -->
+                        <select id="status-filter">
+                            <option value="">All Statuses</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="pending">Pending</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                        <input type="date" id="date-from" title="From Date">
+                        <input type="date" id="date-to" title="To Date">
                     </div>
                 </div>
             </div>
@@ -457,13 +500,15 @@
                             <tr>
                                 <th>Order ID</th>
                                 <th>Customer</th>
+                                <th>Channel</th>
                                 <th>Status</th>
-                                <th>Total</th>
-                                <th>Date</th>
+                                <th>Driver</th>
+                                <th>Created</th>
+                                <th>Payment</th>
                                 <th>Actions</th>
                                 </tr>
                                 </thead>
-                        <tbody id="orders-tbody">
+                        <tbody id="ordersTableBody">
                             <!-- Orders will be populated here -->
                         </tbody>
                         </table>
@@ -496,6 +541,10 @@
     <script src="../assets/js/aws-utils.js"></script>
     <!-- Orders API -->
     <script src="../js/orders-api.js"></script>
+    <!-- Orders transformation utilities -->
+    <script src="../js/orders-transform.js"></script>
+    <!-- Orders management (main logic) -->
+    <script src="../orders.js"></script>
     <!-- Sidebar -->
     <script src="../assets/js/navigation.js"></script>
     <script src="../test-toggle-functionality.js"></script>
@@ -506,7 +555,7 @@
     // Load orders from API
     async function loadOrders() {
         const tableStatus = document.getElementById('table-status');
-        const tbody = document.getElementById('orders-tbody');
+        const tbody = document.getElementById('ordersTableBody');
 
         // SECURITY: Safe static content
         tableStatus.innerHTML = '<span class="loading-spinner"></span> Loading orders...';
@@ -530,11 +579,25 @@
 
             allOrders = result.orders || [];
             
-            // Process orders to add formatted fields
+            // Optimize: Only log if orders exist and only log first order structure once
+            if (allOrders.length > 0 && !window._ordersDebugLogged) {
+                console.log('📦 First order from API:', {
+                    orderId: allOrders[0].orderId,
+                    customerName: allOrders[0].customerName,
+                    status: allOrders[0].status,
+                    hasOrderId: !!allOrders[0].orderId,
+                    orderIdType: typeof allOrders[0].orderId
+                });
+                window._ordersDebugLogged = true;
+            }
+
+            // Process orders efficiently - API already provides orderId
+            // No need for extraction, just format additional fields
             allOrders = allOrders.map(order => ({
                 ...order,
-                cleanOrderId: order.orderId,
-                formattedDate: formatOrderDate(order.createdAt),
+                // orderId already extracted by WizzOrdersAPI
+                cleanOrderId: order.orderId || 'N/A',
+                formattedDate: order.createdAt ? formatOrderDate(order.createdAt) : 'N/A',
                 totalAmount: extractTotalAmount(order.total),
                 customerEmail: order.customerPhone || ''
             }));
@@ -570,7 +633,7 @@
             const safeErrorMessage = SecurityUtils.escapeHTML(error.message || 'Unknown error');
             tbody.innerHTML = SecurityUtils.sanitizeHTML(`
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-error);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                             <div>Failed to load orders: ${safeErrorMessage}</div>
                             ${errorMessage.includes('Token expired') || errorMessage.includes('Invalid login token') ? 
@@ -649,31 +712,21 @@
             return `${(cur === 'IQD' ? Math.round(num) : num.toFixed(2))} ${cur}`;
         }
 
-    // Update statistics
+                // Update statistics - Optimized with single DOM update
     function updateStatistics() {
-        const stats = allOrders.reduce((acc, order) => {
-            acc.total++;
-            if (order.status === 'confirmed') acc.confirmed++;
-            else if (order.status === 'pending') acc.pending++;
-            else if (order.status === 'cancelled') acc.cancelled++;
-            return acc;
-        }, { total: 0, confirmed: 0, pending: 0, cancelled: 0 });
-
-        document.getElementById('total-orders').textContent = stats.total;
-        document.getElementById('confirmed-orders').textContent = stats.confirmed;
-        document.getElementById('pending-orders').textContent = stats.pending;
-        document.getElementById('cancelled-orders').textContent = stats.cancelled;
+        // With stat cards removed, skip DOM updates
+        return;
     }
 
     // Render orders table
     function renderOrdersTable() {
-        const tbody = document.getElementById('orders-tbody');
+        const tbody = document.getElementById('ordersTableBody');
 
         if (filteredOrders.length === 0) {
             // SECURITY: Safe static content
             tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
+                        <td colspan="8" style="text-align: center; padding: 2rem; color: var(--md-sys-color-on-surface-variant);">
                             <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                             <div>No orders found</div>
                         </td>
@@ -687,7 +740,7 @@
             filteredOrders.map(order => {
                 const safeOrderId = SecurityUtils.escapeHTML(order.orderId);
                 const safeCustomerName = SecurityUtils.escapeHTML(order.customerName || 'N/A');
-                const safeCustomerEmail = SecurityUtils.escapeHTML(order.customerEmail || '');
+                const safeCustomerPhone = SecurityUtils.escapeHTML(order.customerPhone || '');
                 const statusRaw = (order.status || '').toString();
                 const safeStatus = SecurityUtils.escapeHTML(statusRaw);
                 const safeStatusClass = SecurityUtils.escapeHTML(statusRaw.toLowerCase());
@@ -697,22 +750,48 @@
                 const amountStr = formatCurrency(order.totalAmount || 0, currency);
                 const safeAmount = SecurityUtils.escapeHTML(amountStr);
 
+                // Channel badge
+                const channelIcons = { 'android': '🤖', 'ios': '🍎', 'web': '🌐' };
+                const channelLower = (order.channel || 'unknown').toLowerCase();
+                const channelIcon = channelIcons[channelLower] || '📱';
+                const safeChannel = SecurityUtils.escapeHTML(order.channel || 'N/A');
+
+                // Driver badge
+                const safeDriverId = order.collectorId ? SecurityUtils.escapeHTML(order.collectorId.substring(0, 8)) : '';
+                const driverBadge = safeDriverId
+                    ? `<span class="driver-badge" title="Driver: ${safeDriverId}">${safeDriverId}</span>`
+                    : `<span class="driver-unassigned">Unassigned</span>`;
+
+                // Payment badge
+                let paymentBadge = '';
+                if (order.codCollectedAt) {
+                    paymentBadge = `<span class="payment-badge payment-cod">COD ✓</span>`;
+                } else if (order.capturedAt) {
+                    paymentBadge = `<span class="payment-badge payment-captured">${currency} ✓</span>`;
+                } else if (order.authorizedAt) {
+                    paymentBadge = `<span class="payment-badge payment-authorized">${currency} ⏳</span>`;
+                } else {
+                    paymentBadge = `<span class="payment-badge">${currency}</span>`;
+                }
+
                 return `
                 <tr>
                     <td><span class="order-id" title="Order ID">${safeOrderId}</span></td>
                     <td>
                         <div class="customer-cell">
                             <div class="customer-name">${safeCustomerName}</div>
-                            <div class="customer-meta">${safeCustomerEmail}</div>
+                            <div class="customer-meta">${safeCustomerPhone}</div>
                         </div>
                     </td>
+                    <td><span class="channel-badge channel-${channelLower}">${channelIcon} ${safeChannel}</span></td>
                     <td>
                         <span class="status-badge status-${safeStatusClass}">
                             ${safeStatus}
                         </span>
                     </td>
-                    <td class="amount-cell">${safeAmount}</td>
+                    <td>${driverBadge}</td>
                     <td>${safeFormattedDate}</td>
+                    <td>${paymentBadge}</td>
                     <td>
                         <button class="view-details-btn" data-order-id="${safeCleanOrderId}">
                             View Details
@@ -930,7 +1009,7 @@
         });
 
         // Delegated click for view details buttons
-        document.getElementById('orders-tbody').addEventListener('click', (e) => {
+        document.getElementById('ordersTableBody').addEventListener('click', (e) => {
             const btn = e.target.closest('.view-details-btn');
             if (btn && btn.dataset.orderId) {
                 showOrderDetails(btn.dataset.orderId);
@@ -949,6 +1028,9 @@
         }, 100); // Small delay to ensure all scripts are loaded
     });
 </script>
+<!-- Top Bar Loading Script -->
+<script src="../assets/js/topbar-loader.js"></script>
+
 <!-- Sidebar Loading Script -->
 <script>
     // Load sidebar content
@@ -1001,5 +1083,8 @@
         } catch (e) { console.warn('RBAC init failed', e); }
     })();
 </script>
+<!-- Top Bar Management Script -->
+<script src="../assets/js/topbar.js"></script>
+
 </body>
 </html>

@@ -1,0 +1,87 @@
+<!-- Material 3 Top Bar -->
+<div class="md-top-app-bar" id="topbar">
+    <div class="top-app-bar-content">
+        <!-- Left Section: Menu Toggle (Mobile) + Breadcrumbs -->
+        <div class="top-app-bar-left">
+            <button class="menu-toggle md-icon-button" id="mobileMenuToggle" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="breadcrumbs">
+                <span class="breadcrumb-item" id="breadcrumbPage">Dashboard</span>
+            </div>
+        </div>
+
+        <!-- Right Section: Actions + User -->
+        <div class="top-app-bar-right">
+            <!-- Search Button -->
+            <button class="md-icon-button" id="searchBtn" aria-label="Search" title="Search">
+                <i class="fas fa-search"></i>
+            </button>
+
+            <!-- Notifications -->
+            <button class="md-icon-button notification-btn" id="notificationBtn" aria-label="Notifications" title="Notifications">
+                <i class="fas fa-bell"></i>
+                <span class="notification-badge" id="notificationBadge">3</span>
+            </button>
+
+            <!-- Theme Toggle -->
+            <button class="md-icon-button" id="themeToggle" aria-label="Toggle theme" title="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+
+            <!-- User Profile -->
+            <div class="top-bar-user-profile">
+                <button class="user-profile-btn" id="userProfileBtn" aria-label="User profile">
+                    <div class="user-avatar-small">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span class="user-name-small" id="topbarUserName">Admin</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                
+                <!-- User Dropdown Menu -->
+                <div class="user-dropdown-menu" id="userDropdownMenu">
+                    <div class="dropdown-header">
+                        <div class="user-avatar-medium">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div class="dropdown-user-info">
+                            <div class="dropdown-user-name" id="dropdownUserName">Admin User</div>
+                            <div class="dropdown-user-email" id="dropdownUserEmail">admin@whizz.sa</div>
+                        </div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <ul class="dropdown-menu-items">
+                        <li>
+                            <a href="#" class="dropdown-item">
+                                <i class="fas fa-user-circle"></i>
+                                <span>Profile</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="dropdown-item">
+                                <i class="fas fa-cog"></i>
+                                <span>Settings</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="dropdown-item">
+                                <i class="fas fa-question-circle"></i>
+                                <span>Help</span>
+                            </a>
+                        </li>
+                    </ul>
+                    <div class="dropdown-divider"></div>
+                    <ul class="dropdown-menu-items">
+                        <li>
+                            <a href="#" class="dropdown-item logout-item" id="topbarLogout">
+                                <i class="fas fa-sign-out-alt"></i>
+                                <span>Logout</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

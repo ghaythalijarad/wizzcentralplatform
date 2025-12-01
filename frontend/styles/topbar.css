@@ -1,0 +1,371 @@
+/* ========================================
+   TOP BAR STYLES
+   Material Design 3 - WizzCentral Platform
+   ======================================== */
+
+/* Top App Bar Container */
+.md-top-app-bar {
+    position: fixed;
+    top: 0;
+    left: 280px; /* Sidebar width */
+    right: 0;
+    height: 56px;
+    background-color: var(--md-sys-color-surface-container);
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+    z-index: 1000;
+    transition: left var(--md-sys-motion-duration-medium2) var(--md-sys-motion-easing-emphasized);
+    display: flex;
+    align-items: center;
+}
+
+.top-app-bar-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 100%;
+    padding: 0 16px;
+}
+
+/* Left Section */
+.top-app-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.menu-toggle {
+    display: none; /* Hidden on desktop */
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--md-sys-typescale-title-medium-font-size);
+    font-weight: var(--md-sys-typescale-title-medium-font-weight);
+    color: var(--md-sys-color-on-surface);
+}
+
+.breadcrumb-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.breadcrumb-item:not(:last-child)::after {
+    content: '/';
+    color: var(--md-sys-color-on-surface-variant);
+    margin-left: 8px;
+}
+
+/* Right Section */
+.top-app-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Icon Buttons */
+.md-icon-button {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--md-sys-shape-corner-full);
+    border: none;
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    position: relative;
+}
+
+.md-icon-button:hover {
+    background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.md-icon-button:active {
+    background-color: var(--md-sys-color-surface-variant);
+}
+
+.md-icon-button i {
+    font-size: 20px;
+}
+
+/* Notification Button */
+.notification-btn {
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-width: 18px;
+    height: 18px;
+    background-color: var(--md-sys-color-error);
+    color: var(--md-sys-color-on-error);
+    border-radius: var(--md-sys-shape-corner-full);
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--md-sys-color-surface-container);
+}
+
+.notification-badge:empty {
+    display: none;
+}
+
+/* User Profile Section */
+.top-bar-user-profile {
+    position: relative;
+    margin-left: 8px;
+}
+
+.user-profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 4px;
+    border-radius: 20px;
+    border: none;
+    background: transparent;
+    color: var(--md-sys-color-on-surface);
+    cursor: pointer;
+    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    height: 40px;
+}
+
+.user-profile-btn:hover {
+    background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.user-avatar-small {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--md-sys-shape-corner-full);
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.user-name-small {
+    font-size: var(--md-sys-typescale-body-medium-font-size);
+    font-weight: var(--md-sys-typescale-body-medium-font-weight);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-profile-btn i.fa-chevron-down {
+    font-size: 12px;
+    color: var(--md-sys-color-on-surface-variant);
+    transition: transform var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+
+.user-profile-btn.active i.fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+/* User Dropdown Menu */
+.user-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 280px;
+    background-color: var(--md-sys-color-surface-container);
+    border-radius: var(--md-sys-shape-corner-large);
+    box-shadow: var(--md-sys-elevation-level2);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-standard),
+                transform var(--md-sys-motion-duration-short3) var(--md-sys-motion-easing-emphasized-decelerate),
+                visibility var(--md-sys-motion-duration-short3);
+    z-index: 1001;
+}
+
+.user-dropdown-menu.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.user-avatar-medium {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--md-sys-shape-corner-full);
+    background-color: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.dropdown-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.dropdown-user-name {
+    font-size: var(--md-sys-typescale-body-large-font-size);
+    font-weight: var(--md-sys-typescale-body-large-font-weight);
+    color: var(--md-sys-color-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-user-email {
+    font-size: var(--md-sys-typescale-body-small-font-size);
+    color: var(--md-sys-color-on-surface-variant);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: var(--md-sys-color-outline-variant);
+    margin: 8px 0;
+}
+
+.dropdown-menu-items {
+    list-style: none;
+    margin: 0;
+    padding: 8px 0;
+}
+
+.dropdown-menu-items li {
+    margin: 0;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--md-sys-color-on-surface);
+    text-decoration: none;
+    transition: background-color var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+    cursor: pointer;
+    font-size: var(--md-sys-typescale-body-medium-font-size);
+}
+
+.dropdown-item:hover {
+    background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.dropdown-item i {
+    font-size: 18px;
+    color: var(--md-sys-color-on-surface-variant);
+    width: 20px;
+    text-align: center;
+}
+
+.dropdown-item.logout-item {
+    color: var(--md-sys-color-error);
+}
+
+.dropdown-item.logout-item i {
+    color: var(--md-sys-color-error);
+}
+
+/* Adjust main content for top bar */
+.main-content {
+    padding-top: 72px; /* Top bar height (56px) + spacing (16px) */
+}
+
+/* Responsive adjustments */
+@media (min-width: 1024px) {
+    /* Desktop: Top bar accounts for sidebar */
+    .md-top-app-bar {
+        left: 280px;
+    }
+
+    /* Collapsed sidebar state */
+    body:has(.md-navigation-drawer.collapsed) .md-top-app-bar,
+    .md-top-app-bar.collapsed-sidebar {
+        left: 72px;
+    }
+}
+
+@media (max-width: 1023px) {
+    /* Tablet and Mobile: Full width top bar */
+    .md-top-app-bar {
+        left: 0;
+        width: 100%;
+    }
+
+    /* Show menu toggle on mobile */
+    .menu-toggle {
+        display: flex !important;
+    }
+
+    /* Hide user name on smaller screens */
+    .user-name-small {
+        display: none;
+    }
+
+    /* Adjust dropdown menu position */
+    .user-dropdown-menu {
+        right: -8px;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Mobile: Compact layout */
+    .top-app-bar-content {
+        padding: 0 8px;
+    }
+
+    .top-app-bar-right {
+        gap: 4px;
+    }
+
+    /* Hide some buttons on very small screens */
+    #searchBtn {
+        display: none;
+    }
+
+    .breadcrumbs {
+        font-size: var(--md-sys-typescale-body-medium-font-size);
+    }
+}
+
+/* Backdrop for closing dropdown when clicking outside */
+.dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    display: none;
+}
+
+.dropdown-backdrop.active {
+    display: block;
+}

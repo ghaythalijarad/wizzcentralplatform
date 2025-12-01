@@ -5,17 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WizzCentral Platform - Regions Management</title>
     <link rel="stylesheet" href="../styles/material-3-design-system.css">
+    <link rel="stylesheet" href="../styles/topbar.css">
     <script src="../styles/wizz-theme-config.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <!-- Leaflet Map Library -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <!-- Add Leaflet.draw for polygon/line drawing -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
-    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <!-- Chart.js for data visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
@@ -440,6 +439,15 @@
         .pagination-info {
             font-size: 0.875rem;
             color: var(--md-sys-color-on-surface-variant);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        #itemsPerPageSelect {
+            font-size: 0.875rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: var(--md-sys-shape-corner-small);
         }
 
         .pagination-controls {
@@ -1027,33 +1035,13 @@
 </head>
 
 <body data-page="regions">
+    <!-- Top Bar Placeholder -->
+    <div id="topbar-placeholder"></div>
     <!-- Sidebar include placeholder -->
     <div id="sidebar-placeholder"></div>
 
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="top-bar-left">
-                <button class="menu-toggle" id="menuToggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1 class="page-title">Regions Management</h1>
-                <span id="version-badge"
-                    style="font-size: 0.7rem; background-color: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant); padding: 2px 6px; border-radius: 8px; margin-left: 10px; font-weight: 500;"></span>
-            </div>
-            <div class="top-bar-actions">
-                <button class="btn-primary" onclick="refreshRegionsData()">
-                    <i class="fas fa-sync"></i>
-                    Refresh
-                </button>
-                <button class="btn-secondary" onclick="window.location.reload(true)" style="margin-left: 0.5rem;">
-                    <i class="fas fa-redo"></i>
-                    Hard Reload
-                </button>
-            </div>
-        </div>
-
         <!-- Page Content -->
         <div class="page-content">
             <!-- Hierarchy Navigation & Search -->
@@ -1160,6 +1148,13 @@
                         <!-- Pagination -->
                         <div class="table-pagination" id="tablePagination">
                             <div class="pagination-info">
+                                <select id="itemsPerPageSelect" class="form-select"
+                                    style="width: auto; min-width: 80px; margin-right: 1rem; padding: 0.5rem;">
+                                    <option value="10" selected>10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
                                 Showing <span id="showingStart">0</span> to <span id="showingEnd">0</span> of <span id="totalCount">0</span> regions
                             </div>
                             <div class="pagination-controls">
@@ -1461,5 +1456,8 @@
         } catch (e) { console.warn('RBAC init failed', e); }
     })();
     </script>
+    <!-- Top Bar Scripts -->
+    <script src="../assets/js/topbar-loader.js"></script>
+    <script src="../assets/js/topbar.js"></script>
 </body>
 </html>

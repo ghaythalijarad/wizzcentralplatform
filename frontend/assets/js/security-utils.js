@@ -21,9 +21,30 @@ window.SecurityUtils = {
         }
 
         const defaultConfig = {
-            ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'span', 'div', 'ul', 'ol', 'li'],
-            ALLOWED_ATTR: ['href', 'class', 'id', 'style'],
-            ALLOW_DATA_ATTR: false,
+            ALLOWED_TAGS: [
+                'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'span', 'div', 'ul', 'ol', 'li',
+                // Table elements
+                'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+                // Form elements
+                'button', 'input', 'select', 'option', 'label', 'form', 'textarea', 'fieldset', 'legend',
+                // Media elements
+                'img', 'svg', 'path', 'circle', 'rect', 'line', 'polygon', 'polyline', 'g', 'use', 'defs',
+                // Heading elements
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                // Other common elements
+                'section', 'article', 'header', 'footer', 'nav', 'aside', 'main', 'figure', 'figcaption',
+                'small', 'code', 'pre', 'blockquote', 'hr', 'dl', 'dt', 'dd', 'abbr', 'time', 'mark',
+                // Icon elements (Font Awesome uses <i>)
+                'i', 'icon', 'fa'
+            ],
+            ALLOWED_ATTR: [
+                'href', 'class', 'id', 'style', 'title', 'alt', 'src', 'loading', 'role', 'aria-label', 'aria-hidden',
+                'data-id', 'data-action', 'data-merchant-row', 'data-status', 'data-events-attached',
+                'type', 'value', 'name', 'placeholder', 'disabled', 'readonly', 'checked', 'selected',
+                'colspan', 'rowspan', 'width', 'height', 'viewBox', 'fill', 'stroke', 'd', 'xmlns',
+                'onerror' // For fallback images - will be sanitized by DOMPurify
+            ],
+            ALLOW_DATA_ATTR: true,
             ALLOW_UNKNOWN_PROTOCOLS: false,
             SAFE_FOR_JQUERY: true
         };

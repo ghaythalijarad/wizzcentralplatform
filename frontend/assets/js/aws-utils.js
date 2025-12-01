@@ -3,6 +3,7 @@ console.log('Loading aws-utils.js...');
 
 window.AWSUtils = {
     dynamodbClient: null,
+    s3Client: null,
     isInitialized: false,
     _redirectedThisLoad: false,
 
@@ -169,6 +170,12 @@ window.AWSUtils = {
                 removeUndefinedValues: true
             });
 
+            // Initialize S3 client for pre-signed URLs
+            this.s3Client = new AWS.S3({
+                region: region,
+                signatureVersion: 'v4'
+            });
+
             this.isInitialized = true;
             console.log('AWS initialized successfully.');
             return this.dynamodbClient;
@@ -204,9 +211,72 @@ window.AWSUtils = {
         return this.dynamodbClient;
     },
 
+    // Get S3 client (initializes if needed)
+    async getS3Client() {
+        if (!this.isInitialized) {
+            await this.initialize();
+        }
+        return this.s3Client;
+    },
+
+    // Generate pre-signed URL for S3 object
+    async getPresignedUrl(s3Url, expiresIn = 3600) {
+        try {
+            if (!s3Url || typeof s3Url !== 'string') {
+                console.warn('Invalid S3 URL provided:', s3Url);
+                return null;
+            }
+
+            // Parse S3 URL to extract bucket and key
+            // Format: https://bucket-name.s3.region.amazonaws.com/key
+            // or: https://s3.region.amazonaws.com/bucket-name/key
+            let bucket, key;
+            
+            const s3Match = s3Url.match(/https?:\/\/([^.]+)\.s3[.-]([^.]+)\.amazonaws\.com\/(.+)/);
+            if (s3Match) {
+                bucket = s3Match[1];
+                key = decodeURIComponent(s3Match[3]);
+            } else {
+                const altMatch = s3Url.match(/https?:\/\/s3[.-]([^.]+)\.amazonaws\.com\/([^/]+)\/(.+)/);
+                if (altMatch) {
+                    bucket = altMatch[2];
+                    key = decodeURIComponent(altMatch[3]);
+                } else {
+                    console.warn('Could not parse S3 URL:', s3Url);
+                    return null;
+                }
+            }
+
+            console.log(`Generating pre-signed URL for bucket: ${bucket}, key: ${key}`);
+
+            // Get S3 client
+            const s3 = await this.getS3Client();
+            if (!s3) {
+                console.warn('S3 client not initialized');
+                return null;
+            }
+
+            // Generate pre-signed URL
+            const params = {
+                Bucket: bucket,
+                Key: key,
+                Expires: expiresIn // URL valid for specified seconds (default 1 hour)
+            };
+
+            const presignedUrl = await s3.getSignedUrlPromise('getObject', params);
+            console.log(`✅ Generated pre-signed URL (expires in ${expiresIn}s)`);
+            return presignedUrl;
+
+        } catch (error) {
+            console.error('Error generating pre-signed URL:', error);
+            return null;
+        }
+    },
+
     // Reset initialization state (useful for re-authentication)
     reset() {
         this.dynamodbClient = null;
+        this.s3Client = null;
         this.isInitialized = false;
     }
 };

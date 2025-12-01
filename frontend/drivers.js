@@ -350,6 +350,56 @@ function setupEventListeners() {
     if (editDriverForm) {
         editDriverForm.addEventListener('submit', handleEditDriver);
     }
+    
+    // ADDED: Setup modal close button event listeners as backup for onclick handlers
+    setupModalCloseListeners();
+}
+
+// NEW: Setup event listeners for modal close buttons (backup for onclick)
+function setupModalCloseListeners() {
+    // Edit modal close button (X)
+    const editModalCloseBtn = document.querySelector('#editDriverModal .modal-close');
+    if (editModalCloseBtn) {
+        console.log('✅ Setting up edit modal close button listener');
+        editModalCloseBtn.addEventListener('click', function(e) {
+            console.log('🔴 Edit modal close button clicked (event listener)');
+            e.preventDefault();
+            e.stopPropagation();
+            closeEditDriverModal();
+        });
+    }
+    
+    // Edit modal cancel button
+    const editModalCancelBtn = document.querySelector('#editDriverModal .btn-secondary');
+    if (editModalCancelBtn) {
+        console.log('✅ Setting up edit modal cancel button listener');
+        editModalCancelBtn.addEventListener('click', function(e) {
+            console.log('🔴 Edit modal cancel button clicked (event listener)');
+            e.preventDefault();
+            e.stopPropagation();
+            closeEditDriverModal();
+        });
+    }
+    
+    // View modal close button
+    const viewModalCloseBtn = document.querySelector('#viewDriverModal .modal-close');
+    if (viewModalCloseBtn) {
+        viewModalCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeViewDriverModal();
+        });
+    }
+    
+    // Add modal close button
+    const addModalCloseBtn = document.querySelector('#addDriverModal .modal-close');
+    if (addModalCloseBtn) {
+        addModalCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAddDriverModal();
+        });
+    }
 }
 
 function renderDriversTable(driversList = drivers) {
@@ -408,6 +458,7 @@ function renderDriversTable(driversList = drivers) {
     tbody.innerHTML = rows || `<tr><td colspan="8" class="text-center" style="padding:2rem;">No drivers found</td></tr>`;
 
     // Attach event listeners for actions (delegation)
+    // FIXED: Removed { once: true } to allow multiple clicks on edit/view buttons
     tbody.addEventListener('click', function(e){
         const btn = e.target.closest('button');
         if(!btn) return;
@@ -419,7 +470,7 @@ function renderDriversTable(driversList = drivers) {
             const currentStatus = btn.getAttribute('data-current-status');
             toggleDriverStatus(id, currentStatus);
         }
-    }, { once: true });
+    });
 }
 
 function generateStars(rating) {
@@ -661,15 +712,19 @@ function viewDriver(driverId) {
     openViewDriverModal();
 }
 
-function displayViewDriverDocuments(driver) {
+async function displayViewDriverDocuments(driver) {
     const documentsSection = document.getElementById('viewDocumentsSection');
     if (!documentsSection) return;
     
     let html = '';
     
-    // SECURITY: Sanitize URLs to prevent XSS
-    const safeLicenseUrl = driver.drivingLicenseUrl ? SecurityUtils.sanitizeURL(driver.drivingLicenseUrl) : null;
-    const safeRegistrationUrl = driver.registrationPaperUrl ? SecurityUtils.sanitizeURL(driver.registrationPaperUrl) : null;
+    // Get URLs from driver data
+    const rawLicenseUrl = driver.drivingLicenseUrl || driver.fullData?.drivingLicenseUrl;
+    const rawRegistrationUrl = driver.registrationPaperUrl || driver.fullData?.registrationPaperUrl;
+    
+    // Generate pre-signed URLs for S3 access
+    const safeLicenseUrl = rawLicenseUrl ? await AWSUtils.getPresignedUrl(rawLicenseUrl) : null;
+    const safeRegistrationUrl = rawRegistrationUrl ? await AWSUtils.getPresignedUrl(rawRegistrationUrl) : null;
     
     // Driving License
     if (safeLicenseUrl) {
@@ -678,10 +733,10 @@ function displayViewDriverDocuments(driver) {
                 <h4>
                     <i class="fas fa-id-card"></i> Driving License
                 </h4>
-                <a href="${safeLicenseUrl}" target="_blank">
+                <a href="${SecurityUtils.sanitizeURL(safeLicenseUrl)}" target="_blank">
                     <i class="fas fa-external-link-alt"></i> Open in New Tab
                 </a>
-                <img src="${safeLicenseUrl}" 
+                <img src="${SecurityUtils.sanitizeURL(safeLicenseUrl)}" 
                      alt="Driving License" 
                      onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
             </div>
@@ -704,10 +759,10 @@ function displayViewDriverDocuments(driver) {
                 <h4>
                     <i class="fas fa-file-alt"></i> Registration Paper
                 </h4>
-                <a href="${safeRegistrationUrl}" target="_blank">
+                <a href="${SecurityUtils.sanitizeURL(safeRegistrationUrl)}" target="_blank">
                     <i class="fas fa-external-link-alt"></i> Open in New Tab
                 </a>
-                <img src="${safeRegistrationUrl}" 
+                <img src="${SecurityUtils.sanitizeURL(safeRegistrationUrl)}" 
                      alt="Registration Paper" 
                      onerror="this.parentElement.innerHTML='<em style=\\'color: var(--md-sys-color-error);\\'>Failed to load image</em>'">
             </div>
@@ -772,19 +827,22 @@ async function editDriver(driverId) {
     document.getElementById('editDriverId').value = driver.id;
     document.getElementById('editDriverName').value = driver.name || '';
     
-    // Set city after dropdown is loaded
+    // Set home_region_name after dropdown is loaded
     setTimeout(() => {
         const citySelect = document.getElementById('editDriverCity');
-        if (citySelect && driver.location) {
+        // Try home_region_name first (new field), then fall back to city or location
+        const regionName = driver.fullData?.home_region_name || driver.fullData?.city || driver.location;
+        
+        if (citySelect && regionName) {
             const matchingOption = Array.from(citySelect.options).find(
-                option => option.value === driver.location
+                option => option.value === regionName
             );
             
             if (matchingOption) {
                 matchingOption.selected = true;
-                console.log(`✅ Auto-selected city: ${driver.location}`);
+                console.log(`✅ Auto-selected region: ${regionName}`);
             } else {
-                console.warn(`⚠️ City "${driver.location}" not found in dropdown`);
+                console.warn(`⚠️ Region "${regionName}" not found in dropdown`);
             }
         }
     }, 150);
@@ -809,13 +867,14 @@ async function editDriver(driverId) {
     displayDriverDocuments(driver);
 }
 
-function displayDriverDocuments(driver) {
+async function displayDriverDocuments(driver) {
     // Driving License
     const drivingLicenseLink = document.getElementById('drivingLicenseLink');
     const drivingLicenseImage = document.getElementById('drivingLicenseImage');
     const drivingLicenseNone = document.getElementById('drivingLicenseNone');
     
-    const drivingLicenseUrl = driver.fullData?.drivingLicenseUrl || driver.documents?.drivingLicense;
+    const rawLicenseUrl = driver.fullData?.drivingLicenseUrl || driver.documents?.drivingLicense;
+    const drivingLicenseUrl = rawLicenseUrl ? await AWSUtils.getPresignedUrl(rawLicenseUrl) : null;
     
     if (drivingLicenseUrl) {
         drivingLicenseLink.href = drivingLicenseUrl;
@@ -823,7 +882,7 @@ function displayDriverDocuments(driver) {
         drivingLicenseNone.style.display = 'none';
         
         // Show image preview if it's an image
-        if (drivingLicenseUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        if (rawLicenseUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
             const img = drivingLicenseImage.querySelector('img');
             img.src = drivingLicenseUrl;
             img.onerror = function() {
@@ -844,7 +903,8 @@ function displayDriverDocuments(driver) {
     const registrationPaperImage = document.getElementById('registrationPaperImage');
     const registrationPaperNone = document.getElementById('registrationPaperNone');
     
-    const registrationPaperUrl = driver.fullData?.registrationPaperUrl || driver.documents?.vehicleRegistration;
+    const rawRegistrationUrl = driver.fullData?.registrationPaperUrl || driver.documents?.vehicleRegistration;
+    const registrationPaperUrl = rawRegistrationUrl ? await AWSUtils.getPresignedUrl(rawRegistrationUrl) : null;
     
     if (registrationPaperUrl) {
         registrationPaperLink.href = registrationPaperUrl;
@@ -852,7 +912,7 @@ function displayDriverDocuments(driver) {
         registrationPaperNone.style.display = 'none';
         
         // Show image preview if it's an image
-        if (registrationPaperUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        if (rawRegistrationUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
             const img = registrationPaperImage.querySelector('img');
             img.src = registrationPaperUrl;
             img.onerror = function() {
@@ -895,7 +955,7 @@ async function loadCitiesDropdown() {
         if (!citySelect) return;
         
         // Show loading state
-        citySelect.innerHTML = '<option value="">Loading cities...</option>';
+        citySelect.innerHTML = '<option value="">Loading regions...</option>';
         
         // Get DynamoDB client
         const dynamoDB = await AWSUtils.getDynamoDBClient();
@@ -908,51 +968,64 @@ async function loadCitiesDropdown() {
         // Scan WizzCentral_Regions table
         const params = {
             TableName: 'WizzCentral_Regions',
-            ProjectionExpression: 'regionName, regionNameArabic, regionCode',
-            Limit: 200
+            ProjectionExpression: '#level, name_ar, is_active',
+            ExpressionAttributeNames: {
+                '#level': 'level'
+            },
+            FilterExpression: 'is_active = :active',
+            ExpressionAttributeValues: {
+                ':active': true
+            }
         };
         
-        console.log('Loading cities from WizzCentral_Regions...');
+        console.log('Loading regions from WizzCentral_Regions...');
         const result = await dynamoDB.scan(params).promise();
         
         const regions = result.Items || [];
-        console.log(`Found ${regions.length} regions`);
+        console.log(`Found ${regions.length} active regions`);
+
+        // Filter to level 2 and 3 (districts and neighborhoods)
+        const filteredRegions = regions.filter(region => {
+            const level = region.level;
+            return level === 2 || level === 3;
+        });
         
-        // Remove duplicates based on English name (some regions appear multiple times)
+        console.log(`Filtered to ${filteredRegions.length} level 2-3 regions (districts/neighborhoods)`);
+        
+        // Remove duplicates based on Arabic name
         const uniqueRegions = [];
         const seenNames = new Set();
-        regions.forEach(region => {
-            const englishName = region.regionName || '';
-            if (englishName && !seenNames.has(englishName)) {
-                seenNames.add(englishName);
+        filteredRegions.forEach(region => {
+            const arabicName = region.name_ar || '';
+            if (arabicName && !seenNames.has(arabicName)) {
+                seenNames.add(arabicName);
                 uniqueRegions.push(region);
             }
         });
         
-        console.log(`Found ${uniqueRegions.length} unique cities after deduplication`);
+        console.log(`Found ${uniqueRegions.length} unique regions after deduplication`);
         
-        // Sort regions alphabetically by English name (since drivers table uses English)
+        // Sort regions alphabetically by Arabic name
         uniqueRegions.sort((a, b) => {
-            const nameA = a.regionName || '';
-            const nameB = b.regionName || '';
-            return nameA.localeCompare(nameB, 'en');
+            const nameA = a.name_ar || '';
+            const nameB = b.name_ar || '';
+            return nameA.localeCompare(nameB, 'ar');
         });
         
-        // Populate dropdown
-        citySelect.innerHTML = '<option value="">Select City / Region</option>';
+        // Populate dropdown with Arabic names
+        citySelect.innerHTML = '<option value="">اختر المنطقة / Select Region</option>';
         uniqueRegions.forEach(region => {
             const option = document.createElement('option');
-            const englishName = region.regionName || '';
-            const arabicName = region.regionNameArabic || '';
-            option.value = englishName; // Store English name (matches driver data)
-            option.textContent = `${englishName}${arabicName ? ' - ' + arabicName : ''}`;
+            const arabicName = region.name_ar || '';
+            option.value = arabicName; // Store Arabic name (matches home_region_name in driver data)
+            option.textContent = arabicName;
             citySelect.appendChild(option);
         });
         
-        console.log(`✅ Loaded ${uniqueRegions.length} cities into dropdown`);
+        console.log(`✅ Loaded ${uniqueRegions.length} regions into dropdown`);
         
     } catch (error) {
-        console.error('Error loading cities:', error);
+        console.error('Error loading regions:', error);
         const citySelect = document.getElementById('editDriverCity');
         if (citySelect) {
             populateFallbackCities(citySelect);
@@ -961,27 +1034,23 @@ async function loadCitiesDropdown() {
 }
 
 function populateFallbackCities(selectElement) {
-    // Fallback cities in case DynamoDB fails (English names to match driver data)
-    const fallbackCities = [
-        { english: 'Baghdad', arabic: 'بغداد' },
-        { english: 'Basra', arabic: 'البصرة' },
-        { english: 'Erbil', arabic: 'أربيل' },
-        { english: 'Najaf', arabic: 'النجف' },
-        { english: 'Kirkuk', arabic: 'كركوك' },
-        { english: 'Mosul', arabic: 'الموصل' },
-        { english: 'Sulaymaniyah', arabic: 'السليمانية' },
-        { english: 'Karbala', arabic: 'كربلاء' },
-        { english: 'Diwaniyah', arabic: 'الديوانية' },
-        { english: 'Amarah', arabic: 'العمارة' },
-        { english: 'Nasiriyah', arabic: 'الناصرية' },
-        { english: 'Hillah', arabic: 'الحلة' }
+    // Fallback regions in case DynamoDB fails (Arabic names to match driver data)
+    const fallbackRegions = [
+        'مركز المناذرة',
+        'ناحية العباسية',
+        'ناحية الحرية',
+        'ناحية الحيدرية',
+        'ناحية الحيرة',
+        'ناحية الكوفة',
+        'مركز الكوفة',
+        'مركز النجف'
     ];
     
-    selectElement.innerHTML = '<option value="">Select City / Region</option>';
-    fallbackCities.forEach(city => {
+    selectElement.innerHTML = '<option value="">اختر المنطقة / Select Region</option>';
+    fallbackRegions.forEach(region => {
         const option = document.createElement('option');
-        option.value = city.english; // Store English name
-        option.textContent = `${city.english} - ${city.arabic}`;
+        option.value = region; // Store Arabic name
+        option.textContent = region;
         selectElement.appendChild(option);
     });
 }
@@ -996,11 +1065,19 @@ function openEditDriverModal() {
 }
 
 function closeEditDriverModal() {
+    console.log('🔴 closeEditDriverModal called');
     const modal = document.getElementById('editDriverModal');
     if (modal) {
+        console.log('✅ Modal found, closing...');
         modal.style.display = 'none';
         // Reset form
-        document.getElementById('editDriverForm').reset();
+        const form = document.getElementById('editDriverForm');
+        if (form) {
+            form.reset();
+            console.log('✅ Form reset');
+        }
+    } else {
+        console.error('❌ Modal not found!');
     }
 }
 
@@ -1019,14 +1096,14 @@ async function handleEditDriver(e) {
         const formData = new FormData(e.target);
         const driverId = formData.get('driverId');
         const name = formData.get('name');
-        const city = formData.get('city');
+        const homeRegionName = formData.get('city'); // Field name is 'city' but we save to home_region_name
         const licenseNumber = formData.get('licenseNumber');
         const nationalId = formData.get('nationalId');
         const vehicleType = formData.get('vehicleType');
         const status = formData.get('status');
         
         console.log(`📝 Updating driver ${driverId}...`);
-        console.log('Form data:', { name, city, licenseNumber, nationalId, vehicleType, status });
+        console.log('Form data:', { name, homeRegionName, licenseNumber, nationalId, vehicleType, status });
         
         // Get DynamoDB client
         const dynamoDB = await AWSUtils.getDynamoDBClient();
@@ -1034,12 +1111,12 @@ async function handleEditDriver(e) {
             throw new Error('AWS is not initialized. Please login again.');
         }
         
-        // Prepare update expression (only for fields that exist in table)
-        const updateExpression = 'SET #name = :name, #city = :city, #license = :license, #nationalId = :nationalId, #vehicleType = :vehicleType, #status = :status, #updatedAt = :timestamp';
+        // Prepare update expression (save to home_region_name field)
+        const updateExpression = 'SET #name = :name, #homeRegion = :homeRegion, #license = :license, #nationalId = :nationalId, #vehicleType = :vehicleType, #status = :status, #updatedAt = :timestamp';
         
         const expressionAttributeNames = {
             '#name': 'name',
-            '#city': 'city',
+            '#homeRegion': 'home_region_name',
             '#license': 'licenseNumber',
             '#nationalId': 'nationalId',
             '#vehicleType': 'vehicleType',
@@ -1049,12 +1126,12 @@ async function handleEditDriver(e) {
         
         const expressionAttributeValues = {
             ':name': name,
-            ':city': city,
+            ':homeRegion': homeRegionName,
             ':license': licenseNumber,
             ':nationalId': nationalId,
             ':vehicleType': vehicleType,
             ':status': status, // Already in DB format (APPROVED, PENDING_REVIEW, SUSPENDED)
-            ':timestamp': Math.floor(Date.now() / 1000)
+            ':timestamp': new Date().toISOString()
         };
         
         // Try updating with 'driverId' key first
@@ -1109,18 +1186,21 @@ async function handleEditDriver(e) {
     } catch (error) {
         console.error('❌ Error updating driver:', error);
         
-        let errorMessage = 'Failed to update driver';
-        if (error.code === 'ResourceNotFoundException') {
-            errorMessage = 'Driver not found in database';
-        } else if (error.code === 'ValidationException') {
-            errorMessage = 'Invalid data provided';
-        } else if (error.code === 'AccessDeniedException') {
-            errorMessage = 'Permission denied. Check IAM role has UpdateItem permission.';
-        } else if (error.message) {
-            errorMessage = error.message;
-        }
+        // ENHANCED: Improved error messages for better UX
+        const errorMessages = {
+            'ResourceNotFoundException': 'Driver not found in database. Please refresh the page.',
+            'ValidationException': 'Invalid data format. Please check all fields.',
+            'AccessDeniedException': 'Permission denied. Your account lacks update permissions.',
+            'ConditionalCheckFailedException': 'Driver was modified by another user. Please refresh.',
+            'ProvisionedThroughputExceededException': 'Too many requests. Please try again in a moment.',
+            'NetworkingError': 'Network connection lost. Please check your internet.',
+            'ThrottlingException': 'System is busy. Please try again in a few seconds.'
+        };
         
-        notify(`Error: ${errorMessage}`, 'error');
+        const errorCode = error.code || error.name || 'UnknownError';
+        const userMessage = errorMessages[errorCode] || error.message || 'An unexpected error occurred';
+        
+        notify(`Error: ${userMessage}`, 'error');
         
     } finally {
         const submitBtn = document.querySelector('#editDriverModal .btn-primary');
@@ -1273,7 +1353,7 @@ window.addEventListener('click', function (e) {
     }
 });
 
-// Export functions
+// Export functions to both driversManager and global window for inline onclick handlers
 window.driversManager = {
     openAddDriverModal,
     closeAddDriverModal,
@@ -1286,6 +1366,24 @@ window.driversManager = {
     editDriverFromView,
     toggleDriverStatus
 };
+
+// Explicitly expose modal functions globally for inline onclick handlers
+window.openAddDriverModal = openAddDriverModal;
+window.closeAddDriverModal = closeAddDriverModal;
+window.openEditDriverModal = openEditDriverModal;
+window.closeEditDriverModal = closeEditDriverModal;
+window.openViewDriverModal = openViewDriverModal;
+window.closeViewDriverModal = closeViewDriverModal;
+window.viewDriver = viewDriver;
+window.editDriver = editDriver;
+window.editDriverFromView = editDriverFromView;
+window.toggleDriverStatus = toggleDriverStatus;
+
+console.log('✅ Modal functions exposed globally:', {
+    closeEditDriverModal: typeof window.closeEditDriverModal,
+    openEditDriverModal: typeof window.openEditDriverModal,
+    closeViewDriverModal: typeof window.closeViewDriverModal
+});
 
 // Initialize page when DOM is loaded
 document.addEventListener('DOMContentLoaded', async function() {

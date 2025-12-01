@@ -10,7 +10,7 @@ class RegionsManager {
         this.currentModal = null;
         this.currentView = 'table'; // Default to table view
         this.currentPage = 1;
-        this.itemsPerPage = 10;
+        this.itemsPerPage = 10; // Set to 10 to test pagination (14 regions = 2 pages)
         this.sortField = null;
         this.sortDirection = 'asc';
         this.filteredRegions = [];
@@ -23,7 +23,7 @@ class RegionsManager {
         this._drawnBoundary = null; // GeoJSON-like { type, coordinates }
         this._shapesLayer = null; // LayerGroup for polygons/lines
         // Server-side pagination state
-        this.pageMode = 'server'; // enable server paging by default
+        this.pageMode = 'client'; // Use client-side pagination (backend doesn't support server-side yet)
         this.tokenStack = [null]; // stack of page start tokens (null for first page)
         this.serverPageIndex = 0; // current index in tokenStack
         this.lastNextToken = null; // nextToken returned by last fetch
@@ -273,17 +273,54 @@ class RegionsManager {
         const mapContainer = document.getElementById('regionsMap');
         if (!mapContainer || typeof L === 'undefined') {
             console.log('ℹ️ Map not initialized (container or Leaflet missing)');
+            if (!mapContainer) console.warn('⚠️ #regionsMap element not found in DOM');
+            if (typeof L === 'undefined') console.warn('⚠️ Leaflet library not loaded. Check CDN script tags and CSP.');
             this.map = null;
             return;
         }
-        // Initialize map centered on Iraq
-        this.map = L.map('regionsMap').setView([33.3152, 44.3661], 6);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 18
-        }).addTo(this.map);
-        this._shapesLayer = L.layerGroup().addTo(this.map);
-        this.map.on('click', (e) => this.onMapClick(e));
+        // Force baseline styling to avoid zero-height due to CSS race
+        mapContainer.style.minHeight = mapContainer.style.minHeight || '420px';
+        mapContainer.style.width = mapContainer.style.width || '100%';
+        let attempts = 0;
+        const MAX_ATTEMPTS = 40; // 40 * 100ms = 4s
+        const startTs = performance.now();
+        const waitForDimensions = () => {
+            attempts++;
+            const rect = mapContainer.getBoundingClientRect();
+            const hidden = !mapContainer.offsetParent; // not displayed
+            if ((rect.height === 0 || rect.width === 0 || hidden) && attempts < MAX_ATTEMPTS) {
+                if (attempts % 10 === 0) {
+                    console.log(`⏳ Waiting for map container (attempt ${attempts}) hidden=${hidden} rect=`, rect);
+                }
+                // Apply fallback height if still zero after 1s
+                if (attempts === 10 && rect.height === 0) {
+                    console.log('⚙️ Applying fallback height to map container');
+                    mapContainer.style.height = '420px';
+                }
+                return setTimeout(waitForDimensions, 100);
+            }
+            if (attempts >= MAX_ATTEMPTS) {
+                console.warn('⚠️ Map container never reported valid dimensions; forcing initialization with fallback size');
+                if (rect.height === 0) mapContainer.style.height = '420px';
+            }
+            console.log('🗺️ Map container ready after', (performance.now()-startTs).toFixed(0), 'ms', { width: rect.width, height: rect.height });
+            // Initialize map centered on Iraq
+            this.map = L.map('regionsMap').setView([33.3152, 44.3661], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(this.map);
+            this._shapesLayer = L.layerGroup().addTo(this.map);
+            this.map.on('click', (e) => this.onMapClick(e));
+            // Invalidate size twice to be safe
+            setTimeout(() => { if (this.map) { this.map.invalidateSize(); } }, 200);
+            setTimeout(() => { if (this.map) { this.map.invalidateSize(); console.log('✅ Map size validated'); } }, 800);
+            this._setupMapPickerButtons();
+        };
+        waitForDimensions();
+    }
+
+    _setupMapPickerButtons() {
         // Pick-on-map helpers
         this._pickOnMapActive = false;
         const pickBtn = document.getElementById('pickOnMapBtn');
@@ -557,7 +594,7 @@ class RegionsManager {
             }
             
             // Transform regions
-            const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
+            const rawById = new Map(list.filter(r => r && (r.id || r.regionId || r.region_id)).map(r => [r.id || r.regionId || r.region_id, r]));
             const findGovernorateName = (rid) => {
                 let cursor = rawById.get(rid);
                 let steps = 0;
@@ -615,16 +652,13 @@ class RegionsManager {
             const tbody = document.getElementById('regionsTableBody');
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
 
-            // Safe env detection for hosted vs local
-            const isLocal = (typeof window !== 'undefined') && (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-            // Build query params based on current filters + server/client mode
+            const isLocal = (typeof window !== 'undefined') && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
             const params = new URLSearchParams();
             const levelEl = document.getElementById('levelFilter');
             const statusEl = document.getElementById('statusFilter');
             const searchEl = document.getElementById('regionSearch');
             if (levelEl && levelEl.value !== '') params.set('level', String(parseInt(levelEl.value, 10)));
-            if (statusEl && statusEl.value !== '') params.set('is_active', statusEl.value); // backend expects is_active
+            if (statusEl && statusEl.value !== '') params.set('is_active', statusEl.value);
             if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
 
             if (this.pageMode === 'server') {
@@ -633,18 +667,30 @@ class RegionsManager {
                 const token = this.tokenStack[this.serverPageIndex] || null;
                 if (token) params.set('nextToken', token);
             } else {
-                // client mode fetch-all then paginate locally
                 params.set('limit', '1000');
                 params.set('offset', '0');
             }
 
             const url = `${this._apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
-            console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode, token: this.tokenStack[this.serverPageIndex] || null });
+            console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode });
             const t0 = performance.now();
             let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
             console.log('⏱️ Regions initial response status:', response.status, 'time(ms):', (performance.now()-t0).toFixed(0));
 
+            // If API not available locally, fallback to static JSON
             if (!response.ok) {
+                console.warn('⚠️ /api/regions failed, attempting local fallback /data/regions.json');
+                try {
+                    const fallback = await fetch('/data/regions.json', { headers: { 'Content-Type': 'application/json' }});
+                    if (fallback.ok) {
+                        const arr = await fallback.json();
+                        console.log('📦 Loaded fallback regions.json items:', Array.isArray(arr) ? arr.length : 'N/A');
+                        return (arr || []).map(r => this.transformRegionData(r, ()=>undefined));
+                    }
+                } catch (fallbackErr) {
+                    console.warn('Fallback fetch failed:', fallbackErr);
+                }
+
                 await this.maybeHandleAwsAuthError?.(response, url);
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
                 if (idToken) {
@@ -660,25 +706,19 @@ class RegionsManager {
                 let msg = '';
                 try { msg = ct.includes('application/json') ? JSON.stringify(await response.clone().json()) : await response.text(); } catch {}
                 const fullMsg = `Failed to load regions (${response.status}). ${msg || ''}`;
-                if (!isLocal && typeof showApiErrorBanner === 'function') {
-                    showApiErrorBanner(fullMsg);
-                }
+                if (typeof showApiErrorBanner === 'function') showApiErrorBanner(fullMsg);
                 this.showError(fullMsg);
                 throw new Error(fullMsg);
             }
 
             const result = await response.json();
             console.log('📦 Raw regions payload keys:', Object.keys(result || {}));
-            // Support multiple backend response shapes: legacy {data|regions|pagination.nextToken} and new Lambda {items,total,nextToken}
             const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
             this.lastNextToken = result?.nextToken || result?.pagination?.nextToken || null;
             console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
-            if (!Array.isArray(list)) {
-                console.warn('Unexpected regions list shape:', result);
-                throw new Error('Regions payload malformed');
-            }
+            if (!Array.isArray(list)) throw new Error('Regions payload malformed');
 
-            const rawById = new Map(list.filter(r => r && (r.id || r.regionId)).map(r => [r.id || r.regionId, r]));
+            const rawById = new Map(list.filter(r => r && (r.id || r.regionId || r.region_id)).map(r => [r.id || r.regionId || r.region_id, r]));
             const findGovernorateName = (rid) => {
                 let cursor = rawById.get(rid);
                 let steps = 0;
@@ -691,9 +731,7 @@ class RegionsManager {
                 }
                 return undefined;
             };
-            const transformed = list.map(r => this.transformRegionData(r, findGovernorateName));
-            console.log('🧭 Transformed regions count:', transformed.length);
-            return transformed;
+            return list.map(r => this.transformRegionData(r, findGovernorateName));
         } catch (e) {
             console.error('fetchRegionsFromBackend failed:', e);
             if (typeof showApiErrorBanner === 'function') showApiErrorBanner(e.message || 'Failed to load regions');
@@ -890,6 +928,8 @@ class RegionsManager {
         const levelFilter = document.getElementById('levelFilter');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
+        const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+        
         if (searchInput) searchInput.addEventListener('input', async () => {
             if (this.pageMode === 'server') { this.resetServerPaging(); await this.loadRegions(); }
             else { this.currentPage = 1; this.renderRegionsList(); }
@@ -902,6 +942,21 @@ class RegionsManager {
             if (this.pageMode === 'server') { this.resetServerPaging(); await this.loadRegions(); }
             else { this.currentPage = 1; this.renderRegionsList(); }
         });
+        
+        // Items per page selector
+        if (itemsPerPageSelect) {
+            itemsPerPageSelect.addEventListener('change', async (e) => {
+                this.itemsPerPage = parseInt(e.target.value, 10) || 25;
+                if (this.pageMode === 'server') { 
+                    this.resetServerPaging(); 
+                    await this.loadRegions(); 
+                } else { 
+                    this.currentPage = 1; 
+                    this.renderRegionsList(); 
+                }
+            });
+        }
+        
         if (prevBtn) prevBtn.addEventListener('click', async () => {
             if (this.pageMode === 'server') { await this.previousServerPage(); }
             else { this.currentPage = Math.max(1, this.currentPage - 1); this.renderRegionsList(); }
@@ -955,6 +1010,7 @@ class RegionsManager {
     }
 
     transformRegionData(region, findGovernorateName) {
+        // Added robust handling for region_id and string level values
         let coordinates = { lat: 33.3152, lng: 44.3661 };
         if (region.coordinates) {
             coordinates = {
@@ -962,20 +1018,26 @@ class RegionsManager {
                 lng: region.coordinates.lng || region.coordinates.center?.lng || 44.3661
             };
         }
+        // Normalize level (supports numeric and string levels like "country", "governorate", "district", "area")
+        const levelMap = { country: 0, governorate: 1, province: 1, district: 2, area: 3, zone: 3, neighborhood: 4 };
+        let lvlRaw = region.level;
+        let lvl = Number(lvlRaw);
+        if (Number.isNaN(lvl)) {
+            lvl = levelMap[String(lvlRaw).toLowerCase()] ?? 0;
+        }
         // Derive governorate for display
         let gov = region.governorate || region.governorate_id;
-        const lvl = Number(region.level);
         if (!gov && typeof findGovernorateName === 'function') {
             if (lvl === 1) {
                 gov = region.name || region.name_en || region.name_ar || region.regionName;
             } else if (lvl >= 2) {
-                gov = findGovernorateName(region.parent_id || region.regionId || region.id) || '—';
+                gov = findGovernorateName(region.parent_id || region.regionId || region.region_id || region.id) || '—';
             }
         }
         return {
-            regionId: region.regionId || region.id,
-            regionName: region.name || region.regionName,
-            regionNameArabic: region.name_ar || region.regionNameArabic,
+            regionId: region.regionId || region.id || region.region_id,
+            regionName: region.name || region.regionName || region.region_name,
+            regionNameArabic: region.name_ar || region.regionNameArabic || region.nameArabic,
             governorate: gov || (lvl === 0 ? '—' : 'N/A'),
             level: lvl,
             parent_id: region.parent_id,

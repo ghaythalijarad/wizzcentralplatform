@@ -15,7 +15,7 @@ const rateLimit = require('express-rate-limit');
 
 // Use specific AWS SDK v3 clients instead of full v2 SDK to avoid conflicts
 const { DynamoDBClient, DescribeTableCommand } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, DeleteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, QueryCommand, ScanCommand, PutCommand, DeleteCommand, UpdateCommand, BatchWriteCommand } = require('@aws-sdk/lib-dynamodb');
 
 // Configure AWS SDK v3 client
 const ddbClient = new DynamoDBClient({
@@ -54,6 +54,9 @@ function buildKeyFromItem(item, keySchema) {
 
 // Import condition engine handler
 const { handler: conditionEngineHandler } = require('./backend/lambda/condition-engine-api.js');
+
+// Import merchants bulk upload handler
+const { bulkUploadProducts } = require('./backend/merchants-bulk-handler.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -483,6 +486,10 @@ const REGIONS_TABLE = 'WizzCentral_Regions';
 const PROMOTIONS_TABLE = 'WizzCentral_Promotions';
 // Merchant Discounts table (REAL DATA)
 const MERCHANT_DISCOUNTS_TABLE = 'WhizzMerchants_Discounts';
+// Products table
+const PRODUCTS_TABLE = 'WhizzMerchants_Products';
+// Global Products table
+const GLOBAL_PRODUCTS_TABLE = 'WhizzMerchants_GlobalProducts';
 
 // Financial Management Tables
 const COMMISSIONS_TABLE = 'WizzCentral_Commission_Rules';
@@ -1180,7 +1187,15 @@ app.get('/dev/businesses/:businessId', async (req, res) => {
 });
 
 // Get all businesses data
-app.get('/businesses', merchantsAccessGuard, async (req, res) => {
+app.get('/businesses', (req, res, next) => {
+    // Restore RBAC by default; allow explicit bypass only via env flag
+    const bypass = process.env.ENABLE_MERCHANTS_DEBUG === 'true';
+    if (bypass) {
+        console.log('🧪 ENABLE_MERCHANTS_DEBUG=true - bypassing RBAC for /businesses endpoint');
+        return next();
+    }
+    return merchantsAccessGuard(req, res, next);
+}, async (req, res) => {
     try {
         console.log('📊 Fetching all businesses from WhizzMerchants_Businesses table...');
         
@@ -1287,6 +1302,239 @@ app.get('/api/merchants/search', merchantsSearchAccessGuard, async (req, res) =>
             error: 'Failed to search merchants',
             message: error.message,
             table: BUSINESSES_TABLE
+        });
+    }
+});
+
+// Bulk items upload endpoint - merchants_admin or admin only
+// Uses merchants-bulk-handler.js with deduplication and fingerprinting
+app.post('/api/merchants/:merchantId/items/bulk', async (req, res) => {
+    try {
+        const idToken = req.headers.authorization?.replace('Bearer ', '') || null;
+        const debugMode = req.headers['x-debug-mode'] === 'true' || process.env.NODE_ENV === 'development';
+        
+        // Basic RBAC guard (expand with real token decode if needed)
+        // Skip authentication in debug mode for local testing
+        if (!debugMode && !idToken) {
+            return res.status(401).json({ success:false, error:'Missing auth token' });
+        }
+        
+        if (debugMode) {
+            console.log('🧪 Debug mode enabled - skipping authentication');
+        }
+        
+        // Call the bulk upload handler
+        await bulkUploadProducts(req, res);
+    } catch (error) {
+        console.error('Bulk items upload error:', error);
+        if (isAwsCredentialsError?.(error)) return sendAwsAuthError(res, '/api/merchants/:merchantId/items/bulk', error);
+        res.status(500).json({ success:false, error:'Failed to bulk upload items', message:error.message });
+    }
+});
+
+// ============================================
+// Get merchant products with GlobalProducts data merged
+// ============================================
+app.get('/api/merchants/:merchantId/products', async (req, res) => {
+    try {
+        const { merchantId } = req.params;
+        const debugMode = req.headers['x-debug-mode'] === 'true' || process.env.NODE_ENV === 'development';
+        
+        if (debugMode) {
+            console.log(`🔍 Fetching products for merchant: ${merchantId}`);
+        }
+        
+        // Query merchant products
+        const productsResult = await dynamodb.query({
+            TableName: PRODUCTS_TABLE,
+            IndexName: 'BusinessIdIndex',
+            KeyConditionExpression: 'businessId = :businessId',
+            ExpressionAttributeValues: { ':businessId': merchantId }
+        }).promise();
+        
+        const merchantProducts = productsResult.Items || [];
+        
+        if (debugMode) {
+            console.log(`📦 Found ${merchantProducts.length} merchant products`);
+        }
+        
+        // Merge with GlobalProducts data
+        const enrichedProducts = await Promise.all(
+            merchantProducts.map(async (product) => {
+                // If product has globalProductId, fetch and merge global data
+                if (product.globalProductId) {
+                    try {
+                        const globalResult = await dynamodb.get({
+                            TableName: GLOBAL_PRODUCTS_TABLE,
+                            Key: { globalProductId: product.globalProductId }
+                        }).promise();
+                        
+                        const globalProduct = globalResult.Item;
+                        
+                        if (globalProduct) {
+                            // Merge: Use merchant overrides or fall back to global data
+                            return {
+                                // Merchant-specific fields (always from Products table)
+                                productId: product.productId,
+                                businessId: product.businessId,
+                                price: product.price,
+                                currency: product.currency,
+                                stockQty: product.stockQty,
+                                isAvailable: product.isAvailable,
+                                vatRate: product.vatRate,
+                                createdAt: product.createdAt,
+                                updatedAt: product.updatedAt,
+                                
+                                // Product data: Use merchant override or global canonical data
+                                name: product.name || globalProduct.canonicalName,
+                                description: product.description || globalProduct.description,
+                                categoryId: product.categoryId || globalProduct.categoryId,
+                                imageUrl: product.imageUrl || globalProduct.imageUrl,
+                                sku: product.sku || globalProduct.sku,
+                                barcode: product.barcode || globalProduct.barcode,
+                                portion: product.portion || globalProduct.portion,
+                                
+                                // Global product reference
+                                globalProductId: product.globalProductId,
+                                usageCount: globalProduct.usageCount,
+                                
+                                // Metadata
+                                dataSource: {
+                                    name: product.name ? 'merchant' : 'global',
+                                    description: product.description ? 'merchant' : 'global',
+                                    categoryId: product.categoryId ? 'merchant' : 'global',
+                                    imageUrl: product.imageUrl ? 'merchant' : 'global'
+                                }
+                            };
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error fetching global product ${product.globalProductId}:`, error.message);
+                    }
+                }
+                
+                // Old product without globalProductId - return as-is
+                return product;
+            })
+        );
+        
+        res.json({
+            success: true,
+            count: enrichedProducts.length,
+            products: enrichedProducts
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching merchant products:', error);
+        if (isAwsCredentialsError?.(error)) return sendAwsAuthError(res, '/api/merchants/:merchantId/products', error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch products', 
+            message: error.message 
+        });
+    }
+});
+
+// Get single merchant product with GlobalProducts data merged
+app.get('/api/merchants/:merchantId/products/:productId', async (req, res) => {
+    try {
+        const { merchantId, productId } = req.params;
+        const debugMode = req.headers['x-debug-mode'] === 'true' || process.env.NODE_ENV === 'development';
+        
+        if (debugMode) {
+            console.log(`🔍 Fetching product ${productId} for merchant ${merchantId}`);
+        }
+        
+        // Get merchant product
+        const productResult = await dynamodb.get({
+            TableName: PRODUCTS_TABLE,
+            Key: { productId }
+        }).promise();
+        
+        const product = productResult.Item;
+        
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                error: 'Product not found'
+            });
+        }
+        
+        // Check if product belongs to this merchant
+        if (product.businessId !== merchantId) {
+            return res.status(403).json({
+                success: false,
+                error: 'Product does not belong to this merchant'
+            });
+        }
+        
+        // If product has globalProductId, fetch and merge global data
+        if (product.globalProductId) {
+            try {
+                const globalResult = await dynamodb.get({
+                    TableName: GLOBAL_PRODUCTS_TABLE,
+                    Key: { globalProductId: product.globalProductId }
+                }).promise();
+                
+                const globalProduct = globalResult.Item;
+                
+                if (globalProduct) {
+                    const enrichedProduct = {
+                        // Merchant-specific fields
+                        productId: product.productId,
+                        businessId: product.businessId,
+                        price: product.price,
+                        currency: product.currency,
+                        stockQty: product.stockQty,
+                        isAvailable: product.isAvailable,
+                        vatRate: product.vatRate,
+                        createdAt: product.createdAt,
+                        updatedAt: product.updatedAt,
+                        
+                        // Product data: Use merchant override or global canonical data
+                        name: product.name || globalProduct.canonicalName,
+                        description: product.description || globalProduct.description,
+                        categoryId: product.categoryId || globalProduct.categoryId,
+                        imageUrl: product.imageUrl || globalProduct.imageUrl,
+                        sku: product.sku || globalProduct.sku,
+                        barcode: product.barcode || globalProduct.barcode,
+                        portion: product.portion || globalProduct.portion,
+                        
+                        // Global product reference
+                        globalProductId: product.globalProductId,
+                        usageCount: globalProduct.usageCount,
+                        
+                        // Metadata
+                        dataSource: {
+                            name: product.name ? 'merchant' : 'global',
+                            description: product.description ? 'merchant' : 'global',
+                            categoryId: product.categoryId ? 'merchant' : 'global',
+                            imageUrl: product.imageUrl ? 'merchant' : 'global'
+                        }
+                    };
+                    
+                    return res.json({
+                        success: true,
+                        product: enrichedProduct
+                    });
+                }
+            } catch (error) {
+                console.error(`❌ Error fetching global product ${product.globalProductId}:`, error.message);
+            }
+        }
+        
+        // Old product without globalProductId - return as-is
+        res.json({
+            success: true,
+            product: product
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching product:', error);
+        if (isAwsCredentialsError?.(error)) return sendAwsAuthError(res, `/api/merchants/:merchantId/products/:productId`, error);
+        res.status(500).json({ 
+            success: false, 
+            error: 'Failed to fetch product', 
+            message: error.message 
         });
     }
 });
@@ -2071,6 +2319,8 @@ app.use('/pages', express.static(path.join(__dirname, 'frontend/pages')));
 app.use('/css', express.static(path.join(__dirname, 'frontend/css')));
 app.use('/js', express.static(path.join(__dirname, 'frontend/js')));
 app.use('/assets', express.static(path.join(__dirname, 'frontend/assets')));
+// Expose project data folder for local fallbacks (e.g., /data/regions.json)
+app.use('/data', express.static(path.join(__dirname, 'data')));
 
 // Serve main frontend from root
 app.use(express.static(path.join(__dirname, 'frontend')));

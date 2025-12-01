@@ -5,6 +5,13 @@ console.log('🔐 Loading RBAC System...');
 // RBAC Configuration
 window.RBAC_CONFIG = {
     groups: {
+        // Support both 'admin' and 'admins' group names
+        admin: {
+            name: 'Administrator',
+            precedence: 1,
+            allowedPages: '*',
+            permissions: ['*']
+        },
         admins: {
             name: 'Admins',
             precedence: 1,
@@ -63,10 +70,16 @@ window.RBAC_CONFIG = {
 window.RBAC = {
     getUserGroups() {
         try {
-            const idToken = localStorage.getItem('idToken');
-            if (!idToken) return [];
+            // Check both sessionStorage and localStorage for idToken
+            const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
+            if (!idToken) {
+                console.log('🔍 RBAC: No idToken found in sessionStorage or localStorage');
+                return [];
+            }
             const payload = JSON.parse(atob(idToken.split('.')[1]));
-            return payload['cognito:groups'] || [];
+            const groups = payload['cognito:groups'] || [];
+            console.log('🔐 RBAC: User groups from token:', groups);
+            return groups;
         } catch (error) {
             console.error('RBAC: Error getting groups:', error);
             return [];
@@ -143,7 +156,9 @@ window.RBAC = {
 
     isReadOnly() {
         const userGroups = this.getUserGroups();
-        if (userGroups.includes('admins')) return false;
+        // Check if user is admin (either 'admin' or 'admins' group)
+        if (userGroups.includes('admin') || userGroups.includes('admins')) return false;
+        
         for (const groupName of userGroups) {
             const groupConfig = RBAC_CONFIG.groups[groupName];
             if (groupConfig && groupConfig.readOnly) return true;
@@ -287,14 +302,18 @@ window.RBAC = {
     // Fetch current user information
     async fetchMe() {
         try {
-            const idToken = localStorage.getItem('idToken');
+            // Check both sessionStorage and localStorage for idToken
+            const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
             if (!idToken) {
+                console.log('🔍 RBAC.fetchMe: No idToken found');
                 return { email: 'Guest', roles: [] };
             }
             
             const payload = JSON.parse(atob(idToken.split('.')[1]));
             const email = payload.email || payload['cognito:username'] || 'User';
             const groups = payload['cognito:groups'] || [];
+            
+            console.log('👤 RBAC.fetchMe:', { email, groups });
             
             // Convert groups to display names
             const roles = groups.map(groupName => {
@@ -318,8 +337,11 @@ window.RBAC = {
     can(domain, action = 'read') {
         const userGroups = this.getUserGroups();
         
-        // Admins can do everything
-        if (userGroups.includes('admins')) {
+        console.log('🔍 RBAC.can():', { domain, action, userGroups });
+        
+        // Admins can do everything (support both 'admin' and 'admins')
+        if (userGroups.includes('admin') || userGroups.includes('admins')) {
+            console.log('✅ Admin access - permission granted');
             return true;
         }
         
@@ -344,6 +366,7 @@ window.RBAC = {
             
             // Wildcard permissions
             if (groupConfig.permissions.includes('*')) {
+                console.log(`✅ Wildcard permission via group: ${groupName}`);
                 return true;
             }
             

@@ -1,10 +1,11 @@
 // WizzCentral Login Page Script (externalized for CSP compliance)
 (function initLoginPage(){
   try {
-    const isAuthed = localStorage.getItem('isAuthenticated') === 'true';
-    const idToken = localStorage.getItem('idToken');
+    // Extended auth check: look in both storages
+    const isAuthed = (localStorage.getItem('isAuthenticated') === 'true') || (sessionStorage.getItem('isAuthenticated') === 'true');
+    const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
     if (isAuthed && idToken) {
-      window.location.replace('/frontend/pages/dashboard.html');
+      window.location.replace('/pages/dashboard.html');
       return; // Skip initialization if already logged in
     }
   } catch(_){}
@@ -70,17 +71,27 @@
             const accessToken = result.getAccessToken().getJwtToken();
             const idToken = result.getIdToken().getJwtToken();
             const refreshToken = result.getRefreshToken().getToken();
+            // Persist in localStorage (existing behavior)
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('idToken', idToken);
             localStorage.setItem('refreshToken', refreshToken);
             localStorage.setItem('userEmail', email);
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('lastLoginTime', Date.now().toString());
+            // NEW: Mirror tokens to sessionStorage for components expecting session-based storage
+            try {
+              sessionStorage.setItem('accessToken', accessToken);
+              sessionStorage.setItem('idToken', idToken);
+              sessionStorage.setItem('refreshToken', refreshToken);
+              sessionStorage.setItem('userEmail', email);
+              sessionStorage.setItem('isAuthenticated', 'true');
+              sessionStorage.setItem('lastLoginTime', Date.now().toString());
+            } catch(e) { console.warn('SessionStorage persistence failed:', e); }
             showStatus('✅ Login successful! Redirecting...', 'success');
             setTimeout(() => {
               const returnUrl = localStorage.getItem('returnUrl');
               if (returnUrl) { localStorage.removeItem('returnUrl'); window.location.href = returnUrl; }
-              else { window.location.href = '/frontend/pages/dashboard.html'; }
+              else { window.location.href = '/pages/dashboard.html'; }
             }, 1500);
           },
           onFailure: function(err) {
@@ -144,9 +155,18 @@
             localStorage.setItem('userEmail', userEmail);
             localStorage.setItem('isAuthenticated', 'true');
             localStorage.setItem('lastLoginTime', Date.now().toString());
+            // Mirror tokens to sessionStorage to keep parity with normal login flow
+            try {
+              sessionStorage.setItem('accessToken', result.getAccessToken().getJwtToken());
+              sessionStorage.setItem('idToken', result.getIdToken().getJwtToken());
+              sessionStorage.setItem('refreshToken', result.getRefreshToken().getToken());
+              sessionStorage.setItem('userEmail', userEmail);
+              sessionStorage.setItem('isAuthenticated', 'true');
+              sessionStorage.setItem('lastLoginTime', Date.now().toString());
+            } catch(e) { console.warn('SessionStorage persistence failed (password change flow):', e); }
             showStatus('✅ Password changed! Redirecting to dashboard...', 'success');
             delete window.pendingPasswordChange;
-            setTimeout(() => { window.location.href = '/frontend/pages/dashboard.html'; }, 1500);
+            setTimeout(() => { window.location.href = '/pages/dashboard.html'; }, 1500);
           },
           onFailure: function(err) {
             log(`❌ Password change failed: ${err.code || err.name}`, 'error');

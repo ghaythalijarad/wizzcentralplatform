@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RBAC Debug - WizzCentral</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a1a1a;
+            margin-top: 0;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 8px;
+        }
+        .info-row {
+            display: flex;
+            padding: 12px;
+            margin: 8px 0;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .info-label {
+            font-weight: 600;
+            width: 200px;
+            color: #666;
+        }
+        .info-value {
+            flex: 1;
+            color: #1a1a1a;
+            font-family: 'Courier New', monospace;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+        .error {
+            color: #f44336;
+            font-weight: 600;
+        }
+        .warning {
+            color: #ff9800;
+            font-weight: 600;
+        }
+        pre {
+            background: #1a1a1a;
+            color: #4CAF50;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .test-result {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .test-pass {
+            background: #e8f5e9;
+            border-color: #4CAF50;
+        }
+        .test-fail {
+            background: #ffebee;
+            border-color: #f44336;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 4px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 RBAC Debug Tool</h1>
+    
+    <div class="card">
+        <h2>Authentication Status</h2>
+        <div id="authStatus"></div>
+    </div>
+    
+    <div class="card">
+        <h2>User Token Info</h2>
+        <div id="tokenInfo"></div>
+    </div>
+    
+    <div class="card">
+        <h2>User Groups</h2>
+        <div id="groupsInfo"></div>
+    </div>
+    
+    <div class="card">
+        <h2>RBAC Permissions Test</h2>
+        <div id="permissionsTest"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Page Access Test</h2>
+        <div id="pageAccessTest"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Actions</h2>
+        <button onclick="clearStorage()">Clear Storage & Reload</button>
+        <button onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+        <button onclick="window.location.reload()">Refresh</button>
+    </div>
+
+    <div class="card">
+        <h2>Dev Helpers</h2>
+        <button onclick="injectMockAdminToken()">Inject Mock Admin Token</button>
+        <button onclick="copyLoginRedirectInfo()">Copy Login Redirect Info</button>
+        <div id="devHelperStatus" style="margin-top:10px;font-size:12px;color:#555;"></div>
+    </div>
+    <script src="../assets/js/rbac.js"></script>
+    <script>
+        function injectMockAdminToken() {
+            const isLocalhost = ['localhost','127.0.0.1'].includes(location.hostname);
+            if (!isLocalhost) { alert('Mock token injection is disabled outside localhost.'); return; }
+            // Creates a short-lived mock JWT with admin group for local debugging only
+            const header = btoa(JSON.stringify({ alg: 'none', typ: 'JWT' }));
+            const payloadObj = {
+                "cognito:username": "mock-admin",
+                "email": "admin@example.com",
+                "cognito:groups": ["admin"],
+                iat: Math.floor(Date.now()/1000),
+                exp: Math.floor(Date.now()/1000)+3600
+            };
+            const payload = btoa(JSON.stringify(payloadObj));
+            const mock = `${header}.${payload}.`;
+            localStorage.setItem('idToken', mock);
+            localStorage.setItem('isAuthenticated','true');
+            sessionStorage.setItem('idToken', mock);
+            sessionStorage.setItem('isAuthenticated','true');
+            document.getElementById('devHelperStatus').textContent = 'Mock admin token injected. Reloading...';
+            setTimeout(()=>window.location.reload(), 600);
+        }
+        function copyLoginRedirectInfo(){
+            const info = 'Login URL: /index.html';
+            navigator.clipboard.writeText(info).then(()=>{
+                document.getElementById('devHelperStatus').textContent = 'Copied login redirect info to clipboard';
+            }).catch(()=>{
+                document.getElementById('devHelperStatus').textContent = 'Failed to copy';
+            });
+        }
+        function renderAuthStatus() {
+            const idTokenLocal = localStorage.getItem('idToken');
+            const idTokenSession = sessionStorage.getItem('idToken');
+            const accessToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+            const refreshToken = localStorage.getItem('refreshToken') || sessionStorage.getItem('refreshToken');
+            let html = '';
+            html += `<div class="info-row"><span class="info-label">ID Token (localStorage):</span><span class="info-value ${idTokenLocal ? 'success':'error'}">${idTokenLocal? 'Present ✓':'Missing ✗'}</span></div>`;
+            html += `<div class="info-row"><span class="info-label">ID Token (sessionStorage):</span><span class="info-value ${idTokenSession ? 'success':'error'}">${idTokenSession? 'Present ✓':'Missing ✗'}</span></div>`;
+            html += `<div class="info-row"><span class="info-label">Access Token:</span><span class="info-value ${accessToken ? 'success':'error'}">${accessToken? 'Present ✓':'Missing ✗'}</span></div>`;
+            html += `<div class="info-row"><span class="info-label">Refresh Token:</span><span class="info-value ${refreshToken ? 'success':'error'}">${refreshToken? 'Present ✓':'Missing ✗'}</span></div>`;
+            document.getElementById('authStatus').innerHTML = html;
+        }
+        
+        function renderTokenInfo() {
+            const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
+            if (!idToken) {
+                document.getElementById('tokenInfo').innerHTML = '<p class="error">No ID token found</p>';
+                return;
+            }
+            
+            try {
+                const payload = JSON.parse(atob(idToken.split('.')[1]));
+                
+                let html = '';
+                html += `<div class="info-row">
+                    <span class="info-label">Username:</span>
+                    <span class="info-value">${payload['cognito:username'] || 'N/A'}</span>
+                </div>`;
+                html += `<div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span class="info-value">${payload.email || 'N/A'}</span>
+                </div>`;
+                html += `<div class="info-row">
+                    <span class="info-label">Email Verified:</span>
+                    <span class="info-value">${payload.email_verified || 'N/A'}</span>
+                </div>`;
+                html += `<div class="info-row">
+                    <span class="info-label">Subject (sub):</span>
+                    <span class="info-value">${payload.sub || 'N/A'}</span>
+                </div>`;
+                html += `<div class="info-row">
+                    <span class="info-label">Issued At:</span>
+                    <span class="info-value">${payload.iat ? new Date(payload.iat * 1000).toLocaleString() : 'N/A'}</span>
+                </div>`;
+                html += `<div class="info-row">
+                    <span class="info-label">Expires At:</span>
+                    <span class="info-value">${payload.exp ? new Date(payload.exp * 1000).toLocaleString() : 'N/A'}</span>
+                </div>`;
+                
+                html += '<h3 style="margin-top: 20px;">Full Token Payload:</h3>';
+                html += `<pre>${JSON.stringify(payload, null, 2)}</pre>`;
+                
+                document.getElementById('tokenInfo').innerHTML = html;
+            } catch (error) {
+                document.getElementById('tokenInfo').innerHTML = `<p class="error">Error parsing token: ${error.message}</p>`;
+            }
+        }
+        
+        function renderGroupsInfo() {
+            const groups = window.RBAC.getUserGroups();
+            const primaryGroup = window.RBAC.getPrimaryGroup();
+            
+            let html = '';
+            html += `<div class="info-row">
+                <span class="info-label">User Groups:</span>
+                <span class="info-value ${groups.length > 0 ? 'success' : 'error'}">${groups.length > 0 ? groups.join(', ') : 'None'}</span>
+            </div>`;
+            html += `<div class="info-row">
+                <span class="info-label">Primary Group:</span>
+                <span class="info-value">${primaryGroup || 'None'}</span>
+            </div>`;
+            html += `<div class="info-row">
+                <span class="info-label">Role Display Name:</span>
+                <span class="info-value">${window.RBAC.getRoleDisplayName()}</span>
+            </div>`;
+            html += `<div class="info-row">
+                <span class="info-label">Is Read-Only:</span>
+                <span class="info-value ${window.RBAC.isReadOnly() ? 'error' : 'success'}">${window.RBAC.isReadOnly() ? 'Yes ✗' : 'No ✓'}</span>
+            </div>`;
+            
+            if (groups.length > 0) {
+                html += '<h3 style="margin-top: 20px;">Group Configurations:</h3>';
+                groups.forEach(groupName => {
+                    const config = window.RBAC_CONFIG.groups[groupName];
+                    if (config) {
+                        html += `<div style="background: #f9f9f9; padding: 12px; margin: 8px 0; border-radius: 8px;">
+                            <strong>${groupName}</strong> (${config.name})<br>
+                            <small>Precedence: ${config.precedence}</small><br>
+                            <small>Allowed Pages: ${config.allowedPages === '*' ? 'All Pages (*)' : config.allowedPages.join(', ')}</small><br>
+                            <small>Permissions: ${config.permissions.join(', ')}</small><br>
+                            ${config.readOnly ? '<small style="color: #f44336;">⚠️ Read-Only Group</small>' : ''}
+                        </div>`;
+                    } else {
+                        html += `<div class="test-result test-fail">Group "${groupName}" not found in RBAC_CONFIG!</div>`;
+                    }
+                });
+            }
+            
+            document.getElementById('groupsInfo').innerHTML = html;
+        }
+        
+        function renderPermissionsTest() {
+            const domains = ['regions', 'orders', 'drivers', 'customers', 'merchants', 'financial', 'support', 'campaigns'];
+            
+            let html = '<p>Testing RBAC.can() for various domains:</p>';
+            
+            domains.forEach(domain => {
+                const canRead = window.RBAC.can(domain, 'read');
+                const canWrite = window.RBAC.can(domain, 'write');
+                
+                html += `<div class="test-result ${canRead && canWrite ? 'test-pass' : 'test-fail'}">
+                    <strong>${domain}:</strong> 
+                    Read: ${canRead ? '✓' : '✗'} | 
+                    Write: ${canWrite ? '✓' : '✗'}
+                </div>`;
+            });
+            
+            document.getElementById('permissionsTest').innerHTML = html;
+        }
+        
+        function renderPageAccessTest() {
+            const pages = [
+                'dashboard.html',
+                'regions.html',
+                'orders.html',
+                'drivers.html',
+                'customers.html',
+                'merchants.html',
+                'financial-management.html',
+                'support.html',
+                'promotions.html'
+            ];
+            
+            let html = '<p>Testing hasPageAccess() for various pages:</p>';
+            
+            pages.forEach(page => {
+                const hasAccess = window.RBAC.hasPageAccess(page);
+                
+                html += `<div class="test-result ${hasAccess ? 'test-pass' : 'test-fail'}">
+                    ${page}: ${hasAccess ? '✓ Access Granted' : '✗ Access Denied'}
+                </div>`;
+            });
+            
+            document.getElementById('pageAccessTest').innerHTML = html;
+        }
+        
+        function clearStorage() {
+            if (confirm('This will clear all tokens and reload the page. Continue?')) {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload();
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const isLocalhost = ['localhost','127.0.0.1'].includes(location.hostname);
+            if (!isLocalhost) {
+                const btn = Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('onclick')==='injectMockAdminToken()');
+                if (btn) { btn.style.display='none'; }
+                const note = document.getElementById('devHelperStatus');
+                if (note) { note.textContent = 'Mock helpers hidden outside localhost.'; }
+            }
+            renderAuthStatus();
+            renderTokenInfo();
+            renderGroupsInfo();
+            renderPermissionsTest();
+            renderPageAccessTest();
+        });
+    </script>
+</body>
+</html>
