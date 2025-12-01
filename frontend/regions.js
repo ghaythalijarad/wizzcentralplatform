@@ -599,20 +599,30 @@ class RegionsManager {
             for (const url of candidates) {
                 lastUrl = url;
                 console.log('🌐 Dropdown fetch try:', url);
-                response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
-                if (!response.ok) {
+                try {
+                    response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
+                } catch (ex) {
+                    console.warn('⚠️ Dropdown fetch exception', { url, message: ex?.message || ex });
+                    response = undefined;
+                }
+                if (response && !response.ok) {
                     let bodySnippet = '';
                     try { bodySnippet = await response.clone().text(); bodySnippet = bodySnippet.slice(0,200); } catch {}
                     console.warn('⚠️ Dropdown attempt failed', { status: response.status, url, bodySnippet });
                 }
-                if (response.ok) break;
+                if (response?.ok) break;
             }
             if (!response || !response.ok) {
-                await this.maybeHandleAwsAuthError?.(response, lastUrl);
+                try { await this.maybeHandleAwsAuthError?.(response, lastUrl); } catch {}
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
                 if (idToken && lastUrl) {
                     console.log('🔐 Retrying dropdown with Authorization header');
-                    response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
+                    try {
+                        response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
+                    } catch (ex) {
+                        console.warn('⚠️ Dropdown auth-retry exception', { url: lastUrl, message: ex?.message || ex });
+                        response = undefined;
+                    }
                 }
             }
             if (!response || !response.ok) { console.warn('Failed to load all regions for dropdown. Last URL:', lastUrl, 'status:', response?.status); this.allRegionsForDropdown = []; return; }
@@ -674,16 +684,22 @@ class RegionsManager {
             for (const url of candidates) {
                 lastUrl = url;
                 console.log('🌐 Regions fetch try:', url);
-                response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
-                if (!response.ok) {
+                try {
+                    response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
+                } catch (ex) {
+                    console.warn('⚠️ Regions fetch exception', { url, message: ex?.message || ex });
+                    response = undefined;
+                }
+                if (response && !response.ok) {
                     let bodySnippet = '';
                     try { bodySnippet = await response.clone().text(); bodySnippet = bodySnippet.slice(0,200); } catch {}
                     console.warn('⚠️ Regions attempt failed', { status: response.status, url, bodySnippet });
                 }
-                if (response.ok) break;
+                if (response?.ok) break;
             }
 
             if (!response || !response.ok) {
+                // Try static fallback regardless of whether earlier attempts threw
                 try {
                     const fallback = await fetch('/data/regions.json', { cache: 'no-store' });
                     if (fallback.ok) {
@@ -692,11 +708,16 @@ class RegionsManager {
                         return (arr || []).map(r => this.transformRegionData(r, ()=>undefined));
                     }
                 } catch (fallbackErr) { console.warn('Fallback fetch failed:', fallbackErr); }
-                await this.maybeHandleAwsAuthError?.(response, lastUrl);
+                try { await this.maybeHandleAwsAuthError?.(response, lastUrl); } catch {}
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
                 if (idToken && lastUrl) {
                     console.log('🔐 Retrying regions with Authorization header');
-                    response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
+                    try {
+                        response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
+                    } catch (ex) {
+                        console.warn('⚠️ Regions auth-retry exception', { url: lastUrl, message: ex?.message || ex });
+                        response = undefined;
+                    }
                 }
             }
 
@@ -1524,13 +1545,16 @@ class RegionsManager {
     async deleteRegion(regionId, event) {
         if (event) event.stopPropagation();
         if (!regionId) return;
-        const ok = window.confirm('Delete this region? This cannot be undone.');
+        try {
+            const ok = window.confirm('Delete this region? This cannot be undone.');
+            if (!ok) return;
             // Remove from memory and refresh
             this.regions = this.regions.filter(r => r.regionId !== regionId);
             this.renderRegionsList();
             this.updateStatistics?.();
             this.showSuccess('Region deleted');
         } catch (e) {
+            console.error('deleteRegion failed:', e);
             this.showError(e.message || 'Failed to delete region');
         }
     }
