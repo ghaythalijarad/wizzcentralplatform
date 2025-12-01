@@ -2,7 +2,8 @@
 window.WIZZCENTRAL_CONFIG = {
     // API Configuration
     // RegionDashboardAPI Lambda Function URL - Responds on root path without /regions
-    API_BASE_URL: 'https://c4obrzqwijwrj6ewm5elkw5byy0ltmkv.lambda-url.us-east-1.on.aws',
+    // ✅ UPDATED 2025-12-01: New Function URL after CORS configuration fix
+    API_BASE_URL: 'https://wkmj5ihhypx7oviwo3yk6bi6lu0vjrum.lambda-url.us-east-1.on.aws',
     
     // Push Notification API Gateway Endpoint
     PUSH_NOTIFICATION_API_URL: 'https://570ve00sak.execute-api.us-east-1.amazonaws.com/prod',
