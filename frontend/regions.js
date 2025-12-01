@@ -588,19 +588,34 @@ class RegionsManager {
         try {
             console.log('📋 Loading all regions for dropdown...');
             const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
-            const url = isLambdaFunctionUrl ? this.apiBase : `${this.apiBase}/regions?limit=1000`;
-            console.log('🌐 Dropdown fetch URL:', url, 'isLambda:', isLambdaFunctionUrl);
-            let response = await fetch(url, { cache: 'no-store' });
-            if (!response.ok) {
-                await this.maybeHandleAwsAuthError?.(response, url);
+            const candidates = isLambdaFunctionUrl
+                ? [
+                    this.apiBase,
+                    this.apiBase.endsWith('/') ? this.apiBase : `${this.apiBase}/`,
+                    `${this.apiBase}?limit=1000`
+                  ]
+                : [ `${this.apiBase}/regions?limit=1000` ];
+            let response, lastUrl;
+            for (const url of candidates) {
+                lastUrl = url;
+                console.log('🌐 Dropdown fetch try:', url);
+                response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
+                if (!response.ok) {
+                    let bodySnippet = '';
+                    try { bodySnippet = await response.clone().text(); bodySnippet = bodySnippet.slice(0,200); } catch {}
+                    console.warn('⚠️ Dropdown attempt failed', { status: response.status, url, bodySnippet });
+                }
+                if (response.ok) break;
+            }
+            if (!response || !response.ok) {
+                await this.maybeHandleAwsAuthError?.(response, lastUrl);
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
-                if (idToken) response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}` }, cache: 'no-store' });
+                if (idToken && lastUrl) {
+                    console.log('🔐 Retrying dropdown with Authorization header');
+                    response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
+                }
             }
-            if (!response.ok) {
-                console.warn('Failed to load all regions for dropdown, using empty list. URL:', url, 'status:', response.status);
-                this.allRegionsForDropdown = [];
-                return;
-            }
+            if (!response || !response.ok) { console.warn('Failed to load all regions for dropdown. Last URL:', lastUrl, 'status:', response?.status); this.allRegionsForDropdown = []; return; }
             const result = await response.json();
             const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
             if (!Array.isArray(list)) { console.warn('Unexpected regions list shape for dropdown'); this.allRegionsForDropdown = []; return; }
@@ -647,11 +662,28 @@ class RegionsManager {
             if (this.pageMode === 'server') { params.set('pageMode', 'server'); params.set('limit', String(this.itemsPerPage)); const token = this.tokenStack[this.serverPageIndex] || null; if (token) params.set('nextToken', token); } else { params.set('limit', '1000'); params.set('offset', '0'); }
 
             const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
-            const url = isLambdaFunctionUrl ? this.apiBase : `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
-            console.log('🌐 Regions fetch URL:', url, 'isLambda:', isLambdaFunctionUrl, 'apiBase:', this.apiBase);
-            let response = await fetch(url, { cache: 'no-store' });
-            if (!response.ok) {
-                console.warn('⚠️ Regions fetch failed. URL:', url, 'status:', response.status);
+            const candidates = isLambdaFunctionUrl
+                ? [
+                    this.apiBase,
+                    this.apiBase.endsWith('/') ? this.apiBase : `${this.apiBase}/`,
+                    `${this.apiBase}?${params.toString()}`
+                  ]
+                : [ `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}` ];
+
+            let response, lastUrl;
+            for (const url of candidates) {
+                lastUrl = url;
+                console.log('🌐 Regions fetch try:', url);
+                response = await fetch(url, { cache: 'no-store', headers: { 'Accept': 'application/json' }});
+                if (!response.ok) {
+                    let bodySnippet = '';
+                    try { bodySnippet = await response.clone().text(); bodySnippet = bodySnippet.slice(0,200); } catch {}
+                    console.warn('⚠️ Regions attempt failed', { status: response.status, url, bodySnippet });
+                }
+                if (response.ok) break;
+            }
+
+            if (!response || !response.ok) {
                 try {
                     const fallback = await fetch('/data/regions.json', { cache: 'no-store' });
                     if (fallback.ok) {
@@ -659,26 +691,16 @@ class RegionsManager {
                         console.log('📦 Loaded fallback regions.json items:', Array.isArray(arr) ? arr.length : 'N/A');
                         return (arr || []).map(r => this.transformRegionData(r, ()=>undefined));
                     }
-                } catch (fallbackErr) {
-                    console.warn('Fallback fetch failed:', fallbackErr);
-                }
-                await this.maybeHandleAwsAuthError?.(response, url);
+                } catch (fallbackErr) { console.warn('Fallback fetch failed:', fallbackErr); }
+                await this.maybeHandleAwsAuthError?.(response, lastUrl);
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
-                if (idToken) {
-                    console.log('🔐 Retrying regions fetch with Authorization Bearer');
-                    response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}` }, cache: 'no-store' });
+                if (idToken && lastUrl) {
+                    console.log('🔐 Retrying regions with Authorization header');
+                    response = await fetch(lastUrl, { headers: { 'Authorization': `Bearer ${idToken}`, 'Accept': 'application/json' }, cache: 'no-store' });
                 }
             }
 
-            if (!response.ok) {
-                const ct = response.headers?.get?.('content-type') || '';
-                let msg = '';
-                try { msg = ct.includes('application/json') ? JSON.stringify(await response.clone().json()) : await response.text(); } catch {}
-                const fullMsg = `Failed to load regions (${response.status}). ${msg || ''}`;
-                if (typeof showApiErrorBanner === 'function') showApiErrorBanner(fullMsg);
-                this.showError(fullMsg);
-                throw new Error(fullMsg);
-            }
+            if (!response || !response.ok) { const status = response?.status; const fullMsg = `Failed to load regions (${status ?? 'unknown'})`; if (typeof showApiErrorBanner === 'function') showApiErrorBanner(fullMsg); this.showError(fullMsg); throw new Error(fullMsg); }
 
             const result = await response.json();
             console.log('📦 Raw regions payload keys:', Object.keys(result || {}));
@@ -690,11 +712,7 @@ class RegionsManager {
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId || r.region_id)).map(r => [r.id || r.regionId || r.region_id, r]));
             const findGovernorateName = (rid) => { let cursor = rawById.get(rid); let steps = 0; while (cursor && steps < 10) { const lvl = Number(cursor.level); if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName; if (!cursor.parent_id) break; cursor = rawById.get(cursor.parent_id); steps++; } return undefined; };
             return list.map(r => this.transformRegionData(r, findGovernorateName));
-        } catch (e) {
-            console.error('fetchRegionsFromBackend failed:', e);
-            if (typeof showApiErrorBanner === 'function') showApiErrorBanner(e.message || 'Failed to load regions');
-            throw e;
-        }
+        } catch (e) { console.error('fetchRegionsFromBackend failed:', e); if (typeof showApiErrorBanner === 'function') showApiErrorBanner(e.message || 'Failed to load regions'); throw e; }
     }
 
     renderRegionsList() {
@@ -1507,16 +1525,6 @@ class RegionsManager {
         if (event) event.stopPropagation();
         if (!regionId) return;
         const ok = window.confirm('Delete this region? This cannot be undone.');
-        if (!ok) return;
-        try {
-            let url = `${this.apiBase}/regions/${regionId}`;
-            let resp = await fetch(url, { method: 'DELETE' });
-            if (!resp.ok) {
-                await this.maybeHandleAwsAuthError(resp, `${url} [DELETE]`);
-                const idToken = sessionStorage.getItem('idToken');
-                if (idToken) resp = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${idToken}` }});
-            }
-            if (!resp.ok) throw new Error(await resp.text());
             // Remove from memory and refresh
             this.regions = this.regions.filter(r => r.regionId !== regionId);
             this.renderRegionsList();
