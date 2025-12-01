@@ -587,64 +587,28 @@ class RegionsManager {
     async loadAllRegionsForDropdown() {
         try {
             console.log('📋 Loading all regions for dropdown...');
-            const url = `${this.apiBase}/regions?limit=1000`;
-            
-            let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
-            
+            const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
+            const url = isLambdaFunctionUrl ? this.apiBase : `${this.apiBase}/regions?limit=1000`;
+            console.log('🌐 Dropdown fetch URL:', url, 'isLambda:', isLambdaFunctionUrl);
+            let response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) {
                 await this.maybeHandleAwsAuthError?.(response, url);
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
-                if (idToken) {
-                    response = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }});
-                }
+                if (idToken) response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}` }, cache: 'no-store' });
             }
-            
             if (!response.ok) {
-                console.warn('Failed to load all regions for dropdown, using empty list');
+                console.warn('Failed to load all regions for dropdown, using empty list. URL:', url, 'status:', response.status);
                 this.allRegionsForDropdown = [];
                 return;
             }
-            
             const result = await response.json();
             const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
-            
-            if (!Array.isArray(list)) {
-                console.warn('Unexpected regions list shape for dropdown');
-                this.allRegionsForDropdown = [];
-                return;
-            }
-            
-            // Transform regions
+            if (!Array.isArray(list)) { console.warn('Unexpected regions list shape for dropdown'); this.allRegionsForDropdown = []; return; }
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId || r.region_id)).map(r => [r.id || r.regionId || r.region_id, r]));
-            const findGovernorateName = (rid) => {
-                let cursor = rawById.get(rid);
-                let steps = 0;
-                while (cursor && steps < 10) {
-                    const lvl = Number(cursor.level);
-                    if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
-                    if (!cursor.parent_id) break;
-                    cursor = rawById.get(cursor.parent_id);
-                    steps++;
-                }
-                return undefined;
-            };
-            
+            const findGovernorateName = (rid) => { let cursor = rawById.get(rid); let steps = 0; while (cursor && steps < 10) { const lvl = Number(cursor.level); if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName; if (!cursor.parent_id) break; cursor = rawById.get(cursor.parent_id); steps++; } return undefined; };
             this.allRegionsForDropdown = list.map(r => this.transformRegionData(r, findGovernorateName));
             console.log('✅ Loaded', this.allRegionsForDropdown.length, 'regions for dropdown');
-            
-            // Log level distribution
-            const byLevel = {};
-            this.allRegionsForDropdown.forEach(r => {
-                const lvl = r.level;
-                if (!byLevel[lvl]) byLevel[lvl] = 0;
-                byLevel[lvl]++;
-            });
-            console.log('📊 Dropdown regions by level:', byLevel);
-            
-        } catch (e) {
-            console.error('loadAllRegionsForDropdown failed:', e);
-            this.allRegionsForDropdown = [];
-        }
+        } catch (e) { console.error('loadAllRegionsForDropdown failed:', e); this.allRegionsForDropdown = []; }
     }
 
     async loadRegions() {
@@ -673,7 +637,6 @@ class RegionsManager {
             const tbody = document.getElementById('regionsTableBody');
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="loading-cell"><div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading regions from API...</div></td></tr>`;
 
-            const isLocal = (typeof window !== 'undefined') && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
             const params = new URLSearchParams();
             const levelEl = document.getElementById('levelFilter');
             const statusEl = document.getElementById('statusFilter');
@@ -681,32 +644,16 @@ class RegionsManager {
             if (levelEl && levelEl.value !== '') params.set('level', String(parseInt(levelEl.value, 10)));
             if (statusEl && statusEl.value !== '') params.set('is_active', statusEl.value);
             if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
+            if (this.pageMode === 'server') { params.set('pageMode', 'server'); params.set('limit', String(this.itemsPerPage)); const token = this.tokenStack[this.serverPageIndex] || null; if (token) params.set('nextToken', token); } else { params.set('limit', '1000'); params.set('offset', '0'); }
 
-            if (this.pageMode === 'server') {
-                params.set('pageMode', 'server');
-                params.set('limit', String(this.itemsPerPage));
-                const token = this.tokenStack[this.serverPageIndex] || null;
-                if (token) params.set('nextToken', token);
-            } else {
-                params.set('limit', '1000');
-                params.set('offset', '0');
-            }
-
-            // Lambda Function URL responds on root, not /regions path
             const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
-            const url = isLambdaFunctionUrl 
-                ? `${this.apiBase}${params.toString() ? `?${params.toString()}` : ''}`
-                : `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
-            console.log('🔎 Fetching regions:', { url, pageMode: this.pageMode, token: this.tokenStack[this.serverPageIndex] || null });
-            const t0 = performance.now();
-            let response = await fetch(url, { headers: { 'Content-Type': 'application/json' }});
-            console.log('⏱️ Regions initial response status:', response.status, 'time(ms):', (performance.now()-t0).toFixed(0));
-
-            // If API not available locally, fallback to static JSON
+            const url = isLambdaFunctionUrl ? this.apiBase : `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}`;
+            console.log('🌐 Regions fetch URL:', url, 'isLambda:', isLambdaFunctionUrl, 'apiBase:', this.apiBase);
+            let response = await fetch(url, { cache: 'no-store' });
             if (!response.ok) {
-                console.warn('⚠️ /api/regions failed, attempting local fallback /data/regions.json');
+                console.warn('⚠️ Regions fetch failed. URL:', url, 'status:', response.status);
                 try {
-                    const fallback = await fetch('/data/regions.json', { headers: { 'Content-Type': 'application/json' }});
+                    const fallback = await fetch('/data/regions.json', { cache: 'no-store' });
                     if (fallback.ok) {
                         const arr = await fallback.json();
                         console.log('📦 Loaded fallback regions.json items:', Array.isArray(arr) ? arr.length : 'N/A');
@@ -715,14 +662,11 @@ class RegionsManager {
                 } catch (fallbackErr) {
                     console.warn('Fallback fetch failed:', fallbackErr);
                 }
-
                 await this.maybeHandleAwsAuthError?.(response, url);
                 const idToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('idToken') : null;
                 if (idToken) {
                     console.log('🔐 Retrying regions fetch with Authorization Bearer');
-                    const t1 = performance.now();
-                    response = await fetch(url, { headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` }});
-                    console.log('⏱️ Regions auth retry status:', response.status, 'time(ms):', (performance.now()-t1).toFixed(0));
+                    response = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}` }, cache: 'no-store' });
                 }
             }
 
@@ -740,22 +684,11 @@ class RegionsManager {
             console.log('📦 Raw regions payload keys:', Object.keys(result || {}));
             const list = result?.data || result?.regions || result?.items || (Array.isArray(result) ? result : []);
             this.lastNextToken = result?.nextToken || result?.pagination?.nextToken || null;
-            console.log('📡 /regions returned items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
+            console.log('📡 Regions items:', Array.isArray(list) ? list.length : 'N/A', 'nextToken:', this.lastNextToken);
             if (!Array.isArray(list)) throw new Error('Regions payload malformed');
 
             const rawById = new Map(list.filter(r => r && (r.id || r.regionId || r.region_id)).map(r => [r.id || r.regionId || r.region_id, r]));
-            const findGovernorateName = (rid) => {
-                let cursor = rawById.get(rid);
-                let steps = 0;
-                while (cursor && steps < 10) {
-                    const lvl = Number(cursor.level);
-                    if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName;
-                    if (!cursor.parent_id) break;
-                    cursor = rawById.get(cursor.parent_id);
-                    steps++;
-                }
-                return undefined;
-            };
+            const findGovernorateName = (rid) => { let cursor = rawById.get(rid); let steps = 0; while (cursor && steps < 10) { const lvl = Number(cursor.level); if (lvl === 1) return cursor.name || cursor.name_en || cursor.name_ar || cursor.regionName; if (!cursor.parent_id) break; cursor = rawById.get(cursor.parent_id); steps++; } return undefined; };
             return list.map(r => this.transformRegionData(r, findGovernorateName));
         } catch (e) {
             console.error('fetchRegionsFromBackend failed:', e);
