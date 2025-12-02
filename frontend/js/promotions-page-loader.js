@@ -68,18 +68,33 @@
 
         try {
             // Initialize and fetch discounts
+            console.log('🔄 Creating WizzMerchantDiscountsAPI instance...');
             const api = new window.WizzMerchantDiscountsAPI();
+            
+            console.log('🔄 Initializing API...');
             await api.initialize();
+            
+            console.log('🔄 Fetching merchant discounts...');
             const result = await api.getMerchantDiscounts(50);
+            
+            console.log('📊 API result:', result);
 
-            if (!result.success || !result.discounts || result.discounts.length === 0) {
+            if (!result || !result.success) {
+                console.warn('⚠️ API returned unsuccessful result:', result);
+                showEmptyState(tbody, 'merchant-discounts');
+                updateStats('discounts', 0, 0);
+                return;
+            }
+
+            if (!result.discounts || result.discounts.length === 0) {
+                console.warn('⚠️ No discounts in result');
                 showEmptyState(tbody, 'merchant-discounts');
                 updateStats('discounts', 0, 0);
                 return;
             }
 
             const discounts = result.discounts;
-            console.log(`✅ Loaded ${discounts.length} merchant discounts`);
+            console.log(`✅ Loaded ${discounts.length} merchant discounts from ${result.source || 'API'}`);
 
             // Hide loading row
             if (loadingRow) loadingRow.style.display = 'none';
@@ -93,7 +108,8 @@
 
         } catch (error) {
             console.error('❌ Error loading merchant discounts:', error);
-            showErrorState(tbody, 'Failed to load merchant discounts');
+            console.error('Error stack:', error.stack);
+            showErrorState(tbody, 'Failed to load merchant discounts: ' + error.message);
             updateStats('discounts', 0, 0);
         }
     }
@@ -111,18 +127,33 @@
 
         try {
             // Initialize and fetch campaigns
+            console.log('🔄 Creating WizzCampaignsAPI instance...');
             const api = new window.WizzCampaignsAPI();
+            
+            console.log('🔄 Initializing campaigns API...');
             await api.initialize();
+            
+            console.log('🔄 Fetching campaigns...');
             const result = await api.getCampaigns(50);
+            
+            console.log('📊 Campaigns API result:', result);
 
-            if (!result.success || !result.campaigns || result.campaigns.length === 0) {
+            if (!result || !result.success) {
+                console.warn('⚠️ Campaigns API returned unsuccessful result:', result);
+                showEmptyState(tbody, 'campaigns');
+                updateStats('campaigns', 0, 0);
+                return;
+            }
+
+            if (!result.campaigns || result.campaigns.length === 0) {
+                console.warn('⚠️ No campaigns in result');
                 showEmptyState(tbody, 'campaigns');
                 updateStats('campaigns', 0, 0);
                 return;
             }
 
             const campaigns = result.campaigns;
-            console.log(`✅ Loaded ${campaigns.length} campaigns`);
+            console.log(`✅ Loaded ${campaigns.length} campaigns from ${result.source || 'API'}`);
 
             // Hide loading row
             if (loadingRow) loadingRow.style.display = 'none';
@@ -136,7 +167,8 @@
 
         } catch (error) {
             console.error('❌ Error loading campaigns:', error);
-            showErrorState(tbody, 'Failed to load campaigns');
+            console.error('Error stack:', error.stack);
+            showErrorState(tbody, 'Failed to load campaigns: ' + error.message);
             updateStats('campaigns', 0, 0);
         }
     }
