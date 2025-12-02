@@ -228,6 +228,6 @@ class WizzCampaignsAPI {
     }
 }
 
-// Create global instance
-window.WizzCampaignsAPI = new WizzCampaignsAPI();
-console.log('✅ WizzCampaignsAPI loaded and available globally');
+// Expose the class globally (not an instance)
+window.WizzCampaignsAPI = WizzCampaignsAPI;
+console.log('✅ WizzCampaignsAPI class loaded and available globally');
