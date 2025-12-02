@@ -372,6 +372,6 @@ class WizzMerchantDiscountsAPI {
     }
 }
 
-// Create global instance
-window.WizzMerchantDiscountsAPI = new WizzMerchantDiscountsAPI();
-console.log('✅ WizzMerchantDiscountsAPI loaded and available globally');
+// Export the class (not an instance) so it can be instantiated by the page loader
+window.WizzMerchantDiscountsAPI = WizzMerchantDiscountsAPI;
+console.log('✅ WizzMerchantDiscountsAPI class loaded and available globally');
