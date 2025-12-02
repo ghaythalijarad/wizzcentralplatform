@@ -69,31 +69,91 @@ class WizzCampaignsAPI {
         console.log('✅ WizzCampaignsAPI initialized with', this.mockCampaigns.length, 'mock campaigns');
     }
 
-    // Get all campaigns
+    // Helper: build Authorization header from Cognito if available
+    getAuthHeaders() {
+        try {
+            const idToken = window.Auth?.getIdToken?.();
+            if (idToken) return { 'Authorization': `Bearer ${idToken}` };
+        } catch (_) {}
+        try {
+            const token = localStorage.getItem('authToken');
+            if (token) return { 'Authorization': `Bearer ${token}` };
+        } catch (_) {}
+        return {};
+    }
+
+    // Helper: resolve API base URL
+    getApiBase() {
+        const cfg = window.WIZZCENTRAL_CONFIG || {};
+        return window.__API_BASE_URL__ || cfg.API_BASE_URL || window.location.origin;
+    }
+
+    async fetchJson(url) {
+        const headers = { 'Accept': 'application/json', ...this.getAuthHeaders() };
+        const res = await fetch(url, { headers, cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        return res.json();
+    }
+
+    // Get all campaigns (real API first, mock fallback)
     async getCampaigns(limit = 50) {
         await this.initialize();
 
         try {
-            console.log('📊 Fetching campaigns...');
+            console.log('📊 Fetching campaigns from API...');
 
-            // Return mock campaigns
+            const base = this.getApiBase().replace(/\/$/, '');
+            const stage = (window.WIZZCENTRAL_CONFIG && window.WIZZCENTRAL_CONFIG.STAGE) || '';
+            const candidates = [
+                `${base}/campaigns`,
+                `${base}/api/campaigns`,
+                `${base}/promotions/campaigns`,
+                stage ? `${base}/${stage}/campaigns` : null,
+                stage ? `${base}/${stage}/promotions/campaigns` : null
+            ].filter(Boolean);
+
+            for (const url of candidates) {
+                try {
+                    console.log('🔗 Trying campaigns endpoint:', url);
+                    const data = await this.fetchJson(url);
+                    const raw = Array.isArray(data) ? data
+                        : (Array.isArray(data.items) ? data.items
+                        : (Array.isArray(data.campaigns) ? data.campaigns : []));
+
+                    if (raw && raw.length) {
+                        const campaigns = raw.map(c => ({
+                            id: c.campaignId || c.id,
+                            name: c.name || c.title || 'Campaign',
+                            type: (c.type || c.campaignType || 'general').toString().toLowerCase().replace(/\s+/g, '-'),
+                            description: c.description || '',
+                            discountType: (c.discountType || c.type) === 'Fixed Amount' || (c.discountType || c.type) === 'fixed' ? 'fixed' : 'percentage',
+                            discountValue: c.discountValue ?? c.value ?? 0,
+                            status: (c.status || 'inactive').toString().toLowerCase(),
+                            targetAudience: c.targetAudience || c.target_audience || 'all_customers',
+                            minimumOrderValue: c.minimumOrderValue ?? c.minValue ?? 0,
+                            usage: c.usage ?? c.usageCount ?? 0,
+                            maxUsage: c.maxUsage ?? c.usageLimit ?? 1000,
+                            startDate: c.startDate || c.validFrom || '',
+                            endDate: c.endDate || c.validUntil || '',
+                            createdAt: c.createdAt || c.created_at || new Date().toISOString()
+                        })).slice(0, limit);
+
+                        console.log(`✅ Loaded ${campaigns.length} campaigns from API`, { url });
+                        return { success: true, campaigns, count: campaigns.length, source: `API:${url}` };
+                    }
+                } catch (err) {
+                    console.warn('⚠️ Endpoint failed, trying next:', url, '-', err.message);
+                }
+            }
+
+            // Fallback to mock if none produced data
+            console.log('📊 Using mock campaigns as fallback...');
             const campaigns = this.mockCampaigns.slice(0, limit);
-
-            return {
-                success: true,
-                campaigns: campaigns,
-                count: campaigns.length,
-                source: 'Mock-Data'
-            };
+            return { success: true, campaigns, count: campaigns.length, source: 'Mock-Data-Fallback' };
 
         } catch (error) {
             console.error('❌ Error fetching campaigns:', error);
-            return {
-                success: false,
-                message: error.message,
-                campaigns: [],
-                count: 0
-            };
+            return { success: false, message: error.message, campaigns: [], count: 0 };
         }
     }
 

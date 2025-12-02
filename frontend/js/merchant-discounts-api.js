@@ -111,6 +111,33 @@ class WizzMerchantDiscountsAPI {
         console.log('✅ WizzMerchantDiscountsAPI initialized with', this.mockDiscounts.length, 'mock discounts');
     }
 
+    // Helper: build Authorization header from Cognito if available
+    getAuthHeaders() {
+        try {
+            const idToken = window.Auth?.getIdToken?.();
+            if (idToken) return { 'Authorization': `Bearer ${idToken}` };
+        } catch (_) {}
+        try {
+            const token = localStorage.getItem('authToken');
+            if (token) return { 'Authorization': `Bearer ${token}` };
+        } catch (_) {}
+        return {};
+    }
+
+    // Helper: resolve API base URL
+    getApiBase() {
+        const cfg = window.WIZZCENTRAL_CONFIG || {};
+        return window.__API_BASE_URL__ || cfg.API_BASE_URL || window.location.origin;
+    }
+
+    // Helper: fetch JSON with auth, no-cache
+    async fetchJson(url) {
+        const headers = { 'Accept': 'application/json', ...this.getAuthHeaders() };
+        const res = await fetch(url, { headers, cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        return res.json();
+    }
+
     // Get all merchant discounts
     async getMerchantDiscounts(limit = 50) {
         await this.initialize();
@@ -118,69 +145,59 @@ class WizzMerchantDiscountsAPI {
         try {
             console.log('📊 Fetching merchant discounts from API...');
 
-            // Try to fetch from real API first
-            const API_BASE_URL = window.location.origin;
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/promotions`);
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('✅ Received promotions data:', data);
-                    
-                    // Extract promotions from the response
-                    const promotions = data.promotions || [];
-                    
-                    // Transform promotions data to match discount format
-                    const discounts = promotions
-                        .map(p => ({
+            const base = this.getApiBase().replace(/\/$/, '');
+            const stage = (window.WIZZCENTRAL_CONFIG && window.WIZZCENTRAL_CONFIG.STAGE) || '';
+            const candidates = [
+                `${base}/promotions`,
+                `${base}/api/promotions`,
+                `${base}/discounts`,
+                `${base}/api/discounts`,
+                stage ? `${base}/${stage}/promotions` : null,
+                stage ? `${base}/${stage}/discounts` : null
+            ].filter(Boolean);
+
+            for (const url of candidates) {
+                try {
+                    console.log('🔗 Trying promotions endpoint:', url);
+                    const data = await this.fetchJson(url);
+                    const raw = Array.isArray(data) ? data
+                        : (Array.isArray(data.items) ? data.items
+                        : (Array.isArray(data.discounts) ? data.discounts
+                        : (Array.isArray(data.promotions) ? data.promotions : [])));
+
+                    if (raw && raw.length) {
+                        const discounts = raw.map(p => ({
                             id: p.promotionId || p.id,
                             discountCode: p.discountCode || p.code || 'N/A',
-                            merchantId: p.merchantId || 'N/A',
-                            merchantName: p.merchantName || 'Unknown Merchant',
-                            discountType: p.type === 'Fixed Amount' ? 'fixed' : 'percentage',
-                            discountValue: p.value || p.discountValue || 0,
-                            status: (p.status || 'INACTIVE').toLowerCase(),
+                            merchantId: p.merchantId || p.merchant_id || 'N/A',
+                            merchantName: p.merchantName || p.merchant_name || 'Unknown Merchant',
+                            discountType: (p.type || p.discountType) === 'Fixed Amount' || (p.type || p.discountType) === 'fixed' ? 'fixed' : 'percentage',
+                            discountValue: p.value ?? p.discountValue ?? 0,
+                            status: (p.status || 'inactive').toString().toLowerCase(),
                             description: p.description || '',
-                            minimumOrderValue: p.minValue || p.minimumOrderValue || 0,
-                            usage: p.usageCount || 0,
-                            maxUsage: p.usageLimit || p.maxUsage || 1000,
+                            minimumOrderValue: p.minValue ?? p.minimumOrderValue ?? 0,
+                            usage: p.usageCount ?? p.usage ?? 0,
+                            maxUsage: p.usageLimit ?? p.maxUsage ?? 1000,
                             validUntil: p.validUntil || p.endDate || '',
-                            createdAt: p.createdAt || new Date().toISOString()
-                        }))
-                        .slice(0, limit);
-                    
-                    if (discounts.length > 0) {
-                        console.log(`✅ Loaded ${discounts.length} merchant discounts from API`);
-                        return {
-                            success: true,
-                            discounts: discounts,
-                            count: discounts.length,
-                            source: 'DynamoDB-API'
-                        };
+                            createdAt: p.createdAt || p.created_at || new Date().toISOString()
+                        })).slice(0, limit);
+
+                        console.log(`✅ Loaded ${discounts.length} merchant discounts from API`, { url });
+                        return { success: true, discounts, count: discounts.length, source: `API:${url}` };
                     }
+                } catch (err) {
+                    console.warn('⚠️ Endpoint failed, trying next:', url, '-', err.message);
                 }
-            } catch (apiError) {
-                console.warn('⚠️ API fetch failed, using mock data:', apiError.message);
             }
 
             // Fallback to mock discounts if API fails or returns no data
             console.log('📊 Using mock merchant discounts as fallback...');
             const discounts = this.mockDiscounts.slice(0, limit);
-
-            return {
-                success: true,
-                discounts: discounts,
-                count: discounts.length,
-                source: 'Mock-Data-Fallback'
-            };
+            return { success: true, discounts, count: discounts.length, source: 'Mock-Data-Fallback' };
 
         } catch (error) {
             console.error('❌ Error fetching merchant discounts:', error);
-            return {
-                success: false,
-                message: error.message,
-                discounts: [],
-                count: 0
-            };
+            return { success: false, message: error.message, discounts: [], count: 0 };
         }
     }
 
