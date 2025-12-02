@@ -112,6 +112,8 @@ class WizzCampaignsAPI {
                 stage ? `${base}/${stage}/promotions/campaigns` : null
             ].filter(Boolean);
 
+            const looksLikeCampaign = (o) => !!(o && (o.campaignId || o.name || o.discountType || o.status || o.discountValue !== undefined));
+
             for (const url of candidates) {
                 try {
                     console.log('🔗 Trying campaigns endpoint:', url);
@@ -120,27 +122,32 @@ class WizzCampaignsAPI {
                         : (Array.isArray(data.items) ? data.items
                         : (Array.isArray(data.campaigns) ? data.campaigns : []));
 
-                    if (raw && raw.length) {
-                        const campaigns = raw.map(c => ({
-                            id: c.campaignId || c.id,
-                            name: c.name || c.title || 'Campaign',
-                            type: (c.type || c.campaignType || 'general').toString().toLowerCase().replace(/\s+/g, '-'),
-                            description: c.description || '',
-                            discountType: (c.discountType || c.type) === 'Fixed Amount' || (c.discountType || c.type) === 'fixed' ? 'fixed' : 'percentage',
-                            discountValue: c.discountValue ?? c.value ?? 0,
-                            status: (c.status || 'inactive').toString().toLowerCase(),
-                            targetAudience: c.targetAudience || c.target_audience || 'all_customers',
-                            minimumOrderValue: c.minimumOrderValue ?? c.minValue ?? 0,
-                            usage: c.usage ?? c.usageCount ?? 0,
-                            maxUsage: c.maxUsage ?? c.usageLimit ?? 1000,
-                            startDate: c.startDate || c.validFrom || '',
-                            endDate: c.endDate || c.validUntil || '',
-                            createdAt: c.createdAt || c.created_at || new Date().toISOString()
-                        })).slice(0, limit);
-
-                        console.log(`✅ Loaded ${campaigns.length} campaigns from API`, { url });
-                        return { success: true, campaigns, count: campaigns.length, source: `API:${url}` };
+                    if (!raw || !raw.length || !raw.some(looksLikeCampaign)) {
+                        console.warn('⚠️ Response does not look like campaigns payload, skipping URL:', url);
+                        continue;
                     }
+
+                    const campaigns = raw.map(c => ({
+                        id: c.campaignId || c.id,
+                        name: c.name || c.title || 'Campaign',
+                        type: (c.campaignType || c.type || 'general').toString().toLowerCase().replace(/\s+/g, '-'),
+                        description: c.description || '',
+                        discountType: (c.discountType || '').toString().toLowerCase(),
+                        discountValue: c.discountValue ?? c.value ?? 0,
+                        status: (c.status || 'inactive').toString().toLowerCase(),
+                        targetAudience: c.targetAudience || c.target_audience || 'all',
+                        minimumOrderValue: c.minimumOrderValue ?? c.minimum_order_amount ?? 0,
+                        usage: c.usage ?? c.usageCount ?? 0,
+                        maxUsage: c.maxUsage ?? c.usageLimit ?? null,
+                        startDate: c.startDate || '',
+                        endDate: c.endDate || '',
+                        createdAt: c.createdAt || c.created_at || new Date().toISOString(),
+                        businessId: c.businessId || null,
+                        createdBy: c.createdBy || null
+                    })).slice(0, limit);
+
+                    console.log(`✅ Loaded ${campaigns.length} campaigns from API`, { url });
+                    return { success: true, campaigns, count: campaigns.length, source: `API:${url}` };
                 } catch (err) {
                     console.warn('⚠️ Endpoint failed, trying next:', url, '-', err.message);
                 }

@@ -156,6 +156,8 @@ class WizzMerchantDiscountsAPI {
                 stage ? `${base}/${stage}/discounts` : null
             ].filter(Boolean);
 
+            const looksLikeDiscount = (o) => !!(o && (o.discountId || o.title || o.type || o.status || o.value !== undefined));
+
             for (const url of candidates) {
                 try {
                     console.log('🔗 Trying promotions endpoint:', url);
@@ -165,26 +167,40 @@ class WizzMerchantDiscountsAPI {
                         : (Array.isArray(data.discounts) ? data.discounts
                         : (Array.isArray(data.promotions) ? data.promotions : [])));
 
-                    if (raw && raw.length) {
-                        const discounts = raw.map(p => ({
-                            id: p.promotionId || p.id,
-                            discountCode: p.discountCode || p.code || 'N/A',
-                            merchantId: p.merchantId || p.merchant_id || 'N/A',
-                            merchantName: p.merchantName || p.merchant_name || 'Unknown Merchant',
-                            discountType: (p.type || p.discountType) === 'Fixed Amount' || (p.type || p.discountType) === 'fixed' ? 'fixed' : 'percentage',
-                            discountValue: p.value ?? p.discountValue ?? 0,
+                    if (!raw || !raw.length || !raw.some(looksLikeDiscount)) {
+                        console.warn('⚠️ Response does not look like discounts payload, skipping URL:', url);
+                        continue;
+                    }
+
+                    const discounts = raw.map(p => {
+                        const typeRaw = (p.type || p.discountType || '').toString();
+                        const normalizedType = /fixedAmount/i.test(typeRaw) ? 'fixed'
+                            : /fixed/i.test(typeRaw) ? 'fixed'
+                            : /percentage/i.test(typeRaw) ? 'percentage'
+                            : /buyxgety/i.test(typeRaw) ? 'buyXGetY'
+                            : /freedelivery/i.test(typeRaw) ? 'freeDelivery'
+                            : (typeRaw || 'percentage').toLowerCase();
+
+                        return {
+                            id: p.discountId || p.promotionId || p.id,
+                            discountCode: p.title || p.discountCode || p.code || p.discountId || 'N/A',
+                            merchantId: p.businessId || p.merchantId || p.merchant_id || 'N/A',
+                            merchantName: p.businessName || p.merchantName || p.merchant_name || p.businessId || 'Unknown Merchant',
+                            discountType: normalizedType,
+                            discountValue: (p.value ?? p.discountValue ?? 0),
                             status: (p.status || 'inactive').toString().toLowerCase(),
                             description: p.description || '',
-                            minimumOrderValue: p.minValue ?? p.minimumOrderValue ?? 0,
-                            usage: p.usageCount ?? p.usage ?? 0,
-                            maxUsage: p.usageLimit ?? p.maxUsage ?? 1000,
-                            validUntil: p.validUntil || p.endDate || '',
-                            createdAt: p.createdAt || p.created_at || new Date().toISOString()
-                        })).slice(0, limit);
+                            minimumOrderValue: (p.minimum_order_amount ?? p.minimumOrderValue ?? 0),
+                            usage: (p.usage_count ?? p.usageCount ?? p.usage ?? 0),
+                            maxUsage: (p.usage_limit ?? p.usageLimit ?? p.maxUsage ?? null),
+                            validUntil: p.valid_to || p.endDate || '',
+                            createdAt: p.created_at || p.createdAt || new Date().toISOString(),
+                            conditionalParameters: p.conditional_parameters || p.conditionalParameters || null
+                        };
+                    }).slice(0, limit);
 
-                        console.log(`✅ Loaded ${discounts.length} merchant discounts from API`, { url });
-                        return { success: true, discounts, count: discounts.length, source: `API:${url}` };
-                    }
+                    console.log(`✅ Loaded ${discounts.length} merchant discounts from API`, { url });
+                    return { success: true, discounts, count: discounts.length, source: `API:${url}` };
                 } catch (err) {
                     console.warn('⚠️ Endpoint failed, trying next:', url, '-', err.message);
                 }
