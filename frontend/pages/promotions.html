@@ -838,22 +838,39 @@
             min-width: 120px;
         }
 
+        /* Discount Badge for Value Display */
+        .discount-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--md-sys-color-primary) 0%, var(--md-sys-color-tertiary) 100%);
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 2px 8px rgba(253, 197, 0, 0.2);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        /* Generic Badge Styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
         /* Discount Validity Cell */
         .discount-validity-cell {
             min-width: 140px;
-        }
-
-        .validity-date {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: var(--md-sys-color-error);
-        }
-
-        .validity-date i {
-            font-size: 11px;
-            color: var (--md-sys-color-error);
         }
 
         /* ===== END MERCHANT DISCOUNTS TABLE STYLES ===== */
@@ -1567,6 +1584,9 @@
     
     <!-- Merchant Discounts API -->
     <script src="../js/merchant-discounts-api.js"></script>
+
+    <!-- Promotions Page Loader - Clean Implementation -->
+    <script src="../js/promotions-page-loader.js"></script>
 
     <!-- Data service (depends on aws-utils) -->
     <script src="../data-service.js?v=10"></script>
@@ -2911,17 +2931,7 @@
                             console.log('✅ "Send to Merchants" button event listener added');
                         }
                     }
-
-        // Setup initial preview
-        updateMerchantNotificationPreview();
-    });
-
-            // Placeholder functions for edit/delete actions
-        </script>
-        <!-- Top Bar Loading Script -->
-        <script src="../assets/js/topbar-loader.js"></script>
-        
-        <!-- Top Bar Management Script -->
-        <script src="../assets/js/topbar.js"></script>
-</body>
-</html>
+                    // Setup completed
+                </script>
+            </body>
+        </html>
