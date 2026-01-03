@@ -140,15 +140,22 @@ class TopBarManager {
     }
 
     toggleSidebar() {
+        // Delegate to NavigationManager if present to avoid double toggles.
+        try {
+            if (window.navigationManager && typeof window.navigationManager.toggleSidebar === 'function') {
+                window.navigationManager.toggleSidebar();
+                return;
+            }
+        } catch (e) {
+            console.warn('TopBar toggleSidebar delegation failed:', e);
+        }
+
+        // Fallback: minimal legacy behavior
         const sidebar = document.getElementById('sidebar');
-        const mainContent = document.getElementById('mainContent');
-        
         if (sidebar) {
             sidebar.classList.toggle('active');
-            
-            // Dispatch event for other components
             const event = new CustomEvent('sidebarToggled', {
-                detail: { 
+                detail: {
                     active: sidebar.classList.contains('active'),
                     collapsed: sidebar.classList.contains('collapsed')
                 }

@@ -203,7 +203,8 @@ window.RBAC = {
 
     enforcePage() {
         console.log('🛡️ Enforcing RBAC...');
-        if (!window.Auth || !window.Auth.requireAuthentication()) return;
+        // RBAC must NOT trigger redirects; Auth is the sole redirect authority.
+        if (!window.Auth || !window.Auth.requireAuthentication({ silent: true })) return;
         const pageName = window.location.pathname.split('/').pop() || 'index.html';
         if (!this.hasPageAccess(pageName)) {
             console.warn('🚫 Access denied:', pageName);

@@ -29,6 +29,7 @@ aws lambda update-function-url-config \
   --cors '{
     "AllowOrigins": [
       "https://main.d2f5oacwil9cbi.amplifyapp.com",
+         "https://main.d638unrr17bpr.amplifyapp.com",
       "http://localhost:8080",
       "http://127.0.0.1:8080"
     ],

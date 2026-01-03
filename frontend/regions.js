@@ -587,14 +587,17 @@ class RegionsManager {
     async loadAllRegionsForDropdown() {
         try {
             console.log('📋 Loading all regions for dropdown...');
-            const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
-            const candidates = isLambdaFunctionUrl
-                ? [
-                    this.apiBase,
-                    this.apiBase.endsWith('/') ? this.apiBase : `${this.apiBase}/`,
-                    `${this.apiBase}?limit=1000`
-                  ]
-                : [ `${this.apiBase}/regions?limit=1000` ];
+                        const base = String(this.apiBase || '').replace(/\/$/, '');
+                        const isLambdaFunctionUrl = base.includes('lambda-url');
+                        // Lambda Function URLs still support routing by path; our Regions Lambda parses /regions (or /api/regions)
+                        const candidates = isLambdaFunctionUrl
+                                ? [
+                                        `${base}/regions?limit=1000`,
+                                        `${base}/api/regions?limit=1000`,
+                                        `${base}?limit=1000`,
+                                        `${base}/?limit=1000`
+                                    ]
+                                : [ `${base}/regions?limit=1000` ];
             let response, lastUrl;
             for (const url of candidates) {
                 lastUrl = url;
@@ -671,14 +674,18 @@ class RegionsManager {
             if (searchEl && searchEl.value.trim()) params.set('search', searchEl.value.trim());
             if (this.pageMode === 'server') { params.set('pageMode', 'server'); params.set('limit', String(this.itemsPerPage)); const token = this.tokenStack[this.serverPageIndex] || null; if (token) params.set('nextToken', token); } else { params.set('limit', '1000'); params.set('offset', '0'); }
 
-            const isLambdaFunctionUrl = this.apiBase.includes('lambda-url');
-            const candidates = isLambdaFunctionUrl
-                ? [
-                    this.apiBase,
-                    this.apiBase.endsWith('/') ? this.apiBase : `${this.apiBase}/`,
-                    `${this.apiBase}?${params.toString()}`
-                  ]
-                : [ `${this.apiBase}/regions${params.toString() ? `?${params.toString()}` : ''}` ];
+                        const base = String(this.apiBase || '').replace(/\/$/, '');
+                        const qs = params.toString();
+                        const isLambdaFunctionUrl = base.includes('lambda-url');
+                        // Lambda Function URL routing still includes the request path; try both /regions and /api/regions.
+                        const candidates = isLambdaFunctionUrl
+                                ? [
+                                        `${base}/regions${qs ? `?${qs}` : ''}`,
+                                        `${base}/api/regions${qs ? `?${qs}` : ''}`,
+                                        `${base}${qs ? `?${qs}` : ''}`,
+                                        `${base}/${qs ? `?${qs}` : ''}`
+                                    ]
+                                : [ `${base}/regions${qs ? `?${qs}` : ''}` ];
 
             let response, lastUrl;
             for (const url of candidates) {

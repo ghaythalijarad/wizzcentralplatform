@@ -29,9 +29,21 @@ window.AWSUtils = {
         try {
             const startTime = Date.now();
             const debugMode = sessionStorage.getItem('debugMode') === 'true';
-            const idToken = localStorage.getItem('idToken');
-            const accessToken = localStorage.getItem('accessToken');
-            const basicAuth = localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('userEmail');
+
+            const readStorageItem = (key) => {
+                try {
+                    if (window.Auth && typeof window.Auth.getToken === 'function') {
+                        return window.Auth.getToken(key);
+                    }
+                } catch (_) { }
+                try { return sessionStorage.getItem(key) || localStorage.getItem(key); } catch (e) {
+                    try { return localStorage.getItem(key); } catch (_) { return null; }
+                }
+            };
+
+            const idToken = readStorageItem('idToken');
+            const accessToken = readStorageItem('accessToken');
+            const basicAuth = readStorageItem('isAuthenticated') === 'true' && !!readStorageItem('userEmail');
             // Allow forcing unauth credentials in debug via sessionStorage or query param
             const debugForceUnauth = debugMode && (
                 sessionStorage.getItem('debugForceUnauth') === 'true' ||
@@ -102,49 +114,33 @@ window.AWSUtils = {
             // If no idToken and not in debug mode, follow original behavior
             if (!idToken) { // changed: only idToken strictly required
                 console.log('AWSUtils: missing idToken (accessToken optional)');
-                // If app believes user is authenticated (basic flags), do not redirect; let callers handle fallback
-                if (basicAuth) {
-                    console.log('AWSUtils: basic auth present without idToken; skipping redirect and returning null');
-                    return null;
-                }
-                // Avoid redirects if on login page or loop protection active
-                const onLogin = window.location.pathname.endsWith('/index.html');
-                const loopBroken = sessionStorage.getItem('redirectLoop:broken') === 'true';
-                if (!this._redirectedThisLoad && !onLogin && !loopBroken) {
-                    this._redirectedThisLoad = true;
-                    try {
-                        sessionStorage.setItem('lastRedirectFrom', window.location.pathname + window.location.search);
-                        sessionStorage.setItem('lastRedirectReason', 'aws-utils:missing-idToken');
-                        sessionStorage.setItem('lastRedirectTime', new Date().toISOString());
-                    } catch (e) { }
-                    if (window.Auth && window.Auth.redirectToLogin) {
-                        window.Auth.redirectToLogin('AWSUtils initialize: missing idToken');
-                    }
-                } else {
-                    console.log('AWSUtils: not redirecting (onLogin=' + onLogin + ', loopBroken=' + loopBroken + ')');
-                }
+                // IMPORTANT: AWSUtils must not redirect; Auth is the sole redirect authority.
                 return null;
             }
 
             // Validate idToken issuer matches expected provider (skip in debugMode)
             if (!debugMode) {
                 try {
-                    const payload = JSON.parse(atob(idToken.split('.')[1] || '')) || {};
+                    const decodeJwtPayload = (token) => {
+                        try {
+                            if (!token || typeof token !== 'string') return null;
+                            const parts = token.split('.');
+                            if (parts.length < 2) return null;
+                            let b64 = parts[1];
+                            b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+                            while (b64.length % 4) b64 += '=';
+                            return JSON.parse(atob(b64));
+                        } catch (e) {
+                            return null;
+                        }
+                    };
+
+                    const payload = decodeJwtPayload(idToken) || {};
                     const iss = payload.iss || '';
                     const expectedIssuer = `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
                     if (!iss || (iss !== expectedIssuer && !iss.endsWith(`/${userPoolId}`))) {
                         console.error('AWSUtils: idToken issuer mismatch', { iss, expectedIssuer });
-                        sessionStorage.setItem('lastRedirectReason', 'aws-utils:issuer-mismatch');
-                        sessionStorage.setItem('lastRedirectTime', new Date().toISOString());
-                        const onLogin = window.location.pathname.endsWith('/index.html');
-                        const loopBroken = sessionStorage.getItem('redirectLoop:broken') === 'true';
-                        if (!this._redirectedThisLoad && !onLogin && !loopBroken) {
-                            this._redirectedThisLoad = true;
-                            if (window.Auth) {
-                                try { Auth.clearTokens(); } catch (_) { }
-                                Auth.redirectToLogin('AWSUtils: idToken issuer mismatch');
-                            }
-                        }
+                        // IMPORTANT: do not clear tokens or redirect here; let Auth handle session policy.
                         return null;
                     }
                 } catch (e) {
@@ -183,22 +179,6 @@ window.AWSUtils = {
         } catch (error) {
             console.error('Failed to initialize AWS:', error);
             this.isInitialized = false;
-            try {
-                sessionStorage.setItem('lastRedirectFrom', window.location.pathname + window.location.search);
-                sessionStorage.setItem('lastRedirectReason', `aws-utils:error:${error?.message || 'unknown'}`);
-                sessionStorage.setItem('lastRedirectTime', new Date().toISOString());
-            } catch (e) { }
-            const onLogin = window.location.pathname.endsWith('/index.html');
-            const loopBroken = sessionStorage.getItem('redirectLoop:broken') === 'true';
-            const basicAuth = localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('userEmail');
-            if (!this._redirectedThisLoad && !onLogin && !loopBroken && !basicAuth) {
-                this._redirectedThisLoad = true;
-                if (window.Auth && window.Auth.redirectToLogin) {
-                    window.Auth.redirectToLogin('AWSUtils initialize error');
-                }
-            } else {
-                console.log('AWSUtils: not redirecting on error (onLogin=' + onLogin + ', loopBroken=' + loopBroken + ', basicAuth=' + basicAuth + ')');
-            }
             throw error;
         }
     },

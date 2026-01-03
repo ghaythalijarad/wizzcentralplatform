@@ -111,6 +111,10 @@ public
 # Serverless directories
 .serverless/
 
+# Local backend build artifacts (not source)
+backend/order-service/
+backend/wallet-service/
+
 # FuseBox cache
 .fusebox/
 

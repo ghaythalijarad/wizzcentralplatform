@@ -10,6 +10,9 @@
     }
   } catch(_){}
 
+  // If we didn't redirect, show the login page UI now.
+  try { document.body.style.visibility = 'visible'; } catch (_) {}
+
   // Simple logger
   function log(message, type = 'info') {
     console.log(`[${type.toUpperCase()}] ${message}`);
@@ -29,6 +32,7 @@
   if (!window.AmazonCognitoIdentity) {
     console.error('Cognito library not loaded - check CSP or network');
     showStatus('❌ Auth library failed to load', 'error');
+    try { document.body.style.visibility = 'visible'; } catch (_) {}
     return; // Abort further auth setup
   }
 

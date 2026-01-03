@@ -12,9 +12,10 @@ const dynamoDB = DynamoDBDocumentClient.from(ddbClient);
 
 const REGIONS_TABLE = process.env.REGIONS_TABLE || 'WizzCentral_Regions';
 
-// CORS is now handled at Lambda Function URL level (not in handler)
 // Response helper
-function response(statusCode, body, event) {
+// CORS is handled at the Lambda Function URL level (not in the handler) to
+// avoid duplicate `Access-Control-Allow-Origin` headers.
+function response(statusCode, body) {
     return {
         statusCode,
         headers: {
@@ -106,9 +107,9 @@ exports.handler = async (event, context) => {
     }));
     
     try {
-        // Handle OPTIONS preflight
+        // Handle OPTIONS preflight (CORS headers are injected by Function URL config)
         if (event.requestContext?.http?.method === 'OPTIONS' || event.httpMethod === 'OPTIONS') {
-            return response(200, { message: 'CORS OK' }, event);
+            return response(200, { ok: true });
         }
         
         const { httpMethod, pathSegments, queryParams, body } = parseRequest(event);
@@ -128,7 +129,7 @@ exports.handler = async (event, context) => {
             return await toggleRegion(pathSegments[0], event);
         }
         
-        return response(404, { error: 'NOT_FOUND', message: 'Route not found' }, event);
+        return response(404, { error: 'NOT_FOUND', message: 'Route not found' });
         
     } catch (error) {
         console.error('Handler error:', error);
