@@ -32,6 +32,25 @@ class NavigationManager {
         console.log('🔧 Current pathname:', window.location.pathname);
 
         try {
+            // Central auth gate for all pages that use the navigation shell.
+            // If a redirect-loop was previously detected, do not block rendering.
+            try {
+                let loopBroken = false;
+                try {
+                    loopBroken = (sessionStorage.getItem('redirectLoop:broken') || localStorage.getItem('redirectLoop:broken')) === 'true';
+                } catch (_) { }
+
+                if (!loopBroken && window.Auth && typeof window.Auth.requireAuthentication === 'function') {
+                    const ok = window.Auth.requireAuthentication();
+                    if (!ok) {
+                        console.warn('🧭 NavigationManager: Authentication required; aborting init');
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn('🧭 NavigationManager: Auth gate error (continuing):', e);
+            }
+
             // Load sidebar HTML first
             await this.loadSidebar();
 
@@ -247,6 +266,45 @@ class NavigationManager {
             this.menuToggle.addEventListener('click', this._boundToggleHandler);
             this.menuToggle.dataset.navToggleBound = '1';
             console.log('🔧 NavigationManager: Mobile menu toggle connected');
+        }
+
+        // Logout button in sidebar footer
+        try {
+            const logoutBtn = this.sidebar && this.sidebar.querySelector('.logout-btn');
+            if (logoutBtn && !logoutBtn.dataset.logoutBound) {
+                logoutBtn.addEventListener('click', (e) => {
+                    try {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    } catch (_) { }
+
+                    try {
+                        if (window.Auth && typeof window.Auth.logout === 'function') {
+                            window.Auth.logout();
+                            return;
+                        }
+                        if (typeof window.logout === 'function') {
+                            window.logout();
+                            return;
+                        }
+
+                        const basePrefix = this._getBasePrefix();
+                        window.location.replace(window.location.origin + basePrefix + '/index.html');
+                    } catch (err) {
+                        console.warn('Logout failed:', err);
+                        try {
+                            const basePrefix = this._getBasePrefix();
+                            window.location.replace(window.location.origin + basePrefix + '/index.html');
+                        } catch (_) {
+                            window.location.href = '/index.html';
+                        }
+                    }
+                });
+                logoutBtn.dataset.logoutBound = '1';
+                console.log('🔧 NavigationManager: Logout button connected');
+            }
+        } catch (e) {
+            console.warn('NavigationManager: Failed to bind logout button', e);
         }
 
         // Sidebar toggle button
@@ -835,48 +893,32 @@ class NavigationManager {
     }
 }
 
-// Initialize the navigation manager
-const navigationManager = new NavigationManager();
+// Initialize (or reuse) the navigation manager
+const navigationManager = (window.navigationManager && typeof window.navigationManager.init === 'function')
+    ? window.navigationManager
+    : new NavigationManager();
 
 // Export for global access
 window.NavigationManager = NavigationManager;
 window.navigationManager = navigationManager;
 
-// Global logout function for sidebar
+// Global logout fallback (auth-utils is the source of truth).
+// Keep this ONLY to support pages that load navigation.js before auth-utils.
 if (!window.logout) {
-    window.logout = function() {
-        console.log('🚪 Logout initiated from sidebar...');
-        
+    window.logout = function () {
         try {
-            // Clear all authentication data
-            sessionStorage.clear();
-            localStorage.clear();
-            
-            // Try to use Auth.logout if available
             if (window.Auth && typeof window.Auth.logout === 'function') {
-                console.log('🔐 Using Auth.logout...');
                 window.Auth.logout();
                 return;
             }
-            
-            // Fallback: Direct redirect to login
-            console.log('🔄 Fallback logout - redirecting to login...');
-            const currentPath = window.location.pathname;
-            const isInFrontendFolder = currentPath.includes('/frontend/');
-            
-            let loginUrl;
-            if (isInFrontendFolder) {
-                loginUrl = window.location.origin + '/frontend/index.html';
-            } else {
-                loginUrl = window.location.origin + '/index.html';
-            }
-            
-            window.location.href = loginUrl;
-            
+
+            // Fallback: redirect to login without clearing all storage
+            const path = window.location.pathname || '';
+            const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+            window.location.replace(window.location.origin + basePrefix + '/index.html');
         } catch (error) {
-            console.error('❌ Logout error:', error);
-            // Emergency fallback
-            window.location.href = window.location.origin + '/index.html';
+            console.error('Logout fallback error:', error);
+            window.location.href = '/index.html';
         }
     };
 }
@@ -895,14 +937,20 @@ if (!window.logout) {
                 } else if (window.Auth && typeof window.Auth.logout === 'function') {
                     window.Auth.logout();
                 } else {
-                    // Fallback: clear storage and go to login
-                    sessionStorage.clear();
-                    localStorage.clear();
-                    window.location.href = window.location.origin + '/index.html';
+                    // Fallback: go to login (do not wipe all storage)
+                    const path = window.location.pathname || '';
+                    const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+                    window.location.replace(window.location.origin + basePrefix + '/index.html');
                 }
             } catch (err) {
                 console.error('Logout handler error:', err);
-                window.location.href = window.location.origin + '/index.html';
+                try {
+                    const path = window.location.pathname || '';
+                    const basePrefix = path.startsWith('/frontend/') ? '/frontend' : '';
+                    window.location.replace(window.location.origin + basePrefix + '/index.html');
+                } catch (_) {
+                    window.location.href = '/index.html';
+                }
             }
         }
     }, true);
