@@ -1,11 +1,39 @@
 // WizzCentral Login Page Script (externalized for CSP compliance)
 (function initLoginPage(){
+  function getBasePrefix() {
+    try {
+      const path = window.location.pathname || '';
+      if (path.startsWith('/frontend/')) return '/frontend';
+      const idx = path.indexOf('/pages/');
+      if (idx > -1) return path.slice(0, idx);
+      return '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function normalizePath(path) {
+    if (!path) return null;
+    // Absolute URL stays as-is
+    if (/^https?:\/\//i.test(path)) return path;
+
+    // Ensure leading slash for pathnames
+    let p = path;
+    if (!p.startsWith('/')) p = '/' + p;
+
+    const basePrefix = getBasePrefix();
+    if (p.startsWith('/frontend/')) return p;
+    if (p.startsWith('/pages/')) return basePrefix === '/frontend' ? ('/frontend' + p) : p;
+    return basePrefix + p;
+  }
+
   try {
     // Extended auth check: look in both storages
     const isAuthed = (localStorage.getItem('isAuthenticated') === 'true') || (sessionStorage.getItem('isAuthenticated') === 'true');
     const idToken = sessionStorage.getItem('idToken') || localStorage.getItem('idToken');
     if (isAuthed && idToken) {
-      window.location.replace('/pages/dashboard.html');
+      const target = normalizePath('/pages/dashboard.html') || '/pages/dashboard.html';
+      window.location.replace(target);
       return; // Skip initialization if already logged in
     }
   } catch(_){}
@@ -94,8 +122,14 @@
             showStatus('✅ Login successful! Redirecting...', 'success');
             setTimeout(() => {
               const returnUrl = localStorage.getItem('returnUrl');
-              if (returnUrl) { localStorage.removeItem('returnUrl'); window.location.href = returnUrl; }
-              else { window.location.href = '/pages/dashboard.html'; }
+              if (returnUrl) {
+                localStorage.removeItem('returnUrl');
+                const normalized = normalizePath(returnUrl) || returnUrl;
+                window.location.href = normalized;
+              } else {
+                const target = normalizePath('/pages/dashboard.html') || '/pages/dashboard.html';
+                window.location.href = target;
+              }
             }, 1500);
           },
           onFailure: function(err) {
@@ -170,7 +204,10 @@
             } catch(e) { console.warn('SessionStorage persistence failed (password change flow):', e); }
             showStatus('✅ Password changed! Redirecting to dashboard...', 'success');
             delete window.pendingPasswordChange;
-            setTimeout(() => { window.location.href = '/pages/dashboard.html'; }, 1500);
+            setTimeout(() => {
+              const target = normalizePath('/pages/dashboard.html') || '/pages/dashboard.html';
+              window.location.href = target;
+            }, 1500);
           },
           onFailure: function(err) {
             log(`❌ Password change failed: ${err.code || err.name}`, 'error');

@@ -85,7 +85,7 @@
                 <span class="user-role">Administrator</span>
             </div>
         </div>
-        <button class="logout-btn" type="button" onclick="try{(window.Auth&&typeof window.Auth.logout==='function')?window.Auth.logout():((typeof window.logout==='function')?window.logout():null);}catch(e){console.warn('Logout failed',e);}">
+        <button class="logout-btn" type="button" onclick="try{if(window.Auth&&typeof window.Auth.logout==='function'){window.Auth.logout();return;}if(typeof window.logout==='function'){window.logout();return;}var p=(location&&location.pathname)||'';var pref=p.startsWith('/frontend/')?'/frontend':'';location.replace(location.origin+pref+'/index.html');}catch(e){console.warn('Logout failed',e);try{var p2=(location&&location.pathname)||'';var pref2=p2.startsWith('/frontend/')?'/frontend':'';location.href=pref2+'/index.html';}catch(_){location.href='/index.html';}}">
             <i class="fas fa-sign-out-alt"></i>
             <span>Logout</span>
         </button>
