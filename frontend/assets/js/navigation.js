@@ -11,6 +11,7 @@ class NavigationManager {
         this.isInitialized = false;
         this._boundToggleHandler = this.toggleSidebar.bind(this);
         this._globalListenersBound = false;
+        this._initPromise = null;
     }
 
     async init() {
@@ -18,6 +19,13 @@ class NavigationManager {
             console.log('🧭 NavigationManager: Already initialized, skipping...');
             return;
         }
+
+        if (this._initPromise) {
+            console.log('🧭 NavigationManager: Init already in progress, awaiting...');
+            return this._initPromise;
+        }
+
+        this._initPromise = (async () => {
 
         console.log('🧭 NavigationManager: Initializing...');
         console.log('🔧 Current URL:', window.location.href);
@@ -61,7 +69,13 @@ class NavigationManager {
 
         } catch (error) {
             console.error('❌ NavigationManager: Initialization failed:', error);
+        } finally {
+            this._initPromise = null;
         }
+
+        })();
+
+        return this._initPromise;
     }
 
     // Collapse any repeated /pages/ segments in the current path and redirect once
@@ -329,12 +343,28 @@ class NavigationManager {
 
         let path = url.pathname || '';
 
-        // Do not normalize explicit login/index destinations
-        if (/\/index\.html$/i.test(path) || /\/login\.html$/i.test(path)) {
-            return null;
+        // Normalize trailing slashes (e.g., /frontend/pages/merchants/ -> /frontend/pages/merchants)
+        // Keep root '/' intact.
+        if (path.length > 1) {
+            path = path.replace(/\/+$/g, '');
         }
 
         const basePrefix = this._getBasePrefix();
+
+        // If a link hard-codes /frontend/* but we're hosted at root (Amplify), strip it.
+        if (!basePrefix && path.startsWith('/frontend/')) {
+            path = path.replace(/^\/frontend/, '');
+            if (!path) path = '/';
+        }
+
+        // If we're hosted under /frontend but the link isn't prefixed, keep it unmodified here;
+        // we'll apply basePrefix on the normalized output.
+
+        // Normalize explicit index/login destinations to the correct base
+        if (path === '/' || /\/index\.html$/i.test(path) || /\/login\.html$/i.test(path)) {
+            const file = /\/login\.html$/i.test(path) ? 'login.html' : 'index.html';
+            return (basePrefix || '') + '/' + file + (url.search || '') + (url.hash || '');
+        }
 
         // Helper to ensure filename has .html
         const ensureHtml = (name) => /\.[a-z0-9]+$/i.test(name) ? name : (name + '.html');
@@ -371,7 +401,7 @@ class NavigationManager {
     rewriteNavLinks(containerEl) {
         try {
             const container = containerEl || this.sidebar || document;
-            const links = container.querySelectorAll?.('a.nav-link');
+            const links = container.querySelectorAll?.('a[href]');
             if (!links || !links.length) return;
 
             links.forEach(a => {

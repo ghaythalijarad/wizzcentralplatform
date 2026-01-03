@@ -2,6 +2,33 @@
 console.log('Loading auth-utils.js...');
 
 window.Auth = {
+    _readStorageItem(key) {
+        try {
+            return sessionStorage.getItem(key) || localStorage.getItem(key);
+        } catch (e) {
+            try { return localStorage.getItem(key); } catch (_) { return null; }
+        }
+    },
+
+    _removeStorageItem(key) {
+        try { sessionStorage.removeItem(key); } catch (_) { }
+        try { localStorage.removeItem(key); } catch (_) { }
+    },
+
+    _decodeJwtPayload(token) {
+        try {
+            if (!token || typeof token !== 'string') return null;
+            const parts = token.split('.');
+            if (parts.length < 2) return null;
+            let b64 = parts[1];
+            b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4) b64 += '=';
+            return JSON.parse(atob(b64));
+        } catch (e) {
+            return null;
+        }
+    },
+
     // Check if user is authenticated
     requireAuthentication() {
         console.log('🔐 Checking authentication...');
@@ -10,11 +37,11 @@ window.Auth = {
         console.log('🔍 Current Path:', window.location.pathname);
 
         // Get authentication data
-        const isAuthenticated = localStorage.getItem('isAuthenticated');
-        const userEmail = localStorage.getItem('userEmail');
-        const userId = localStorage.getItem('userId');
-        const idToken = localStorage.getItem('idToken');
-        const accessToken = localStorage.getItem('accessToken');
+        const isAuthenticated = this._readStorageItem('isAuthenticated');
+        const userEmail = this._readStorageItem('userEmail');
+        const userId = this._readStorageItem('userId');
+        const idToken = this._readStorageItem('idToken');
+        const accessToken = this._readStorageItem('accessToken');
 
         console.log('📊 Auth status:', {
             isAuthenticated: isAuthenticated,
@@ -42,15 +69,15 @@ window.Auth = {
         if (idToken) {
             console.log('🔑 Found idToken (accessToken optional), validating...');
             try {
-                const tokenPayload = JSON.parse(atob(idToken.split('.')[1] || '')) || {};
+                const tokenPayload = this._decodeJwtPayload(idToken) || {};
                 const currentTime = Math.floor(Date.now() / 1000);
 
                 // Check if token is expired
                 if (tokenPayload.exp && tokenPayload.exp < currentTime) {
                     console.warn('⚠️ Token expired, clearing token values only');
-                    localStorage.removeItem('idToken');
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refreshToken');
+                    this._removeStorageItem('idToken');
+                    this._removeStorageItem('accessToken');
+                    this._removeStorageItem('refreshToken');
                     this.redirectToLogin('Token expired');
                     return false;
                 }
@@ -181,44 +208,46 @@ window.Auth = {
             console.log('💾 Stored return URL:', returnUrl);
         }
 
-        // Build login URL - always use /frontend/index.html for local development
-        const loginUrl = window.location.origin + '/frontend/index.html';
+        // Build login URL based on hosting layout (root hosting vs /frontend prefix)
+        const basePrefix = (typeof this._getBasePrefix === 'function') ? this._getBasePrefix() : '';
+        const loginUrl = window.location.origin + basePrefix + '/index.html';
         console.log('🔄 Redirecting to login URL:', loginUrl);
         window.location.href = loginUrl;
     },
 
     // Store authentication tokens
     setToken(key, value) {
+        try { sessionStorage.setItem(key, value); } catch (_) { }
         localStorage.setItem(key, value);
     },
 
     // Get authentication token (defaults to idToken when no key specified)
     getToken(key = 'idToken') {
-        return localStorage.getItem(key);
+        return this._readStorageItem(key);
     },
 
     // Convenience helpers
     getIdToken() {
-        return localStorage.getItem('idToken');
+        return this._readStorageItem('idToken');
     },
 
     getAccessToken() {
-        return localStorage.getItem('accessToken');
+        return this._readStorageItem('accessToken');
     },
 
     // Extract current user info from stored session and token
     getCurrentUser() {
         try {
-            const userId = localStorage.getItem('userId');
-            const userEmail = localStorage.getItem('userEmail');
-            const idToken = localStorage.getItem('idToken');
+            const userId = this._readStorageItem('userId');
+            const userEmail = this._readStorageItem('userEmail');
+            const idToken = this._readStorageItem('idToken');
 
             let role = localStorage.getItem('role') || null;
             let username = null;
 
             if (idToken) {
                 try {
-                    const payload = JSON.parse(atob(idToken.split('.')[1]));
+                    const payload = this._decodeJwtPayload(idToken) || {};
                     username = payload['cognito:username'] || payload['username'] || username;
                     // Map cognito groups to a simple role
                     const groups = payload['cognito:groups'] || [];
@@ -251,16 +280,16 @@ window.Auth = {
         // More surgical clearing (keep returnUrl & debug flags)
         const preservedReturn = localStorage.getItem('returnUrl');
         const preservedDebug = localStorage.getItem('authDebug');
-        localStorage.removeItem('idToken');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userEmail');
-        localStorage.removeItem('userId');
-        localStorage.removeItem('isAuthenticated');
+        this._removeStorageItem('idToken');
+        this._removeStorageItem('accessToken');
+        this._removeStorageItem('refreshToken');
+        this._removeStorageItem('userEmail');
+        this._removeStorageItem('userId');
+        this._removeStorageItem('isAuthenticated');
         if (preservedReturn) localStorage.setItem('returnUrl', preservedReturn);
         if (preservedDebug) localStorage.setItem('authDebug', preservedDebug);
-        localStorage.removeItem('rememberLogin');
-        localStorage.removeItem('lastEmail');
+        this._removeStorageItem('rememberLogin');
+        this._removeStorageItem('lastEmail');
     },
 
     // Global logout function
@@ -273,11 +302,13 @@ window.Auth = {
             if (Auth.redirectToLogin) {
                 Auth.redirectToLogin('manual-logout');
             } else {
-                window.location.href = window.location.origin + '/frontend/index.html';
+                const basePrefix = (typeof Auth._getBasePrefix === 'function') ? Auth._getBasePrefix() : '';
+                window.location.href = window.location.origin + basePrefix + '/index.html';
             }
         } catch (error) {
             console.error('Logout error:', error);
-            window.location.href = window.location.origin + '/frontend/index.html';
+            const basePrefix = (typeof Auth._getBasePrefix === 'function') ? Auth._getBasePrefix() : '';
+            window.location.href = window.location.origin + basePrefix + '/index.html';
         }
     },
 
